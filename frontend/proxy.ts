@@ -8,6 +8,10 @@ export function proxy(request: NextRequest) {
   const publicPaths = [
     '/login',
     '/reset-password',
+    // Estado del servicio: tiene que poder abrirse justamente cuando la
+    // plataforma no anda. Si esta ruta pidiera sesión, el día que la API se
+    // caiga redirigiría a un login que tampoco puede funcionar.
+    '/estado',
     '/api', // API routes pueden tener su propia autenticación
   ]
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
@@ -49,8 +53,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - login (página de login)
      * - reset-password (página de reset password)
+     * - estado (página pública de estado del servicio)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|login|reset-password).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|login|reset-password|estado).*)',
   ],
 }
-
