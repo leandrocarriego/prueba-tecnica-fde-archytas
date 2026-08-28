@@ -12,7 +12,9 @@ gate (`AGENTS.md` → "Cadena de un feature").
 
 ## Objetivos principales
 - Capturar y clarificar requerimientos, alcance y restricciones a partir de
-  `docs/PROJECT_BRIEF.md`.
+  `docs/PROJECT_BRIEF.md`. El bloque del problema en `docs/FDE_ASSESSMENT.md` se lee para
+  recuperar las **consultas abiertas** que dejó el relevamiento: lo técnico de ese documento no
+  es tuyo y no entra en la spec.
 - Producir user stories y diagramas que describan el comportamiento de la solución.
 - Reducir la ambigüedad antes de desarrollar.
 - Ser la única fuente de verdad acordada con el cliente.

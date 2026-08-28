@@ -28,7 +28,11 @@ Escribir la definición funcional de una feature nueva: qué hace y para quién.
 
 ## Pasos (ORDEN OBLIGATORIO)
 1. Leer `docs/PROJECT_BRIEF.md`. Si la feature resuelve uno de los doce problemas, nombrarlo
-   (`P4`) y reusar el vocabulario del cliente, no uno nuevo.
+   (`P4`) y reusar el vocabulario del cliente, no uno nuevo. Leer también el bloque del problema
+   en `docs/FDE_ASSESSMENT.md`: ahí están las consultas abiertas que el relevamiento dejó por
+   escrito, y cada una que siga sin respuesta se arrastra a la spec como
+   `[NECESITA ACLARACIÓN: …]` en vez de resolverse suponiendo. **Nada de lo técnico de ese
+   documento entra en la spec.**
 2. Calcular el número: el siguiente al mayor **entre `docs/specs/` y `docs/specs/archive/`**. Un
    número no se reutiliza nunca.
 3. Elegir el slug: dos o tres palabras, kebab-case, **en inglés** y sin tildes

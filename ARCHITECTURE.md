@@ -37,6 +37,9 @@ El desarrollo se dirige por specs, con un gate explícito de aprobación del cli
 - Skills y procedimientos: `agents/skills/`
 - Roles y responsabilidades: `agents/roles/`
 - Brief del proyecto: `docs/PROJECT_BRIEF.md`
+- Relevamiento técnico preliminar del FDE: `docs/FDE_ASSESSMENT.md` — **no vinculante**: son
+  hipótesis previas a la primera spec, y cada una muere cuando la feature que la toca tiene su
+  `plan.md`. Si contradice al brief, gana el brief; si contradice a un `plan.md`, gana el plan.
 - Specs por feature: `docs/specs/<NNN-feature>/` (ver `docs/specs/README.md`)
 
 Al ser un proyecto único, las specs viven en **un solo árbol numerado**.
@@ -105,6 +108,7 @@ Al ser un proyecto único, las specs viven en **un solo árbol numerado**.
 │   └── skills/                 # Procedimientos paso a paso
 ├── docs/                       # Qué se construye
 │   ├── PROJECT_BRIEF.md        # Definición acordada con el cliente
+│   ├── FDE_ASSESSMENT.md       # Relevamiento preliminar del FDE (interno, no vinculante)
 │   └── specs/                  # Specs por feature (árbol único numerado)
 │       ├── <NNN-feature>/      # spec.md + plan.md + tasks.md + diagrams/
 │       └── archive/            # Features ya entregadas

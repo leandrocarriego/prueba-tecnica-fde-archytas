@@ -3,8 +3,6 @@
 ## Propósito
 Este documento captura el acuerdo inicial entre el **Forward Deployed Engineer** y el cliente sobre las necesidades y el desarrollo planificado del proyecto. Este brief sirve como base para generar la documentación de diseño de solución.
 
-No hay un analista que releve y después alguien distinto que construya: el Forward Deployed Engineer acompaña el trabajo **de punta a punta** —del pedido del cliente a la funcionalidad en producción— y por eso este brief y el código que sale de él responden a la misma persona.
-
 - **Versión**: 1.0.0 · **Fecha**: [YYYY-MM-DD]
 - **Creado por**: [Nombre del Forward Deployed Engineer]
 - **Cliente**: [Nombre del Cliente]

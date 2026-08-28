@@ -33,6 +33,11 @@ rompe el build, un documento no.
 
 6. **`docs/PROJECT_BRIEF.md`** - el alcance acordado con el cliente. Leerlo antes de definir o planificar una feature.
 
+7. **`docs/FDE_ASSESSMENT.md`** - el relevamiento técnico preliminar del FDE: hipótesis de solución
+   por problema, decisiones transversales sin cerrar y orden sugerido de construcción. **No es
+   autoridad**: es contexto útil antes de la primera spec de cada problema, y queda por debajo de
+   todo lo anterior. Cada hipótesis muere cuando la feature que la toca tiene su `plan.md`.
+
 **1 y 2 están siempre en contexto** — 1 porque este archivo la importa, 2 porque es este archivo.
 Los demás se abren cuando el trabajo lo pide: leer el documento correcto en el momento correcto es
 parte del trabajo, no un extra.

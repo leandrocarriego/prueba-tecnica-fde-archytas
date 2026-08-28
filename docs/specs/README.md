@@ -210,8 +210,10 @@ diagramas van embebidos como vectores, así que también se pueden ampliar dentr
 
 **Lo que se exporta es una lista blanca, no "todo menos lo excluido".** Sólo salen
 `PROJECT_BRIEF.md`, los `spec.md` y los diagramas `flujo-*` y `estados-*`. Quedan afuera
-`plan.md`, `tasks.md`, `research.md`, `data-model.md`, `contracts/`, `checklists/`,
-`quickstart.md` y los `sequence-*.mmd` internos: llevan stack, endpoints y rutas de archivo.
+`FDE_ASSESSMENT.md`, `plan.md`, `tasks.md`, `research.md`, `data-model.md`, `contracts/`,
+`checklists/`, `quickstart.md` y los `sequence-*.mmd` internos: llevan stack, endpoints y rutas
+de archivo. `FDE_ASSESSMENT.md` además son hipótesis sin acordar, y una hipótesis que el cliente
+lee en un PDF con su logo deja de leerse como hipótesis.
 Un artefacto nuevo queda **excluido por defecto** — para que llegue al cliente hay que agregarlo
 a mano a `CLIENT_FACING_DOCS` en `scripts/docs/export_client.py`, que es una decisión sobre qué
 se le pide leer al cliente, no una conveniencia.

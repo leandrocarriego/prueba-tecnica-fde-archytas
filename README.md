@@ -115,7 +115,8 @@ cd frontend && npm install && npm run dev
 │   ├── roles/
 │   └── skills/
 ├── docs/             qué se construye
-│   ├── PROJECT_BRIEF.md
+│   ├── PROJECT_BRIEF.md    lo acordado con el cliente (se firma)
+│   ├── FDE_ASSESSMENT.md   relevamiento técnico preliminar (interno, no vinculante)
 │   └── specs/        specs por feature + archive/ de las entregadas
 ├── scripts/          utilidades: diagramas y entregable del cliente
 ├── .claude/          puente a Claude Code: CLAUDE.md, comandos y permisos
