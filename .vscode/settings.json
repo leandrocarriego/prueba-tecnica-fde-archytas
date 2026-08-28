@@ -1,0 +1,59 @@
+{
+  // Ajustes del workspace. Existen para que las extensiones recomendadas hagan
+  // exactamente lo mismo que el pre-commit: si el editor y el hook difieren, el
+  // commit "arregla" archivos que ya estaban bien y el diff se ensucia solo.
+
+  // ── Python ─────────────────────────────────────────────────────────────
+  // El intérprete es el venv de uv, no el del sistema.
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}/backend",
+  "python.testing.pytestArgs": ["tests"],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  // Ruff lee `line-length = 100` de backend/pyproject.toml: la regla no se
+  // duplica acá (`PY-08`).
+
+  // ── Frontend ───────────────────────────────────────────────────────────
+  // ESLint 9 usa flat config y necesita que su CWD sea frontend/.
+  "eslint.workingDirectories": [{ "directory": "frontend", "changeProcessCWD": true }],
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "editor.formatOnSave": true,
+
+  // Markdown NO lleva formateador a propósito: el pre-commit corre Prettier
+  // sólo sobre `^frontend/`, así que formatear la documentación de la raíz
+  // reflowearía los diagramas ASCII y las tablas contra nada que lo verifique.
+  "[markdown]": { "editor.formatOnSave": false },
+
+  // ── Higiene de archivos (`GIT-04`, lo verifica pre-commit) ─────────────
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // ── Ruido fuera de la vista ────────────────────────────────────────────
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.mypy_cache": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/htmlcov": true
+  },
+  "search.exclude": {
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/htmlcov": true,
+    "**/coverage.xml": true,
+    "frontend/.next": true
+  }
+}

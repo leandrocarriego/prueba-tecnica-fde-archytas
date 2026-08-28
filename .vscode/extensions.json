@@ -1,0 +1,40 @@
+{
+  // Extensiones recomendadas para la Plataforma Cordillera.
+  // VS Code las ofrece solo al abrir el repositorio; no instala nada sin permiso.
+  // Cada una existe por una herramienta que el proyecto YA usa: si se saca la
+  // herramienta, se saca la extensión.
+  "recommendations": [
+    // ── Backend: Python 3.12, uv, Ruff, mypy, pytest ──────────────────────
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "ms-python.mypy-type-checker",
+    "tamasfe.even-better-toml",
+
+    // ── Frontend: Next.js 16, React 19, TypeScript, Tailwind 4 ────────────
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+
+    // ── Infraestructura: Postgres y RabbitMQ por Docker Compose ───────────
+    "ms-azuretools.vscode-docker",
+
+    // ── Documentación: los diagramas de cada spec son Mermaid ─────────────
+    // Sin la primera, el preview de Markdown muestra los diagramas como texto
+    // plano. Las otras dos son para abrir un .mmd suelto: resaltado de sintaxis
+    // y vista previa en vivo.
+    "bierner.markdown-mermaid",
+    "bpruitt-goddard.mermaid-markdown-syntax-highlighting",
+    "MermaidChart.vscode-mermaid-chart"
+  ],
+  "unwantedRecommendations": [
+    // El proyecto formatea Python con Ruff (`PY-08`). Black competiría por el
+    // mismo archivo y dejaría un diff distinto en cada máquina.
+    "ms-python.black-formatter",
+    // Lint de Python: también es Ruff, que reemplaza a flake8, isort y pylint.
+    "ms-python.flake8",
+    "ms-python.isort",
+    "ms-python.pylint"
+  ]
+}

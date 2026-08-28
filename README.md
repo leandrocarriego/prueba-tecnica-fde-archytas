@@ -125,9 +125,13 @@ cd frontend && npm install && npm run dev
 
 ## 📐 Spec-Driven Development (SDD)
 
-El proyecto usa **Spec-Driven Development** con [GitHub Spec Kit](https://github.com/github/spec-kit).
 La *spec* por feature es la fuente de verdad que dirige plan → tasks → implementación,
 manteniendo el gate de aprobación con el cliente.
+
+El flujo está **inspirado en [GitHub Spec Kit](https://github.com/github/spec-kit)** —de ahí salen
+la cadena de comandos y la idea de historias de usuario priorizadas y entregables de forma
+independiente— pero los comandos y las plantillas son **propios**: en español, con la estructura de
+carpetas de este repositorio y con los dos gates que el proyecto necesita.
 
 ```
 docs/PROJECT_BRIEF.md
@@ -144,10 +148,8 @@ docs/PROJECT_BRIEF.md
    → /ship        → PR contra main, y la spec pasa a docs/specs/archive/
 ```
 
-> Los comandos `/specify`, `/clarify`, `/plan`, `/tasks`, `/analyze`, `/implement`,
-> `/constitution` y `/checklist` son **alias** de las skills `speckit-*` de Spec Kit
-> (ambos nombres funcionan). `/approve-spec`, `/review-feature`, `/converge`, `/ship` y
-> `/diagram` son comandos propios del proyecto.
+> Los trece comandos viven en `.claude/commands/` y no dependen de ninguna herramienta externa.
+> Las plantillas de `spec.md`, `plan.md` y `tasks.md` están en `docs/specs/`.
 
 - Principios no-negociables: [CONSTITUTION.md](./CONSTITUTION.md)
 - Punto de entrada de los agentes, orden de autoridad y reglas del dominio:
@@ -235,10 +237,17 @@ const { data, error } = await apiClient.GET("/api/v1/suppliers");
 
 ## 🚢 Deploy
 
+Un solo `docker-compose.yml` con dos modos, así que no hay dos archivos que se desincronicen:
+
 ```bash
-make prod       # docker-compose.prod.yml
-make prod-down
+make dev     # Postgres + RabbitMQ; backend y frontend nativos (día a día)
+make full    # todo en contenedores: el stack de producción
+make tools   # suma Flower para mirar la cola
+make down    # baja todo, sea cual sea el modo
 ```
+
+`make full` construye las imágenes y levanta backend, Celery worker, Celery beat y frontend.
+El TLS y el ruteo los resuelve Traefik por labels (variable `DOMAIN`); no hay nginx.
 
 ## 📄 Documentación para el cliente
 
@@ -262,7 +271,8 @@ Detalle en [docs/specs/README.md](./docs/specs/README.md).
 
 ```bash
 make help          # ver todos los comandos
-make dev           # levantar la infraestructura
+make dev           # levantar la infraestructura (Postgres + RabbitMQ)
+make full          # levantar todo el stack en contenedores
 make down          # detener los servicios
 make logs          # ver logs
 make db-migrate    # aplicar migraciones

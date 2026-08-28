@@ -1,0 +1,130 @@
+# What used to depend on someone remembering to run the commands by hand.
+#
+# Pre-commit covers the fast checks (format, types, unit and architecture
+# tests). This runs what cannot run inside a commit: the full suite against a
+# real database, the coverage gate, and the check that models and tables still
+# describe the same thing.
+#
+# Without this, CONSTITUTION.md promises "a test that breaks the build" while
+# there is no build to break.
+#
+# Step names are in Spanish on purpose: they are what the team reads in the
+# Actions UI. Comments are in English, like the rest of the configuration.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  POSTGRES_USER: cordillera
+  POSTGRES_PASSWORD: cordillera
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+  SECRET_KEY: ci-secret-key
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cordillera
+          POSTGRES_PASSWORD: cordillera
+          # The suite forces POSTGRES_DB=cordillera_test and refuses to run
+          # against a database whose name does not end in `_test`.
+          POSTGRES_DB: cordillera_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cordillera"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: uv sync --locked
+
+      # DEP-02: the lockfile travels with pyproject.toml. `--locked` above
+      # already fails when they drift; this note says why that matters.
+      - name: Formato y lint (PY-08)
+        working-directory: backend
+        run: |
+          uv run ruff format --check app tests
+          uv run ruff check app tests
+
+      - name: Tipos (PY-10)
+        working-directory: backend
+        run: uv run mypy app
+
+      # Runs the whole suite: unit, integration, e2e and architecture.
+      # The coverage gate (TEST-05) lives in pyproject's addopts.
+      - name: Tests y cobertura
+        working-directory: backend
+        run: uv run pytest
+
+      # DB-01: models and tables describe the same thing. Checked after the
+      # tests, which are what apply the migrations to the database.
+      - name: Migraciones sincronizadas (DB-01)
+        working-directory: backend
+        env:
+          POSTGRES_DB: cordillera_test
+        run: uv run alembic check
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint (TS-06)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Tipos (TS-01)
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  diagrams:
+    name: Diagramas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # This is what makes "a broken diagram breaks the build" true in
+      # docs/specs/DIAGRAMS.md.
+      - name: Validar los .mmd
+        run: make diagrams-check

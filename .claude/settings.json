@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(uv *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(docker compose ps*)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose stop*)",
+      "Bash(docker compose logs*)",
+      "Bash(docker compose build*)",
+      "Bash(docker ps*)",
+      "Bash(psql *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(find *)",
+      "Bash(tree *)",
+      "Bash(which *)",
+      "Bash(pwd)",
+      "Bash(mkdir -p *)",
+      "Bash(curl -s http://localhost:*)",
+      "Bash(curl -sS http://localhost:*)",
+      "Bash(python3 *)",
+      "Bash(docker compose config*)",
+      "Read"
+    ],
+    "ask": [
+      "Bash(make clean)",
+      "Bash(docker compose down *)",
+      "Bash(docker compose down)"
+    ],
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)"
+    ]
+  }
+}

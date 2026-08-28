@@ -1,0 +1,36 @@
+# entorno
+.env
+.env.local
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# node
+node_modules/
+.next/
+out/
+.turbo/
+
+# artefactos de corrida: descargas del portal y trazas de Playwright
+downloads/
+traces/
+test-results/
+playwright-report/
+*.log
+
+# diagramas: los .mmd se versionan, las imagenes exportadas no
+
+# sistema
+.DS_Store
+
+# el enunciado de la prueba no es parte del codigo
+prueba-tecnica-fde.pdf
+
+# Entregables generados para el cliente (regenerables con `make client-docs`)
+dist/
