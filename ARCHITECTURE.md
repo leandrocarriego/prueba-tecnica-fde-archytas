@@ -284,7 +284,7 @@ propio, no cuando simplemente hay muchos archivos.
 |---|---|---|
 | `make dev` | PostgreSQL + RabbitMQ | Trabajo diario: la app va **nativa** en el host, con recarga en caliente y debugger |
 | `make full` | además backend, Celery worker, Celery beat y frontend | El stack completo en esta máquina, con los puertos publicados en loopback y sin reverse proxy |
-| `make deploy` | lo mismo, pero el frontend detrás de **Traefik** | El servidor. Corre **en** el VPS, no desde una laptop |
+| `make deploy` | trae los cambios de git y levanta lo mismo, con el frontend detrás de **Traefik** | El servidor. Corre **en** el VPS, no desde una laptop |
 | `make tools` | además Flower | Inspeccionar las tasks de extracción en vuelo |
 
 `full` y `deploy` comparten backend, worker y beat; se diferencian sólo en cómo se llega al

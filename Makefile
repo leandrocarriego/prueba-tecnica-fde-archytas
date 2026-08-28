@@ -49,14 +49,29 @@ full: ## Levantar TODO en contenedores en esta maquina, sin Traefik (profile ful
 
 # Runs ON THE SERVER, not from a laptop: it needs the shared `traefik` network
 # and a .env with DOMAIN. See README -> Deploy.
-deploy: ## Levantar el stack detras de Traefik (profile deploy) — se corre EN el VPS
+#
+# It pulls first, because what gets deployed is what is in git — leaving that as
+# a separate step someone has to remember is how a server ends up running
+# something nobody can point at.
+#
+# CAVEAT: make has already read this file by the time the pull runs, so a commit
+# that changes THIS target only takes effect on the next `make deploy`.
+deploy: ## Traer los cambios y levantar el stack detras de Traefik — se corre EN el VPS
 	@test -n "$$DOMAIN" || grep -q "^DOMAIN=" .env 2>/dev/null || \
 		{ echo "Falta DOMAIN: es el dominio que publica Traefik. Definilo en .env."; exit 1; }
 	@docker network inspect traefik >/dev/null 2>&1 || \
 		{ echo "No existe la red 'traefik'. Este target corre en el servidor, no en tu maquina."; exit 1; }
+	@# Tracked files only: the server's own .env is untracked and must not block a deploy.
+	@git diff --quiet HEAD -- . 2>/dev/null || { \
+		echo "Hay cambios sin commitear en archivos versionados:"; \
+		git status --short --untracked-files=no; \
+		echo "Un deploy despliega lo que esta en git. Descartalos o commitealos."; exit 1; }
+	@echo "Trayendo los cambios..."
+	@git pull --ff-only
 	$(COMPOSE) --profile deploy up -d --build
 	@echo ""
-	@echo "Levantado. Traefik publica el dominio de DOMAIN en cuanto emita el certificado."
+	@echo "Desplegado $$(git log --oneline -1)."
+	@echo "Traefik publica el dominio de DOMAIN en cuanto emita el certificado."
 	@echo "Recorda aplicar las migraciones:  make db-migrate"
 
 tools: ## Levantar Flower para inspeccionar las tasks de Celery (profile tools)

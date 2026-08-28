@@ -249,8 +249,17 @@ make down    # baja todo, sea cual sea el modo
 ```
 
 `make deploy` **se corre en el servidor**, no desde una laptop: necesita la red `traefik`, que es
-compartida por todos los proyectos del host, y un `.env` con `DOMAIN`. El target verifica las dos
-cosas antes de hacer nada.
+compartida por todos los proyectos del host, y un `.env` con `DOMAIN`. Verifica las dos cosas
+antes de tocar nada, **trae los cambios con `git pull --ff-only`** y recién ahí reconstruye: lo
+que se despliega es lo que está en git, y dejar eso como un paso aparte es cómo un servidor
+termina corriendo algo que nadie puede señalar. Si encuentra cambios sin commitear en el
+servidor, se detiene.
+
+Actualizar el deploy es entonces una sola línea:
+
+```bash
+ssh <servidor> 'cd /srv/projects/<org>/<proyecto> && make deploy'
+```
 
 **Sólo el frontend queda publicado.** La API no tiene router: el navegador habla con Next, y sólo
 Next habla con la API por la red interna, a través de `app/api/proxy/[...path]`, que además le
