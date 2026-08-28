@@ -278,15 +278,26 @@ propio, no cuando simplemente hay muchos archivos.
 
 ## Estrategia de deploy
 
-**Un solo `docker-compose.yml`, dos modos**, para que no haya dos archivos que se desincronicen:
+**Un solo `docker-compose.yml`, tres modos**, para que no haya dos archivos que se desincronicen:
 
 | Comando | Qué levanta | Para qué |
 |---|---|---|
 | `make dev` | PostgreSQL + RabbitMQ | Trabajo diario: la app va **nativa** en el host, con recarga en caliente y debugger |
-| `make full` | además backend, Celery worker, Celery beat y frontend | El stack de producción, todo en contenedores |
+| `make full` | además backend, Celery worker, Celery beat y frontend | El stack completo en esta máquina, con los puertos publicados en loopback y sin reverse proxy |
+| `make deploy` | lo mismo, pero el frontend detrás de **Traefik** | El servidor. Corre **en** el VPS, no desde una laptop |
 | `make tools` | además Flower | Inspeccionar las tasks de extracción en vuelo |
 
-Son **siete servicios**. El TLS y el ruteo los resuelve **Traefik** por labels; no hay nginx.
+`full` y `deploy` comparten backend, worker y beat; se diferencian sólo en cómo se llega al
+frontend —puerto publicado contra Traefik—, y por eso son dos servicios y no uno: la red
+`traefik` es externa y sólo existe en el servidor, así que `full` tiene que poder ignorarla.
+
+**Sólo el frontend se publica.** La API no tiene router propio en ningún modo: el navegador habla
+con Next, y sólo Next habla con la API por la red interna. Eso ya lo hace
+`app/api/proxy/[...path]`, que además le adosa el token de sesión — algo que un reverse proxy no
+puede hacer, porque no puede leer una cookie httpOnly. No hay nginx.
+
+El TLS lo resuelve Traefik por labels, y el certificado se emite por **desafío DNS contra
+Cloudflare**: el registro puede quedar proxeado y nada tiene que responder en el puerto 80.
 
 No existe un modo intermedio "la app en contenedores con recarga en caliente": Compose no permite
 condicionar `volumes` ni el `target` de un build con una variable, así que sostenerlo obligaba a

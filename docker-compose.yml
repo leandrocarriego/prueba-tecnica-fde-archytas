@@ -6,8 +6,13 @@
 #       and a debugger that actually attaches.
 #
 #   docker compose --profile full up -d  -> everything in containers (`make full`)
-#       The production stack: backend, workers, beat and frontend, with Traefik
-#       resolving TLS and routing through labels. There is no nginx.
+#       The whole stack on this machine, ports published on loopback. It needs
+#       no reverse proxy: it is how you check the production images locally.
+#
+#   docker compose --profile deploy up -d -> the VPS (`make deploy`)
+#       Same services, but the frontend joins the shared `traefik` network and
+#       carries the routers that publish the domain. Nothing else is reachable
+#       from outside: the browser talks to Next, and only Next talks to the API.
 #
 #   --profile tools                      -> adds Flower (queue inspection)
 #
@@ -20,6 +25,27 @@ x-backend-build: &backend-build
   build:
     context: ./backend
     dockerfile: Dockerfile
+
+# `next.config.js` publishes NEXT_PUBLIC_API_URL through `env`, and Next inlines
+# that into the bundle AT BUILD TIME. Passing it only as a runtime variable
+# leaves the built image pointing wherever it was built, so it travels as a
+# build argument as well.
+#
+# `backend` is Docker's DNS name on `cordillera_network`, and it is right in
+# both modes: every caller of this variable runs on the server side of Next
+# (the proxy route, `createServerClient`, `lib/health.ts`). Nothing in the
+# browser ever reads it — which is why the API needs no public route.
+x-frontend-build: &frontend-build
+  build:
+    context: ./frontend
+    dockerfile: Dockerfile
+    args:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+  image: cordillera-frontend:latest
+
+x-frontend-env: &frontend-env
+  NODE_ENV: production
+  NEXT_PUBLIC_API_URL: http://backend:8000
 
 x-backend-env: &backend-env
   # The `full` profile is the production stack, so production is the default.
@@ -77,6 +103,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 384m
     <<: *app-defaults
 
   rabbitmq:
@@ -95,6 +122,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    mem_limit: 384m
     <<: *app-defaults
 
   # ── Application · profile `full` ──────────────────────────────────────────
@@ -106,8 +134,8 @@ services:
   backend:
     <<: [*backend-build, *app-defaults]
     container_name: cordillera_backend
-    profiles: ["full"]
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4}
+    profiles: ["full", "deploy"]
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-2}
     environment: *backend-env
     ports:
       - "${BIND_HOST:-127.0.0.1}:8000:8000"
@@ -118,49 +146,66 @@ services:
       retries: 5
       start_period: 30s
     depends_on: *depends-on-infra
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`api.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.backend.entrypoints=websecure"
-      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+    mem_limit: 768m
+    # No Traefik router, deliberately. The API is not published: the browser
+    # talks to Next, and Next talks to the API over `cordillera_network`. That
+    # is what `app/api/proxy/[...path]` is for — it also attaches the session
+    # token, which a reverse proxy could not read out of an httpOnly cookie.
 
   celery_worker:
     <<: [*backend-build, *app-defaults]
     container_name: cordillera_celery_worker
-    profiles: ["full"]
-    command: celery -A app.worker.celery_app:celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-4}
+    profiles: ["full", "deploy"]
+    command: celery -A app.worker.celery_app:celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-1}
     environment: *backend-env
     depends_on: *depends-on-infra
+    mem_limit: 384m
 
   celery_beat:
     <<: [*backend-build, *app-defaults]
     container_name: cordillera_celery_beat
-    profiles: ["full"]
+    profiles: ["full", "deploy"]
     command: celery -A app.worker.celery_app:celery_app beat --loglevel=info
     environment: *backend-env
     depends_on: *depends-on-infra
+    mem_limit: 256m
 
+  # Two frontends, one image, never both at once. They differ in how they are
+  # reached, and in nothing else: locally through a published port, on the VPS
+  # through Traefik. Keeping them apart is what lets `full` run on a laptop
+  # where the shared `traefik` network does not exist.
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: cordillera_frontend
+    <<: [*frontend-build, *app-defaults]
     profiles: ["full"]
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      NODE_ENV: production
+    environment: *frontend-env
     ports:
       - "${BIND_HOST:-127.0.0.1}:3000:3000"
     depends_on:
       - backend
+    mem_limit: 384m
+
+  # ── The VPS · profile `deploy` ────────────────────────────────────────────
+  # The only service the outside world reaches. Traefik terminates TLS and
+  # routes by these labels; it takes the certificate through the Cloudflare DNS
+  # challenge, so the record can stay proxied and nothing has to answer on :80.
+  frontend_deploy:
+    <<: [*frontend-build, *app-defaults]
+    container_name: cordillera_frontend
+    profiles: ["deploy"]
+    environment: *frontend-env
+    depends_on:
+      - backend
+    mem_limit: 384m
+    # On two networks, so Traefik has to be told which one to dial.
+    networks: [cordillera_network, traefik]
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
-    <<: *app-defaults
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.cordillera.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.cordillera.entrypoints=websecure"
+      - "traefik.http.routers.cordillera.tls=true"
+      - "traefik.http.routers.cordillera.tls.certresolver=cloudflare"
+      - "traefik.http.services.cordillera.loadbalancer.server.port=3000"
 
   # ── Optional observability · profile `tools` ──────────────────────────────
   # Flower watches extraction tasks in flight. It is not needed day to day,
@@ -188,12 +233,9 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.flower.rule=Host(`flower.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.flower.entrypoints=websecure"
-      - "traefik.http.routers.flower.tls.certresolver=letsencrypt"
-      - "traefik.http.services.flower.loadbalancer.server.port=5555"
+    mem_limit: 256m
+    # No router either: this is the queue's console. It is reached over the SSH
+    # tunnel that already gets you to the server, not published on a domain.
 
 volumes:
   postgres_data:
@@ -202,3 +244,7 @@ volumes:
 networks:
   cordillera_network:
     driver: bridge
+  # Created once on the host, shared by every project the reverse proxy serves.
+  # Only the `deploy` profile joins it, so `full` needs nothing on a laptop.
+  traefik:
+    external: true

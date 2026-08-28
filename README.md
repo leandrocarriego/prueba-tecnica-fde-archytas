@@ -238,17 +238,24 @@ const { data, error } = await apiClient.GET("/api/v1/suppliers");
 
 ## 🚢 Deploy
 
-Un solo `docker-compose.yml` con dos modos, así que no hay dos archivos que se desincronicen:
+Un solo `docker-compose.yml` con tres modos, así que no hay dos archivos que se desincronicen:
 
 ```bash
 make dev     # Postgres + RabbitMQ; backend y frontend nativos (día a día)
-make full    # todo en contenedores: el stack de producción
+make full    # todo en contenedores en esta máquina, sin reverse proxy
+make deploy  # el servidor: lo mismo, con el frontend detrás de Traefik
 make tools   # suma Flower para mirar la cola
 make down    # baja todo, sea cual sea el modo
 ```
 
-`make full` construye las imágenes y levanta backend, Celery worker, Celery beat y frontend.
-El TLS y el ruteo los resuelve Traefik por labels (variable `DOMAIN`); no hay nginx.
+`make deploy` **se corre en el servidor**, no desde una laptop: necesita la red `traefik`, que es
+compartida por todos los proyectos del host, y un `.env` con `DOMAIN`. El target verifica las dos
+cosas antes de hacer nada.
+
+**Sólo el frontend queda publicado.** La API no tiene router: el navegador habla con Next, y sólo
+Next habla con la API por la red interna, a través de `app/api/proxy/[...path]`, que además le
+adosa el token de sesión. No hay nginx. El TLS lo resuelve Traefik por labels, con el certificado
+emitido por desafío DNS contra Cloudflare.
 
 ## 📄 Documentación para el cliente
 

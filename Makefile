@@ -12,14 +12,14 @@ unexport VIRTUAL_ENV
 # brings up the whole stack in containers. `ALL` is for down/logs/build, which
 # have to reach everything regardless of how it was started.
 COMPOSE := docker compose
-ALL := --profile full --profile tools
+ALL := --profile full --profile deploy --profile tools
 
 .PHONY: help dev full tools up down logs build clean \
         test test-unit test-integration test-cov lint format \
         playwright-install db-migrate db-revision \
         frontend-api-types backend-shell frontend-shell \
         pre-commit-install pre-commit-run \
-        diagrams diagrams-check client-docs
+        diagrams diagrams-check client-docs deploy
 
 help: ## Mostrar esta ayuda
 	@echo "Comandos disponibles:"
@@ -38,14 +38,26 @@ dev: ## Levantar solo la infraestructura (Postgres + RabbitMQ); backend y fronte
 	@echo "  Backend:  cd backend && uv run uvicorn app.main:app --reload"
 	@echo "  Frontend: cd frontend && npm run dev"
 
-full: ## Levantar TODO en contenedores: el stack de producción (profile full)
+full: ## Levantar TODO en contenedores en esta maquina, sin Traefik (profile full)
 	$(COMPOSE) --profile full up -d --build
 	@echo ""
-	@echo "Stack completo levantado:"
+	@echo "Stack completo levantado (local, sin reverse proxy):"
 	@echo "  Frontend: http://localhost:3000"
 	@echo "  Backend:  http://localhost:8000"
 	@echo ""
 	@echo "Recordá aplicar las migraciones:  make db-migrate"
+
+# Runs ON THE SERVER, not from a laptop: it needs the shared `traefik` network
+# and a .env with DOMAIN. See README -> Deploy.
+deploy: ## Levantar el stack detras de Traefik (profile deploy) — se corre EN el VPS
+	@test -n "$$DOMAIN" || grep -q "^DOMAIN=" .env 2>/dev/null || \
+		{ echo "Falta DOMAIN: es el dominio que publica Traefik. Definilo en .env."; exit 1; }
+	@docker network inspect traefik >/dev/null 2>&1 || \
+		{ echo "No existe la red 'traefik'. Este target corre en el servidor, no en tu maquina."; exit 1; }
+	$(COMPOSE) --profile deploy up -d --build
+	@echo ""
+	@echo "Levantado. Traefik publica el dominio de DOMAIN en cuanto emita el certificado."
+	@echo "Recorda aplicar las migraciones:  make db-migrate"
 
 tools: ## Levantar Flower para inspeccionar las tasks de Celery (profile tools)
 	$(COMPOSE) --profile tools up -d
@@ -121,11 +133,13 @@ db-revision: ## Crear una migración nueva (usar: make db-revision MESSAGE="desc
 frontend-api-types: ## Generar los tipos TypeScript desde el OpenAPI del backend
 	cd frontend && npm run generate-api-types:dev
 
-backend-shell: ## Abrir una shell en el contenedor del backend (requiere `make full`)
-	$(COMPOSE) --profile full exec backend /bin/bash
+backend-shell: ## Abrir una shell en el contenedor del backend (requiere `make full` o `make deploy`)
+	$(COMPOSE) $(ALL) exec backend /bin/bash
 
-frontend-shell: ## Abrir una shell en el contenedor del frontend (requiere `make full`)
-	$(COMPOSE) --profile full exec frontend /bin/sh
+# El frontend es un servicio distinto en cada modo, asi que se prueban los dos.
+frontend-shell: ## Abrir una shell en el contenedor del frontend (requiere `make full` o `make deploy`)
+	@$(COMPOSE) $(ALL) exec frontend /bin/sh 2>/dev/null || \
+		$(COMPOSE) $(ALL) exec frontend_deploy /bin/sh
 
 # ── Spec diagrams (Mermaid) ─────────────────────────────────────────────────
 # RUTA narrows the work to one feature:

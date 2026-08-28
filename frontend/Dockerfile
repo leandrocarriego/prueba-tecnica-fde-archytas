@@ -19,6 +19,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# next.config.js exposes NEXT_PUBLIC_API_URL through `env`, which Next inlines
+# into the bundle at build time — so the value has to be here, not only at run
+# time. The default keeps a plain `docker build` working for a local check.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
