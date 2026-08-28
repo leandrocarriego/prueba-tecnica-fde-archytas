@@ -79,6 +79,11 @@ jobs:
         working-directory: backend
         run: uv run pytest
 
+      # Pre-commit checks this too, but a hook is skipped by --no-verify and a
+      # command that fails to register does so in silence.
+      - name: Frontmatter de los comandos
+        run: uv run --quiet --with pyyaml python scripts/validate_command_frontmatter.py
+
       # DB-01: models and tables describe the same thing. Checked after the
       # tests, which are what apply the migrations to the database.
       - name: Migraciones sincronizadas (DB-01)

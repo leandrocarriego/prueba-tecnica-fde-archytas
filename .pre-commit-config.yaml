@@ -64,6 +64,17 @@ repos:
         files: ^backend/
         pass_filenames: false
 
+      # --- Project commands ------------------------------------------------
+      # A command whose frontmatter does not parse is not rejected: it is
+      # silently ignored, and the command stops existing. `check-yaml` above
+      # does not see this, because it only looks at .yaml/.yml files — never at
+      # the frontmatter inside a .md.
+      - id: command-frontmatter
+        name: frontmatter de los comandos del proyecto
+        entry: uv run --quiet --with pyyaml python scripts/validate_command_frontmatter.py
+        language: system
+        files: ^\.claude/commands/.*\.md$
+
       # --- Diagrams --------------------------------------------------------
       - id: diagrams
         name: mermaid (diagramas de las specs)
