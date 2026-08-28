@@ -1,0 +1,204 @@
+# Plataforma Cordillera — one Compose file, two modes.
+#
+#   docker compose up -d                 -> Postgres + RabbitMQ (or `make dev`)
+#       The day-to-day mode: database and queue in containers, backend and
+#       frontend running natively on the host. That is what gives hot reload
+#       and a debugger that actually attaches.
+#
+#   docker compose --profile full up -d  -> everything in containers (`make full`)
+#       The production stack: backend, workers, beat and frontend, with Traefik
+#       resolving TLS and routing through labels. There is no nginx.
+#
+#   --profile tools                      -> adds Flower (queue inspection)
+#
+# There is deliberately no middle mode ("the app in containers, with hot
+# reload"): Compose cannot make `volumes` or a build `target` conditional on a
+# variable, so keeping it meant duplicating every service — the same drift that
+# having two Compose files caused, moved inside one. To develop, run natively.
+
+x-backend-build: &backend-build
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+
+x-backend-env: &backend-env
+  # The `full` profile is the production stack, so production is the default.
+  # Set ENVIRONMENT=development to bring it up in development mode.
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_USER: ${POSTGRES_USER:-cordillera}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cordillera}
+  POSTGRES_DB: ${POSTGRES_DB:-cordillera}
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: 5672
+  RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
+  CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin}@rabbitmq:5672//
+  CELERY_RESULT_BACKEND: rpc://
+  # SIGProv portal (read-only). Credentials come from the environment and are
+  # never baked into an image (Artículo VII).
+  PORTAL_BASE_URL: ${PORTAL_BASE_URL:-https://prueba-tecnica-portal.vercel.app}
+  PORTAL_USER: ${PORTAL_USER:-}
+  PORTAL_PASSWORD: ${PORTAL_PASSWORD:-}
+  PORTAL_HEADLESS: ${PORTAL_HEADLESS:-true}
+  PORTAL_DOWNLOAD_TTL_SECONDS: ${PORTAL_DOWNLOAD_TTL_SECONDS:-45}
+  PORTAL_NAVIGATION_TIMEOUT_MS: ${PORTAL_NAVIGATION_TIMEOUT_MS:-15000}
+
+x-app-defaults: &app-defaults
+  restart: ${RESTART_POLICY:-unless-stopped}
+  networks: [cordillera_network]
+
+x-depends-on-infra: &depends-on-infra
+  postgres:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+
+services:
+  # ── Infrastructure · always on ────────────────────────────────────────────
+  # Ports are published on 127.0.0.1, not 0.0.0.0: locally that is all the
+  # native backend needs, and in production it stops the database from being
+  # exposed to the world by omission. BIND_HOST opens it for whoever needs it.
+  postgres:
+    image: postgres:17-alpine
+    container_name: cordillera_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cordillera}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cordillera}
+      POSTGRES_DB: ${POSTGRES_DB:-cordillera}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cordillera} -d ${POSTGRES_DB:-cordillera}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *app-defaults
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cordillera_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${RABBITMQ_PORT:-5672}:5672"
+      - "${BIND_HOST:-127.0.0.1}:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *app-defaults
+
+  # ── Application · profile `full` ──────────────────────────────────────────
+  # PENDING (Playwright): backend/Dockerfile starts from python:3.14-slim and
+  # does not install the browsers. Extraction runs in celery_worker, so the
+  # image MUST carry chromium and its system libraries before the first deploy:
+  # `playwright install --with-deps chromium` in the Dockerfile. Until then,
+  # extraction runs from the host (`make playwright-install`).
+  backend:
+    <<: [*backend-build, *app-defaults]
+    container_name: cordillera_backend
+    profiles: ["full"]
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4}
+    environment: *backend-env
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on: *depends-on-infra
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+
+  celery_worker:
+    <<: [*backend-build, *app-defaults]
+    container_name: cordillera_celery_worker
+    profiles: ["full"]
+    command: celery -A app.worker.celery_app:celery_app worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-4}
+    environment: *backend-env
+    depends_on: *depends-on-infra
+
+  celery_beat:
+    <<: [*backend-build, *app-defaults]
+    container_name: cordillera_celery_beat
+    profiles: ["full"]
+    command: celery -A app.worker.celery_app:celery_app beat --loglevel=info
+    environment: *backend-env
+    depends_on: *depends-on-infra
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cordillera_frontend
+    profiles: ["full"]
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NODE_ENV: production
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:3000:3000"
+    depends_on:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    <<: *app-defaults
+
+  # ── Optional observability · profile `tools` ──────────────────────────────
+  # Flower watches extraction tasks in flight. It is not needed day to day,
+  # which is why it stays out of the default start-up.
+  celery_flower:
+    <<: [*backend-build, *app-defaults]
+    container_name: cordillera_celery_flower
+    profiles: ["tools"]
+    command: celery -A app.worker.celery_app:celery_app flower --port=5555
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:5555:5555"
+    environment:
+      # The minimum app.config.Settings demands, without the portal
+      # credentials: Flower only looks at the queue.
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-cordillera}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cordillera}
+      POSTGRES_DB: ${POSTGRES_DB:-cordillera}
+      CELERY_BROKER_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-admin}@rabbitmq:5672//
+      CELERY_RESULT_BACKEND: rpc://
+      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flower.rule=Host(`flower.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.flower.entrypoints=websecure"
+      - "traefik.http.routers.flower.tls.certresolver=letsencrypt"
+      - "traefik.http.services.flower.loadbalancer.server.port=5555"
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+networks:
+  cordillera_network:
+    driver: bridge

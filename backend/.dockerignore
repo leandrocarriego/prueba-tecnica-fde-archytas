@@ -1,3 +1,6 @@
+# uv.lock is deliberately NOT here: the image is built from the locked
+# resolution (`uv sync --locked`), which is what makes the build reproducible
+# (Artículo IX). Excluding it silently turned every build into a fresh resolve.
 __pycache__
 *.pyc
 *.pyo
@@ -8,13 +11,15 @@ venv/
 .venv
 *.egg-info
 .pytest_cache
-.coverage
-htmlcov/
-.env
-.env.local
-*.log
-.uv
-uv.lock
-.pytest_cache
 .mypy_cache
 .ruff_cache
+.coverage
+coverage.xml
+htmlcov/
+.uv
+# Portal credentials never enter an image (Artículo VII).
+.env
+.env.*
+*.log
+downloads/
+traces/

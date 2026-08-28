@@ -24,13 +24,12 @@ test-results/
 playwright-report/
 *.log
 
-# diagramas: los .mmd se versionan, las imagenes exportadas no
-
 # sistema
 .DS_Store
 
 # el enunciado de la prueba no es parte del codigo
 prueba-tecnica-fde.pdf
 
-# Entregables generados para el cliente (regenerables con `make client-docs`)
+# Todo lo generado y regenerable: entregables del cliente (`make client-docs`) e
+# imagenes de los diagramas (`make diagrams`). Los .mmd si se versionan.
 dist/

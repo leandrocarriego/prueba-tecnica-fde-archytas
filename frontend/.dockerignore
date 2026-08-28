@@ -3,7 +3,11 @@ node_modules
 .git
 .gitignore
 *.md
-.env*.local
+# Nothing from a local environment enters an image (Artículo VII).
+.env
+.env.*
 .DS_Store
 *.log
-
+*.tsbuildinfo
+test-results/
+playwright-report/

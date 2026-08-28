@@ -1,0 +1,109 @@
+# Quality gates that run before a commit lands.
+#   install:  make pre-commit-install
+#   run:      make pre-commit-run
+#
+# The backend uses Ruff as formatter and linter (it replaces Black + isort).
+# The frontend delegates to its own tooling through local hooks, so a commit is
+# checked with exactly the same configuration a developer runs by hand.
+#
+# Hook names are in Spanish on purpose: they are what the terminal prints to the
+# team. Comments are in English, like the rest of the configuration.
+
+default_language_version:
+  python: python3
+
+repos:
+  # --- File hygiene --------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      # Portal credentials live only in the environment (Artículo VII). This is
+      # what enforces it.
+      - id: detect-private-key
+
+  # --- Backend -------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
+    hooks:
+      - id: ruff-format
+        files: ^backend/
+      - id: ruff
+        args: ["--fix"]
+        files: ^backend/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (backend)
+        entry: bash -c 'cd backend && uv run mypy app'
+        language: system
+        types: [python]
+        files: ^backend/
+        pass_filenames: false
+
+      # Unit + architecture tests, without the coverage gate:
+      # `--cov-fail-under=80` lives in pyproject's addopts and measures the whole
+      # suite, so applying it to a subset failed every commit (unit tests alone
+      # reach ~70%). Coverage is verified against the full suite, in CI.
+      # The architecture tests are here on purpose: the module boundaries and
+      # route authorization are the rules the constitution calls automatic, and
+      # a rule nothing runs is not automatic.
+      - id: pytest-fast
+        name: pytest (unitarios + arquitectura)
+        entry: bash -c 'cd backend && uv run pytest tests/unit tests/architecture -q --no-cov'
+        language: system
+        types: [python]
+        files: ^backend/
+        pass_filenames: false
+
+      # --- Diagrams --------------------------------------------------------
+      - id: diagrams
+        name: mermaid (diagramas de las specs)
+        entry: make diagrams-check
+        language: system
+        files: \.mmd$
+        pass_filenames: false
+
+      # --- Frontend --------------------------------------------------------
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && npx prettier --write "$@"' --
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md)$
+
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: tsc
+        name: typescript (frontend)
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: npm-audit-gate
+        name: auditoría de dependencias del frontend
+        entry: scripts/npm-audit-gate.sh
+        language: system
+        files: ^frontend/(package\.json|package-lock\.json)$
+        pass_filenames: false
+
+  # --- Commit messages -----------------------------------------------------
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]

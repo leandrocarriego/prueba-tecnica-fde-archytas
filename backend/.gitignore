@@ -23,9 +23,9 @@ wheels/
 .installed.cfg
 *.egg
 
-# uv
+# uv — uv.lock IS versioned (DEP-02, Articulo IX): CI runs `uv sync --locked`
+# and the image is built from it, so a clone without the lock cannot be built.
 .uv/
-uv.lock
 
 # Testing
 .pytest_cache/

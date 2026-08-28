@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# node 24 (alpine) — aligns with CI (.github diagrams job) and the devcontainer,
-# and pulls fewer base-image CVEs than the older node:20-alpine.
+# node 24 (alpine) — the same major CI runs (.github/workflows/ci.yml), and it
+# pulls fewer base-image CVEs than the older node:20-alpine.
 FROM node:24-alpine AS base
 
 # Install dependencies only when needed
@@ -20,13 +20,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build Next.js
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# Production image, copy all the files and run next
+# Production image
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -39,8 +41,8 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
 CMD ["node", "server.js"]
 

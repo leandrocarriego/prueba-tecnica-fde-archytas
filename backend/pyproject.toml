@@ -60,6 +60,10 @@ dev = [
     "mypy==2.1.0",
     "ruff==0.15.17",
     "pre-commit==4.6.0",
+    # Renders the client-facing Markdown in scripts/docs/export_client.py. It
+    # arrived transitively through `rich`; declared here because the script
+    # imports it directly, and a transitive dependency is not a promise (DEP-01).
+    "markdown-it-py==4.2.0",
 ]
 
 [build-system]
