@@ -1,7 +1,7 @@
 # Buenas prácticas del frontend — Plataforma Cordillera
 
-Guía práctica para escribir el frontend de la plataforma. El *dónde vive cada cosa* está en
-[`ARCHITECTURE.md`](./ARCHITECTURE.md); acá está el *cómo se escribe*.
+Guía práctica para escribir el frontend de la plataforma. El _dónde vive cada cosa_ está en
+[`ARCHITECTURE.md`](./ARCHITECTURE.md); acá está el _cómo se escribe_.
 
 Los ejemplos usan el dominio real del producto: corridas de extracción (`operations`), cola de
 excepciones (`triage`), proveedores (`suppliers`). El código va en **inglés**; los textos que ve
@@ -25,16 +25,16 @@ el usuario, en **español**.
 
 ### Dónde va cada cosa
 
-| Qué | Dónde |
-|---|---|
-| Página de un módulo | `app/(private)/<modulo>/page.tsx` |
-| Componentes de un módulo | `components/<modulo>/` |
-| Primitivas de UI (shadcn/ui) | `components/ui/` |
-| Componentes genéricos sin dominio | `components/common/` |
-| Tipos, hooks y acceso a datos de un módulo | `lib/<modulo>/` |
-| Hooks transversales | `lib/hooks/` |
-| Mutaciones (Server Actions) | `app/actions/<modulo>.ts` |
-| Sesión y proxy hacia el backend | `app/api/` |
+| Qué                                        | Dónde                             |
+| ------------------------------------------ | --------------------------------- |
+| Página de un módulo                        | `app/(private)/<modulo>/page.tsx` |
+| Componentes de un módulo                   | `components/<modulo>/`            |
+| Primitivas de UI (shadcn/ui)               | `components/ui/`                  |
+| Componentes genéricos sin dominio          | `components/common/`              |
+| Tipos, hooks y acceso a datos de un módulo | `lib/<modulo>/`                   |
+| Hooks transversales                        | `lib/hooks/`                      |
+| Mutaciones (Server Actions)                | `app/actions/<modulo>.ts`         |
+| Sesión y proxy hacia el backend            | `app/api/`                        |
 
 Los módulos del frontend siguen a los del backend: `auth`, `operations`, `triage`, `suppliers`,
 `catalog`, `purchasing`, `billing`, `sales`. **No hay división `core/` vs `custom/`** en ningún

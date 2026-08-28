@@ -1,6 +1,6 @@
 /**
  * Branding configuration for authentication pages.
- * 
+ *
  * This configuration allows customization of:
  * - Colors and theme
  * - Logo and branding elements
@@ -9,7 +9,7 @@
  * - Background images
  */
 
-export type AuthLayout = "centered" | "split-screen" | "full-width"
+export type AuthLayout = 'centered' | 'split-screen' | 'full-width'
 
 export interface BrandingColors {
   primary: string
@@ -29,7 +29,7 @@ export interface BrandingLogo {
   alt?: string
   component?: React.ComponentType<{ className?: string }>
   text?: string
-  size?: "sm" | "md" | "lg"
+  size?: 'sm' | 'md' | 'lg'
 }
 
 export interface BrandingTexts {
@@ -51,10 +51,10 @@ export interface BrandingTexts {
 
 export interface BrandingFormOptions {
   showRememberMe?: boolean // Show "Remember me" checkbox
-  textAlignment?: "left" | "center" // Text alignment for titles and descriptions
+  textAlignment?: 'left' | 'center' // Text alignment for titles and descriptions
   cardStyle?: {
-    rounded?: "sm" | "md" | "lg" | "xl" | "2xl"
-    shadow?: "sm" | "md" | "lg" | "xl" | "2xl" | "none"
+    rounded?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+    shadow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'none'
   }
 }
 
@@ -84,44 +84,44 @@ export interface AuthBrandingConfig {
  */
 export const brandingConfig: AuthBrandingConfig = {
   colors: {
-    primary: "#2563eb", // blue-600
-    primaryHover: "#1d4ed8", // blue-700
-    background: "#f9fafb", // gray-50
-    cardBackground: "#ffffff", // white
-    text: "#111827", // gray-900
-    textSecondary: "#6b7280", // gray-500
-    border: "#e5e7eb", // gray-200
-    error: "#dc2626", // red-600
-    success: "#16a34a", // green-600
+    primary: '#2563eb', // blue-600
+    primaryHover: '#1d4ed8', // blue-700
+    background: '#f9fafb', // gray-50
+    cardBackground: '#ffffff', // white
+    text: '#111827', // gray-900
+    textSecondary: '#6b7280', // gray-500
+    border: '#e5e7eb', // gray-200
+    error: '#dc2626', // red-600
+    success: '#16a34a', // green-600
   },
   logo: {
-    text: "Cordillera",
-    size: "md",
+    text: 'Cordillera',
+    size: 'md',
   },
   texts: {
-    loginTitle: "Iniciar Sesión",
-    loginSubtitle: "Ingresa tus credenciales para acceder a la plataforma",
-    loginButton: "Iniciar Sesión",
-    resetPasswordTitle: "Restablecer Contraseña",
-    resetPasswordSubtitle: "Ingresa tu email para recibir un enlace de restablecimiento",
-    resetPasswordButton: "Enviar Enlace",
-    forgotPasswordLink: "¿Olvidaste tu contraseña?",
-    backToLogin: "Volver al Login",
-    emailLabel: "Email",
-    passwordLabel: "Contraseña",
-    confirmPasswordLabel: "Confirmar Contraseña",
-    emailPlaceholder: "tu@email.com",
-    passwordPlaceholder: "••••••••",
+    loginTitle: 'Iniciar Sesión',
+    loginSubtitle: 'Ingresa tus credenciales para acceder a la plataforma',
+    loginButton: 'Iniciar Sesión',
+    resetPasswordTitle: 'Restablecer Contraseña',
+    resetPasswordSubtitle: 'Ingresa tu email para recibir un enlace de restablecimiento',
+    resetPasswordButton: 'Enviar Enlace',
+    forgotPasswordLink: '¿Olvidaste tu contraseña?',
+    backToLogin: 'Volver al Login',
+    emailLabel: 'Email',
+    passwordLabel: 'Contraseña',
+    confirmPasswordLabel: 'Confirmar Contraseña',
+    emailPlaceholder: 'tu@email.com',
+    passwordPlaceholder: '••••••••',
   },
   layout: {
-    type: "centered",
+    type: 'centered',
   },
   formOptions: {
     showRememberMe: false,
-    textAlignment: "center",
+    textAlignment: 'center',
     cardStyle: {
-      rounded: "md",
-      shadow: "sm",
+      rounded: 'md',
+      shadow: 'sm',
     },
   },
 }

@@ -8,3 +8,8 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
+# Generado por `npm run generate-api-types` desde el OpenAPI del backend, y el
+# propio archivo pide no editarlo a mano. Formatearlo es una edicion a mano que
+# la proxima regeneracion deshace, y `format:check` volveria a fallar sin que
+# nadie haya tocado nada.
+lib/api/types.ts

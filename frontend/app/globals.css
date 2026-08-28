@@ -8,7 +8,7 @@
  * `text-muted-foreground`, …); `:root` y `.dark` les dan valor. Para cambiar la
  * paleta se tocan los valores, nunca las clases repartidas por la app.
  */
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
 

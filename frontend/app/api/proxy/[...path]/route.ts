@@ -1,8 +1,8 @@
-import { cookies } from "next/headers"
-import { NextRequest, NextResponse } from "next/server"
+import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-const API_PREFIX = "api/v1"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_PREFIX = 'api/v1'
 
 type RouteParams = { params: Promise<{ path: string[] }> }
 
@@ -17,27 +17,27 @@ type RouteParams = { params: Promise<{ path: string[] }> }
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { path } = await params
-  return handleRequest(request, path, "GET")
+  return handleRequest(request, path, 'GET')
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { path } = await params
-  return handleRequest(request, path, "POST")
+  return handleRequest(request, path, 'POST')
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   const { path } = await params
-  return handleRequest(request, path, "PUT")
+  return handleRequest(request, path, 'PUT')
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { path } = await params
-  return handleRequest(request, path, "DELETE")
+  return handleRequest(request, path, 'DELETE')
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { path } = await params
-  return handleRequest(request, path, "PATCH")
+  return handleRequest(request, path, 'PATCH')
 }
 
 /** Build the error envelope the backend uses, so callers only parse one shape. */
@@ -45,21 +45,17 @@ function errorResponse(type: string, message: string, status: number) {
   return NextResponse.json({ error: { type, message, details: {} } }, { status })
 }
 
-async function handleRequest(
-  request: NextRequest,
-  pathArray: string[],
-  method: string
-) {
+async function handleRequest(request: NextRequest, pathArray: string[], method: string) {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get("access_token")?.value
+    const token = cookieStore.get('access_token')?.value
 
     if (!token) {
-      return errorResponse("Unauthorized", "No autenticado", 401)
+      return errorResponse('Unauthorized', 'No autenticado', 401)
     }
 
     // Callers may or may not include the API prefix; accept both.
-    let path = pathArray.join("/")
+    let path = pathArray.join('/')
     if (!path.startsWith(API_PREFIX)) {
       path = `${API_PREFIX}/${path}`
     }
@@ -69,10 +65,10 @@ async function handleRequest(
     const headers: HeadersInit = { Authorization: `Bearer ${token}` }
 
     let body: string | undefined
-    if (["POST", "PUT", "PATCH"].includes(method)) {
+    if (['POST', 'PUT', 'PATCH'].includes(method)) {
       try {
         body = JSON.stringify(await request.json())
-        headers["Content-Type"] = "application/json"
+        headers['Content-Type'] = 'application/json'
       } catch {
         // No body sent: leave it undefined and do not claim a JSON content type.
       }
@@ -91,12 +87,12 @@ async function handleRequest(
       return new NextResponse(null, { status: 204 })
     }
 
-    const contentType = response.headers.get("content-type") ?? ""
-    if (!contentType.includes("application/json")) {
+    const contentType = response.headers.get('content-type') ?? ''
+    if (!contentType.includes('application/json')) {
       const text = await response.text()
       return new NextResponse(text, {
         status: response.status,
-        headers: contentType ? { "Content-Type": contentType } : undefined,
+        headers: contentType ? { 'Content-Type': contentType } : undefined,
       })
     }
 
@@ -104,7 +100,7 @@ async function handleRequest(
   } catch (error) {
     // The backend is unreachable or answered something unparseable: that is a
     // gateway problem, not an application error.
-    console.error("Proxy error:", error)
-    return errorResponse("BadGateway", "No se pudo contactar al servidor", 502)
+    console.error('Proxy error:', error)
+    return errorResponse('BadGateway', 'No se pudo contactar al servidor', 502)
   }
 }

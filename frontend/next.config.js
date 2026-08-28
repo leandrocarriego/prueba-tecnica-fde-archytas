@@ -17,11 +17,7 @@ const nextConfig = {
   // Permitir Server Actions cuando se usa un túnel de desarrollo
   experimental: {
     serverActions: {
-      allowedOrigins: [
-        'localhost:3000',
-        '*.devtunnels.ms',
-        '*.brs.devtunnels.ms',
-      ],
+      allowedOrigins: ['localhost:3000', '*.devtunnels.ms', '*.brs.devtunnels.ms'],
     },
   },
 }
