@@ -1,0 +1,186 @@
+[project]
+name = "cordillera"
+version = "1.0.0"
+description = "Plataforma Cordillera backend: modular-monolith FastAPI API for Ferreteria Industrial Cordillera"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Plataforma Cordillera" },
+]
+keywords = ["fastapi", "sqlalchemy", "celery", "playwright", "cordillera"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+dependencies = [
+    # --- HTTP layer ---
+    "fastapi==0.137.0",
+    "uvicorn[standard]==0.49.0",
+    "python-multipart==0.0.32",
+    # --- Persistence (async SQLAlchemy 2.0 over asyncpg) ---
+    "sqlalchemy[asyncio]==2.0.50",
+    "asyncpg==0.31.0",
+    # SQLAlchemy's async layer runs the sync ORM inside greenlets; declared
+    # explicitly so the requirement is visible and not only an extra's side effect.
+    "greenlet==3.5.5",
+    "alembic==1.18.4",
+    # --- Validation and settings ---
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.1",
+    "email-validator==2.3.0",
+    # --- Security ---
+    "python-jose[cryptography]==3.5.0",
+    "bcrypt==5.0.0",
+    # --- Background work (Celery over RabbitMQ) ---
+    "celery==5.6.3",
+    "kombu==5.6.2",
+    "flower==2.0.1",
+    # --- SIGProv extraction (browser automation, read-only source system) ---
+    "playwright==1.62.0",
+    # --- Entity resolution (supplier aliases, fuzzy matching) ---
+    "rapidfuzz==3.14.5",
+    # --- Utilities ---
+    "httpx==0.28.1",
+    "python-dotenv==1.2.2",
+    "rich==15.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.0",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "pytest-mock==3.15.1",
+    "mypy==2.1.0",
+    "ruff==0.15.17",
+    "pre-commit==4.6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# --- Ruff: single formatter + linter (replaces black and isort) ---
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    ".venv",
+    "venv",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501", # line length is enforced by the formatter
+    "B008", # function calls in argument defaults: FastAPI's Depends()/Query()
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+# The repository has an `alembic/` directory, which would otherwise make Ruff
+# classify the installed `alembic` package as first-party.
+known-third-party = ["alembic"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"] # re-exports
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# --- Tests ---
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
+]
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (may use database, external services)",
+    "e2e: End-to-end tests (require all services)",
+    "performance: Performance tests",
+    "slow: Slow tests (may take more than 1 second)",
+    "external: Tests that require external services",
+    "database: Tests that require a database",
+    "portal: Tests that exercise the SIGProv extraction layer against fixtures",
+]
+filterwarnings = [
+    # Dependency warning (Starlette/httpx inside TestClient), outside our control.
+    "ignore:Using `httpx`",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/alembic/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+# --- Typing ---
+
+[tool.mypy]
+files = ["app"]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "celery.*",
+    "jose.*",
+]
+ignore_missing_imports = true
