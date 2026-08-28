@@ -1,5 +1,5 @@
 ---
-description: Traduce una spec firmada a un plan técnico, con Constitution Check (argumento: 001-portal-extraction)
+description: "Traduce una spec firmada a un plan técnico, con Constitution Check (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Backend-Architect · Frontend-Architect** (`agents/roles/`) y ejecutá el procedimiento de

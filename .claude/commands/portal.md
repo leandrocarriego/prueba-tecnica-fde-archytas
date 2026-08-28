@@ -1,5 +1,5 @@
 ---
-description: Verifica contra el portal real la estructura de una sección (argumento: /precios, /ventas, …)
+description: "Verifica contra el portal real la estructura de una sección (argumento: /precios, /ventas, …)"
 ---
 
 Asumí el rol **Developer** (`agents/roles/`) y ejecutá el procedimiento de

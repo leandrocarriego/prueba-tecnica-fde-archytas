@@ -1,5 +1,5 @@
 ---
-description: Verifica que el código implementado de una feature sea lo que el cliente firmó (argumento: 001-portal-extraction)
+description: "Verifica que el código implementado de una feature sea lo que el cliente firmó (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Lead** (`agents/roles/`) y ejecutá el procedimiento de

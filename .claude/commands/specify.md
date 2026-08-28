@@ -1,5 +1,5 @@
 ---
-description: Crea la spec funcional de una feature nueva (argumento: qué tiene que hacer)
+description: "Crea la spec funcional de una feature nueva (argumento: qué tiene que hacer)"
 ---
 
 Asumí el rol **Solution-Designer** (`agents/roles/`) y ejecutá el procedimiento de

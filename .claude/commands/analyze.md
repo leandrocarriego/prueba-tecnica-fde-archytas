@@ -1,5 +1,5 @@
 ---
-description: Verifica la consistencia entre spec, plan y tasks antes de implementar (argumento: 001-portal-extraction)
+description: "Verifica la consistencia entre spec, plan y tasks antes de implementar (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Lead** (`agents/roles/`) y ejecutá el procedimiento de

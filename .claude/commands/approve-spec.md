@@ -1,5 +1,5 @@
 ---
-description: Registra la firma del cliente sobre una spec y habilita la planificación (argumento: 001-portal-extraction)
+description: "Registra la firma del cliente sobre una spec y habilita la planificación (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Solution-Designer** (`agents/roles/`) y ejecutá el procedimiento de

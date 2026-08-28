@@ -1,5 +1,5 @@
 ---
-description: Resuelve las ambigüedades de una spec antes de que el cliente la firme (argumento: 001-portal-extraction)
+description: "Resuelve las ambigüedades de una spec antes de que el cliente la firme (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Solution-Designer** (`agents/roles/`) y ejecutá el procedimiento de

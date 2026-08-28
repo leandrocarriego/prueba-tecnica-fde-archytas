@@ -1,5 +1,5 @@
 ---
-description: Genera o actualiza los diagramas Mermaid de una feature (argumento: 001-portal-extraction)
+description: "Genera o actualiza los diagramas Mermaid de una feature (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Solution-Designer** (`agents/roles/`) y ejecutá el procedimiento de

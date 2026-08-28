@@ -1,5 +1,5 @@
 ---
-description: Ejecuta las tareas de una feature, cada una por su skill (argumento: 001-portal-extraction)
+description: "Ejecuta las tareas de una feature, cada una por su skill (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Developer** (`agents/roles/`) y ejecutá el procedimiento de

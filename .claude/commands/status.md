@@ -1,5 +1,5 @@
 ---
-description: Radiografía del proyecto — servicios, base, migraciones y qué falta construir
+description: "Radiografía del proyecto — servicios, base, migraciones y qué falta construir"
 ---
 
 Asumí el rol **Lead** (`agents/roles/`) y ejecutá el procedimiento de

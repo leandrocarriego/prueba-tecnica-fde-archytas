@@ -1,5 +1,5 @@
 ---
-description: Commit + push + PR contra main de una feature ya testeada y revisada
+description: "Commit + push + PR contra main de una feature ya testeada y revisada"
 ---
 
 Asumí el rol **Release-Manager** (`agents/roles/`) y ejecutá el procedimiento de

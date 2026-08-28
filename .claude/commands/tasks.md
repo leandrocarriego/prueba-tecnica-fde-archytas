@@ -1,5 +1,5 @@
 ---
-description: Desglosa un plan en tareas ejecutables, cada una mapeada a una skill (argumento: 001-portal-extraction)
+description: "Desglosa un plan en tareas ejecutables, cada una mapeada a una skill (argumento: 001-portal-extraction)"
 ---
 
 Asumí el rol **Backend-Architect · Frontend-Architect** (`agents/roles/`) y ejecutá el procedimiento de

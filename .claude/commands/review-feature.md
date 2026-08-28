@@ -1,5 +1,5 @@
 ---
-description: Quality gate del Code-Reviewer sobre un changeset (argumento opcional: 001-portal-extraction)
+description: "Quality gate del Code-Reviewer sobre un changeset (argumento opcional: 001-portal-extraction)"
 ---
 
 Asumí el rol **Code-Reviewer** (`agents/roles/`) y ejecutá el procedimiento de
