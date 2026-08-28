@@ -23,10 +23,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import models  # noqa: F401
 from app.config import settings
 from app.database import engine
+from app.health import router as health_router
 from app.logging import get_logger, setup_logging
-from app.modules.identity.routes import auth_router, users_router
-from app.modules.operations.routes import health_router
-from app.modules.operations.routes import router as operations_router
 from app.shared.errors import (
     AuthenticationError,
     ConflictError,
@@ -56,11 +54,10 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
     DomainError: status.HTTP_400_BAD_REQUEST,
 }
 
+# One entry per tag actually mounted below. A domain module adds its own when
+# it lands, together with its routers.
 TAGS_METADATA: list[dict[str, str]] = [
     {"name": "Health", "description": "Liveness of the service and its dependencies."},
-    {"name": "Auth", "description": "Sessions, password recovery and password changes."},
-    {"name": "Users", "description": "Administration of accounts and roles."},
-    {"name": "Operations", "description": "Background runs and configurable business parameters."},
 ]
 
 
@@ -164,11 +161,8 @@ def register_event_handlers() -> None:
 
 
 def register_routers(application: FastAPI) -> None:
-    """Mount every module's routers. Adding a module means adding a line here."""
+    """Mount every router. Adding a module means adding a line here."""
     application.include_router(health_router, prefix=API_PREFIX)
-    application.include_router(auth_router, prefix=API_PREFIX)
-    application.include_router(users_router, prefix=API_PREFIX)
-    application.include_router(operations_router, prefix=API_PREFIX)
 
     # Docker's healthcheck runs inside the container and has no reason to know
     # the API version, so health answers at the root as well. Hidden from the

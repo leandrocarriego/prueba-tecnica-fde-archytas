@@ -26,7 +26,7 @@ not end in `_test`.
 """
 
 import asyncio
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -40,16 +40,13 @@ from app.config import settings
 # every table before the schema is created below.
 from app.database import Base, get_session
 from app.main import app
-from app.modules.identity.models import User, UserRole
-from app.modules.identity.security import create_access_token
-from tests.factories.user_factory import UserFactory
 
 BASE_URL = "http://testserver"
 API_PREFIX = f"/api/{settings.API_VERSION}"
 
-# The one-way extraction pipeline plus the operational schema. `operations` is the only
-# one with tables today; the other three are created so a schema-qualified model
-# added tomorrow does not fail with InvalidSchemaName.
+# The one-way extraction pipeline plus the operational schema. None of them holds
+# a table yet: they are created so the first schema-qualified model to land does
+# not fail with InvalidSchemaName.
 PIPELINE_SCHEMAS: tuple[str, ...] = ("raw", "staging", "core", "operations")
 
 # Connecting to `postgres` to issue CREATE DATABASE: a database cannot be
@@ -167,82 +164,21 @@ async def session(connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
 # --- HTTP client ---------------------------------------------------------
 
 
-def authorization_header(user: User) -> dict[str, str]:
-    """Return the bearer header of a token issued for this user."""
-    return {"Authorization": f"Bearer {create_access_token(str(user.id))}"}
-
-
 @pytest.fixture
-async def client_for(session: AsyncSession) -> AsyncIterator[Callable[..., AsyncClient]]:
-    """Build API clients, optionally authenticated as a given user.
+async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
+    """An anonymous client, talking to the app in-process over the test session.
 
-    Every client talks to the application in-process (`ASGITransport`, no
-    socket) and against the test's session.
+    There is no authenticated variant yet: issuing a token needs `identity`,
+    which has not landed. Its fixtures — the users, their roles and their
+    clients — come back in the same commit as the module.
     """
 
     async def _session_override() -> AsyncIterator[AsyncSession]:
         yield session
 
     app.dependency_overrides[get_session] = _session_override
-    built: list[AsyncClient] = []
-
-    def _build(user: User | None = None) -> AsyncClient:
-        http_client = AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url=BASE_URL,
-            headers=authorization_header(user) if user is not None else {},
-        )
-        built.append(http_client)
-        return http_client
-
     try:
-        yield _build
+        async with AsyncClient(transport=ASGITransport(app=app), base_url=BASE_URL) as http_client:
+            yield http_client
     finally:
-        for http_client in built:
-            await http_client.aclose()
         app.dependency_overrides.pop(get_session, None)
-
-
-@pytest.fixture
-def client(client_for: Callable[..., AsyncClient]) -> AsyncClient:
-    """An anonymous client: no credentials at all."""
-    return client_for()
-
-
-# --- Users and their clients ---------------------------------------------
-
-
-@pytest.fixture
-async def owner(session: AsyncSession) -> User:
-    """The owner: admitted everywhere."""
-    return await UserFactory.create(session, email="owner@example.com", role=UserRole.OWNER)
-
-
-@pytest.fixture
-async def purchasing_user(session: AsyncSession) -> User:
-    """Whoever handles purchasing."""
-    return await UserFactory.create(session, email="compras@example.com", role=UserRole.PURCHASING)
-
-
-@pytest.fixture
-async def sales_user(session: AsyncSession) -> User:
-    """Whoever handles sales."""
-    return await UserFactory.create(session, email="ventas@example.com", role=UserRole.SALES)
-
-
-@pytest.fixture
-def owner_client(client_for: Callable[..., AsyncClient], owner: User) -> AsyncClient:
-    """A client authenticated as the owner."""
-    return client_for(owner)
-
-
-@pytest.fixture
-def purchasing_client(client_for: Callable[..., AsyncClient], purchasing_user: User) -> AsyncClient:
-    """A client authenticated as purchasing."""
-    return client_for(purchasing_user)
-
-
-@pytest.fixture
-def sales_client(client_for: Callable[..., AsyncClient], sales_user: User) -> AsyncClient:
-    """A client authenticated as sales."""
-    return client_for(sales_user)
