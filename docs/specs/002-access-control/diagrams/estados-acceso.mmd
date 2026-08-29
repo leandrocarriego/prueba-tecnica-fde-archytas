@@ -1,0 +1,37 @@
+---
+title: El ciclo de vida de un acceso
+---
+stateDiagram-v2
+    state "Invitado, sin clave definida" as Invitado
+    state "Activo" as Activo
+    state "Bloqueado por intentos fallidos" as Bloqueado
+    state "Desactivado" as Desactivado
+
+    [*] --> Invitado: el dueño lo da de alta con la persona, su teléfono y su rol
+    Invitado --> Activo: la persona define su clave desde la invitación
+    Activo --> Bloqueado: más intentos fallidos seguidos que el límite
+    Bloqueado --> Activo: vence el tiempo del bloqueo
+    Activo --> Desactivado: el dueño lo desactiva
+    Invitado --> Desactivado: el dueño lo desactiva antes de que acepte la invitación
+    Bloqueado --> Desactivado: el dueño lo desactiva
+    Desactivado --> Invitado: la persona vuelve al equipo y el dueño reactiva su acceso
+    Desactivado --> [*]
+
+    note right of Invitado
+        Mientras no defina su clave no puede entrar.
+        El dueño nunca la conoce ni se la puede poner
+    end note
+
+    note right of Bloqueado
+        No entra ni con la clave correcta, y el bloqueo
+        queda a la vista del dueño entre los intentos
+        rechazados
+    end note
+
+    note right of Desactivado
+        Deja de entrar en el momento y sus sesiones
+        abiertas se cierran, pero su nombre sigue
+        figurando en todo lo que registró. Si vuelve,
+        es la misma persona: define una clave nueva y
+        la anterior ya no sirve
+    end note

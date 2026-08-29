@@ -1,0 +1,23 @@
+---
+title: El ciclo de vida de una sesión
+---
+stateDiagram-v2
+    state "Abierta" as Abierta
+    state "Cerrada" as Cerrada
+
+    [*] --> Abierta: la persona entra con su acceso
+    Abierta --> Cerrada: la persona cierra su sesión
+    Abierta --> Cerrada: pasa el tiempo de inactividad sin uso, ocho horas al arrancar
+    Abierta --> Cerrada: el dueño desactiva ese acceso
+    Cerrada --> [*]
+
+    note right of Abierta
+        La pantalla muestra el nombre de quien trabaja,
+        y cada consulta se verifica igual, una por una
+    end note
+
+    note right of Cerrada
+        Volver atrás en el navegador no devuelve la
+        pantalla anterior con datos: hay que entrar
+        de nuevo
+    end note

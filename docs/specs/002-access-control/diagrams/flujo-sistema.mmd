@@ -1,0 +1,33 @@
+---
+title: El sistema — qué controla en cada ingreso y en cada consulta
+---
+flowchart TD
+    A["Alguien presenta sus credenciales"] --> B{"¿Corresponden a un acceso que existe y está activo?"}
+    B -->|No| C["Rechaza el ingreso sin decir cuál de los dos datos falló"]
+    C --> D["Cuenta el intento fallido de ese acceso"]
+    D --> E{"¿Superó el límite de intentos seguidos?"}
+    E -->|No| F["Queda a la espera del próximo intento"]
+    E -->|Sí| G["Bloquea ese acceso quince minutos y lo registra entre los intentos rechazados"]
+    G --> H{"¿Venció el tiempo del bloqueo?"}
+    H -->|Sí| I["Vuelve a permitir el ingreso de ese acceso"]
+
+    B -->|Sí| J{"¿Ese acceso está bloqueado por intentos fallidos?"}
+    J -->|Sí| K["Rechaza el ingreso aunque la clave sea correcta"]
+    J -->|No| L["Deja entrar y registra quién ingresó y cuándo"]
+    L --> M["Muestra el nombre de quien trabaja y sólo las secciones de su rol"]
+
+    M --> N["Le llega una consulta"]
+    N --> O{"¿Viene con una sesión activa?"}
+    O -->|No| P["La rechaza y pide entrar"]
+    O -->|Sí| Q{"¿El rol tiene habilitada esa sección?"}
+    Q -->|No| R["Rechaza la consulta, lo informa y registra el intento"]
+    Q -->|Sí| S{"¿La consulta cambia algo?"}
+    S -->|No| T["Responde"]
+    S -->|Sí| U{"¿La sección está habilitada como edición para ese rol?"}
+    U -->|No| R
+    U -->|Sí| T
+
+    M --> V{"¿La sesión pasó el tiempo de inactividad sin uso?"}
+    V -->|Sí| W["La cierra y vuelve a pedir entrar"]
+    M --> X{"¿El dueño desactivó ese acceso?"}
+    X -->|Sí| W

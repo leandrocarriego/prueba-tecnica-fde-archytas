@@ -1,0 +1,24 @@
+---
+title: Marcela, compras — con qué entra y hasta dónde llega
+---
+flowchart TD
+    A["Le llega la invitación por WhatsApp"] --> B["Define su propia clave"]
+    B --> C["Entra con su acceso y la pantalla muestra su nombre"]
+    C --> D["Ve sólo las secciones de compras"]
+
+    D --> E["Proveedores, facturas, pagos, órdenes y recibos"]
+    D --> F["Calendario de vencimientos: lo consulta y lo edita"]
+    D --> G["Precios: los consulta, pide la lista a mano y resuelve lo apartado"]
+    D --> H["Ventas y tablero comercial: no aparecen en su menú"]
+    H --> I{"¿Y si pega la dirección de esa pantalla?"}
+    I -->|Queda afuera igual| J["El sistema le avisa que no tiene permiso y registra el intento"]
+
+    C --> K{"¿Qué pasa con su clave?"}
+    K -->|La quiere cambiar| L["La cambia desde su propia pantalla y la anterior deja de servir"]
+    K -->|Se la olvidó| M["Pide recuperar su acceso"]
+    M --> N["Le llega un enlace por WhatsApp, sin que el dueño intervenga"]
+    N --> O["Define una clave nueva y el enlace deja de servir"]
+    K -->|La erró varias veces seguidas| P["Su acceso queda bloqueado un rato y el dueño lo ve"]
+
+    C --> Q{"¿Dejó la pantalla abierta sin usarla?"}
+    Q -->|Ocho horas sin uso| R["El sistema cierra la sesión y le pide entrar de nuevo"]

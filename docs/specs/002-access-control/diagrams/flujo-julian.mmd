@@ -1,0 +1,21 @@
+---
+title: Julián, ventas — con qué entra y hasta dónde llega
+---
+flowchart TD
+    A["Entra con su acceso y la pantalla muestra su nombre"] --> B["Ve sólo las secciones de ventas"]
+    B --> C["Ventas, tablero comercial, stock, rubros y catálogo"]
+
+    B --> D["Precios: los consulta y ve su evolución"]
+    D --> E["Pedir la lista a mano y resolver lo apartado no es suyo"]
+
+    B --> F["Calendario de vencimientos: lo consulta"]
+    F --> G{"¿Puede mover un vencimiento?"}
+    G -->|No| H["El sistema le rechaza el cambio aunque vea la pantalla"]
+
+    B --> I["Proveedores, facturas de compra y pagos: no aparecen en su menú"]
+    I --> J["Copia la dirección exacta de la pantalla de proveedores y la abre"]
+    J --> K["El sistema le avisa que no tiene permiso, en lugar de mostrársela"]
+    K --> L["El intento queda registrado con su nombre, qué quiso ver y cuándo"]
+    L --> M["El dueño lo ve en su lista de intentos rechazados"]
+
+    B --> N["La administración de accesos y la lista de ingresos no son suyas"]
