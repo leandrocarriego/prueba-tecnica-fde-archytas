@@ -4,10 +4,18 @@ import type { NextRequest } from 'next/server'
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Rutas públicas que NO requieren autenticación
+  // Rutas públicas que NO requieren autenticación.
+  //
+  // Todas las páginas de (auth) van acá, y no es una lista de conveniencia: son
+  // exactamente las que visita alguien que **no puede** iniciar sesión. Una
+  // invitación o un enlace de recuperación detrás del guard redirige a un login
+  // que esa persona todavía no puede pasar, que es el único momento en que
+  // necesitaba el enlace.
   const publicPaths = [
     '/login',
     '/reset-password',
+    '/invitacion',
+    '/recuperar',
     // Estado del servicio: tiene que poder abrirse justamente cuando la
     // plataforma no anda. Si esta ruta pidiera sesión, el día que la API se
     // caiga redirigiría a un login que tampoco puede funcionar.
@@ -52,9 +60,11 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - login (página de login)
-     * - reset-password (página de reset password)
+     * - reset-password (pedir un enlace de recuperación)
+     * - invitacion (definir la clave de un acceso nuevo)
+     * - recuperar (definir una clave nueva)
      * - estado (página pública de estado del servicio)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|login|reset-password|estado).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|login|reset-password|invitacion|recuperar|estado).*)',
   ],
 }
