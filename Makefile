@@ -138,8 +138,19 @@ playwright-install: ## Instalar el navegador Chromium que usa la extracción
 
 # ── Base de datos ───────────────────────────────────────────────────────────
 
+# Where these run depends on where the application runs: in containers on the
+# server, natively on a laptop. There is no uv on the server and no backend
+# container in development, so a single hardcoded path is wrong in one of the
+# two places — and it was wrong in the one that matters, because `make deploy`
+# ends by telling you to run them.
+IN_CONTAINERS := docker ps --format '{{.Names}}' | grep -q '^cordillera_backend$$'
+
 db-migrate: ## Aplicar las migraciones pendientes (alembic upgrade head)
-	cd backend && uv run alembic upgrade head
+	@if $(IN_CONTAINERS); then \
+		$(COMPOSE) $(ALL) exec -T backend alembic upgrade head; \
+	else \
+		cd backend && uv run alembic upgrade head; \
+	fi
 
 db-revision: ## Crear una migración nueva (usar: make db-revision MESSAGE="descripción")
 	cd backend && uv run alembic revision --autogenerate -m "$(MESSAGE)"
@@ -147,8 +158,12 @@ db-revision: ## Crear una migración nueva (usar: make db-revision MESSAGE="desc
 # The one account that cannot be created from a screen: everybody else is
 # invited by the owner, so the first one is created here, from the environment.
 # It is idempotent — running it twice leaves one owner, not two.
-db-owner: ## Crear el primer acceso (el dueno) en los contenedores — OWNER_* del .env
-	$(COMPOSE) $(ALL) exec backend python -m app.modules.identity.bootstrap
+db-owner: ## Crear el primer acceso (el dueno) — OWNER_* del .env
+	@if $(IN_CONTAINERS); then \
+		$(COMPOSE) $(ALL) exec -T backend python -m app.modules.identity.bootstrap; \
+	else \
+		cd backend && uv run python -m app.modules.identity.bootstrap; \
+	fi
 
 # ── Utilities ───────────────────────────────────────────────────────────────
 
