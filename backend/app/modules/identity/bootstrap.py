@@ -24,6 +24,7 @@ from app.modules.identity.models import User, UserRole
 from app.modules.identity.repository import UserRepository
 from app.modules.identity.schemas import PHONE_MIN
 from app.modules.identity.service import INVITE_NEW_ACCESS, IdentityService
+from app.shared.events import discover_handlers
 
 logger = get_logger(__name__)
 
@@ -38,6 +39,11 @@ async def create_first_owner() -> str:
 
     Returns a line describing what happened, for whoever ran the command.
     """
+    # This command is its own process, so it starts with an empty bus. Without
+    # this the owner is created, `AccessInvited` is published to nobody, and the
+    # line printed below claims an invitation that never left.
+    discover_handlers()
+
     if not (settings.OWNER_EMAIL and settings.OWNER_NAME and settings.OWNER_PHONE):
         return MISSING_SETTINGS
     if len(settings.OWNER_PHONE) < PHONE_MIN:

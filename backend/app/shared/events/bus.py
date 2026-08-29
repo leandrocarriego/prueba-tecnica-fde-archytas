@@ -87,10 +87,14 @@ events = EventBus()
 def discover_handlers() -> list[str]:
     """Import every module's `handlers.py` so its subscriptions register.
 
-    Called once by `app.main`. Discovery is automatic on purpose: a handler that
-    is never imported is a subscription that silently does not exist, and a
-    composition root with eleven hand-written imports is one `git merge` away
-    from missing one.
+    Called once per process, by every entry point that publishes: the API
+    (`app.main`), the Celery worker and the bootstrap command. Subscriptions do
+    not survive a process boundary, and a process that skips this publishes into
+    silence — which is legal for the bus and wrong for the product.
+
+    Discovery is automatic on purpose: a handler that is never imported is a
+    subscription that silently does not exist, and a composition root with
+    eleven hand-written imports is one `git merge` away from missing one.
     """
     package = import_module("app.modules")
     imported: list[str] = []
