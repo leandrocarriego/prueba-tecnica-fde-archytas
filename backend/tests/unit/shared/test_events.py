@@ -8,9 +8,11 @@ event, only a swallowed exception.
 
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
+import app.shared.events.bus as events_bus
 from app.shared.events import DomainEvent, EventBus, UserRegistered, discover_handlers
 
 
@@ -154,6 +156,35 @@ class TestRegistry:
         # Assert
         assert bus.handlers_for(UserRegistered) == ()
 
-    def test_discovery_tolerates_a_module_without_handlers(self) -> None:
-        """Not every module reacts to something; a missing handlers.py is legal."""
-        assert discover_handlers() == []
+    def test_discovery_returns_exactly_the_modules_that_subscribe(self) -> None:
+        """A module without a `handlers.py` is walked past, not raised on.
+
+        This used to name `identity` as the module that publishes and never
+        subscribes. It subscribes now — it projects the settings `operations`
+        owns — so naming any module here would just make the test wrong again
+        the day that one changes. What holds regardless is the rule itself:
+        discovery returns the modules that have the file and nothing else.
+        """
+        # Arrange
+        modules_root = Path(events_bus.__file__).parents[2] / "modules"
+        with_handlers = {
+            f"app.modules.{path.name}.handlers"
+            for path in modules_root.iterdir()
+            if path.is_dir() and (path / "handlers.py").exists()
+        }
+        without_handlers = {
+            path.name
+            for path in modules_root.iterdir()
+            if path.is_dir()
+            and (path / "__init__.py").exists()
+            and not (path / "handlers.py").exists()
+        }
+
+        # Act
+        discovered = discover_handlers()
+
+        # Assert
+        assert set(discovered) == with_handlers
+        assert all(name.endswith(".handlers") for name in discovered)
+        # Whatever has no handlers is simply absent, and discovery did not raise.
+        assert not any(module in name for module in without_handlers for name in discovered)

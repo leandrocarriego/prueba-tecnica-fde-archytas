@@ -37,11 +37,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Exchange credentials for an access token
+         * Exchange credentials for a session
          * @description Public: anyone may attempt to log in.
          *
-         *     A wrong email, a wrong password and a disabled account all fail the same
-         *     way, so the endpoint cannot be used to find out which emails exist.
+         *     An unknown email, a wrong password, a deactivated access and a temporarily
+         *     locked one all fail the same way, so the endpoint cannot be used to find
+         *     out which addresses exist or which accounts are blocked.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -58,8 +59,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Read the caller's own account
-         * @description Any authenticated role, restricted to the caller's own account.
+         * Who is working, and what they may reach
+         * @description Any live session, restricted to the caller's own account.
+         *
+         *     Returns the permission map so the menu is drawn from what the backend
+         *     enforces instead of from a second copy of the rules in the frontend.
          */
         get: operations["read_current_user_api_v1_auth_me_get"];
         put?: never;
@@ -70,7 +74,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/password-reset/request": {
+    "/api/v1/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,33 +84,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Ask for a password reset link
-         * @description Public, and always answers 200.
-         *
-         *     Reporting whether the address is registered would turn a recovery form into
-         *     an account enumeration oracle, so the answer never varies.
+         * Close your session
+         * @description Any live session. Closes the one the caller is using, not the others.
          */
-        post: operations["request_password_reset_api_v1_auth_password_reset_request_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/password-reset/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Redeem a reset token for a new password
-         * @description Public: the single-use token is itself the credential.
-         */
-        post: operations["confirm_password_reset_api_v1_auth_password_reset_confirm_post"];
+        post: operations["logout_api_v1_auth_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -124,12 +105,88 @@ export interface paths {
         put?: never;
         /**
          * Change your own password
-         * @description Any authenticated role, and only on the caller's own account.
+         * @description Any live session, and only on the caller's own account.
          *
-         *     The target user is taken from the token, never from the body, so this route
-         *     cannot be pointed at somebody else's account.
+         *     The target is taken from the session, never from the body, so this route
+         *     cannot be pointed at somebody else. Every other session of the same person
+         *     is closed: a password that stopped being valid must not survive elsewhere.
          */
         post: operations["change_password_api_v1_auth_password_change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask for a recovery link
+         * @description Public, and always answers the same.
+         *
+         *     Saying whether the address is registered would turn a recovery form into a
+         *     way of finding out who has an account, so the answer never varies. The link
+         *     itself goes out by WhatsApp and is never returned here.
+         */
+        post: operations["request_password_reset_api_v1_auth_password_reset_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Is this recovery link still good?
+         * @description Public: the single-use token is the credential.
+         */
+        get: operations["check_reset_token_api_v1_auth_password_reset__token__get"];
+        put?: never;
+        /**
+         * Set a new password with a recovery link
+         * @description Public: the single-use token is the credential. Spending it kills it.
+         */
+        post: operations["confirm_password_reset_api_v1_auth_password_reset__token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/invitation/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Is this invitation still good?
+         * @description Public: whoever was invited holds no session yet.
+         */
+        get: operations["check_invitation_api_v1_auth_invitation__token__get"];
+        put?: never;
+        /**
+         * Accept an invitation and set your password
+         * @description Public: the invitation is the credential, and it works once.
+         *
+         *     This is the only way a password is ever set for the first time. The owner
+         *     never types one for somebody else.
+         */
+        post: operations["accept_invitation_api_v1_auth_invitation__token__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -144,14 +201,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List users
-         * @description Every authenticated role: the team needs to know who its colleagues are.
+         * List accesses
+         * @description Owner only: administering accesses is the owner's, and so is seeing them.
          */
         get: operations["list_users_api_v1_users_get"];
         put?: never;
         /**
-         * Create a user
-         * @description Owner only: handing out accounts and roles is the owner's decision.
+         * Create an access and invite its person
+         * @description Owner only. Returns no credential: the invitation goes out by WhatsApp.
          */
         post: operations["create_user_api_v1_users_post"];
         delete?: never;
@@ -168,27 +225,83 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Read a user
-         * @description Every authenticated role.
+         * Read one access
+         * @description Owner only.
          */
         get: operations["get_user_api_v1_users__user_id__get"];
         put?: never;
         post?: never;
-        /**
-         * Deactivate a user
-         * @description Owner only.
-         *
-         *     The account is deactivated, not deleted: the purchases, sales and messages
-         *     it authored have to keep pointing at a real person.
-         */
-        delete: operations["deactivate_user_api_v1_users__user_id__delete"];
+        delete?: never;
         options?: never;
         head?: never;
         /**
-         * Update a user
+         * Update an access
          * @description Owner only: this route can change a role, so it changes what someone may do.
          */
         patch: operations["update_user_api_v1_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate an access
+         * @description Owner only, and never on themselves.
+         *
+         *     The access is deactivated, not deleted: everything it authored has to keep
+         *     pointing at a real person. Its open sessions are closed on the spot.
+         */
+        post: operations["deactivate_user_api_v1_users__user_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reactivate an access
+         * @description Owner only. The same person comes back, with a new invitation and no old password.
+         */
+        post: operations["reactivate_user_api_v1_users__user_id__reactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who got in, and who was turned away
+         * @description Owner only: nobody else sees other people's activity.
+         */
+        get: operations["list_access_events_api_v1_access_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/operations/jobs": {
@@ -241,10 +354,343 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/price-updates/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The state of the price update
+         * @description Every authenticated role.
+         *
+         *     It answers the last **successful** update (RF-09) and whether the update is
+         *     interrupted (RF-11), which is what the prices screen shows at the top.
+         */
+        get: operations["price_update_status_api_v1_price_updates_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bring the list now
+         * @description The owner and purchasing, and nobody else.
+         *
+         *     Asking for the list by hand is knocking on a third party's door, so it is
+         *     not a read that any role can do. Who asked is taken from the token and
+         *     recorded with the run (RF-17); a second request while one is running is
+         *     answered with a 409 rather than starting another (RF-15).
+         */
+        post: operations["request_price_update_api_v1_price_updates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-updates/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The two parameters of the price update
+         * @description Owner only: these values decide how the platform behaves.
+         */
+        get: operations["read_price_update_settings_api_v1_price_updates_settings_get"];
+        /**
+         * Change how often and what counts as a big rise
+         * @description Owner only (RF-18, RF-19). The new frequency applies from the next query.
+         */
+        put: operations["write_price_update_settings_api_v1_price_updates_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-updates/{job_run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How one update ended
+         * @description The owner and purchasing.
+         *
+         *     Deliberately a different route from `/status`: that one reports the last
+         *     **successful** update, so a run that failed would never show up there and
+         *     whoever asked for it would never learn that it failed (RF-16).
+         */
+        get: operations["read_price_update_api_v1_price_updates__job_run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The price list in force
+         * @description Every authenticated role: the owner, purchasing and sales.
+         */
+        get: operations["list_prices_api_v1_prices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prices/{product_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the price of a product evolved
+         * @description Every authenticated role.
+         */
+        get: operations["price_history_api_v1_prices__product_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/triage/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the update set aside
+         * @description The owner and purchasing: this is the screen where the queue is emptied.
+         */
+        get: operations["list_cases_api_v1_triage_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/triage/cases/{case_id}/resolution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide what to do with a case
+         * @description The owner and purchasing.
+         *
+         *     Who decided is taken from the token, never from the body: RF-32 asks for the
+         *     person who took the decision, and a body could name somebody else. The name
+         *     travels as a plain string — the first name, which is how the business names
+         *     these people — and not as a user of another module (Artículo IV).
+         */
+        post: operations["resolve_case_api_v1_triage_cases__case_id__resolution_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/triage/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The decisions that are being applied on their own
+         * @description The owner and purchasing (RF-36).
+         */
+        get: operations["list_rules_api_v1_triage_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/triage/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Leave a rule without effect
+         * @description The owner and purchasing.
+         *
+         *     The rule is revoked, not deleted, and what it was resolving comes back to
+         *     the queue (RF-37).
+         */
+        delete: operations["revoke_rule_api_v1_triage_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessEventKind
+         * @description What happened, in the vocabulary the owner reads on screen.
+         *
+         *     The first four are about getting in; the last four are the owner acting on
+         *     somebody else's access. They share a table because they answer the same
+         *     question — who did what to which access, and when — and the owner reads
+         *     them in a single list.
+         * @enum {string}
+         */
+        AccessEventKind: "LOGIN_SUCCEEDED" | "LOGIN_REJECTED" | "ACCESS_LOCKED" | "PERMISSION_DENIED" | "ACCESS_GRANTED" | "ACCESS_ROLE_CHANGED" | "ACCESS_DEACTIVATED" | "ACCESS_REACTIVATED";
+        /**
+         * AccessEventList
+         * @description A page of the access log.
+         */
+        AccessEventList: {
+            /** Items */
+            items: components["schemas"]["AccessEventRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
+        /**
+         * AccessEventRead
+         * @description One line of the access log.
+         */
+        AccessEventRead: {
+            /** Id */
+            id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            kind: components["schemas"]["AccessEventKind"];
+            /** User Id */
+            user_id: number | null;
+            /** Actor User Id */
+            actor_user_id: number | null;
+            /** Attempted Email */
+            attempted_email: string | null;
+            /** Resource */
+            resource: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * CaseList
+         * @description A page of cases.
+         */
+        CaseList: {
+            /** Items */
+            items: components["schemas"]["CaseRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
+        /**
+         * CaseRead
+         * @description A case as the review screen shows it (RF-26).
+         */
+        CaseRead: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Reason */
+            reason: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            status: components["schemas"]["CaseStatus"];
+            /** Batch Id */
+            batch_id: number | null;
+            /** Occurrences */
+            occurrences: number;
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            } | null;
+            /** Resolved By User Id */
+            resolved_by_user_id: number | null;
+            /** Resolved By Name */
+            resolved_by_name: string | null;
+            /** Resolved At */
+            resolved_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * CaseStatus
+         * @description Whether somebody has already decided about a case.
+         * @enum {string}
+         */
+        CaseStatus: "PENDING" | "RESOLVED";
         /**
          * ComponentHealth
          * @description The state of one dependency.
@@ -257,6 +703,21 @@ export interface components {
             status: components["schemas"]["HealthState"];
             /** Detail */
             detail?: string | null;
+        };
+        /**
+         * CurrentUser
+         * @description Who is working, and what they may reach.
+         *
+         *     The permission map travels with the user so the menu is drawn from what the
+         *     backend actually enforces. Without it the frontend would need its own copy
+         *     of the rules, and two copies of a rule are one rule and one bug.
+         */
+        CurrentUser: {
+            user: components["schemas"]["UserRead"];
+            /** Permissions */
+            permissions: {
+                [key: string]: components["schemas"]["Level"];
+            };
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -329,6 +790,15 @@ export interface components {
          */
         JobStatus: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
         /**
+         * Level
+         * @description How far into a section a role gets.
+         *
+         *     Ordered, not a set of flags: whoever may edit may also read, so
+         *     `require_section(x, READ)` admits somebody holding `WRITE`.
+         * @enum {integer}
+         */
+        Level: 0 | 1 | 2;
+        /**
          * LoginRequest
          * @description Credentials submitted at login.
          */
@@ -358,9 +828,6 @@ export interface components {
         /**
          * MessageResponse
          * @description A bare acknowledgement.
-         *
-         *     It carries no resource, which is why it lives here and not in `schemas.py`
-         *     next to the identity contracts.
          */
         MessageResponse: {
             /** Message */
@@ -423,18 +890,8 @@ export interface components {
             new_password: string;
         };
         /**
-         * PasswordResetConfirm
-         * @description Redeem a reset token for a new password.
-         */
-        PasswordResetConfirm: {
-            /** Token */
-            token: string;
-            /** New Password */
-            new_password: string;
-        };
-        /**
          * PasswordResetRequest
-         * @description Request a reset token for an email address.
+         * @description Ask for a recovery link.
          */
         PasswordResetRequest: {
             /**
@@ -444,8 +901,227 @@ export interface components {
             email: string;
         };
         /**
+         * PasswordSet
+         * @description Redeem a single-use link and set a password.
+         */
+        PasswordSet: {
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * PriceHistoryRead
+         * @description How the price of a product evolved (RF-23), and its monthly variation (RF-24).
+         */
+        PriceHistoryRead: {
+            /** Product Id */
+            product_id: number;
+            /** Code */
+            code: string;
+            /** Description */
+            description: string;
+            /** Price */
+            price: string | null;
+            /** Currency */
+            currency: string;
+            /** Monthly Variation Pct */
+            monthly_variation_pct: string | null;
+            /** Points */
+            points: components["schemas"]["PricePointRead"][];
+        };
+        /**
+         * PriceList
+         * @description A page of prices.
+         */
+        PriceList: {
+            /** Items */
+            items: components["schemas"]["PriceRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
+        /**
+         * PricePointRead
+         * @description One point of a product's history.
+         */
+        PricePointRead: {
+            /** Price */
+            price: string;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            source: components["schemas"]["PriceSource"];
+        };
+        /**
+         * PriceRead
+         * @description A product with the price in force, as the prices screen shows it.
+         */
+        PriceRead: {
+            /** Product Id */
+            product_id: number;
+            /** Code */
+            code: string;
+            /** Description */
+            description: string;
+            status: components["schemas"]["ProductStatus"];
+            /** Price */
+            price: string | null;
+            /** Currency */
+            currency: string;
+            /** Effective At */
+            effective_at: string | null;
+            /** Previous Price */
+            previous_price: string | null;
+            /** Is Highlighted */
+            is_highlighted: boolean;
+            /** Is Stale */
+            is_stale: boolean;
+            /** Monthly Variation Pct */
+            monthly_variation_pct?: string | null;
+        };
+        /**
+         * PriceSource
+         * @description Where a point of the history came from.
+         * @enum {string}
+         */
+        PriceSource: "PORTAL" | "SYSTEM";
+        /**
+         * PriceUpdateRequested
+         * @description The answer to asking for an update by hand (RF-14, RF-16).
+         */
+        PriceUpdateRequested: {
+            /** Job Run Id */
+            job_run_id: number;
+            status: components["schemas"]["JobStatus"];
+        };
+        /**
+         * PriceUpdateSettingsRead
+         * @description The two parameters of this feature, with the value in force (RF-20).
+         */
+        PriceUpdateSettingsRead: {
+            /** Interval Hours */
+            interval_hours: number;
+            /** Highlight Threshold Pct */
+            highlight_threshold_pct: string;
+        };
+        /**
+         * PriceUpdateSettingsWrite
+         * @description What the owner may change (RF-18, RF-19).
+         */
+        PriceUpdateSettingsWrite: {
+            /** Interval Hours */
+            interval_hours: number;
+            /** Highlight Threshold Pct */
+            highlight_threshold_pct: number | string;
+        };
+        /**
+         * PriceUpdateStatusRead
+         * @description What the prices screen shows about the update itself (RF-09, RF-11).
+         */
+        PriceUpdateStatusRead: {
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Last Run Id */
+            last_run_id: number | null;
+            last_run_status: components["schemas"]["JobStatus"] | null;
+            /** Last Result */
+            last_result: {
+                [key: string]: unknown;
+            } | null;
+            /** Last Quarantined */
+            last_quarantined: number | null;
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /** Is Stalled */
+            is_stalled: boolean;
+            /** Interval Hours */
+            interval_hours: number;
+            /** Highlight Threshold Pct */
+            highlight_threshold_pct: string;
+        };
+        /**
+         * ProductStatus
+         * @description Whether the business still buys this product.
+         * @enum {string}
+         */
+        ProductStatus: "ACTIVE" | "DISCONTINUED";
+        /**
+         * ResolutionRequest
+         * @description What a person decided about a case.
+         *
+         *     `decision` is free-form because the queue is generic: an unreadable row is
+         *     resolved with a price and a product, an unknown product with whether to
+         *     incorporate it, a missing one with whether it is discontinued.
+         */
+        ResolutionRequest: {
+            /**
+             * Decision
+             * @description What to do. For instance {'action': 'incorporate'} or {'price': '48210'}
+             */
+            decision: {
+                [key: string]: unknown;
+            };
+            /**
+             * Remember
+             * @default true
+             */
+            remember: boolean;
+        };
+        /**
+         * RuleRead
+         * @description A rule that is being applied on its own (RF-36).
+         */
+        RuleRead: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Matcher */
+            matcher: {
+                [key: string]: unknown;
+            };
+            /** Decision */
+            decision: {
+                [key: string]: unknown;
+            };
+            /** Created By User Id */
+            created_by_user_id: number;
+            /** Created By Name */
+            created_by_name: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Revoked By User Id */
+            revoked_by_user_id: number | null;
+            /** Revoked At */
+            revoked_at: string | null;
+        };
+        /**
+         * Section
+         * @description The parts of the business a person can be let into.
+         * @enum {string}
+         */
+        Section: "PRICES" | "CALENDAR" | "SUPPLIERS" | "PURCHASE_INVOICES" | "PAYMENTS" | "PURCHASE_ORDERS" | "RECEIPTS" | "SALES" | "DASHBOARD" | "STOCK" | "PRODUCT_CATEGORIES" | "PRODUCT_CATALOG" | "ACCESS_ADMIN" | "ACCESS_LOG" | "SYSTEM_PARAMETERS";
+        /**
+         * TokenStatus
+         * @description Whether a single-use link still works.
+         */
+        TokenStatus: {
+            /** Usable */
+            usable: boolean;
+        };
+        /**
          * UserCreate
-         * @description Payload to create a user.
+         * @description Payload to create an access.
+         *
+         *     There is no password field, and that is the point: the owner hands out
+         *     accesses, not credentials. The person sets their own from the invitation.
          */
         UserCreate: {
             /**
@@ -458,20 +1134,13 @@ export interface components {
             /** Last Name */
             last_name?: string | null;
             /** Phone */
-            phone?: string | null;
+            phone: string;
             /** @default SALES */
             role: components["schemas"]["UserRole"];
-            /** Password */
-            password: string;
-            /**
-             * Is Active
-             * @default true
-             */
-            is_active: boolean;
         };
         /**
          * UserList
-         * @description A page of users.
+         * @description A page of accesses.
          */
         UserList: {
             /** Items */
@@ -485,7 +1154,7 @@ export interface components {
         };
         /**
          * UserRead
-         * @description A user as exposed by the API and to other modules.
+         * @description An access as exposed by the API.
          */
         UserRead: {
             /** Id */
@@ -500,10 +1169,14 @@ export interface components {
             /** Last Name */
             last_name: string | null;
             /** Phone */
-            phone: string | null;
+            phone: string;
             role: components["schemas"]["UserRole"];
             /** Is Active */
             is_active: boolean;
+            /** Activated At */
+            activated_at: string | null;
+            /** Locked Until */
+            locked_until: string | null;
             /**
              * Created At
              * Format: date-time
@@ -522,7 +1195,7 @@ export interface components {
         UserRole: "OWNER" | "PURCHASING" | "SALES";
         /**
          * UserUpdate
-         * @description Payload to update a user. Every field is optional.
+         * @description Payload to update an access. Every field is optional.
          */
         UserUpdate: {
             /** Name */
@@ -532,8 +1205,6 @@ export interface components {
             /** Phone */
             phone?: string | null;
             role?: components["schemas"]["UserRole"] | null;
-            /** Is Active */
-            is_active?: boolean | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -632,7 +1303,69 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserRead"];
+                    "application/json": components["schemas"]["CurrentUser"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_auth_password_change_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                Authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -670,16 +1403,49 @@ export interface operations {
             };
         };
     };
-    confirm_password_reset_api_v1_auth_password_reset_confirm_post: {
+    check_reset_token_api_v1_auth_password_reset__token__get: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_password_reset_api_v1_auth_password_reset__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PasswordResetConfirm"];
+                "application/json": components["schemas"]["PasswordSet"];
             };
         };
         responses: {
@@ -701,16 +1467,49 @@ export interface operations {
             };
         };
     };
-    change_password_api_v1_auth_password_change_post: {
+    check_invitation_api_v1_auth_invitation__token__get: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invitation_api_v1_auth_invitation__token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PasswordChangeRequest"];
+                "application/json": components["schemas"]["PasswordSet"];
             };
         };
         responses: {
@@ -832,7 +1631,42 @@ export interface operations {
             };
         };
     };
-    deactivate_user_api_v1_users__user_id__delete: {
+    update_user_api_v1_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_user_api_v1_users__user_id__deactivate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -861,7 +1695,7 @@ export interface operations {
             };
         };
     };
-    update_user_api_v1_users__user_id__patch: {
+    reactivate_user_api_v1_users__user_id__reactivate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -870,11 +1704,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserUpdate"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -883,6 +1713,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_access_events_api_v1_access_log_get: {
+        parameters: {
+            query?: {
+                /** @description Rows to skip */
+                skip?: number;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Filter by kind */
+                kind?: components["schemas"]["AccessEventKind"][] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessEventList"];
                 };
             };
             /** @description Validation Error */
@@ -975,6 +1841,335 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ParameterRead"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    price_update_status_api_v1_price_updates_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceUpdateStatusRead"];
+                };
+            };
+        };
+    };
+    request_price_update_api_v1_price_updates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceUpdateRequested"];
+                };
+            };
+        };
+    };
+    read_price_update_settings_api_v1_price_updates_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceUpdateSettingsRead"];
+                };
+            };
+        };
+    };
+    write_price_update_settings_api_v1_price_updates_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceUpdateSettingsWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceUpdateSettingsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_price_update_api_v1_price_updates__job_run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prices_api_v1_prices_get: {
+        parameters: {
+            query?: {
+                /** @description Rows to skip */
+                skip?: number;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Match code or description */
+                q?: string | null;
+                /** @description Only the rises above the threshold */
+                highlighted?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    price_history_api_v1_prices__product_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceHistoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cases_api_v1_triage_cases_get: {
+        parameters: {
+            query?: {
+                /** @description Rows to skip */
+                skip?: number;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Filter by state */
+                status_filter?: components["schemas"]["CaseStatus"] | null;
+                /** @description Filter by kind of case */
+                kind?: string | null;
+                /** @description Only the cases of one run */
+                batch_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_case_api_v1_triage_cases__case_id__resolution_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rules_api_v1_triage_rules_get: {
+        parameters: {
+            query?: {
+                /** @description Also the ones already revoked */
+                include_revoked?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_rule_api_v1_triage_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

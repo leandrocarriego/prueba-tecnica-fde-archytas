@@ -56,6 +56,36 @@ class Settings(BaseSettings):
     # within this window or re-request the link.
     PORTAL_DOWNLOAD_TTL_SECONDS: int = 45
     PORTAL_NAVIGATION_TIMEOUT_MS: int = 15_000
+    # The published history of a product is read once, when the catalog first
+    # gets to know it. A hundred products on day one are a hundred visits to a
+    # third party's system, so they are queued this many seconds apart.
+    PORTAL_HISTORY_SPACING_SECONDS: int = 20
+
+    # --- WhatsApp notifications (Evolution API) ---
+    # The channel the owner is warned through when the update stops working.
+    # Missing settings disable the sending: an alert that cannot be delivered is
+    # logged, and never aborts an extraction.
+    EVOLUTION_API_URL: str = ""
+    EVOLUTION_API_KEY: str = ""
+    EVOLUTION_INSTANCE: str = ""
+    EVOLUTION_TIMEOUT_SECONDS: int = 15
+    # Where the alerts go: the owner's number, in international format.
+    NOTIFICATIONS_WHATSAPP_TO: str = ""
+    # Writes every message to this directory instead of sending it, so a
+    # development machine can exercise the invitation flow —and read the link—
+    # without WhatsApping a real person. Off by default: turning it on is what
+    # a developer does in their own `.env`, and leaving it off keeps the
+    # channel behaving in production exactly as it is written.
+    NOTIFICATIONS_TO_DISK: bool = False
+    NOTIFICATIONS_OUTBOX_DIR: str = "./outbox"
+
+    # --- First access ---
+    # The owner's access is created when the platform is installed, from here,
+    # and never from a screen: everybody else is invited by the owner, so the
+    # first one cannot be. Leaving these empty skips the bootstrap.
+    OWNER_EMAIL: str = ""
+    OWNER_NAME: str = ""
+    OWNER_PHONE: str = ""
 
     # --- Frontend ---
     FRONTEND_URL: str = "http://localhost:3000"
