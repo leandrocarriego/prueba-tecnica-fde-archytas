@@ -17,6 +17,7 @@ Two things are pinned for every task, because they are what a task is for:
 """
 
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace, TracebackType
 from typing import Any
 
@@ -383,3 +384,80 @@ class TestTheScheduledHeartbeat:
         # Assert
         assert result["requested"] is False
         assert no_dispatch == []
+
+    async def test_a_run_whose_worker_died_stops_blocking_the_next_one(
+        self, session: AsyncSession, no_dispatch: list[int]
+    ) -> None:
+        """Otherwise the feature stops for good and nothing says so.
+
+        Found in production: a redeploy killed the extraction mid-flight, the
+        row stayed RUNNING, and from then on neither the schedule nor a person
+        could start another. Giving way to a run in flight (RF-15) is right;
+        giving way forever to one that is gone is not.
+        """
+        # Arrange: abandoned yesterday, so the interval has gone by as well.
+        run = await open_run(session)
+        run.started_at = datetime.now(UTC) - timedelta(hours=13)
+        await session.commit()
+
+        # Act
+        result = await tick_price_update()
+
+        # Assert
+        assert result["abandoned"] == run.id
+        assert result["requested"] is True
+        assert len(no_dispatch) == 1
+
+        await session.refresh(run)
+        assert run.status is JobStatus.FAILED
+        assert run.error == operations_service.ABANDONED
+        assert run.finished_at is not None
+
+    async def test_an_abandoned_run_still_counts_as_the_last_attempt(
+        self, session: AsyncSession, no_dispatch: list[int]
+    ) -> None:
+        """Closed, but it does not buy the next update its turn early.
+
+        The interval is measured from the last attempt whatever became of it,
+        and a run that was interrupted is an attempt. Reaping it unblocks the
+        feature; it does not restart the clock.
+        """
+        # Arrange
+        run = await open_run(session)
+        run.started_at = (
+            datetime.now(UTC) - operations_service.ABANDONED_AFTER - timedelta(minutes=1)
+        )
+        await session.commit()
+
+        # Act
+        result = await tick_price_update()
+
+        # Assert
+        assert result["abandoned"] == run.id
+        assert result["requested"] is False
+        assert no_dispatch == []
+
+        await session.refresh(run)
+        assert run.status is JobStatus.FAILED
+
+    async def test_a_run_still_within_its_time_limit_is_left_alone(
+        self, session: AsyncSession, no_dispatch: list[int]
+    ) -> None:
+        """A slow extraction is not an abandoned one, and reaping it would lie."""
+        # Arrange
+        run = await open_run(session)
+        run.started_at = (
+            datetime.now(UTC) - operations_service.ABANDONED_AFTER + timedelta(minutes=5)
+        )
+        await session.commit()
+
+        # Act
+        result = await tick_price_update()
+
+        # Assert
+        assert result["abandoned"] is None
+        assert result["requested"] is False
+        assert no_dispatch == []
+
+        await session.refresh(run)
+        assert run.status is JobStatus.RUNNING

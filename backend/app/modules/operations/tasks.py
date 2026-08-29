@@ -33,8 +33,13 @@ async def tick_price_update() -> dict[str, Any]:
     """Ask for the price list if the configured interval has gone by (RF-01)."""
     async with SessionFactory() as session:
         service = OperationsService(session)
+        # Before deciding anything: a run whose worker died is still RUNNING,
+        # and while it is, nothing else can start — not the schedule and not a
+        # person. The heartbeat is the only thing that wakes up on its own, so
+        # it is where that gets noticed.
+        abandoned = await service.close_abandoned_price_update()
         if not await service.due_for_update():
-            return {"requested": False}
+            return {"requested": False, "abandoned": abandoned}
         try:
             requested = await service.request_price_update()
         except ConflictError:
@@ -44,7 +49,7 @@ async def tick_price_update() -> dict[str, Any]:
             return {"requested": False}
 
     logger.info("Scheduled price update requested", extra={"job_run_id": requested.job_run_id})
-    return {"requested": True, "job_run_id": requested.job_run_id}
+    return {"requested": True, "job_run_id": requested.job_run_id, "abandoned": abandoned}
 
 
 # Registered from the module that owns the task: `app/worker/celery_app.py` does

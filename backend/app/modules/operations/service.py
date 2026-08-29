@@ -74,6 +74,18 @@ STALL_THRESHOLD = 2
 
 ALREADY_RUNNING = "A price update is already running"
 
+# A run that is still RUNNING long past the point where its task could still be
+# alive did not get slow: its worker is gone — a redeploy, an OOM, a reboot.
+# Nobody will ever close it, and while it is open `due_for_update` says no and
+# `request_price_update` raises: the feature stops for good, quietly, which is
+# the one thing it is not allowed to do (Artículo II).
+#
+# The bound is Celery's own hard time limit, because that is what actually
+# bounds a live task, plus a margin so a task killed *at* the limit still gets
+# to record its own failure instead of being reaped first.
+ABANDONED_AFTER = timedelta(seconds=celery_app.conf.task_time_limit or 1800) + timedelta(minutes=15)
+ABANDONED = "The run was interrupted: its worker never came back"
+
 
 def dispatch_price_extraction(job_run_id: int) -> None:
     """Hand the extraction to the worker that owns it.
@@ -359,6 +371,32 @@ class OperationsService:
         if run is None:
             return
         await self.runs.update(run, {"result": result})
+
+    async def close_abandoned_price_update(self) -> int | None:
+        """Fail a run whose worker never came back, and say so like any failure.
+
+        Called by the heartbeat before it decides anything, because this is the
+        only thing that can be waiting on the other side of that decision. It
+        goes through the same path a real failure takes, so the run keeps its
+        reason (RF-10), the screen stops claiming an update is in progress
+        (RF-11) and the owner is warned on the same terms (RF-12, RF-13): from
+        outside, a worker that died mid-run and a portal that would not answer
+        are the same event — the update did not happen.
+        """
+        running = await self.runs.running(PRICE_UPDATE_TASK)
+        if running is None or running.started_at is None:
+            return None
+        if datetime.now(UTC) - running.started_at < ABANDONED_AFTER:
+            return None
+
+        run_id = running.id
+        logger.warning(
+            "Abandoned price update closed",
+            extra={"run_id": run_id, "started_at": running.started_at.isoformat()},
+        )
+        await self.record_price_update_failure(run_id, ABANDONED)
+        await self.session.commit()
+        return run_id
 
     async def due_for_update(self) -> bool:
         """Whether the next scheduled query is due.
