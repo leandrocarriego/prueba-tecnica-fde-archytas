@@ -10,6 +10,11 @@ apagado**. Por eso estos archivos se versionan.
 | `price-list-broken-2026-08-28.xlsx` | **Derivado a mano** del anterior | La cuarentena |
 | `price-list-page-2026-08-28.html` | La sección de precios renderizada | La navegación: encontrar el botón de descarga |
 | `price-history-page-2026-08-28.html` | La pantalla de historial de un producto | El parser del historial publicado (RF-38) |
+| `invoices-page-2026-08-29.html` | La sección `/facturas` renderizada, las 100 filas | La navegación y el parser de la tabla de facturas (004) |
+| `invoice-F-8411-text.pdf` | Factura en PDF **con capa de texto** | El lector de PDF (004) |
+| `invoice-F-9936-scanned.pdf` | Factura en PDF **escaneado**: un JPEG, sin texto | El OCR (004) |
+| `invoice-F-7797.xlsx` | Factura en planilla, con el encabezado corrido | El lector de planillas (004) |
+| `purchase-orders-page-2026-08-29.html` | La sección `/ordenes-compra` renderizada, las 40 filas | La navegación y el parser de órdenes de compra (007) |
 
 ## El archivo del día
 
@@ -48,6 +53,59 @@ La última no es una fila rota y no se comporta como tal: en la **primera** corr
 producto conocido junto con el resto (RF-02), y sólo a partir de la **segunda** queda apartada
 (RF-07). Es la diferencia de comportamiento entre dos corridas consecutivas, y es lo más fácil de
 romper sin darse cuenta.
+
+## Las facturas (004)
+
+Capturadas el **2026-08-29**. Cuatro hechos medidos sobre las 100 filas, que el parser puede dar por
+ciertos:
+
+- **La tabla ya trae los cuatro datos de cabecera** —`Proveedor`, `Nro. Factura`, `Fecha`, `Monto`—
+  y **no hay una sola celda vacía** en ninguna columna. Las fechas vienen en ISO (`2026-05-03`) y los
+  montos con `$` y separador de miles (`$223.376`), sin centavos.
+- **Los formatos son tres**, en la columna `Tipo`: 46 `PDF (escaneado)`, 29 `Excel`, 25 `PDF`. No hay
+  paginación: las 100 filas están en una sola pantalla.
+- **24 grafías distintas de proveedor** para 8 proveedores reales, y **ningún** par
+  (proveedor, número) repetido.
+- **Dentro del archivo, la fecha viene en `dd/mm/aaaa`** —`03/05/2026`—, no en ISO como en la tabla.
+
+Y una trampa que costó encontrar y no conviene volver a pisar:
+
+> **El CUIT impreso en la factura es el de Cordillera, no el del proveedor.** Todas dicen
+> `Cliente: Ferreteria Industrial Cordillera - CUIT 30-71234567-8`. Un parser que se quede con el
+> primer CUIT que encuentre le asigna el mismo proveedor a las cien.
+
+La planilla trae el encabezado **corrido a `A2`**, filas vacías intercaladas y una fila `TOTAL` al
+pie: se lee buscando las etiquetas por nombre en toda la hoja, no por posición.
+
+El escaneado es un único JPEG de 800×600 a 72 DPI sin capa de texto. La medición de OCR sobre doce
+como éste está en `docs/specs/004-invoices-suppliers/research.md`.
+
+## Las órdenes de compra (007)
+
+Capturada el **2026-08-29** de `/ordenes-compra`. Siete columnas —`Nro. OC`, `Fecha`, `Proveedor`,
+`Producto/insumo`, `Cantidad`, `Monto estimado`, `Estado`—, 40 filas, sin paginación. Cuatro hechos
+medidos que el parser puede dar por ciertos:
+
+- **Una orden es un producto.** Los 40 números de OC son distintos: no hay órdenes de varias líneas,
+  y por lo tanto no hay pantalla de detalle que abrir.
+- **El producto viene identificado con el código del catálogo** y enlazado a su ficha:
+  `COR-0078 - Sujecion - Articulo 78` → `/precios/p78?de=ordenes`. El código de la celda es el mismo
+  `COR-####` de la lista de precios, así que la orden se cruza con el catálogo sin adivinar por
+  nombre.
+- **Los cuatro estados son texto**, y sus conteos son los del relevamiento: 14 `Pendiente de envio`,
+  5 `Enviada al proveedor`, 10 `Confirmada por proveedor`, 11 `Recibida`. 20 proveedores.
+- **Hay una sola fecha por orden**, en ISO, y el monto viene con `$` y separador de miles, sin
+  centavos — igual que en facturas.
+
+Y dos hechos que **no** son del parser sino de la feature, y que conviene no volver a medir:
+
+> **El portal no publica desde cuándo una orden está en su estado.** La única fecha es la de la
+> orden. "Días en el mismo estado" no se puede leer del origen: se sabe recién cuando el sistema
+> observa el cambio por sí mismo.
+
+> **Ninguna de las 40 repite el par (proveedor, producto).** El caso que RF-15 tiene que detectar no
+> existe en los datos reales: para testear la detección de pedido repetido hay que derivar un
+> fixture a mano, como se hizo con `price-list-broken`.
 
 ## Recapturar
 

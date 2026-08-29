@@ -21,13 +21,17 @@ stateDiagram-v2
         Es la que fecha la pantalla de precios.
         Si la pidió una persona, se le informa
         el resultado y queda registrado quién
-        la pidió y cuándo
+        la pidió y cuándo. Si la actualización
+        venía interrumpida, el dueño recibe
+        además el aviso de que volvió a
+        funcionar
     end note
 
     note right of Fallida
         Se registra con su motivo. Recién cuando
-        se acumulan dos consultas programadas
-        seguidas sin una exitosa, el sistema lo
-        señala en pantalla y avisa al dueño por
-        WhatsApp, una sola vez por interrupción
+        se acumulan dos consultas seguidas sin
+        una exitosa —programadas o pedidas a
+        mano—, el sistema lo señala en pantalla
+        y avisa al dueño por WhatsApp, una sola
+        vez por interrupción
     end note

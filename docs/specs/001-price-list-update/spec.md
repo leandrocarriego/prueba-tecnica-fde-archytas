@@ -10,6 +10,15 @@
 **Estado:** Aprobado · **Feature:** 001-price-list-update · **Fecha:** 2026-08-28
 **Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-28
 
+**Refirmas.** El alcance se amplió tres veces después de la firma original. Las tres quedan
+registradas acá, con fecha y firmante, porque un documento que se firma no se corrige en silencio.
+
+| Fecha | Qué se agregó | Firmada por |
+|---|---|---|
+| 2026-08-29 | **RF-41 a RF-43** — los dos casos borde que la suite encontró sin definir (`checklists/tests.md`). Ninguno agrega pantalla ni capacidad nueva | Leandro Carriego — FDE |
+| 2026-08-29 | **RF-44** — el aviso de que la actualización volvió a funcionar, y el canal de WhatsApp confirmado como decisión del cliente y no ya como supuesto | Leandro Carriego — FDE |
+| 2026-08-29 | **RF-45** y la corrección de **RF-11** y **RF-12** — el historial ilegible se puede dar por revisado, y la interrupción no distingue quién pidió la consulta | Leandro Carriego — FDE |
+
 <!-- `/approve-spec` completa Aprobada por y Fecha de aprobación, y pasa Estado a Aprobado. -->
 
 ## Problema
@@ -58,10 +67,10 @@ lo esperable.
   donde una persona decide, caso por caso, si un producto desconocido se incorpora y si uno que
   dejó de aparecer se da por discontinuado. Lo que el sistema nunca hace es decidirlo solo.
 
-- **Se asume que los avisos de esta feature llegan por WhatsApp, y que los recibe el dueño.** El
-  canal es el mismo que va a usar el sistema para todos sus avisos. **Tampoco lo confirmó el
-  cliente**: queda a la espera de que el equipo acepte recibirlos por ahí, porque un canal que
-  incomoda se apaga y el aviso deja de existir.
+- ~~Se asume que los avisos de esta feature llegan por WhatsApp, y que los recibe el dueño.~~
+  **Confirmado el 2026-08-29.** El canal es WhatsApp y el destinatario es el dueño, y es el mismo
+  que va a usar el sistema para todos sus avisos. Deja de ser un supuesto y pasa a ser una regla de
+  negocio, abajo.
 
 ## Historias de usuario
 
@@ -141,8 +150,8 @@ revisión queda sin ese caso.
 | RF-08 | Si un producto conocido no figura en la lista obtenida, entonces el sistema debe conservar su último precio registrado. | H1 |
 | RF-09 | El sistema debe mostrar la fecha y la hora de la última actualización de precios que terminó con éxito. | H2 |
 | RF-10 | Si una actualización de precios falla, entonces el sistema debe registrar el fallo junto con su motivo. | H2 |
-| RF-11 | Si pasan dos consultas programadas seguidas sin una actualización exitosa, entonces el sistema debe señalarlo de forma visible en la pantalla de precios. | H2 |
-| RF-12 | Si pasan dos consultas programadas seguidas sin una actualización exitosa, entonces el sistema debe avisar al dueño por WhatsApp. | H2 |
+| RF-11 | Si pasan dos consultas seguidas sin una actualización exitosa, sean programadas o pedidas a mano, entonces el sistema debe señalarlo de forma visible en la pantalla de precios. | H2 |
+| RF-12 | Si pasan dos consultas seguidas sin una actualización exitosa, sean programadas o pedidas a mano, entonces el sistema debe avisar al dueño por WhatsApp. | H2 |
 | RF-13 | Mientras una misma interrupción siga sin resolverse, el sistema debe avisar una sola vez. | H2 |
 | RF-14 | Cuando una persona autorizada lo solicite, el sistema debe obtener la lista de precios sin esperar a la consulta programada. | H3 |
 | RF-15 | Si ya hay una actualización en curso, entonces el sistema debe informarlo en lugar de iniciar otra. | H3 |
@@ -171,6 +180,11 @@ revisión queda sin ese caso.
 | RF-38 | Cuando el sistema registre un producto como conocido por primera vez, debe incorporar a su historial los precios que el portal ya publica para ese producto. | H5 |
 | RF-39 | Si el historial publicado de un producto no se puede interpretar, entonces el sistema debe apartarlo sin perder el precio vigente de ese producto. | H5 |
 | RF-40 | Si un precio del historial publicado coincide con uno que el sistema ya registró, entonces el sistema debe conservar un solo punto. | H5 |
+| RF-41 | Si la lista obtenida no trae ninguna fila de datos, entonces el sistema debe registrar la consulta como fallida, junto con su motivo. | H2 |
+| RF-42 | Si la lista obtenida no trae ninguna fila de datos, entonces el sistema no debe señalar como faltante a ningún producto conocido. | H7 |
+| RF-43 | Si la pantalla de historial de un producto no publica ningún precio, entonces el sistema debe terminar esa importación sin puntos y sin registrar un fallo. | H5 |
+| RF-44 | Cuando la actualización de precios vuelva a funcionar después de una interrupción avisada, el sistema debe avisar al dueño por WhatsApp una sola vez. | H2 |
+| RF-45 | Cuando una persona autorizada dé por revisado un historial que no se pudo interpretar, el sistema debe dejar de mostrarlo entre los pendientes. | H8 |
 
 ## Reglas de negocio
 
@@ -195,13 +209,35 @@ revisión queda sin ese caso.
   destaca toda suba **mayor al 10%**. Lo primero sale de un dato medido —el proveedor publica dos
   veces por día, así que consultar más seguido no trae precios nuevos y castiga una cuenta que es de
   un tercero—. Lo segundo es sólo un punto de partida. El dueño cambia los dos cuando quiera.
+- **Una consulta fallida es una consulta fallida, la haya pedido el reloj o una persona.** Si el
+  portal no responde, la actualización dejó de funcionar y el dueño tiene que enterarse: esperar a
+  que además fallen dos consultas programadas puede demorar el aviso un día entero.
+- **Todo lo que entra a la pantalla de revisión tiene forma de salir.** Cada motivo por el que el
+  sistema aparta algo —una fila que no se entiende, un producto desconocido, uno que dejó de
+  figurar, un historial ilegible— tiene su decisión posible. Una cola con un caso que no se puede
+  resolver deja de vaciarse y deja de servir.
 - **Una decisión sobre un caso apartado se toma una sola vez.** Cuando una persona resuelve un caso,
   esa decisión queda guardada como regla y el sistema la aplica a los casos iguales que lleguen
   después, en lugar de volver a preguntar. Las reglas están a la vista, con quién las tomó, y se
   pueden dejar sin efecto: una regla equivocada tiene que poder corregirse, y corregirla devuelve a
   revisión lo que esa regla venía resolviendo.
+- **Los avisos de esta feature llegan por WhatsApp y los recibe el dueño.** Confirmado con el
+  cliente el 2026-08-29. Es el canal que va a usar el sistema para todos sus avisos: un canal que
+  incomoda se apaga, y un aviso que nadie mira no es un aviso.
 - **Un aviso no se repite mientras la causa siga siendo la misma.** Si la actualización lleva días
-  sin funcionar, el dueño recibe un aviso, no uno por cada intento fallido.
+  sin funcionar, el dueño recibe un aviso, no uno por cada intento fallido. **Y cuando la causa se
+  resuelve, recibe uno que se lo dice**: sin eso, la única forma de saber que volvió a andar es
+  acordarse de ir a mirar la pantalla, que es justo lo que esta feature existe para evitar.
+
+- **Una lista vacía es una consulta que salió mal, no cien productos que desaparecieron.** Si el
+  archivo del día llega sin una sola fila, lo que falló es la consulta: se registra como fallida y
+  se avisa por el mismo camino que cualquier otra falla. Tratarla como si cada producto hubiera
+  dejado de figurar llenaría la pantalla de revisión con cien casos que nadie causó, y encima daría
+  la actualización por buena.
+- **Un producto sin historial publicado es un hecho, no una falla.** Que el portal no publique
+  ningún precio para un producto es información, y se registra como tal: sin puntos y sin ruido. Lo
+  que sigue siendo una falla técnica es que la pantalla **no tenga** su tabla de precios, porque eso
+  significa que el portal cambió y el sistema dejó de entender lo que lee.
 
 ## Criterios de aceptación
 
@@ -215,7 +251,7 @@ revisión queda sin ese caso.
 - [ ] **RF-08** — Un producto que no vino en la lista del día sigue mostrando su último precio, con la fecha en que se registró.
 - [ ] **RF-09** — La pantalla de precios muestra la fecha y hora de la última actualización exitosa.
 - [ ] **RF-10** — Después de un fallo, queda registrado que la actualización falló y por qué.
-- [ ] **RF-11** — Cortado el acceso al portal, tras dos consultas programadas fallidas la pantalla de precios lo señala a la vista.
+- [ ] **RF-11** — Cortado el acceso al portal, tras dos consultas fallidas seguidas la pantalla de precios lo señala a la vista, sin importar si las disparó el reloj o una persona.
 - [ ] **RF-12** — En esa misma situación, al dueño le llega el aviso a su WhatsApp.
 - [ ] **RF-13** — Con la actualización caída varios ciclos seguidos, al dueño le llegó un solo aviso.
 - [ ] **RF-14** — Pedida la actualización a mano, el sistema consulta el portal en el momento.
@@ -245,6 +281,11 @@ revisión queda sin ese caso.
 - [ ] **RF-38** — Recién instalado el sistema, un producto muestra los mismos puntos de historial que muestra el portal para ese producto.
 - [ ] **RF-39** — Un producto cuyo historial no se pudo leer aparece igual en la lista con su precio vigente, y el historial faltante queda en la pantalla de revisión.
 - [ ] **RF-40** — Un producto cuyo historial se trae dos veces sigue mostrando la misma cantidad de puntos.
+- [ ] **RF-41** — Un archivo del día con sus encabezados y sin una sola fila de datos deja la actualización registrada como fallida, con el motivo a la vista.
+- [ ] **RF-42** — Ese mismo archivo no señala a ningún producto como faltante: la pantalla de revisión queda igual que antes de la consulta.
+- [ ] **RF-43** — Un producto cuya pantalla de historial no publica ningún precio queda sin puntos, sin caso en revisión y sin fallo registrado, y su precio vigente no se toca.
+- [ ] **RF-44** — Restablecido el acceso al portal después de una interrupción que ya se avisó, al dueño le llega un aviso de que volvió a funcionar, y uno solo.
+- [ ] **RF-45** — Un historial que no se pudo interpretar se puede dar por revisado desde la pantalla de revisión, y deja de figurar entre los pendientes.
 
 ## Fuera de alcance
 

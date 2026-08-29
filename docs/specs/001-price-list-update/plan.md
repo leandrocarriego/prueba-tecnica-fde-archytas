@@ -14,8 +14,8 @@
 | I — El origen es ajeno y de sólo lectura | Sí | La extracción es Playwright navegando la sección de precios como una persona. No se usa ningún endpoint JSON interno del portal, no se emite ninguna escritura contra SIGProv, y el módulo `portal` no expone forma de hacerlo: su único método público obtiene y devuelve bytes. |
 | II — Nada se descarta | Sí | Es el corazón de la feature. Una fila que no se puede interpretar va a `staging.price_row` con `status = CUARENTENA` y abre una fila en `operations.exception`; un producto desconocido y uno que desapareció también. H8 agrega lo que el artículo pide además: la decisión humana se guarda como `operations.resolution_rule` y se reaplica sola. |
 | III — Flujo unidireccional, `raw` inmutable | Sí | `raw.portal_document` guarda el archivo tal como llegó con su `content_hash`, sin `UPDATE` ni `DELETE`: el repositorio de `raw` sólo expone `insert` y `get`. Toda corrección ocurre al normalizar hacia `staging`, así que se puede reconstruir `core` desde `raw` sin volver a pedirle nada al portal. |
-| IV — Las fronteras entre módulos son reales | Sí | Cinco módulos, cero imports cruzados: se hablan por nueve eventos nuevos del catálogo compartido. Las dos lecturas sincrónicas que la feature necesitaba —`ingestion` consultando las reglas aprendidas, y `catalog` sabiendo qué productos conoce— se resuelven con proyecciones propias alimentadas por eventos, que es el costo que el artículo dice que hay que aceptar. Detalle abajo en *Eventos de dominio*. |
-| V — Spec primero, y con firma | Sí | `spec.md` está en `Estado: Aprobado`, firmada el 2026-08-28. Este plan no agrega alcance: los 37 requisitos tienen lugar acá y no hay nada acá que no salga de uno de ellos. |
+| IV — Las fronteras entre módulos son reales | Sí | Cinco módulos, cero imports cruzados: se hablan por dieciséis eventos nuevos del catálogo compartido. Las dos lecturas sincrónicas que la feature necesitaba —`ingestion` consultando las reglas aprendidas, y `catalog` sabiendo qué productos conoce— se resuelven con proyecciones propias alimentadas por eventos, que es el costo que el artículo dice que hay que aceptar. Detalle abajo en *Eventos de dominio*. |
+| V — Spec primero, y con firma | Sí | `spec.md` está en `Estado: Aprobado`, firmada el 2026-08-28. Este plan no agrega alcance: los 45 requisitos tienen lugar acá y no hay nada acá que no salga de uno de ellos. |
 | VI — Lo que no está tipado y testeado no está terminado | Sí | Tipos completos con `mypy --strict` (`PY-10`). El parser de la lista se testea contra **archivos fijados**, nunca contra el portal en vivo (`TEST-03`); la task de extracción tiene su test de idempotencia (`TEST-04`), apoyada en `content_hash`. |
 | VII — Las credenciales de terceros viven sólo en el entorno | Sí | `SIGPROV_USER` y `SIGPROV_PASSWORD` se leen de `config.Settings` y no se persisten, no se loguean y no viajan en un traceback: el cliente del portal envuelve sus errores en una excepción de dominio propia antes de propagarlos. Ninguna tabla de este plan tiene una columna de credencial. |
 | VIII — Un idioma para cada audiencia | Sí | Este plan y la spec en español; el código, los nombres de eventos y los commits en inglés; los strings de la UI en español. |
@@ -89,23 +89,25 @@ distintas y el mapa hay que actualizarlo en el mismo commit que cree el módulo.
 
 ## Eventos de dominio
 
-Catorce eventos nuevos en `app/shared/events/catalog.py`, todos en pasado, congelados, con
+Dieciséis eventos nuevos en `app/shared/events/catalog.py`, todos en pasado, congelados, con
 identificadores y valores planos (`GEN-08`). `JobRunFailed` ya existe y se reusa.
 
 | Evento | Lo publica | Lo consume | Qué lleva |
 |---|---|---|---|
-| `PriceListExtracted` | `portal` | `ingestion` | `raw_document_id`, `content_hash`, `fetched_at` |
-| `PriceListNormalized` | `ingestion` | `catalog` | `batch_id`, `raw_document_id`, `rows` — tupla de valores planos con `staging_row_id`, `product_code`, `description`, `price` |
+| `PriceListExtracted` | `portal` | `ingestion` | `raw_document_id`, `content_hash`, `content`, `content_type`, `fetched_at`, `job_run_id` |
+| `PriceListNormalized` | `ingestion` | `catalog` | `batch_id`, `raw_document_id`, `rows` — tupla de valores planos con `staging_row_id`, `product_code`, `description`, `price`—, `seen_codes`, `quarantined`, `job_run_id` |
 | `PriceRowsQuarantined` | `ingestion` | `triage` | `batch_id`, `cases` — tupla con `staging_row_id`, `reason`, `excerpt` |
-| `ProductPricesUpdated` | `catalog` | `operations` | `batch_id`, `updated`, `unchanged`, `highlighted` |
+| `ProductPricesUpdated` | `catalog` | `operations` | `batch_id`, `updated`, `unchanged`, `highlighted`, `quarantined`, `job_run_id` |
 | `UnknownProductsObserved` | `catalog` | `triage` | `batch_id`, `cases` — tupla con `staging_row_id`, `product_code`, `description`, `price` |
-| `KnownProductsMissing` | `catalog` | `triage` | `batch_id`, `product_ids` |
-| `QuarantineCaseResolved` | `triage` | `catalog`, `ingestion` | `case_id`, `kind`, `decision`, `payload`, `decided_by_user_id`, `decided_at` |
-| `QuarantineRuleRevoked` | `triage` | `ingestion`, `catalog` | `rule_id`, `kind` |
+| `KnownProductsMissing` | `catalog` | `triage` | `batch_id`, `products` — tupla con `product_id`, `product_code` y `description` |
+| `QuarantineCaseResolved` | `triage` | `catalog`, `ingestion` | `case_id`, `kind`, `decision`, `payload`, `rule_id`, `matcher`, `decided_by_user_id`, `decided_at` |
+| `QuarantineRuleRevoked` | `triage` | `ingestion`, `catalog` | `rule_id`, `kind`, `matcher`, `decision` |
 | `PriceUpdateStalled` | `operations` | `notifications` | `consecutive_failures`, `last_success_at`, `reason` |
 | `PriceUpdateRecovered` | `operations` | `notifications` | `recovered_at` |
 | `ProductsRegistered` | `catalog` | `portal` | `batch_id`, `products` — tupla con `product_id` y `product_code` |
-| `ProductHistoryExtracted` | `portal` | `ingestion` | `raw_document_id`, `product_code`, `content_hash` |
+| `ProductHistoryExtracted` | `portal` | `ingestion` | `raw_document_id`, `product_code`, `content_hash`, `content` |
+| `JobRunSucceeded` | quien corrió la task | `operations` | `job_run_id`, `job_name` |
+| `BusinessParameterChanged` | `operations` | `catalog` | `key`, `value` |
 | `PriceHistoryNormalized` | `ingestion` | `catalog` | `product_code`, `points` — tupla con `staging_row_id`, `price` y `changed_at` |
 | `PriceHistoryRowsQuarantined` | `ingestion` | `triage` | `product_code`, `cases` — tupla con `staging_row_id`, `reason` y `excerpt` |
 
@@ -145,8 +147,11 @@ Dos advertencias que ahorran un bug:
   `operations` de Postgres, porque así lo fija `AGENTS.md` —la excepción vive en
   `operations.exception`—. Eso **no** los habilita a leerse las tablas entre sí: la frontera sigue
   siendo el módulo, y el test la verifica por import, no por schema.
-- **`raw` no tiene `UPDATE`.** Su repositorio no expone el método. Es la forma barata de que el
-  Artículo III no dependa de que alguien se acuerde.
+- **`raw` no se corrige.** Su repositorio no expone `update` ni `delete`, y es la forma barata de
+  que el Artículo III no dependa de que alguien se acuerde. La **única** escritura posterior al
+  insert es `mark_normalized`, que toca una columna de contabilidad propia y no puede alcanzar ni
+  el contenido, ni el hash, ni el momento en que el documento llegó. El porqué está abajo, en
+  *Decisiones posteriores a la convergencia*.
 
 **`staging.price_row` guarda la categoría y la subcategoría tal como vinieron, sin interpretarlas.**
 No es alcance de P1 —el cliente no las ve en ninguna pantalla de esta feature, y por eso no hay
@@ -177,6 +182,11 @@ Toda ruta declara su autorización con la dependencia de `identity` (`PY-09`, Bl
 | `POST /triage/cases/{case_id}/resolution` | RF-29 a RF-33 | `OWNER`, `PURCHASING` |
 | `GET /triage/rules` | RF-36 | `OWNER`, `PURCHASING` |
 | `DELETE /triage/rules/{rule_id}` | RF-36, RF-37 | `OWNER`, `PURCHASING` |
+
+> **La autorización de estas rutas la reescribió 002-access-control.** La columna de arriba dice
+> qué rol tiene que poder hacer cada cosa, que es la decisión de esta feature y no cambió. El
+> mecanismo sí: 002 reemplazó los roles por secciones y niveles (`require_section`), y las rutas de
+> 001 ya están migradas. La intención por rol es la misma; dónde se declara, no.
 
 `POST /price-updates` es **single-flight**: toma un lock consultivo de Postgres
 (`pg_try_advisory_lock`) y devuelve `409` con el id de la corrida en curso si ya hay una (RF-15). No
@@ -225,8 +235,39 @@ corrida que falló nunca aparecería ahí y quien la pidió no se enteraría de 
 | **La cuenta del portal es compartida.** Una persona puede estar usándola cuando corre el job; la sesión se corta por inactividad a las 8 horas. | Extracción fallida sin causa aparente. | La task es idempotente y reintenta; el fallo se registra con su motivo (RF-10) y recién dos seguidos avisan (RF-12). Ningún reintento escribe nada en el portal. |
 | **El supuesto de que la lista sólo cambia precios puede ser falso.** | Si fuera falso y el sistema diera de alta solo, ensuciaría el catálogo en silencio. | Ya está mitigado por diseño: lo desconocido se aparta, no se crea. El primer día se ve en la cola de revisión. **No hace falta ninguna decisión técnica adicional.** |
 | **La primera corrida visita cien pantallas de historial**, una por producto, contra una cuenta compartida de un tercero. | El proveedor puede leerlo como abuso, o la sesión puede cortarse a mitad. | Las visitas van encoladas de a una y espaciadas, no en paralelo; cada una es idempotente por `content_hash`, así que reanudar no repite trabajo. Es un costo que se paga **una sola vez**: RF-38 corre cuando un producto se registra por primera vez, no en cada actualización. |
-| **`triage` es el módulo más grande de la feature** —9 de los 37 requisitos— y es transversal: P2 lo va a necesitar igual. | Sobre-ajustarlo a precios obliga a rehacerlo. | Los casos se modelan con un `kind` y un `payload` JSONB desde el principio, no con columnas de precios. La cola no sabe qué es un precio. |
+| **`triage` es el módulo más grande de la feature** —10 de los 45 requisitos— y es transversal: P2 lo va a necesitar igual. | Sobre-ajustarlo a precios obliga a rehacerlo. | Los casos se modelan con un `kind` y un `payload` JSONB desde el principio, no con columnas de precios. La cola no sabe qué es un precio. |
 | **Evolution API es un servicio gratuito de terceros.** | Un aviso que no llega es un aviso que no existe. | El fallo del envío **no aborta** la actualización: `notifications` encola su envío como task en lugar de hacerlo en el handler, y su fallo queda como `JobRun` fallido visible. El aviso también se muestra en pantalla (RF-11), que no depende de WhatsApp. |
+
+## Decisiones posteriores a la convergencia
+
+`/converge` encontró ocho desvíos entre lo firmado y el código
+([`checklists/converge.md`](checklists/converge.md)). Dos de ellos se resolvieron con decisiones de
+arquitectura, y quedan acá porque el próximo que lea este plan las va a encontrar en el código:
+
+1. **Quién tomó una decisión se guarda con la decisión, no se consulta después** (C5). RF-32 y
+   RF-36 prometen "quién lo decidió", y la pantalla mostraba `usuario #3`. `operations.exception` y
+   `operations.resolution_rule` ganan `resolved_by_name` y `created_by_name`, que la ruta completa
+   con el nombre que trae el token. **No** se resuelve con una proyección de usuarios: una decisión
+   es un hecho histórico —quien la tomó no deja de haberla tomado cuando cambia de apellido o se
+   va— y una proyección haría que la pantalla dependiera del estado actual de otro módulo. El
+   nombre cruza la frontera como string por `dependencies.py`, que es la excepción que el Artículo
+   IV ya admite.
+
+2. **La evidencia se commitea antes de interpretarla** (C8). `portal` guardaba el documento y
+   publicaba el evento en la misma transacción, así que un archivo que el parser no podía leer se
+   iba con el rollback: **toda falla de interpretación destruía su propia evidencia**, justo el día
+   —el del cambio de formato del portal— en que esa evidencia es lo único que sirve. Ahora
+   `raw.portal_document` se commitea solo, y `normalized_at` marca que el pipeline logró leerlo.
+
+   La consecuencia que obliga a la marca es el reintento: si el salteo siguiera preguntando *"¿ya
+   tengo este archivo?"*, el segundo intento encontraría el documento guardado, no haría nada y
+   **cerraría la corrida como exitosa sobre un archivo que nadie leyó** — exactamente el silencio
+   que RF-41 existe para romper. El salteo pregunta *"¿ya lo leí?"*.
+
+   Se evaluó poner la marca en `staging`, que es de quien normaliza. Se descartó porque `portal` no
+   puede leer una tabla de `ingestion` para decidir si saltea, y porque la marca registra un hecho
+   que `portal` **sí** observa: su propio `publish` volvió sin excepción, que es el contrato del
+   bus (`GEN-09`).
 
 ## Contexto de traspaso
 
@@ -236,9 +277,9 @@ hacia arriba —`portal` → `ingestion` → `catalog` → `triage` → `notific
 publica lo que el siguiente consume y así podés probar cada eslabón contra un evento a mano.
 
 **Lo que NO tenés que tocar:** `operations.JobRun` y `operations.Parameter` ya existen y alcanzan;
-`app/health.py` y el composition root sólo se tocan para registrar routers y handlers.
+el composition root sólo se toca para registrar routers y handlers.
 
-**Decisiones ya tomadas, no las rediscutas:** los módulos se hablan sólo por los catorce eventos de la
+**Decisiones ya tomadas, no las rediscutas:** los módulos se hablan sólo por los dieciséis eventos de la
 tabla de arriba; `ingestion` y `catalog` mantienen proyecciones propias en vez de leerle las tablas a
 nadie; el single-flight de RF-15 es un advisory lock, no un `SELECT` de estado; los dos parámetros
 van en `operations.parameter`, no en una tabla nueva. Si alguna de las cuatro te resulta incómoda de
@@ -276,7 +317,7 @@ nada.
   **no** `SALES`, porque le golpea la puerta a un sistema de un tercero.
 - **`DB-01`** — tablas en cuatro schemas; que `alembic check` quede limpio y que cada modelo nuevo
   esté en `app/models.py` en el mismo commit que su migración.
-- **Artículo III** — verificá que el repositorio de `raw` no exponga `update` ni `delete`, y que
+- **Artículo III** — la escritura sobre lo extraído ya la frena `tests/architecture/test_raw_immutability.py`; lo que sí hay que mirar a ojo es que
   **el historial pase por `staging` igual que la lista**: es el camino que ya se saltó una vez en
   este mismo plan, y saltárselo no rompe ningún test, sólo deja sin lugar a la cuarentena de RF-39. Es una
   ausencia, y las ausencias son lo que un review no ve si no las busca.
