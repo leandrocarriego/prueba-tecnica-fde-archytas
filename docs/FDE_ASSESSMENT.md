@@ -336,12 +336,13 @@ para todo el proyecto.
 | # | Decisión | Afecta | Quién la toma |
 |---|---|---|---|
 | D1 | **Qué OCR y qué modelo** para leer facturas escaneadas y planillas irregulares | P2 (y por dependencia, P3, P4, P5) | El arquitecto — pero el **costo recurrente** lo aprueba el cliente |
-| D2 | **Canal de avisos** fuera del sistema | P6, P8, P12 | El cliente |
+| D2 | ~~**Canal de avisos** fuera del sistema~~ → **WhatsApp**, decidido por el FDE el 2026-08-28. **Falta confirmarlo con el cliente**: el brief advierte que si el canal les incomoda lo apagan, y el problema de los avisos vuelve al punto de partida | P6, P8, P12 | El cliente |
 | D3 | **Mecanismo de tiempo real** para el calendario compartido | P11 | Los dos arquitectos |
 | D4 | **Aplicación instalable en el teléfono**, sí o no | P8, P11 (si el calendario se usa en el teléfono) | El cliente, con el costo de que las tres personas la instalen |
 
-D1 y D2 son las que bloquean más trabajo: **hasta que no estén cerradas, P2 y P8 no se pueden
-planificar con honestidad.**
+D1 sigue bloqueando P2. **D2 quedó decidida a favor de WhatsApp**, lo que desbloquea la
+planificación de P6, P8 y P12 — y hace que D4 deje de ser necesaria para los avisos, aunque siga
+abierta para el calendario en el teléfono. La decisión es del FDE y espera confirmación del cliente.
 
 ---
 
