@@ -11,13 +11,13 @@ import { PasswordForm } from '@/components/auth/PasswordForm'
  */
 export default async function Page({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const sirve = await tokenIsUsable('recuperar', token)
+  const usable = await tokenIsUsable('recuperar', token)
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
       <h1 className="mb-2 text-2xl font-semibold">Poné una clave nueva</h1>
 
-      {sirve ? (
+      {usable ? (
         <>
           <p className="mb-6 text-muted-foreground">
             Elegí la clave con la que vas a entrar de ahora en más.
@@ -27,8 +27,8 @@ export default async function Page({ params }: { params: Promise<{ token: string
               'use server'
               return setPasswordWithToken('recuperar', token, formData)
             }}
-            etiqueta="Guardar la clave"
-            unaSolaVez
+            label="Guardar la clave"
+            singleUse
           />
           <Link href="/login" className="mt-6 rounded bg-gray-900 px-4 py-2 text-center text-white">
             Ir a la pantalla de ingreso

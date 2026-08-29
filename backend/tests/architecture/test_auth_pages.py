@@ -85,7 +85,7 @@ class TestAuthenticationPagesArePublic:
 # Pages that redeem a token: their action works once, so the form must not
 # survive it. `mi-cuenta` deliberately does not qualify — changing your own
 # password is something you may do again tomorrow.
-SINGLE_USE = re.compile(r"unaSolaVez")
+SINGLE_USE = re.compile(r"singleUse")
 
 
 def token_pages() -> list[Path]:
@@ -105,6 +105,6 @@ class TestASingleUseLinkStopsOfferingItself:
     def test_it_asks_the_form_to_go_away(self, page: Path) -> None:
         """Otherwise it offers an action that can no longer succeed."""
         assert SINGLE_USE.search(page.read_text(encoding="utf-8")), (
-            f"{page.parts[-3]} redeems a single-use token and does not pass `unaSolaVez`: "
+            f"{page.parts[-3]} redeems a single-use token and does not pass `singleUse`: "
             "after saving, the form stays on screen offering to save again."
         )
