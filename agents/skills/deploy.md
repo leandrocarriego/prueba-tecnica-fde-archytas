@@ -14,7 +14,7 @@ Preparar y desplegar la Plataforma Cordillera en producción con Docker Compose.
 - El cambio está mergeado en `main`, con tests y `/review-feature` pasados.
 - Las migraciones están creadas y probadas en desarrollo.
 - Las variables de entorno de producción están configuradas (`.env` a partir de `.env.example`).
-- El navegador de Playwright está disponible en la imagen del worker.
+- El navegador de Playwright está en la imagen del worker (`backend/Dockerfile`, `playwright install --with-deps chromium`). Sin él la extracción falla en el primer `chromium.launch()`, con la corrida ya abierta.
 
 ## Servicios desplegados
 `frontend` (Next.js) · `backend` (FastAPI) · `postgres` · `rabbitmq` · `celery_worker` ·

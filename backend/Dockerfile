@@ -10,14 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# TODO (Playwright): this image cannot run the SIGProv extraction yet. The
-# dependency is declared in pyproject.toml, but the browser is not in the image.
-# Before the first deploy, after the install below:
-#     RUN uv run playwright install --with-deps chromium
-# (`--with-deps` pulls libnss3, libatk-bridge2.0-0, libgbm1, libasound2, ... on
-# this Debian slim base, and adds ~400MB.)
-# Until that lands, the extraction runs from the host (`make playwright-install`).
-
 RUN pip install --no-cache-dir uv
 
 # Install into the system prefix instead of a project .venv, so `uvicorn` and
@@ -31,6 +23,19 @@ ENV UV_PROJECT_ENVIRONMENT=/usr/local
 # their layer.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-install-project --no-dev
+
+# The browser the extraction reads the portal through. Article I says the portal
+# is read from the rendered screen and never through its internal JSON, so this
+# is not an optimisation: without it the extraction cannot run at all, and it
+# fails at the first `chromium.launch()` with the run already open.
+#
+# `--with-deps` pulls what Chromium needs on this Debian slim base — libnss3,
+# libatk-bridge2.0-0, libgbm1, libasound2 and company. It adds around 400 MB to
+# an image that three services share, and that is the price of the article.
+#
+# On its own layer, right after the dependencies and before the source: the
+# browser has no reason to be downloaded again because a handler changed.
+RUN playwright install --with-deps chromium
 
 COPY . .
 RUN uv sync --locked --no-dev
