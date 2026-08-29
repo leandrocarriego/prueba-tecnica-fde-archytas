@@ -1,0 +1,20 @@
+---
+title: El dueño — cuánto debe, a quién, y hace cuánto
+---
+flowchart TD
+    A["Abre la lista de facturas"] --> B["Ve de un vistazo cuáles están saldadas, a medias y sin tocar"]
+    B --> C["De cada una, el monto pagado, el saldo y el porcentaje pagado"]
+    C --> D{"¿El número le cierra con la cuenta hecha a mano?"}
+    D -->|No cierra| E["La factura aparece señalada, con su total y la suma de sus pagos"]
+    E --> F["El sistema la dejó afuera de la deuda y lo dice, en lugar de acomodar el número"]
+
+    A --> G["Abre la ficha de un proveedor"]
+    G --> H["Cuánto le pagó y cuánto le debe"]
+    G --> I["Cómo se reparte esa deuda por antigüedad, contada desde cada vencimiento"]
+    G --> J["Cuántos días en promedio se le paga tarde contra el plazo pactado con él"]
+    G --> K["Cuántas facturas quedaron excluidas, y llega a verlas"]
+
+    A --> L["Recibe por WhatsApp, en copia, el aviso de un vencimiento sin recibo"]
+    L --> M["Un aviso por vencimiento, no uno por día"]
+    A --> N["Define con cuántos días de anticipación quiere que avise"]
+    N --> O["Arranca en tres días y el próximo aviso sale con el valor nuevo"]

@@ -1,0 +1,33 @@
+---
+title: Marcela, compras — el trabajo del día sobre pagos y recibos
+---
+flowchart TD
+    A["Abre la lista de facturas"] --> B["Ve cuáles están saldadas, a medias y sin tocar, con su saldo"]
+    B --> C["Filtra por estado de pago, por proveedor, por vencimiento o por si tienen recibo"]
+
+    A --> D{"¿Pagamos algo que todavía no aparece del sistema viejo?"}
+    D -->|Sí| E["Registra el pago a mano con su monto y su fecha"]
+    E --> F{"¿El monto supera el saldo de la factura?"}
+    F -->|Sí| G["El sistema la advierte antes de confirmar"]
+    F -->|No| H["El saldo baja y el pago queda con su nombre y la fecha en que lo cargó"]
+    H --> I{"¿Lo cargó mal?"}
+    I -->|Sí| J["Lo deja sin efecto y el saldo vuelve a lo anterior"]
+    I -->|Vino del portal| K["Ese no se puede dejar sin efecto: es lo que informó el origen"]
+
+    A --> L["Revisa lo que el sistema apartó"]
+    L --> M{"¿Por qué está apartado?"}
+    M -->|Cubre varias facturas| N["Reparte el monto entre esas facturas hasta que sume exacto"]
+    M -->|Se parece a un pago que ella cargó| O["Resuelve si son el mismo pago o dos distintos"]
+    M -->|Su factura todavía no estaba| P["No hace nada: el sistema lo imputa solo cuando la factura entre"]
+
+    A --> Q{"¿Esta factura ya tiene su recibo de recepción?"}
+    Q -->|No, y todavía no venció| R["Lo emite desde el sistema"]
+    R --> S["Queda con su número correlativo y descarga el documento para el proveedor"]
+    S --> T{"¿Lo emitió por error?"}
+    T -->|Sí| U["Lo anula, y queda registrado quién lo anuló y cuándo"]
+    U --> V["Si la fecha todavía no pasó, emite uno nuevo"]
+    U --> W["Si la fecha ya pasó, la factura queda señalada como incidente"]
+    Q -->|No, y la fecha ya pasó| X["El sistema no la deja emitirlo y le explica por qué"]
+    X --> Y["Cierra el incidente indicando qué se hizo"]
+    Y --> Z["Deja de figurar entre los pendientes, y el motivo queda a la vista con su nombre"]
+    Q -->|Sí| AA["Por esa factura no le llega ningún aviso de vencimiento"]

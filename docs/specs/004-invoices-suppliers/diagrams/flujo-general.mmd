@@ -1,0 +1,51 @@
+---
+title: Facturas y proveedores — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Sistema as El sistema
+    participant Portal as Portal del proveedor
+    actor Marcela as Marcela, compras
+    actor Duenio as El dueño
+    actor Julian as Julián, ventas
+
+    loop Con la frecuencia configurada
+        Sistema->>Portal: Entra por su cuenta y pide las facturas de compra
+        Portal-->>Sistema: Las facturas y sus archivos
+        Sistema->>Sistema: Conserva cada archivo tal como llegó
+        Sistema->>Sistema: Lee número, fecha, proveedor y total, sea PDF, imagen escaneada o planilla
+        Sistema->>Sistema: Anota, dato por dato, si lo obtuvo con certeza o le quedó en duda
+
+        alt La factura trae el CUIT del proveedor
+            Sistema->>Sistema: Lo identifica por el CUIT, sin interpretar nada
+        else No lo trae
+            Sistema->>Sistema: Lo resuelve por el nombre contra el padrón de ocho proveedores
+        end
+
+        alt Todo quedó con certeza y el proveedor es del padrón
+            Sistema->>Sistema: Registra la factura asociada a su proveedor
+        else Un dato en duda, un proveedor ambiguo o uno que no está en el padrón
+            Sistema->>Sistema: La aparta con su motivo, sin frenar a las demás
+        end
+
+        opt La misma factura ya estaba registrada
+            Sistema->>Sistema: Conserva una sola y anota cuántas veces llegó
+            Note over Sistema: Si el total difiere, no descarta ninguna:<br/>la aparta con los dos totales a la vista
+        end
+    end
+
+    Marcela->>Sistema: Abre la pantalla de revisión
+    Sistema-->>Marcela: Cada caso con su motivo y el recorte del archivo del que salió el dato
+    Marcela->>Sistema: Confirma o corrige el dato, o asigna la grafía del nombre a un proveedor
+    Sistema-->>Marcela: Le avisa a cuántas facturas apartadas alcanza esa asignación
+    Marcela->>Sistema: Confirma
+    Sistema->>Sistema: Resuelve esas facturas y guarda la decisión para las que lleguen después
+
+    Marcela->>Sistema: Corrige el correo, el teléfono o el plazo pactado de un proveedor
+    Sistema->>Sistema: Registra quién lo corrigió, cuándo y qué valor tenía antes
+
+    Duenio->>Sistema: Abre un proveedor y pide un período
+    Sistema-->>Duenio: Sus facturas, el total facturado y cuántas quedaron afuera por estar en revisión
+
+    Julian->>Sistema: Intenta abrir las facturas de compra
+    Sistema-->>Julian: No tiene permiso, ni siquiera conociendo la dirección de la pantalla

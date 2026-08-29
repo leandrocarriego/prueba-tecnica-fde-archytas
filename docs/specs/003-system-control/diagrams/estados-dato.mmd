@@ -1,0 +1,45 @@
+---
+title: Qué le pasa a un dato que una persona puede corregir
+---
+stateDiagram-v2
+    state "Informado por el portal" as Portal
+    state "Cargado a mano por una persona" as Manual
+    state "Corregido a mano" as Corregido
+    state "En conflicto con el portal" as Conflicto
+
+    [*] --> Portal: lo trae el portal
+    [*] --> Manual: lo carga una persona
+    Manual --> Manual: se modifica con un motivo, conservando el valor anterior
+    Portal --> Corregido: una persona de esa sección lo corrige, con un motivo
+    Corregido --> Conflicto: el portal informa un valor distinto del original
+    Conflicto --> Corregido: una persona lo corrige otra vez
+    Conflicto --> Portal: el dueño deja sin efecto la corrección
+    Corregido --> Portal: el dueño deja sin efecto la corrección
+
+    note right of Portal
+        Lo que el portal informó se conserva
+        siempre, aunque encima haya una
+        corrección. Si mañana un número no
+        cierra, se explica con lo que dijo
+        el origen
+    end note
+
+    note right of Corregido
+        Se distingue a simple vista de un dato
+        sin corregir, y al lado se ve el valor
+        original. Se corrige cualquier campo:
+        importe, fecha, número de comprobante
+        o nombre del proveedor
+    end note
+
+    note right of Conflicto
+        El sistema lo señala en la pantalla del
+        propio dato y le avisa al dueño. Nunca
+        decide solo cuál de los dos vale, y no
+        hay una bandeja aparte que vaciar
+    end note
+
+    note right of Manual
+        No ofrece volver al valor del portal,
+        porque nunca vino de ahí
+    end note

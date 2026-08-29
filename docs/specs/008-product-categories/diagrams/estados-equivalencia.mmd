@@ -1,0 +1,25 @@
+---
+title: El ciclo de vida de una equivalencia
+---
+stateDiagram-v2
+    state "Vigente" as Vigente
+    state "Sin efecto" as SinEfecto
+
+    [*] --> Vigente: ventas decide a qué rubro corresponde una forma escrita
+    Vigente --> Vigente: ventas la cambia de rubro y se reasignan sus productos
+    Vigente --> SinEfecto: ventas la deja sin efecto
+    SinEfecto --> Vigente: la forma escrita vuelve a decidirse y se guarda otra vez
+
+    note right of Vigente
+        Se aplica sola a todo producto que llegue después
+        con esa misma forma escrita: la decisión se toma
+        una sola vez.
+        Se ve en la lista de equivalencias, con quién la
+        decidió y cuándo
+    end note
+
+    note right of SinEfecto
+        Los productos que esa equivalencia venía resolviendo
+        vuelven a la pantalla de revisión, en lugar de quedar
+        con un rubro que ya nadie sostiene
+    end note

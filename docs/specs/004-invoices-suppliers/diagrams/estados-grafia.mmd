@@ -1,0 +1,30 @@
+---
+title: Qué le pasa a cada forma de escribir el nombre de un proveedor
+---
+stateDiagram-v2
+    state "Grafía nueva, observada en una factura" as Nueva
+    state "Reconocida contra el padrón" as Reconocida
+    state "Ambigua, esperando una decisión" as Ambigua
+    state "Asignada a un proveedor por una persona" as Asignada
+    state "Dejada sin efecto" as SinEfecto
+
+    [*] --> Nueva
+    Nueva --> Reconocida: el nombre corresponde sin dudas a un proveedor del padrón
+    Nueva --> Ambigua: podría ser de dos, o de ninguno
+    Ambigua --> Asignada: una persona dice a qué proveedor corresponde
+    Reconocida --> [*]
+    Asignada --> SinEfecto: la decisión estaba equivocada y se anula
+    SinEfecto --> Ambigua: las facturas que resolvía vuelven a quedar apartadas
+
+    note right of Asignada
+        Antes de guardarla, el sistema dice a
+        cuántas facturas apartadas alcanza.
+        Al confirmar, las resuelve a todas y
+        se aplica a las que lleguen después
+    end note
+
+    note right of Asignada
+        Queda a la vista con quién la decidió
+        y cuándo: una decisión equivocada
+        tiene que poder corregirse
+    end note

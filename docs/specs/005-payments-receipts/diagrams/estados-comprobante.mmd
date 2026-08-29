@@ -1,0 +1,39 @@
+---
+title: El camino de un comprobante de pago
+---
+stateDiagram-v2
+    state "Traído del portal" as Traido
+    state "Cargado a mano" as AMano
+    state "Apartado para revisión" as Apartado
+    state "Imputado a su factura" as Imputado
+    state "Unificado en un solo pago" as Unificado
+    state "Dejado sin efecto" as SinEfecto
+
+    [*] --> Traido: el sistema lo trae con la frecuencia configurada
+    [*] --> AMano: compras registra un pago que todavía no aparece en el portal
+    Traido --> Imputado: indica una sola factura registrada y no se parece a ningún pago cargado a mano
+    AMano --> Imputado: se imputa a la factura sobre la que se cargó
+    Traido --> Apartado: su factura no está registrada
+    Traido --> Apartado: cubre más de una factura
+    Traido --> Apartado: coincide en factura y monto con un pago cargado a mano
+    Apartado --> Imputado: entra la factura que faltaba y el sistema lo imputa e informa
+    Apartado --> Imputado: compras reparte el monto y el reparto suma exacto
+    Apartado --> Imputado: una persona resuelve que no era el mismo pago
+    Apartado --> Unificado: una persona resuelve que era el mismo pago y la factura queda con uno solo
+    AMano --> SinEfecto: compras lo deja sin efecto
+    Imputado --> [*]
+    Unificado --> [*]
+    SinEfecto --> [*]
+
+    note right of Traido
+        Se conserva tal como llegó del portal, y si vuelve
+        a llegar no se imputa dos veces. Nunca se borra:
+        lo que se puede dejar sin efecto es lo que cargó
+        una persona
+    end note
+
+    note right of Apartado
+        Mientras está apartado ningún saldo se mueve.
+        Nada se descarta ni se aplica a la factura que
+        más se le parezca
+    end note

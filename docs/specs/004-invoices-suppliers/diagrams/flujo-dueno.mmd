@@ -1,0 +1,19 @@
+---
+title: El dueño — qué mira y qué decide
+---
+flowchart TD
+    A["El dueño quiere saber con cuántos proveedores trabaja y cuánto le compró a cada uno"] --> B["Abre la pantalla de proveedores"]
+    B --> C["Ve ocho proveedores, no veinticuatro, y cuántos son"]
+    C --> D["Abre uno y ve todas las formas en que llegó escrito su nombre"]
+    D --> E["Ve sus datos fiscales, su contacto y su plazo de pago pactado"]
+
+    E --> F["Pide un período"]
+    F --> G["El total facturado por ese proveedor en ese período"]
+    G --> H["Y cuántas facturas quedaron afuera del total por estar en revisión"]
+    H --> I{"¿El número cierra con la suma hecha a mano?"}
+    I -->|Sí| J["Puede confiar en el dato"]
+    I -->|No| K["Las que faltan están en la pantalla de revisión, contadas y con su motivo"]
+
+    A --> L["Ve todo el sistema, igual que compras"]
+    L --> M["También resuelve facturas apartadas y asigna grafías"]
+    K --> M

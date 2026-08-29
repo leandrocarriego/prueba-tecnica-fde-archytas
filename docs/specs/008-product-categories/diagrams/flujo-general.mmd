@@ -1,0 +1,43 @@
+---
+title: Rubros unificados — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Sistema as El sistema
+    actor Julian as Julián, ventas
+    actor Duenio as El dueño
+    actor Marcela as Marcela, compras
+
+    Sistema->>Sistema: Trae la lista del proveedor y lee la categoría de cada producto
+    Sistema->>Sistema: Reconoce las 18 formas escritas y las agrupa en los 7 rubros
+    Note over Sistema: Guarda también la subcategoría con la que llegó cada producto,<br/>aunque no agrupe por ella
+
+    Sistema-->>Julian: Le muestra los 8 productos sin rubro, cada uno con un rubro propuesto<br/>a partir de su subcategoría
+    Note over Sistema,Julian: Mientras Julián no confirme, el producto no queda en ningún rubro<br/>y sigue contando en «sin rubro»
+    Julian->>Sistema: Confirma las propuestas que están bien y corrige la que no
+    Sistema->>Sistema: Registra quién lo asignó y cuándo, y los saca de «sin rubro»
+
+    alt Llega una forma de escribir el rubro que el sistema no conoce
+        Sistema->>Sistema: Aparta el producto para revisión y no lo asigna a ningún rubro
+        Sistema-->>Julian: Se lo muestra con la forma escrita con la que llegó
+        Julian->>Sistema: Le indica a qué rubro corresponde esa forma escrita
+        Sistema->>Sistema: Guarda la decisión como equivalencia
+        Note over Sistema: El próximo producto que llegue con esa misma forma escrita<br/>entra directo al rubro, sin volver a preguntar
+    end
+
+    alt Una equivalencia quedó apuntando al rubro que no era
+        Julian->>Sistema: La cambia de rubro desde la lista de equivalencias
+        Sistema->>Sistema: Reasigna todos los productos que dependían de ella
+    else Julián prefiere dejarla sin efecto
+        Julian->>Sistema: La deja sin efecto
+        Sistema->>Sistema: Los productos que esa equivalencia resolvía vuelven a revisión
+    end
+
+    Duenio->>Sistema: Mira cómo quedó clasificado el catálogo
+    Sistema-->>Duenio: Los 7 rubros más «sin rubro», cada uno con cuántos productos tiene
+    Note over Sistema,Duenio: La suma de todos, «sin rubro» incluido, da el total general:<br/>no quedan pedazos sueltos
+
+    Marcela->>Sistema: Consulta en qué rubro está un producto que le facturaron
+    Sistema-->>Marcela: Se lo muestra, junto con la forma en que llegó escrito
+
+    Note over Sistema,Marcela: Cuánto se gasta en cada rubro no es parte de esta feature:<br/>hoy ninguna fuente dice qué productos se compraron

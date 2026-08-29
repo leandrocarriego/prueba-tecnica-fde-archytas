@@ -1,0 +1,50 @@
+---
+title: Pagos y recibos de recepción — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Portal as El portal del proveedor
+    participant Sistema as El sistema
+    actor Marcela as Marcela, compras
+    actor Duenio as El dueño
+
+    Sistema->>Portal: Con la frecuencia configurada, trae los comprobantes de pago y los recibos ya emitidos
+    Sistema->>Sistema: Conserva cada comprobante tal como llegó
+    Sistema->>Sistema: Lo imputa a la factura que indica y actualiza su saldo
+    Sistema-->>Duenio: La lista muestra cada factura saldada, a medias o sin tocar, con su saldo
+
+    alt El comprobante no se puede imputar solo
+        Sistema->>Sistema: Lo aparta sin tocar ningún saldo
+        Note over Sistema,Marcela: Apunta a una factura que todavía no está,<br/>cubre varias facturas,<br/>o se parece a un pago cargado a mano
+        Marcela->>Sistema: Reparte el monto entre las facturas que cubre, o resuelve si son el mismo pago
+        Sistema->>Sistema: Recién ahí mueve los saldos, y registra quién lo decidió
+    else Aparece después la factura que faltaba
+        Sistema->>Sistema: Le imputa el comprobante que estaba esperando e informa que lo hizo
+    end
+
+    alt Los números no cierran
+        Sistema-->>Duenio: Señala la factura con su total y la suma de sus pagos a la vista
+        Sistema->>Sistema: La deja afuera de los totales de deuda y avisa que la excluyó
+        Note over Sistema,Duenio: Si el portal la da por pagada y sus comprobantes no llegan al total,<br/>gana la suma de los comprobantes y la diferencia queda señalada
+    end
+
+    Marcela->>Sistema: Emite el recibo de recepción de una factura que todavía no venció
+    Sistema-->>Marcela: Le da su número correlativo y el documento para descargar
+    Sistema->>Sistema: Registra quién lo emitió y cuándo
+
+    Sistema-->>Marcela: Tres días antes del vencimiento de una factura sin recibo, avisa por WhatsApp
+    Sistema-->>Duenio: El mismo aviso le llega en copia
+    Note over Sistema,Duenio: Un aviso por vencimiento, no uno por día.<br/>Si el recibo ya está emitido, no avisa
+
+    alt La fecha se pasó igual
+        Marcela->>Sistema: Intenta emitir el recibo de una factura vencida
+        Sistema-->>Marcela: No la deja y le explica por qué
+        Sistema->>Sistema: Señala la factura como incidente, con la fecha en que se pasó
+        Marcela->>Sistema: Cierra el incidente indicando qué se hizo
+        Sistema->>Sistema: Deja de contarlo entre los pendientes y conserva el motivo, con quién lo cerró y cuándo
+    end
+
+    Duenio->>Sistema: Abre un proveedor
+    Sistema-->>Duenio: Le muestra cuánto le pagó, cuánto le debe, desde cuándo venció cada parte y cuántos días en promedio se le paga tarde
+    Sistema-->>Duenio: Y cuántas facturas quedaron afuera de esos totales
+    Duenio->>Sistema: Cambia con cuántos días de anticipación quiere el aviso

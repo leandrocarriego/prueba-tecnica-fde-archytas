@@ -1,6 +1,6 @@
 # Relevamiento técnico preliminar — Plataforma Cordillera
 
-- **Versión**: 1.0.0 · **Fecha**: 2026-08-28
+- **Versión**: 1.1.0 · **Fecha**: 2026-08-29 · *(D1 decidida; hipótesis de P2 corregidas por medición)*
 - **Autor**: Forward Deployed Engineer — Archytas
 - **Cliente**: Ferretería Industrial Cordillera
 - **Estado**: preliminar · **no acordado con el cliente** · **no vinculante**
@@ -100,6 +100,12 @@ escaneada, y planillas "armadas a las apuradas", hace falta lectura asistida por
 las imágenes y los PDF, y un modelo que interprete las planillas irregulares (fila de títulos
 corrida, filas vacías en el medio).
 
+> **Corregido el 2026-08-29 por medición.** La segunda mitad de esa hipótesis era falsa: la planilla
+> se resuelve buscando las etiquetas por su nombre en toda la hoja, sin ningún modelo. Y la primera
+> quedó más chica de lo que parecía, porque **los cuatro datos de cabecera ya están en la tabla
+> renderizada de las 100 facturas**: el archivo se lee igual, pero como segunda lectura que confirma
+> o manda a revisión, no como única fuente. Ver `004-invoices-suppliers/research.md`.
+
 ### Hallazgo que corrige una hipótesis previa
 La primera idea fue **identificar al proveedor por el CUIT de la factura**, lo que evitaría tener
 que resolver las 24 grafías distintas del nombre con un modelo.
@@ -115,10 +121,11 @@ Esto hay que verificarlo sobre el universo real de facturas antes de planificar,
 muestra.
 
 ### A definir en el `plan.md`
-- **Qué modelo y qué OCR.** No está decidido. Entra en tensión con la restricción de presupuesto
-  del brief: *"el trabajo se resuelve con herramientas sin costo de licencia"*. Un servicio de OCR
-  o un modelo por API tienen costo recurrente por documento, y eso es un pendiente **de acordar con
-  el cliente**, no una decisión del equipo.
+- ~~**Qué modelo y qué OCR.**~~ **Decidido el 2026-08-29** (D1): `pypdf` para el PDF con texto,
+  **Tesseract 5 + `spa`** para el escaneado, `openpyxl` para la planilla y `rapidfuzz` para la
+  grafía del proveedor. **Ningún modelo de lenguaje.** Sobre las 12 facturas escaneadas medidas,
+  Tesseract acertó los 48 datos de cabecera en 0,22 s cada una. La evidencia y las alternativas
+  descartadas están en `docs/specs/004-invoices-suppliers/research.md`.
 - **Umbral de confianza por dato.** El brief ya compromete el comportamiento (se carga lo confiable,
   se pregunta lo dudoso, mostrando el recorte de la imagen); falta el número y cómo se calibra.
 - **Reproceso.** Como `raw` es inmutable y el contenido se conserva tal como llegó, un cambio de
@@ -126,14 +133,21 @@ muestra.
   debería ser una capacidad explícita, no un efecto colateral.
 
 ### Consultas al cliente
-3. **¿Las facturas llegan por correo electrónico?** → *brief*
-   *Por qué importa*: si llegan por mail, se podría escuchar la casilla en vez de ir a buscarlas al
-   sistema viejo — el archivo llega en su formato original, sin pasar por el portal.
+*Las dos quedaron **contestadas el 2026-08-29**; se dejan con su respuesta para que no se vuelvan a
+preguntar.*
+
+3. ~~**¿Las facturas llegan por correo electrónico?**~~ → **No.** El portal sigue siendo la única
+   fuente y el alcance acordado no se movió.
+   *Por qué importaba*: si llegaran por mail, se podría escuchar la casilla en vez de ir a buscarlas
+   al sistema viejo — el archivo llega en su formato original, sin pasar por el portal.
    **Advertencia**: adoptar eso **cambia el alcance acordado**. El brief dice hoy que SIGProv es la
    *única fuente de datos*, y sumar una segunda fuente es un cambio `MAJOR` del brief, con su
    propia conversación. Se releva la respuesta; no se implementa por iniciativa propia.
-4. **¿Las facturas reales traen el CUIT del proveedor?** → *brief*
-   *Por qué importa*: si lo traen, la identificación del proveedor pasa a ser determinista y buena
+4. ~~**¿Las facturas reales traen el CUIT del proveedor?**~~ → **Algunas sí y otras no.** Con CUIT
+   la identificación es determinista; sin CUIT se resuelve por el nombre contra el padrón y lo que
+   no sea concluyente va a revisión. **Ojo con la muestra**: el único CUIT impreso en estas facturas
+   es el de Cordillera —el cliente—, no el del proveedor.
+   *Por qué importaba*: si lo traen, la identificación del proveedor pasa a ser determinista y buena
    parte del riesgo R3 del brief se desarma.
 
 ---
@@ -152,8 +166,10 @@ vencer**, al día.
 Sobre eso se puede montar una notificación —por correo u otro medio— cuando algo cruza el umbral.
 
 ### A definir en el `plan.md`
-- Si el plazo pactado se toma del portal como valor inicial y después lo edita el cliente, o si se
-  carga a mano desde el arranque. El brief lo marca como supuesto *a confirmar*.
+- ~~Si el plazo pactado se toma del portal como valor inicial y después lo edita el cliente, o si se
+  carga a mano desde el arranque.~~ **Resuelto el 2026-08-29**: el cliente confirmó que los plazos
+  del portal —30, 45 o 60 días— son los vigentes; entran como valor inicial de cada ficha y se
+  corrigen desde ahí (004, RF-15 y RF-16).
 - Cómo se calcula el "atraso promedio contra el plazo pactado" que el brief compromete en la ficha.
 
 ---
@@ -183,7 +199,32 @@ enviadas, 10 confirmadas, 11 recibidas). Se toma ese estado y se lo convierte en
 de la pantalla — mensajería, correo, o notificación push si la aplicación se instala en el teléfono.
 
 ### A definir en el `plan.md`
-El canal, junto con P8 y P12: es el mismo problema tres veces y se resuelve una sola vez.
+~~El canal, junto con P8 y P12~~ → **resuelto por D2**: WhatsApp, confirmado por el cliente el
+2026-08-29 durante el `/clarify` de `007-orders-alerts`.
+
+### Consulta técnica — **cerrada el 2026-08-29** contra el portal real
+**¿El portal publica, para cada orden de compra, qué producto se pidió?** → **Sí.** Medido sobre
+`/ordenes-compra` con `/portal`; el fixture quedó en
+`backend/tests/fixtures/portal/purchase-orders-page-2026-08-29.html` y su lectura, en el README de
+esa carpeta.
+
+Siete columnas —`Nro. OC`, `Fecha`, `Proveedor`, `Producto/insumo`, `Cantidad`, `Monto estimado`,
+`Estado`—, 40 filas, sin paginación. **Una orden es un producto** (40 números de OC distintos), y el
+producto viene con el código del catálogo enlazado a su ficha (`COR-0078 …` → `/precios/p78`), así
+que se cruza con precios sin adivinar por nombre. **RF-15 se sostiene tal como se firmó**, y el plan
+B queda descartado.
+
+La medición destapó además dos cosas que la spec daba por ciertas, ya corregidas en `007/spec.md`:
+
+- **El portal no publica desde cuándo una orden está en su estado**: la única fecha es la del pedido.
+  El reloj del estancamiento pasa a ser del sistema, que cuenta desde que observa el estado por sí
+  mismo (RF-05, RF-10, RF-48).
+- **Con el límite en 15 días, las 29 órdenes en curso quedarían señaladas el primer día** —la más
+  nueva tiene 22 días, la mediana 147, y ni con 90 días baja de 26—. El reloj propio lo resuelve: el
+  día uno no hay nada señalado. El arrastre del sistema viejo se lista con su antigüedad a la vista
+  (RF-49).
+- Dato para el `Tester`: **ninguna de las 40 repite el par (proveedor, producto)**. El caso que RF-15
+  detecta no existe en los datos reales y su fixture hay que derivarlo a mano.
 
 ---
 
@@ -239,6 +280,14 @@ Dos piezas distintas:
 1. **Un panel de configuración general** del sistema, para los parámetros que el brief ya enumera
    (frecuencia de actualización, umbrales de aviso, días de anticipación, días para considerar
    estancada una orden, porcentaje de suba destacable).
+
+   > **Coordinación con las specs, al 2026-08-29.** `003-system-control` está firmada con **siete**
+   > parámetros identificados, y fija la regla de que *cada funcionalidad que necesite un valor
+   > ajustable lo publica ahí*. `007-orders-alerts` aporta **dos más**: la ventana de pedido
+   > repetido (valor inicial 15 días) y la franja horaria en la que puede sonar un aviso inmediato
+   > (valor inicial lunes a viernes de 8:00 a 18:00). El panel arranca entonces con **nueve**.
+   > No contradice a `003` —es lo que esa regla prevé—, pero la lista de siete de su `spec.md` deja
+   > de ser el inventario completo. Lo verifica el `Lead` en el `/analyze` de las dos features.
 2. **Acciones de un solo botón** para lo que hoy se hace a mano: *Registrar pago*, *Emitir recibo*,
    *Ajustar monto*.
 
@@ -335,14 +384,20 @@ para todo el proyecto.
 
 | # | Decisión | Afecta | Quién la toma |
 |---|---|---|---|
-| D1 | **Qué OCR y qué modelo** para leer facturas escaneadas y planillas irregulares | P2 (y por dependencia, P3, P4, P5) | El arquitecto — pero el **costo recurrente** lo aprueba el cliente |
-| D2 | ~~**Canal de avisos** fuera del sistema~~ → **WhatsApp**, decidido por el FDE el 2026-08-28. **Falta confirmarlo con el cliente**: el brief advierte que si el canal les incomoda lo apagan, y el problema de los avisos vuelve al punto de partida | P6, P8, P12 | El cliente |
+| D1 | ~~**Qué OCR y qué modelo** para leer facturas escaneadas y planillas irregulares~~ → **Tesseract 5 + `spa`, `pypdf`, `openpyxl` y ningún modelo de lenguaje**, decidido por el Backend-Architect el 2026-08-29 sobre medición, en `docs/specs/004-invoices-suppliers/research.md`. El cliente ya había respondido que **no** acepta costo por documento | P2 (y por dependencia, P3, P4, P5) | El arquitecto — el **costo recurrente** lo aprobaba el cliente, y quedó en cero |
+| D2 | ~~**Canal de avisos** fuera del sistema~~ → **WhatsApp. Cerrada**: el cliente la confirmó el 2026-08-29 en el `/clarify` de `007-orders-alerts`, con sus tres bordes definidos — avisos a los **números personales** de cada persona, **reclamos y vencimientos a compras** y **resumen diario al dueño**, y ningún aviso inmediato fuera de la franja **lunes a viernes de 8:00 a 18:00** | P6, P8, P12 | El cliente ✅ |
 | D3 | **Mecanismo de tiempo real** para el calendario compartido | P11 | Los dos arquitectos |
 | D4 | **Aplicación instalable en el teléfono**, sí o no | P8, P11 (si el calendario se usa en el teléfono) | El cliente, con el costo de que las tres personas la instalen |
 
-D1 sigue bloqueando P2. **D2 quedó decidida a favor de WhatsApp**, lo que desbloquea la
-planificación de P6, P8 y P12 — y hace que D4 deje de ser necesaria para los avisos, aunque siga
-abierta para el calendario en el teléfono. La decisión es del FDE y espera confirmación del cliente.
+**D1 dejó de bloquear P2**: se midió contra el portal real y las cuatro piezas elegidas son libres,
+así que la restricción de presupuesto del brief se cumple sin recortar la feature. **D2 quedó
+decidida a favor de WhatsApp**, lo que desbloquea la planificación de P6, P8 y P12 — y hace que D4
+deje de ser necesaria para los avisos, aunque siga abierta para el calendario en el teléfono. **El
+cliente confirmó D2 el 2026-08-29**, así que ya no espera nada.
+
+Lo único que D2 deja abierto no es el canal sino su costo: WhatsApp cobra por mensaje y exige una
+cuenta de negocio. **Ese gasto recurrente lo aprueba el cliente**, como el de D1 — que terminó en
+cero.
 
 ---
 
@@ -356,10 +411,12 @@ dependencias se desatan solas:
 2. **P10 — Accesos.** Cuanto antes, mejor: agregar permisos reales sobre pantallas que se
    construyeron sin ellos es rehacerlas. Y es innegociable para el cliente.
 3. **P2 + P4 — Facturas y proveedores.** Van juntas: son la misma entidad mirada desde dos lados.
-   **Bloqueadas por D1.**
+   ~~Bloqueadas por D1.~~ **Desbloqueadas el 2026-08-29.**
 4. **P5 + P12 — Pagos y recibos.** Se apoyan en las facturas ya cargadas.
 5. **P11 — Calendario.** Necesita facturas, vencimientos y recibos para tener algo que mostrar.
-6. **P6 + P8 — Órdenes y avisos.** **Bloqueadas por D2.**
+6. **P6 + P8 — Órdenes y avisos.** ~~Bloqueadas por D2.~~ **Desbloqueadas el 2026-08-29**, y con la
+   verificación del portal ya hecha (P6 → *Consulta técnica cerrada*). `007-orders-alerts` está sin
+   preguntas abiertas, a la espera de sus diagramas y de la firma.
 7. **P7 — Rubros.** Independiente y de bajo riesgo; puede adelantarse si algo de lo anterior se
    traba.
 8. **P3 — Tablero.** Al final: es la vista de todo lo demás ya limpio.
@@ -371,6 +428,7 @@ dependencias se desatan solas:
 Todo lo de este documento es **preliminar**. Lo que el cliente firma es `docs/PROJECT_BRIEF.md`; lo
 que obliga al equipo es la constitución y el `plan.md` de cada feature.
 
-Las siete consultas de acá que necesitan una respuesta del cliente ya están volcadas al brief, en
+Las consultas de acá que necesitan una respuesta del cliente ya están volcadas al brief, en
 *Pendientes de acordar con el cliente*, que es el lugar donde se las va a buscar cuando haya
-reunión.
+reunión. **Las de P2 —el correo y el CUIT— ya están contestadas** y figuran en *Resueltas con el
+cliente* del brief 1.2.0.

@@ -1,0 +1,36 @@
+---
+title: El sistema — qué hace con cada factura que trae del portal
+---
+flowchart TD
+    A["Con la frecuencia configurada, entra al portal y trae las facturas de compra"] --> B["Conserva el archivo de cada una tal como llegó"]
+    B --> C{"¿Qué formato tiene el archivo?"}
+    C -->|PDF con texto| D["Lee número, fecha, proveedor y total"]
+    C -->|Imagen escaneada| D
+    C -->|Planilla| D
+    C -->|Una forma que no reconoce| E["La aparta para revisión, sin frenar a las demás"]
+
+    D --> F["Anota, dato por dato, si lo obtuvo con certeza o le quedó en duda"]
+    F --> G{"¿Algún dato quedó en duda?"}
+    G -->|Sí| E
+    G -->|No| H{"¿La factura trae el CUIT del proveedor?"}
+
+    H -->|Sí| I["Identifica al proveedor por su CUIT"]
+    H -->|No| J["Busca el nombre contra el padrón de ocho proveedores"]
+    J --> K{"¿La grafía ya fue asignada antes por una persona?"}
+    K -->|Sí| I
+    K -->|No, y el nombre no es concluyente| E
+    K -->|No está en el padrón| L["La aparta indicando que el proveedor no está en el padrón"]
+
+    I --> M{"¿Esta factura ya estaba registrada?"}
+    M -->|No| N["La registra con su proveedor, su número, su fecha y su total"]
+    M -->|Sí, igual en todo| O["Conserva una sola y anota cuántas veces llegó"]
+    M -->|Sí, pero con otro total| P["La aparta con los dos totales a la vista"]
+
+    E --> Q["Queda contada y visible en la pantalla de revisión, con su motivo"]
+    L --> Q
+    P --> Q
+    N --> R["Aparece en la lista de facturas y en la ficha de su proveedor"]
+    O --> R
+
+    S["Nunca da de alta un proveedor por su cuenta"] --- L
+    T["Nunca completa un dato por suposición"] --- E

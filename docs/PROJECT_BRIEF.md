@@ -3,7 +3,7 @@
 ## Propósito
 Este documento captura el acuerdo inicial entre el **Forward Deployed Engineer** y el cliente sobre las necesidades y el desarrollo planificado del proyecto. Este brief sirve como base para generar la documentación de diseño de solución.
 
-- **Versión**: 1.1.0 · **Fecha**: 2026-08-28
+- **Versión**: 1.4.0 · **Fecha**: 2026-08-29
 - **Creado por**: Forward Deployed Engineer — Archytas
 - **Cliente**: Ferretería Industrial Cordillera
 - **Proyecto**: Plataforma Cordillera
@@ -207,7 +207,7 @@ estado del origen al momento del relevamiento, no un objetivo:
 | Comprobantes de pago | 82 |
 | Movimientos de cuenta corriente | 182 (todos referencian facturas y pagos existentes) |
 | Grafías distintas del nombre de proveedor | 24 en facturas, 20 en órdenes de compra, 13 en remitentes de mensajes |
-| Proveedores reales | **8**, con CUIT, correo, teléfono y condición de pago pactada (30, 45 o 60 días) |
+| Proveedores reales | **8**, con CUIT, correo, teléfono y condición de pago pactada (30, 45 o 60 días) — **confirmado por el cliente el 2026-08-29** |
 | Órdenes de compra | 40 — 14 pendientes de envío, 5 enviadas, 10 confirmadas, 11 recibidas |
 | Categorías de producto | 19 variantes escritas que corresponden a 7 rubros reales, más 8 productos sin categoría |
 | Mensajes en la bandeja | 64 — 27 de vencimiento próximo, 21 reclamos de pago, 16 de stock bajo; 30 sin leer |
@@ -241,7 +241,8 @@ los vencimientos, sigue las órdenes de compra."*
 - **Ve y trabaja**: proveedores y su cuenta corriente, facturas de compra, pagos, órdenes de
   compra, recibos de recepción, calendario de vencimientos, mensajes y reclamos de proveedores.
 - **Ve sólo para consultar**: los precios de lista, porque los necesita para controlar lo que le
-  facturan (esa información no revela nada de las ventas de la empresa).
+  facturan (esa información no revela nada de las ventas de la empresa). Sobre esos precios sí puede
+  pedir la lista sin esperar al próximo ciclo y resolver lo que el sistema haya apartado.
 - **No accede**: a las ventas ni al tablero comercial del negocio.
 - **Resuelve**: las revisiones humanas que caen de su lado (proveedores ambiguos, facturas que no
   se pudieron leer del todo).
@@ -249,9 +250,8 @@ los vencimientos, sigue las órdenes de compra."*
 ### 3. Julián — ventas y números del negocio
 *"Y tengo a Julián, que lleva la parte de ventas y los números del negocio."*
 
-- **Ve y trabaja**: ventas, tablero comercial, evolución de precios, stock, altas de producto,
-  rubros y catálogo.
-- **Ve sólo para consultar**: el calendario de vencimientos.
+- **Ve y trabaja**: ventas, tablero comercial, stock, altas de producto, rubros y catálogo.
+- **Ve sólo para consultar**: el calendario de vencimientos y la evolución de los precios.
 - **No accede**: a las cuentas de los proveedores ni a las facturas de compra y pagos.
 - **Resuelve**: las revisiones humanas de su lado (ventas duplicadas o con datos rotos, productos
   sin rubro).
@@ -402,6 +402,22 @@ y se imputan a su factura, que queda mostrando su estado: saldada, sin tocar, o 
 porcentaje pagado a la vista**. Los recibos se leen de la misma fuente y sirven para contrastar
 contra los vencimientos y avisar antes de que se pase la fecha.
 
+Lo que se acordó el 2026-08-29, al cerrar las dudas de la feature de pagos y recibos:
+
+- **El estado de pago lo dicen los comprobantes, no el sistema viejo.** Si el portal informa que una
+  factura está pagada y sus comprobantes no llegan al total, no gana el portal: la factura queda
+  señalada con los dos datos a la vista.
+- **El recibo de recepción es un documento que genera el sistema**, con numeración propia y
+  correlativa, y se descarga para mandárselo al proveedor. Emitirlo tarde sigue sin permitirse.
+- **Una factura que se pasó de fecha sin recibo no queda trabada para siempre**: compras cierra el
+  incidente explicando qué se hizo, y queda registrado quién lo cerró y cuándo.
+- **La fecha de vencimiento sale siempre del plazo pactado con el proveedor**, y no de ninguna otra
+  fecha que traiga el documento.
+- **Un mismo pago puede cubrir varias facturas** —es habitual, corrige lo que se había supuesto del
+  relevamiento— y el reparto entre esas facturas lo hace una persona, nunca el sistema.
+- **La antigüedad de la deuda y el atraso promedio se cuentan desde el vencimiento**, e incluyen lo
+  que se debe y ya se pasó de fecha.
+
 ### Los vencimientos (P11)
 Un calendario donde se ve de un vistazo qué vence y cuándo, con los vencimientos moviéndose
 arrastrándolos, y actualizándose para todos los que lo estén mirando en el momento en que alguien
@@ -435,10 +451,24 @@ Un panel donde el dueño ajusta los parámetros del sistema, y **acciones de un 
 que hoy se hace a mano: registrar un pago, emitir un recibo, ajustar un monto. Los accesos son los
 tres descritos en *Actores y Roles*, con permisos que se verifican de verdad.
 
-> **Consultas pendientes**: cuando el cliente dice *"hoy todo lo hacemos a mano"*, no quedó claro si
+Al definir la feature de accesos (spec `002`, firmada el 2026-08-29) se resolvió cómo funciona
+cada uno de esos accesos. **Son decisiones del FDE, tomadas para poder avanzar, y esperan
+confirmación del cliente**:
+
+- **Los roles son tres y el dueño es uno solo.** No hace falta un cuarto acceso técnico por encima
+  de él, y no hay pantalla para armar roles nuevos: quien entra al equipo entra en uno de los tres.
+- **Cada sección se habilita como consulta, o como consulta y edición.** Ver algo no habilita a
+  cambiarlo.
+- **A alguien nuevo lo da de alta el dueño** con su nombre, su teléfono y su rol, y esa persona
+  define su propia clave desde una invitación: el dueño no conoce la clave de nadie.
+- **La invitación y la recuperación de clave llegan por WhatsApp**, el mismo canal de los avisos.
+  Se eligió así porque Cordillera no tiene dominio propio de correo.
+- **La sesión se cierra a las ocho horas sin uso**, y probar claves hasta acertar bloquea el acceso
+  un rato.
+
+> **Consulta pendiente**: cuando el cliente dice *"hoy todo lo hacemos a mano"*, no quedó claro si
 > se refiere a papel, a una planilla aparte o al sistema viejo. Las tres llevan a soluciones
-> distintas y **no se asumió ninguna**. Y falta definir si hace falta un cuarto acceso, técnico, por
-> encima del dueño, o si con los tres alcanza.
+> distintas y **no se asumió ninguna**.
 
 ### El tablero (P3)
 Va al final, y no por importancia: el tablero muestra los datos ya limpios, así que depende de que
@@ -602,10 +632,6 @@ definidos en la conversación inicial. Debe acordarse antes de comprometer un pl
 - El portal SIGProv seguirá disponible y con la cuenta compartida activa mientras dure el proyecto.
 - El contenido que publica el portal es correcto salvo lo que se identifique como sucio: no se
   audita al proveedor, se procesa lo que publica.
-- El padrón de 8 proveedores del portal es la lista real y completa con la que trabaja Cordillera.
-  *A confirmar con el cliente.*
-- Las condiciones de pago pactadas (30, 45 o 60 días) que publica el portal son las vigentes.
-  *A confirmar con el cliente.*
 - El equipo se mantiene en tres personas con los roles descritos. Si se suman más, los roles
   existentes alcanzan como molde.
 - El cliente tiene alguien disponible a diario para atender la cola de revisión — sin eso, los
@@ -635,37 +661,44 @@ Ninguna de estas cosas surgió de la conversación inicial ni del material relev
 completaron por suposición**; hay que cerrarlas antes de comprometer un plan de entrega.
 
 1. **Plazos, hitos y fecha de puesta en marcha.** No hay ninguna fecha definida.
-2. **Canal por el que quieren recibir los avisos** de P6, P8 y P12, y quién recibe qué tipo de
-   aviso. Las tres opciones y lo que cuesta cada una están en *Dirección de Solución Propuesta*.
-   **Es la consulta que más trabajo desbloquea**, junto con la 11.
-3. **Valores iniciales de los parámetros configurables**: cada cuánto actualizar, con cuántos días
-   de anticipación avisar un vencimiento, a partir de qué monto avisar, a partir de cuántos días
-   una orden de compra se considera estancada, y qué porcentaje de suba de precio amerita destacar.
+2. **Quién recibe cada tipo de aviso en P6 y P8** — órdenes estancadas, reclamos de proveedores y
+   el resumen diario de la bandeja. *El canal ya está acordado y los avisos de vencimiento sin
+   recibo ya tienen destinatario — ver Resueltas.*
+3. **Valores iniciales de los parámetros configurables**: cada cuánto actualizar, a partir de qué
+   monto avisar, a partir de cuántos días una orden de compra se considera estancada, y qué
+   porcentaje de suba de precio amerita destacar. *La anticipación del aviso de vencimiento sin
+   recibo ya está acordada — ver Resueltas.*
 4. **Tiempos de respuesta esperados** de las pantallas y expectativas de crecimiento a 2–3 años.
-5. **Confirmación del padrón de proveedores** (que sean 8 y no más) y de las condiciones de pago
-   pactadas con cada uno.
-6. **Qué hacer con las 17 facturas ya vencidas sin recibo** que aparecen el primer día: si se
-   regularizan antes de arrancar o entran como trabajo pendiente del sistema.
-7. **Quién administra los accesos** en el día a día y qué pasa cuando se suma alguien nuevo.
-8. **Dónde y cómo se pone en marcha el sistema** (entorno, responsable de la operación).
-9. **Si existe alguna herramienta que el cliente ya use** y que deba conectarse.
-10. **Si la lista diaria de precios sólo actualiza precios, o también da de alta y de baja
-    productos** — y con qué frecuencia y en qué horario se actualiza. *Sin esto no se puede decidir
-    qué hace el sistema cuando un producto deja de aparecer en la lista.*
-11. **Si las facturas reales traen el CUIT del proveedor.** Las de muestra no lo traen. *Con CUIT,
-    reconocer al proveedor es una certeza y no una interpretación: cambia el riesgo R3 y el costo de
-    la lectura automática.*
-12. **Si las facturas llegan también por correo electrónico.** *Si llegan, existiría una segunda vía
-    para obtenerlas — pero incorporarla cambiaría el alcance acordado, que hoy declara al portal
-    como única fuente. Se pregunta para saberlo, no para adoptarlo por cuenta propia.*
-13. **Qué significa exactamente *"hoy todo lo hacemos a mano"*** (P9): papel, planilla aparte o el
-    sistema viejo. *Las tres llevan a soluciones distintas y ninguna se asumió.*
-14. **Si hace falta un cuarto acceso, técnico, por encima del dueño**, o si con los tres roles
-    descritos alcanza. *Depende de quién opere el sistema en el día a día — consulta 7.*
-15. **Si el cliente acepta un costo recurrente por documento leído**, dado que la lectura automática
-    de las facturas escaneadas es el camino principal y no un extra. *Hoy el brief declara que no
-    hay presupuesto para servicios pagos; si esa restricción se mantiene, condiciona la solución de
-    P2.*
+5. **Quién administra los accesos** en el día a día y qué pasa cuando se suma alguien nuevo.
+   *La spec `002` asume que los administra el dueño y que a alguien nuevo lo da de alta él, con una
+   invitación por WhatsApp para que esa persona defina su propia clave. **Falta que el cliente lo
+   confirme.***
+6. **Dónde y cómo se pone en marcha el sistema** (entorno, responsable de la operación).
+7. **Si existe alguna herramienta que el cliente ya use** y que deba conectarse.
+8. **Si la lista diaria de precios sólo actualiza precios, o también da de alta y de baja
+   productos** — y con qué frecuencia y en qué horario se actualiza. *Sin esto no se puede decidir
+   qué hace el sistema cuando un producto deja de aparecer en la lista.*
+9. **Qué significa exactamente *"hoy todo lo hacemos a mano"*** (P9): papel, planilla aparte o el
+   sistema viejo. *Las tres llevan a soluciones distintas y ninguna se asumió.*
+10. **Si hace falta un cuarto acceso, técnico, por encima del dueño**, o si con los tres roles
+   descritos alcanza. *Depende de quién opere el sistema en el día a día — consulta 5. La spec
+   `002` asume que **no hace falta**: tres roles y un solo dueño. **Falta que el cliente lo
+   confirme.***
+
+### Resueltas con el cliente
+
+Se cierran acá para que no queden dos versiones de la misma pregunta. Cada respuesta entró además a
+la spec de la feature que la necesitaba.
+
+| # original | Consulta | Respuesta del cliente | Fecha |
+|---|---|---|---|
+| 2 | Canal por el que llegan los avisos | **WhatsApp**, que es donde el equipo ya mira. El aviso de un vencimiento sin recibo lo recibe compras, con copia al dueño. Queda por definir quién recibe cada tipo de aviso en P6 y P8. **Desde el 2026-08-29 ese canal lleva además las invitaciones y las recuperaciones de clave** (P10), así que ya no sólo avisa: sin él nadie puede entrar por primera vez | 2026-08-29 |
+| 3 | Con cuántos días de anticipación avisar un vencimiento sin recibo | **Tres días**, como valor inicial. El dueño lo cambia cuando quiera desde los parámetros del sistema | 2026-08-29 |
+| 5 | Padrón de proveedores y condiciones de pago | **Son 8 y no más**, y los plazos que publica el portal —30, 45 o 60 días— son los vigentes. El plazo entra como valor inicial de cada ficha y se corrige desde ahí | 2026-08-29 |
+| 11 | Si las facturas reales traen el CUIT del proveedor | **Algunas sí y otras no.** Con CUIT la identificación es una certeza; sin CUIT se resuelve por el nombre contra el padrón, y lo que no sea concluyente va a revisión humana | 2026-08-29 |
+| 12 | Si las facturas llegan también por correo electrónico | **No.** El portal sigue siendo la única fuente y el alcance acordado no se mueve | 2026-08-29 |
+| 5 | Qué hacer con las 17 facturas ya vencidas sin recibo el primer día | **Entran como trabajo pendiente señalado**, con la fecha en que se pasaron. El recibo no se emite fuera de término: compras cierra cada caso explicando qué se hizo | 2026-08-29 |
+| 15 | Si acepta un costo recurrente por documento leído | **No.** La lectura se resuelve con herramientas sin costo de licencia, y se acepta la consecuencia: más facturas caen en la cola de revisión | 2026-08-29 |
 
 ### Aclaración de vocabulario
 El cliente usa la palabra **recibo** en un sentido preciso, que conviene no confundir: *"no un
@@ -690,6 +723,9 @@ Todo cambio de versión se acuerda con el cliente y se anota acá:
 
 | Versión | Fecha | Qué cambió |
 |---------|-------|------------|
+| 1.4.0 | 2026-08-29 | Se anota lo decidido al definir la feature de accesos (P10) y queda a la espera de confirmación del cliente: tres roles con un solo dueño, permisos de consulta y de edición, alta por invitación y recuperación por WhatsApp. Se precisa que compras resuelve lo apartado de precios y que ventas consulta su evolución. El alcance acordado no se movió. |
+| 1.3.0 | 2026-08-29 | Se cierran tres consultas al aclarar la feature de pagos y recibos (2, 3 y 5): el canal de avisos es WhatsApp, la anticipación arranca en tres días y las 17 facturas vencidas sin recibo entran como trabajo pendiente. Se precisa que el recibo es un documento numerado por el sistema, que el vencimiento sale siempre del plazo pactado y que un pago puede cubrir varias facturas, con el reparto a cargo de una persona. El alcance acordado no se movió. |
+| 1.2.0 | 2026-08-29 | Se cierran cuatro consultas al cliente (5, 11, 12 y 15); el padrón de 8 proveedores y sus condiciones de pago dejan de ser supuestos y pasan a hecho confirmado. El alcance acordado no se movió: la vía del correo quedó descartada por el propio cliente. |
 | 1.1.0 | 2026-08-28 | Se agrega *Dirección de Solución Propuesta* con el enfoque del FDE por problema, y seis consultas nuevas al cliente (10 a 15). El alcance acordado no se movió. |
 | 1.0.0 | 2026-08-28 | Versión inicial, a partir de la reunión de relevamiento. |
 
