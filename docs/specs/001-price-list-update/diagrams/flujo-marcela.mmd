@@ -1,0 +1,32 @@
+---
+title: Marcela, compras — qué puede hacer y qué ve
+---
+flowchart TD
+    A["Marcela tiene que controlar lo que le facturan"] --> B["Abre la lista de precios vigente"]
+    B --> C["Ve el código, la descripción y el precio de cada producto"]
+    C --> D{"¿El precio está actualizado al momento que ella necesita?"}
+    D -->|Sí| E["Controla la factura contra ese precio"]
+    D -->|No| F["Pide la actualización a mano"]
+
+    F --> G{"¿Ya hay una actualización en curso?"}
+    G -->|Sí| H["El sistema le informa que ya hay una en curso y no inicia otra"]
+    G -->|No| I["El sistema entra al portal y trae la lista, y queda registrado que la pidió ella"]
+    I --> J["Al terminar le informa si trajo la lista o si falló"]
+    H --> C
+    J --> C
+
+    A --> K["Revisa lo que el sistema apartó"]
+    K --> L{"¿Por qué se apartó este caso?"}
+    L -->|No se pudo interpretar la fila| M["Señala a qué producto conocido corresponde y con qué precio"]
+    L -->|Es un producto que el sistema no conoce| N["Decide si lo incorpora a los conocidos o lo deja fuera"]
+    L -->|Es un conocido que dejó de figurar| O["Decide si lo da por discontinuado o lo mantiene vigente"]
+
+    M --> P["El caso queda resuelto y sale de los pendientes"]
+    N --> P
+    O --> P
+    P --> Q["La decisión queda guardada como regla, con su nombre y la fecha"]
+    Q --> R["Los casos iguales que lleguen después se resuelven solos, sin volver a apartarse"]
+    R --> S{"¿La regla estaba equivocada?"}
+    S -->|Sí| T["La deja sin efecto y esos casos vuelven a la pantalla de revisión"]
+    S -->|No| U["La pantalla de revisión se mantiene vacía"]
+    T --> K

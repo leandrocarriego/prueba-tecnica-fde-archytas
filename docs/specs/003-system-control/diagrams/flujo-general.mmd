@@ -1,0 +1,45 @@
+---
+title: Control propio del sistema — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    actor Duenio as El dueño
+    actor Marcela as Marcela, compras
+    actor Julian as Julián, ventas
+    participant Sistema as El sistema
+    participant Portal as Portal del proveedor
+
+    Duenio->>Sistema: Abre el panel y ajusta un parámetro
+    Note over Sistema: Mientras no los cambie rigen los valores iniciales:<br/>vencimiento 3 días, orden estancada 15 días, sesión 60 minutos,<br/>recibo 3 días y resumen diario a las 8:00
+    alt El valor está dentro del rango admitido
+        Sistema->>Sistema: Aplica el valor nuevo de inmediato
+        Sistema->>Sistema: Registra el anterior, el nuevo, quién y cuándo
+    else Queda fuera del rango
+        Sistema-->>Duenio: Rechaza el cambio e informa entre qué valores tiene que estar
+    end
+
+    Marcela->>Sistema: Abre el único lugar de cargas y correcciones
+    Sistema-->>Marcela: Sólo las acciones habilitadas para su rol
+    Marcela->>Sistema: Corrige un dato de su sección y elige el motivo
+    Sistema->>Sistema: Conserva lo que informó el portal y el valor que tenía antes
+    Sistema->>Sistema: Señala el dato como corregido a mano
+    Sistema-->>Marcela: Le avisa si la acción se aplicó o si falló
+
+    loop En cada actualización posterior
+        Sistema->>Portal: Vuelve a leer ese mismo dato
+        Portal-->>Sistema: El valor que publica hoy
+        alt Difiere del valor original
+            Sistema->>Sistema: Señala el conflicto en la pantalla del dato, sin pisar la corrección
+            Sistema-->>Duenio: Le avisa que hay un conflicto esperando a una persona
+        else Coincide con el original
+            Sistema->>Sistema: La corrección sigue en pie, sin novedad
+        end
+    end
+
+    Duenio->>Sistema: Abre el historial y filtra por persona y fechas
+    Sistema-->>Duenio: Los cambios de las tres personas, de más nuevo a más viejo, con su motivo
+    Duenio->>Sistema: Deja sin efecto una corrección
+    Sistema->>Sistema: Restituye el valor del portal y registra quién la anuló y cuándo
+
+    Julian->>Sistema: Pide el historial de las facturas de compra
+    Sistema-->>Julian: Sólo los cambios de las secciones a las que tiene acceso

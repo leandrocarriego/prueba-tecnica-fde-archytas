@@ -1,0 +1,39 @@
+---
+title: El dueño — administra los accesos y mira quién entró
+---
+flowchart TD
+    A["El dueño entra con su propio acceso"] --> B["Ve todas las secciones del sistema"]
+    A --> C["Abre la administración de accesos"]
+
+    C --> D{"¿Qué necesita hacer?"}
+    D -->|Sumar a alguien| E["Carga la persona, su correo, su teléfono y uno de los tres roles"]
+    E --> F["El sistema le manda la invitación para que ella defina su clave"]
+    F --> G["Mientras no la defina, ese acceso no entra"]
+
+    D -->|Cambiar lo que ve alguien| H["Le cambia el rol al acceso"]
+    H --> I{"¿Lo quiere poner como dueño?"}
+    I -->|Sí| J["El sistema no lo permite: el dueño es uno solo"]
+    I -->|No| K["Al volver a entrar, esa persona ve las secciones de su rol nuevo"]
+
+    D -->|Alguien deja el equipo| L["Desactiva su acceso"]
+    L --> M["Sus sesiones abiertas se cierran y ya no puede entrar"]
+    M --> N["Su nombre sigue figurando en todo lo que registró"]
+
+    D -->|Alguien vuelve al equipo| V["Reactiva su acceso"]
+    V --> W["El sistema le manda una invitación nueva para que ella defina otra clave"]
+    W --> X["La clave que usaba antes no vuelve a servir"]
+    X --> Y["Sigue siendo la misma persona: lo viejo y lo nuevo figuran bajo un solo nombre"]
+
+    D -->|Sacarse a sí mismo| O["El sistema no lo permite"]
+
+    E --> P["Cada alta, cambio de rol y desactivación queda registrado con qué cambió, quién y cuándo"]
+    H --> P
+    L --> P
+    V --> P
+
+    A --> Q["Abre la lista de ingresos e intentos rechazados"]
+    Q --> R["Quién entró y cuándo"]
+    Q --> S["A quién se le negó el paso, qué quiso ver y cuándo"]
+    Q --> T["Qué accesos quedaron bloqueados por intentos fallidos"]
+
+    B --> U["Ajusta desde los parámetros el tiempo de sesión y el límite de intentos"]

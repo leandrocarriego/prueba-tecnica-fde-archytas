@@ -23,8 +23,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import models  # noqa: F401
 from app.config import settings
 from app.database import engine
-from app.health import router as health_router
 from app.logging import get_logger, setup_logging
+from app.modules.catalog.routes import router as catalog_router
+from app.modules.identity.middleware import record_refusals
+from app.modules.identity.routes import access_log_router, auth_router, users_router
+from app.modules.operations.routes import health_router, price_updates_router
+from app.modules.operations.routes import router as operations_router
+from app.modules.triage.routes import router as triage_router
 from app.shared.errors import (
     AuthenticationError,
     ConflictError,
@@ -58,6 +63,18 @@ DOMAIN_ERROR_STATUS: dict[type[DomainError], int] = {
 # it lands, together with its routers.
 TAGS_METADATA: list[dict[str, str]] = [
     {"name": "Health", "description": "Liveness of the service and its dependencies."},
+    {"name": "Auth", "description": "Logging in, the caller's own account, password recovery."},
+    {"name": "Users", "description": "Accounts and roles. The owner's surface."},
+    {"name": "Operations", "description": "Background runs and the business parameters."},
+    {"name": "Prices", "description": "The supplier's price list and how each price evolved."},
+    {
+        "name": "Price updates",
+        "description": "The state of the price update, asking for one, and its settings.",
+    },
+    {
+        "name": "Triage",
+        "description": "What the pipeline set aside, and the rules learned from it.",
+    },
 ]
 
 
@@ -170,6 +187,14 @@ def register_routers(application: FastAPI) -> None:
     # collide on operation ids.
     application.include_router(health_router, include_in_schema=False)
 
+    application.include_router(auth_router, prefix=API_PREFIX)
+    application.include_router(users_router, prefix=API_PREFIX)
+    application.include_router(access_log_router, prefix=API_PREFIX)
+    application.include_router(operations_router, prefix=API_PREFIX)
+    application.include_router(price_updates_router, prefix=API_PREFIX)
+    application.include_router(catalog_router, prefix=API_PREFIX)
+    application.include_router(triage_router, prefix=API_PREFIX)
+
 
 def register_exception_handlers(application: FastAPI) -> None:
     """Wire the domain errors, and FastAPI's own, to the shared error envelope."""
@@ -190,6 +215,11 @@ def create_app() -> FastAPI:
         openapi_tags=TAGS_METADATA,
         lifespan=lifespan,
     )
+
+    # Every 403 leaves a line for the owner (RF-14). Registered here because
+    # `main.py` is the composition root; written in `identity`, because what an
+    # access event is belongs to that module.
+    application.middleware("http")(record_refusals)
 
     application.add_middleware(
         CORSMiddleware,

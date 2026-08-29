@@ -1,0 +1,44 @@
+---
+title: Qué le pasa a cada fila de la lista que llega del portal
+---
+stateDiagram-v2
+    state "Recibida del portal" as Recibida
+    state "No se pudo interpretar" as Ilegible
+    state "De un producto que el sistema no conoce" as Desconocida
+    state "Apartada, esperando una decisión" as Apartada
+    state "Resuelta por una persona" as Resuelta
+    state "Precio vigente registrado" as Registrada
+    state "Dejada fuera de la lista" as Descartada
+
+    [*] --> Recibida
+    Recibida --> Registrada: se entiende y el producto es conocido
+    Recibida --> Ilegible: no se entiende lo que dice
+    Recibida --> Desconocida: se entiende, pero el producto no está entre los conocidos
+    Ilegible --> Apartada
+    Desconocida --> Apartada
+    Apartada --> Resuelta: una persona decide qué hacer con el caso
+    Resuelta --> Registrada: la decisión le da un producto conocido y un precio
+    Resuelta --> Descartada: la decisión lo deja fuera
+    Registrada --> [*]
+    Descartada --> [*]
+
+    note right of Desconocida
+        No ocurre con la primera lista: esa es
+        la que establece cuáles son los
+        productos conocidos
+    end note
+
+    note right of Apartada
+        Visible con su motivo y contada, sin
+        frenar al resto de las filas. Un caso
+        igual que llegue después no agrega otro
+        pendiente: se mantiene uno solo
+    end note
+
+    note right of Resuelta
+        La decisión queda guardada como regla,
+        con quién la tomó y cuándo. Los casos
+        iguales que lleguen después se resuelven
+        solos. Si esa regla se deja sin efecto,
+        vuelven a quedar apartados
+    end note

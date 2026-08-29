@@ -97,7 +97,8 @@ Al ser un proyecto único, las specs viven en **un solo árbol numerado**.
 │   │       ├── purchasing/     # Órdenes de compra y recepciones
 │   │       ├── billing/        # Facturas, comprobantes de pago, estado de cuenta
 │   │       ├── sales/          # Ventas y deduplicación
-│   │       ├── messaging/      # Mensajes internos
+│   │       ├── messaging/      # Mensajes internos del portal
+│   │       ├── notifications/  # Avisos al equipo por WhatsApp (Evolution API)
 │   │       ├── triage/         # Cola de excepciones y reglas aprendidas
 │   │       └── operations/     # Jobs, parámetros, auditoría
 │   ├── alembic/                # Migraciones
@@ -215,7 +216,7 @@ SIGProv ──(Playwright)──> raw ──> staging ──> core
 
 | Esquema | Contenido | Regla |
 |---|---|---|
-| `raw` | Lo extraído tal cual, más un hash del contenido | Inmutable. Nunca se sobrescribe ni se corrige. |
+| `raw` | Lo extraído tal cual, más un hash del contenido | Lo extraído es inmutable: contenido, hash, tipo y fecha de llegada nunca se sobrescriben ni se corrigen. Una columna de contabilidad del pipeline sí se escribe, y el test enumera cuáles no (Art. III). |
 | `staging`  | Tipado y normalizado; cada fila queda `valido` o `cuarentena` | Reproducible: se puede reconstruir desde `raw`. |
 | `core` | Modelo canónico del negocio | Solo se alimenta de filas `valido`. |
 | `operations`  | Jobs, excepciones, parámetros, auditoría | Es el sistema operando sobre sí mismo. |

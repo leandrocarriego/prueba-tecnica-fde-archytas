@@ -1,0 +1,37 @@
+---
+title: El ciclo de vida de la clasificación de un producto
+---
+stateDiagram-v2
+    state "En un rubro" as Clasificado
+    state "Sin rubro" as SinRubro
+    state "Apartado para revisión" as Apartado
+
+    [*] --> Clasificado: llega con una forma escrita que ya está decidida
+    [*] --> SinRubro: llega sin categoría cargada
+    [*] --> Apartado: llega con una forma escrita que el sistema no conoce
+
+    SinRubro --> Clasificado: ventas confirma el rubro propuesto, o elige otro
+    Apartado --> Clasificado: ventas decide a qué rubro corresponde esa forma escrita
+    Clasificado --> Clasificado: ventas le cambia el rubro
+    Clasificado --> Clasificado: cambia de rubro la equivalencia que lo resolvía
+    Clasificado --> Apartado: queda sin efecto la equivalencia que lo resolvía
+
+    note right of SinRubro
+        Si trae una subcategoría conocida, el sistema
+        propone un rubro; si no, lo presenta sin propuesta.
+        En los dos casos espera: mientras nadie confirme,
+        no queda en ningún rubro.
+        No está escondido, es una categoría más y entra
+        en los totales generales
+    end note
+
+    note right of Apartado
+        Se ve con la forma escrita con la que llegó.
+        El sistema no lo asigna por su cuenta ni lo manda
+        a un cajón de «otros»
+    end note
+
+    note right of Clasificado
+        Queda registrado quién lo asignó y cuándo.
+        Deja de figurar entre los productos sin rubro
+    end note

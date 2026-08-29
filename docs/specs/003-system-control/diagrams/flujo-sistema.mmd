@@ -1,0 +1,26 @@
+---
+title: El sistema — qué hace por su cuenta ante cada cambio
+---
+flowchart TD
+    A["Alguien cambia un parámetro"] --> B{"¿Es el dueño?"}
+    B -- "No" --> C["Se lo impide"]
+    B -- "Sí" --> D{"¿El valor está dentro del rango admitido?"}
+    D -- "No" --> E["Rechaza el cambio e informa el rango"]
+    D -- "Sí" --> F["Aplica el valor nuevo de inmediato y registra el anterior, el nuevo, quién y cuándo"]
+
+    G["Alguien carga o modifica un dato a mano"] --> H["Registra quién lo hizo y cuándo"]
+    H --> I["Conserva el valor que tenía antes"]
+    I --> J["Exige un motivo elegido de una lista, y admite un detalle escrito"]
+    J --> K["Informa a quien la ejecutó si la acción se aplicó o si falló"]
+
+    L["La corrección es sobre un dato traído del portal"] --> M["Conserva sin cambios lo que el portal había informado"]
+    M --> N["Señala el dato como corregido a mano y muestra al lado el valor original"]
+
+    O["Una actualización posterior del portal informa ese mismo dato"] --> P{"¿Coincide con el valor original?"}
+    P -- "Sí" --> Q["La corrección sigue en pie, sin novedad"]
+    P -- "No" --> R["Señala el conflicto en la pantalla de ese dato, sin pisar la corrección"]
+    R --> S["Le avisa al dueño"]
+    R --> T["No decide solo cuál de los dos vale: espera a una persona"]
+
+    U["El historial de cambios"] --> V["No se puede modificar"]
+    U --> W["No se puede eliminar"]

@@ -1,0 +1,40 @@
+---
+title: El recibo de recepción de una factura
+---
+stateDiagram-v2
+    state "Sin recibo emitido" as SinRecibo
+    state "Avisada por vencimiento cercano" as Avisada
+    state "Recibo emitido" as Emitido
+    state "Incidente abierto" as Incidente
+    state "Incidente cerrado" as Cerrado
+
+    [*] --> SinRecibo: la factura entra al sistema
+    SinRecibo --> Avisada: faltan para su vencimiento los días de anticipación configurados
+    Avisada --> Avisada: sigue sin recibo, y no se vuelve a avisar por la misma causa
+    SinRecibo --> Emitido: compras emite el recibo antes del vencimiento
+    Avisada --> Emitido: compras emite el recibo antes del vencimiento
+    Emitido --> SinRecibo: compras anula el recibo y la fecha todavía no pasó
+    SinRecibo --> Incidente: se pasa la fecha de vencimiento sin recibo
+    Avisada --> Incidente: se pasa la fecha de vencimiento sin recibo
+    Emitido --> Incidente: compras anula el recibo y la fecha ya pasó
+    Incidente --> Cerrado: compras lo cierra indicando qué se hizo
+    Emitido --> [*]
+    Cerrado --> [*]
+
+    note right of Emitido
+        Lleva su número propio y correlativo, su documento
+        se descarga para el proveedor, y queda registrado
+        quién lo emitió y cuándo
+    end note
+
+    note right of Incidente
+        Pasada la fecha ya no se emite el recibo, ni
+        siquiera con el incidente cerrado. Las 17 facturas
+        que arrancan vencidas sin recibo entran acá,
+        con la fecha en que se pasaron
+    end note
+
+    note right of Cerrado
+        Deja de contarse entre los pendientes, y el motivo
+        queda consultable con quién lo cerró y cuándo
+    end note

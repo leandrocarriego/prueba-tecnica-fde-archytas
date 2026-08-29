@@ -1,0 +1,20 @@
+---
+title: El dueño — cómo quedó clasificado el catálogo
+---
+flowchart TD
+    A["Entra y ve todo el sistema"] --> B["Abre el corte por rubro"]
+    B --> C["Ve los 7 rubros del negocio"]
+    C --> D["Cada uno dice cuántos productos tiene"]
+    B --> E["Y ve «sin rubro» como una categoría más, junto a los demás"]
+    E --> F["No está escondido: es lo que antes le dejaba pedazos sueltos"]
+
+    D --> G["La suma de todos, «sin rubro» incluido, da el total general"]
+    F --> G
+
+    E --> H["Ve cuántos productos están sin rubro y puede listarlos"]
+    A --> I["Ve cuántos productos están pendientes de revisión por su categoría"]
+    I --> J["Sabe cuánto trabajo de clasificación queda por hacer"]
+
+    A --> K["Los nombres de los rubros son los que él acordó,<br/>y son los que lee en sus informes"]
+
+    L["Cuánto se gasta en cada rubro no está en esta feature:<br/>ni las facturas ni las órdenes de compra dicen qué productos se compraron.<br/>Esta feature deja los rubros limpios, que es la condición para poder medirlo"]

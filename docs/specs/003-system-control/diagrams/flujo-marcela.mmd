@@ -1,0 +1,20 @@
+---
+title: Marcela, compras — qué puede hacer y qué ve
+---
+flowchart TD
+    A["Marcela abre la aplicación"] --> B["Un solo lugar con todas las cargas y correcciones"]
+    B --> C["Ve únicamente las acciones habilitadas para su rol"]
+    B --> D["Corrige un dato de su sección que llegó mal del portal"]
+    D --> E["Cualquier campo: importe, fecha, número de comprobante o nombre del proveedor"]
+    E --> F["Elige un motivo de la lista y, si quiere, agrega un detalle escrito"]
+    F --> G{"¿Eligió un motivo?"}
+    G -- "No" --> H["La corrección no se puede confirmar"]
+    G -- "Sí" --> I["El sistema le avisa si se aplicó o si falló"]
+    I --> J["El dato queda señalado como corregido a mano"]
+    J --> K["Al lado se ve el valor que había informado el portal"]
+    J --> L["Desde el dato llega a su historial, sin buscarlo en otra pantalla"]
+
+    A --> M["Historial de cambios manuales"]
+    M --> N["Ve sus cambios y los de las secciones a las que tiene acceso"]
+
+    A --> O["El panel de parámetros del sistema no lo encuentra"]

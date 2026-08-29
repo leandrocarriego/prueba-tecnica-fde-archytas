@@ -27,6 +27,8 @@ not end in `_test`.
 
 import asyncio
 from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -40,6 +42,11 @@ from app.config import settings
 # every table before the schema is created below.
 from app.database import Base, get_session
 from app.main import app
+from app.modules.identity import middleware as identity_middleware
+from app.modules.identity.models import Session as UserSession
+from app.modules.identity.models import User, UserRole
+from app.modules.identity.security import generate_token, hash_token
+from tests.factories.user_factory import UserFactory
 
 BASE_URL = "http://testserver"
 API_PREFIX = f"/api/{settings.API_VERSION}"
@@ -164,21 +171,128 @@ async def session(connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
 # --- HTTP client ---------------------------------------------------------
 
 
-@pytest.fixture
-async def client(session: AsyncSession) -> AsyncIterator[AsyncClient]:
-    """An anonymous client, talking to the app in-process over the test session.
+async def open_session(session: AsyncSession, user: User) -> str:
+    """Open a real session for this user and return the token that reaches it.
 
-    There is no authenticated variant yet: issuing a token needs `identity`,
-    which has not landed. Its fixtures — the users, their roles and their
-    clients — come back in the same commit as the module.
+    A session stopped being a signed string and became a row, so a test cannot
+    mint one on its own any more: it has to write what the application would
+    have written. That is the point of the change and not a nuisance — a
+    fixture that forged a token would keep passing after the code stopped
+    honouring revocation, which is exactly what these tests exist to catch.
+
+    What is stored is the hash; what the caller sends is the token.
+    """
+    token = generate_token()
+    session.add(
+        UserSession(
+            user_id=user.id,
+            token_hash=hash_token(token),
+            last_seen_at=datetime.now(UTC),
+        )
+    )
+    await session.flush()
+    return token
+
+
+async def authorization_header(session: AsyncSession, user: User) -> dict[str, str]:
+    """The header a client sends once it holds a live session of this user."""
+    return {"Authorization": f"Bearer {await open_session(session, user)}"}
+
+
+def _use_test_session(session: AsyncSession, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the app at the test's session: dependencies and middleware alike.
+
+    `get_session` covers everything that runs inside a request. The middleware
+    that records refusals is the exception: it opens a session of its own
+    precisely because the request's was rolled back by the 403 that produced
+    it, so an override of the dependency never reaches it. Without this second
+    seam its rows would land outside the test's transaction — invisible to the
+    test that caused them, and left behind for the next one.
     """
 
     async def _session_override() -> AsyncIterator[AsyncSession]:
         yield session
 
+    @asynccontextmanager
+    async def _factory() -> AsyncIterator[AsyncSession]:
+        yield session
+
     app.dependency_overrides[get_session] = _session_override
+    monkeypatch.setattr(identity_middleware, "SessionFactory", _factory)
+
+
+@pytest.fixture
+async def client(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[AsyncClient]:
+    """An anonymous client, talking to the app in-process over the test session."""
+    _use_test_session(session, monkeypatch)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url=BASE_URL) as http_client:
             yield http_client
     finally:
         app.dependency_overrides.pop(get_session, None)
+
+
+# --- The three roles the business has ------------------------------------
+#
+# Each role gets its **own** client rather than a header slapped onto the shared
+# one: `client` is the anonymous caller, and a test that uses both (an owner
+# creating an account, its holder then logging in) needs them to stay separate.
+
+
+@pytest.fixture
+async def owner(session: AsyncSession) -> User:
+    """The owner: admitted everywhere."""
+    return await UserFactory.create(session, role=UserRole.OWNER)
+
+
+@pytest.fixture
+async def purchasing_user(session: AsyncSession) -> User:
+    """Whoever handles purchasing."""
+    return await UserFactory.create(session, role=UserRole.PURCHASING)
+
+
+@pytest.fixture
+async def sales_user(session: AsyncSession) -> User:
+    """Whoever handles sales."""
+    return await UserFactory.create(session, role=UserRole.SALES)
+
+
+async def _client_for(
+    session: AsyncSession, user: User, monkeypatch: pytest.MonkeyPatch
+) -> AsyncClient:
+    """Build a client that calls as this user, over the test's session."""
+    _use_test_session(session, monkeypatch)
+    return AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url=BASE_URL,
+        headers=await authorization_header(session, user),
+    )
+
+
+@pytest.fixture
+async def owner_client(
+    session: AsyncSession, owner: User, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[AsyncClient]:
+    """A client calling as the owner."""
+    async with await _client_for(session, owner, monkeypatch) as http_client:
+        yield http_client
+
+
+@pytest.fixture
+async def purchasing_client(
+    session: AsyncSession, purchasing_user: User, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[AsyncClient]:
+    """A client calling as whoever handles purchasing."""
+    async with await _client_for(session, purchasing_user, monkeypatch) as http_client:
+        yield http_client
+
+
+@pytest.fixture
+async def sales_client(
+    session: AsyncSession, sales_user: User, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[AsyncClient]:
+    """A client calling as whoever handles sales."""
+    async with await _client_for(session, sales_user, monkeypatch) as http_client:
+        yield http_client

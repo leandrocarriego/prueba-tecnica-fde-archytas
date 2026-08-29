@@ -1,0 +1,48 @@
+---
+title: Accesos por persona — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    actor Duenio as El dueño
+    participant Sistema as El sistema
+    actor Marcela as Marcela, compras
+    actor Julian as Julián, ventas
+
+    Duenio->>Sistema: Da de alta un acceso con la persona, su correo, su teléfono y su rol
+    Sistema-->>Marcela: Le manda una invitación por WhatsApp
+    Note over Sistema,Marcela: Hasta que no define su clave, ese acceso no entra.<br/>El dueño nunca la conoce ni se la puede poner
+    Marcela->>Sistema: Define su propia clave desde la invitación
+    Sistema->>Sistema: El acceso queda activo
+
+    Marcela->>Sistema: Entra con su acceso
+    Sistema->>Sistema: Registra quién ingresó y cuándo
+    Sistema-->>Marcela: Muestra su nombre en pantalla y sólo sus secciones
+
+    Julian->>Sistema: Entra y pega la dirección de la pantalla de proveedores
+    Sistema->>Sistema: Verifica el permiso antes de responder
+    Sistema-->>Julian: Le avisa que no tiene permiso, en lugar de mostrarle la pantalla
+    Sistema->>Sistema: Registra el intento con su nombre, qué quiso ver y cuándo
+
+    Julian->>Sistema: Abre el calendario de vencimientos e intenta mover uno
+    Sistema-->>Julian: Lo deja consultarlo y le rechaza el cambio
+
+    alt Marcela olvida su clave
+        Marcela->>Sistema: Pide recuperar su acceso
+        Sistema-->>Marcela: Le manda un enlace por WhatsApp, sin que el dueño intervenga
+        Marcela->>Sistema: Define una clave nueva y la anterior deja de servir
+    end
+
+    alt Alguien prueba claves hasta acertar
+        Sistema->>Sistema: Al quinto intento fallido seguido bloquea ese acceso quince minutos
+        Sistema-->>Duenio: El bloqueo aparece entre los intentos rechazados que él ve
+    end
+
+    Duenio->>Sistema: Mira quién entró y a quién se le negó el paso
+    Duenio->>Sistema: Desactiva el acceso de quien deja el equipo
+    Sistema->>Sistema: Cierra sus sesiones y conserva su nombre en todo lo que registró
+
+    alt Esa persona vuelve al equipo
+        Duenio->>Sistema: Reactiva su acceso
+        Sistema-->>Marcela: Le manda por WhatsApp una invitación nueva para definir otra clave
+        Note over Sistema,Marcela: La clave anterior no vuelve a servir.<br/>Es la misma persona: su historial no se parte en dos
+    end

@@ -1,0 +1,38 @@
+---
+title: El sistema — qué hace con cada comprobante y con cada vencimiento
+---
+flowchart TD
+    A["Con la frecuencia configurada, trae del portal los comprobantes de pago y los recibos emitidos"] --> B["Conserva cada comprobante tal como llegó"]
+    B --> C{"¿Ya lo había traído antes?"}
+    C -->|Sí| D["No lo imputa de nuevo: el saldo no se descuenta dos veces"]
+    C -->|No| E{"¿A cuántas facturas apunta?"}
+
+    E -->|A una que no tiene registrada| F["Lo aparta para revisión, sin perderlo"]
+    F --> G{"¿Entró después esa factura?"}
+    G -->|Sí| H["Le imputa el comprobante que estaba esperando e informa que lo hizo"]
+    G -->|Todavía no| F
+
+    E -->|A varias facturas| I["Lo aparta para que una persona reparta el monto"]
+    I --> J{"¿El reparto suma exacto el monto del comprobante?"}
+    J -->|No| K["No deja confirmarlo y ningún saldo se mueve"]
+    K --> I
+    J -->|Sí| L["Imputa cada parte a su factura y registra quién repartió y cuándo"]
+
+    E -->|A una sola factura| M{"¿Coincide en factura y monto con un pago cargado a mano?"}
+    M -->|Sí| N["Lo aparta y pregunta, en lugar de unirlos o contarlos dos veces"]
+    M -->|No| O["Lo imputa a su factura"]
+    H --> O
+    L --> P["Recalcula el saldo y el estado de la factura"]
+    O --> P
+
+    P --> Q{"¿Los pagos superan el total de la factura?"}
+    Q -->|Sí| R["La señala como inconsistente, con los dos números a la vista"]
+    R --> S["La deja afuera de los totales de deuda e informa que la excluyó"]
+    Q -->|No| T{"¿El portal informa un estado distinto del que dan los pagos?"}
+    T -->|Sí| U["Manda la suma de los pagos, y señala la diferencia mostrando los dos estados"]
+    T -->|No| V["Muestra la factura como saldada, parcial con su porcentaje, o sin pagos"]
+
+    W["Vigila las facturas que siguen sin su recibo de recepción"] --> X{"¿Faltan para su vencimiento los días de anticipación configurados?"}
+    X -->|Sí, y no avisó antes por este vencimiento| Y["Avisa por WhatsApp a compras, con copia al dueño"]
+    X -->|Ya avisó| Z["No vuelve a avisar por la misma causa"]
+    X -->|La fecha ya pasó| AA["Señala la factura como incidente y no permite emitirle el recibo"]

@@ -1,0 +1,28 @@
+---
+title: Qué le pasa a un parámetro del sistema
+---
+stateDiagram-v2
+    state "Con su valor inicial" as Inicial
+    state "Ajustado por el dueño" as Ajustado
+
+    [*] --> Inicial: el sistema arranca
+    Inicial --> Inicial: el valor queda fuera del rango admitido y el cambio se rechaza
+    Inicial --> Ajustado: el dueño pone un valor dentro del rango
+    Ajustado --> Ajustado: el dueño lo vuelve a cambiar
+    Ajustado --> Ajustado: el valor queda fuera del rango admitido y el cambio se rechaza
+
+    note right of Inicial
+        Vencimiento 3 días, orden estancada
+        15 días, sesión 60 minutos, recibo
+        3 días y resumen a las 8:00. Los dos
+        parámetros de la actualización de
+        precios llegan con el valor que fijó
+        esa feature
+    end note
+
+    note right of Ajustado
+        El valor nuevo rige de inmediato, sin
+        ninguna intervención adicional, y queda
+        registrado el anterior, el nuevo, quién
+        lo cambió y cuándo. Sólo el dueño
+    end note

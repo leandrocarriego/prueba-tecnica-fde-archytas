@@ -1,0 +1,30 @@
+---
+title: Julián, ventas — mantiene los rubros y el catálogo
+---
+flowchart TD
+    A["Abre la pantalla de rubros"] --> B["Ve los 7 rubros, las formas en que llega escrito cada uno<br/>y cuántos productos tiene"]
+    B --> C["Agrega un rubro nuevo"]
+    B --> D["Le cambia el nombre a un rubro"]
+    B --> E{"¿Puede borrar un rubro?"}
+    E -->|Sólo si no tiene productos| F["Se borra"]
+    E -->|Si tiene productos| G["El sistema no lo permite y le dice por qué"]
+
+    A --> H["Abre la lista de productos sin clasificar"]
+    H --> I["Cada producto llega con un rubro propuesto<br/>a partir de su subcategoría"]
+    I --> J{"¿La propuesta es correcta?"}
+    J -->|Sí| K["La confirma"]
+    J -->|No| L["La corrige y elige otro rubro"]
+    K --> M["El producto pasa a ese rubro y sale de la lista"]
+    L --> M
+    M --> N["Queda registrado que lo asignó él, y cuándo"]
+    N --> O["Si más adelante se equivocó, le cambia el rubro igual"]
+
+    A --> P["Abre la pantalla de revisión"]
+    P --> Q["Ve los productos que llegaron con una forma escrita<br/>que el sistema no conoce"]
+    Q --> R["Le indica a qué rubro corresponde esa forma escrita"]
+    R --> S["La decisión queda guardada como equivalencia<br/>y no se la vuelven a preguntar"]
+
+    A --> T["Abre la lista de equivalencias"]
+    T --> U["Las ve todas, con quién decidió cada una y cuándo"]
+    U --> V["Cambia una de rubro y el sistema reasigna<br/>los productos que dependían de ella"]
+    U --> W["O la deja sin efecto, y esos productos vuelven a revisión"]

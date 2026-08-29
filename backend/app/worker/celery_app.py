@@ -48,7 +48,12 @@ celery_app.conf.update(
     beat_schedule={},
 )
 
-celery_app.autodiscover_tasks(packages=_module_packages(), force=True)
+# Discovery is **lazy**: Celery imports every `tasks.py` when the application is
+# finalised — which the worker and beat do on start — instead of at the moment
+# this module is imported. Forcing it here would mean that any service asking
+# for `celery_app` to dispatch a task by name imported its own module's tasks
+# back, half-initialised, through this line.
+celery_app.autodiscover_tasks(packages=_module_packages())
 
 
 @worker_shutdown.connect

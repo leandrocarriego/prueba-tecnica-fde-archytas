@@ -1,0 +1,32 @@
+---
+title: Ciclo de vida del precio de un producto conocido
+---
+stateDiagram-v2
+    state "Sin precio todavía" as Sin
+    state "Precio vigente" as Vigente
+    state "Precio vigente, destacado por suba" as Destacado
+    state "Último precio conservado y señalado" as Conservado
+
+    [*] --> Sin
+    Sin --> Vigente: la primera lista trae su precio
+    Vigente --> Vigente: la lista lo trae con el mismo precio
+    Vigente --> Destacado: subió más que el porcentaje definido
+    Destacado --> Vigente: la actualización siguiente no supera el porcentaje
+    Vigente --> Conservado: deja de figurar en la lista
+    Destacado --> Conservado: deja de figurar en la lista
+    Conservado --> Vigente: vuelve a figurar en la lista
+
+    note right of Vigente
+        Cada vez que el precio cambia se agrega
+        un punto a su historial, con su fecha.
+        Al registrarse por primera vez también
+        se suma el historial que el portal ya
+        publicaba para ese producto
+    end note
+
+    note right of Conservado
+        El sistema nunca da de baja un producto
+        por su cuenta: conserva el último precio
+        conocido y lo señala para que lo revise
+        una persona
+    end note

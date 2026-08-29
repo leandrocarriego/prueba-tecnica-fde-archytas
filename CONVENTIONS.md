@@ -120,10 +120,11 @@ corrige la frontera, no se agrega el evento. Escalá al `Backend-Architect`.
 **`GEN-06` · Blocker — Se respetan las reglas del dominio (INVIOLABLES) de `AGENTS.md`.**
 No se reproducen acá para que exista un solo lugar donde cambiarlas. En resumen operativo: SIGProv
 es solo lectura, la extracción es automatización de navegador (nunca un cliente HTTP contra el
-portal ni sus endpoints JSON internos), nada se descarta, `raw` nunca se sobrescribe y las
-credenciales del portal viven solo en el entorno.
+portal ni sus endpoints JSON internos), nada se descarta, lo extraído en `raw` nunca se sobrescribe
+—contenido, hash, tipo y fecha de llegada— y las credenciales del portal viven solo en el entorno.
 ```bash
 cd backend && grep -rnE "httpx|requests\." app/modules/portal
+cd backend && uv run pytest tests/architecture/test_raw_immutability.py
 ```
 Ver también `ERR-05` (cuarentena) y `SEC-02` (credenciales), que son sus manifestaciones en código.
 
@@ -196,8 +197,12 @@ cd backend && grep -rnE "\bcreate_engine\(|sessionmaker\(|\bSession\(" app
 Los workers son sincrónicos y el acceso a datos es async: el puente es uno solo,
 `app/worker/bridge.py` (`@async_task` / `run_async`). Abrir un event loop en cualquier otro lado es
 Blocker.
+
+La excepción son los **entry points de línea de comandos**: un comando que se corre una vez —al
+instalar, o a mano— es un proceso propio que no tiene loop, y no es un worker. La regla protege al
+worker de abrir un segundo loop sobre el que ya tiene; un `python -m ...` no está en esa situación.
 ```bash
-cd backend && grep -rnE "asyncio\.(run|new_event_loop|get_event_loop)" app/modules
+cd backend && grep -rnE "asyncio\.(run|new_event_loop|get_event_loop)" app/modules | grep -v "bootstrap.py"
 ```
 
 **`PY-07` · Major — Toda task es idempotente: re-ejecutarla no duplica efectos.**
@@ -279,8 +284,11 @@ cd backend && grep -rn -A2 "except" app | grep -E "pass$|continue$"
 **`ERR-02` · Minor — Los mensajes de error tienen sentido para quien los lee.**
 
 **`ERR-03` · Blocker — Logging estructurado; nunca `print`.**
+La excepción son los **entry points de línea de comandos** (`if __name__ == "__main__"`): lo que un
+comando le contesta a quien lo corrió va a su terminal, no al log, donde esa persona no lo está
+mirando. Acotada a la función `main()` del comando: todo lo que ese comando llama sigue logueando.
 ```bash
-cd backend && grep -rnE "^\s*print\(" app
+cd backend && grep -rnE "^\s*print\(" app | grep -v "bootstrap.py"
 ```
 
 **`ERR-04` · Blocker — Los servicios no lanzan `HTTPException`.**

@@ -1,0 +1,38 @@
+---
+title: Actualización de la lista de precios — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    actor Duenio as El dueño
+    participant Sistema as El sistema
+    participant Portal as Portal del proveedor
+    actor Marcela as Marcela, compras
+    actor Julian as Julián, ventas
+
+    Duenio->>Sistema: Define cada cuánto se consulta y qué suba se destaca
+    Note over Sistema: Mientras no los cambie rigen los valores iniciales:<br/>cada 12 horas y toda suba mayor al 10%
+
+    loop Con la frecuencia configurada
+        Sistema->>Portal: Entra por su cuenta y pide la lista de precios del día
+        alt El portal responde
+            Portal-->>Sistema: La lista publicada
+            Sistema->>Sistema: Conserva la lista tal como llegó
+            Sistema->>Sistema: Actualiza el precio de cada producto conocido
+            Sistema->>Portal: De cada producto nuevo para él, trae el historial ya publicado
+            Sistema->>Sistema: Aparta lo que no entiende y lo que no conoce
+            Sistema->>Sistema: Señala los productos conocidos que no vinieron
+            Sistema->>Sistema: Destaca las subas por encima del porcentaje definido
+        else El portal no responde
+            Sistema->>Sistema: Registra el fallo con su motivo
+            Note over Sistema: Recién tras dos consultas seguidas sin éxito
+            Sistema-->>Duenio: Avisa por WhatsApp, una sola vez por interrupción
+        end
+    end
+
+    Duenio->>Sistema: Mira cuándo fue la última actualización que salió bien
+    Marcela->>Sistema: Necesita el precio ahora y pide la lista a mano
+    Sistema-->>Marcela: Le informa si la trajo o si falló
+    Marcela->>Sistema: Revisa lo apartado y decide qué hacer con cada caso
+    Sistema->>Sistema: Guarda la decisión como regla y deja de apartar los casos iguales
+    Julian->>Sistema: Abre un producto
+    Sistema-->>Julian: Su evolución en el tiempo y la variación contra el mes anterior

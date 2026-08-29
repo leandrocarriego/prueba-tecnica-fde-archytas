@@ -34,8 +34,6 @@ dependencies = [
     "pydantic==2.13.4",
     "pydantic-settings==2.14.1",
     "email-validator==2.3.0",
-    # --- Security ---
-    "python-jose[cryptography]==3.5.0",
     "bcrypt==5.0.0",
     # --- Background work (Celery over RabbitMQ) ---
     "celery==5.6.3",
@@ -49,6 +47,9 @@ dependencies = [
     "httpx==0.28.1",
     "python-dotenv==1.2.2",
     "rich==15.0.0",
+    # Reads the supplier's daily .xlsx. Chosen over pandas, which would drag
+    # numpy and tens of megabytes in to read a hundred rows.
+    "openpyxl==3.1.5",
 ]
 
 [dependency-groups]
@@ -185,6 +186,5 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     "celery.*",
-    "jose.*",
 ]
 ignore_missing_imports = true

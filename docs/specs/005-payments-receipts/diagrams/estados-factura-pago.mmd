@@ -1,0 +1,39 @@
+---
+title: El estado de pago de una factura
+---
+stateDiagram-v2
+    state "Sin pagos" as SinPagos
+    state "Parcialmente pagada" as Parcial
+    state "Saldada" as Saldada
+    state "Señalada como inconsistente" as Inconsistente
+
+    [*] --> SinPagos: la factura entra al sistema
+    SinPagos --> Parcial: se le imputa un pago que no llega a cubrir su total
+    Parcial --> Parcial: se le imputa otro pago a cuenta
+    Parcial --> Saldada: los pagos imputados cubren el total
+    SinPagos --> Saldada: un solo pago cubre el total
+    Parcial --> SinPagos: se deja sin efecto un pago cargado a mano
+    Saldada --> Parcial: se deja sin efecto un pago cargado a mano
+    SinPagos --> Inconsistente: los pagos imputados superan el total
+    Parcial --> Inconsistente: los pagos imputados superan el total
+    Saldada --> Inconsistente: los pagos imputados superan el total
+    Inconsistente --> Parcial: se deja sin efecto el pago cargado a mano que sobraba
+    Saldada --> [*]
+
+    note right of SinPagos
+        El estado sale siempre de los pagos imputados.
+        Si el portal informa otra cosa, no gana el portal:
+        la diferencia queda señalada con los dos datos
+        a la vista
+    end note
+
+    note right of Parcial
+        Muestra el monto pagado, el saldo pendiente y
+        el porcentaje pagado
+    end note
+
+    note right of Inconsistente
+        Muestra su total y la suma de sus pagos, queda
+        afuera de los totales de deuda —que informan que
+        la excluyeron— y nunca figura como saldada
+    end note

@@ -1,0 +1,26 @@
+---
+title: El sistema — qué hace con cada producto que llega
+---
+flowchart TD
+    A["Llega un producto de la lista del proveedor"] --> B["Guarda la subcategoría con la que llegó escrito"]
+    B --> C{"¿Trae categoría cargada?"}
+
+    C -->|Sí| D{"¿Ya está decidido a qué rubro<br/>corresponde esa forma escrita?"}
+    D -->|Sí| E["Lo asigna a ese rubro, sin preguntar nada"]
+    D -->|No| F["Lo aparta para revisión y no lo asigna a ningún rubro"]
+    F --> G["Lo muestra con la forma escrita con la que llegó,<br/>para que ventas decida"]
+    G --> H["Cuenta cuántos productos están pendientes de revisión"]
+
+    C -->|No| I{"¿Trae una subcategoría conocida?"}
+    I -->|Sí| J["Propone el rubro que le corresponde a esa subcategoría"]
+    I -->|No| K["Lo presenta para clasificar, sin proponer ningún rubro"]
+
+    J --> L["Hasta que alguien confirme, no queda en ningún rubro"]
+    K --> L
+    L --> M["Figura en «sin rubro», que es una categoría más<br/>y entra en los totales generales"]
+
+    E --> N["Cuenta cuántos productos tiene cada rubro"]
+    M --> N
+    N --> O["La suma de todos los rubros da el total general"]
+
+    P["Nunca inventa un rubro ni manda nada a un cajón de «otros»:<br/>lo que no conoce lo pregunta"]

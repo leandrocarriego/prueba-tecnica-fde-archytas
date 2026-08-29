@@ -1,0 +1,35 @@
+---
+title: Marcela, compras — qué puede hacer y qué ve
+---
+flowchart TD
+    A["Marcela trabaja las facturas de compra y los proveedores"] --> B["Abre la lista de facturas"]
+    B --> C["Ve número, fecha, proveedor, total y en qué formato llegó cada una"]
+    C --> D["Busca por CUIT o por razón social, y filtra por fecha, proveedor o estado de revisión"]
+    D --> E["Abre el archivo original de cualquier factura"]
+
+    A --> F["Abre la pantalla de revisión"]
+    F --> G{"¿Por qué se apartó este caso?"}
+    G -->|Un dato quedó en duda| H["Ve el recorte del archivo del que salió y confirma o corrige el dato"]
+    G -->|El proveedor no se pudo identificar| I["Asigna la grafía del nombre al proveedor que corresponde"]
+    G -->|El proveedor no está en el padrón| J["No puede darlo de alta: el caso espera una decisión del negocio"]
+    G -->|La misma factura llegó con otro total| K["Ve los dos totales y decide cuál queda"]
+
+    I --> L["El sistema le avisa a cuántas facturas apartadas alcanza esa asignación"]
+    L --> M["Confirma y todas esas facturas quedan resueltas de una vez"]
+    M --> N["La próxima factura con esa misma grafía entra directo, sin pasar por revisión"]
+
+    H --> O["El caso queda resuelto y sale de los pendientes"]
+    K --> O
+    M --> O
+    O --> P["Queda registrado qué se decidió, quién lo decidió y cuándo"]
+
+    N --> Q{"¿La asignación estaba equivocada?"}
+    Q -->|Sí| R["La deja sin efecto y esas facturas vuelven a la revisión"]
+    Q -->|No| S["La pantalla de revisión se mantiene vacía"]
+    R --> F
+
+    A --> T["Abre la ficha de un proveedor"]
+    T --> U["Ve su razón social, su CUIT, su correo, su teléfono y su plazo de pago pactado"]
+    U --> V["Corrige el correo, el teléfono o el plazo, y queda registrado con su nombre y el valor anterior"]
+    V --> W["Si el portal trae después otro valor, el sistema lo señala en lugar de pisar la corrección"]
+    U --> X["La razón social y el CUIT no se editan: son con lo que se reconoce al proveedor"]
