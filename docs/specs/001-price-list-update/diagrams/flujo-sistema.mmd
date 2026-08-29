@@ -1,0 +1,42 @@
+---
+title: El sistema — qué hace en cada consulta al portal
+---
+flowchart TD
+    A["Llega el momento de consultar, según la frecuencia configurada"] --> B["Entrar al portal y pedir la lista del día"]
+    B --> C{"¿El portal respondió?"}
+
+    C -->|No| D["Registrar el fallo junto con su motivo"]
+    D --> E{"¿Van dos consultas programadas seguidas sin éxito?"}
+    E -->|Sí| F["Señalarlo en la pantalla de precios y avisar al dueño por WhatsApp, una sola vez"]
+    E -->|No| Z["Esperar a la próxima consulta"]
+    F --> Z
+
+    C -->|Sí| G["Conservar la lista tal como llegó del portal"]
+    G --> H{"¿Es la primera lista que obtiene el sistema?"}
+    H -->|Sí| I["Registrar como productos conocidos todos los que figuran en ella"]
+    H -->|No| J["Recorrer la lista fila por fila"]
+    I --> I2["Por cada producto recién conocido, traer del portal el historial que ya publica"]
+    I2 --> I3{"¿Se pudo leer ese historial?"}
+    I3 -->|Sí| I4["Sumarlo a su evolución, sin repetir un precio que ya estaba"]
+    I3 -->|No| I5["Apartarlo para revisión, sin perder el precio vigente del producto"]
+    I4 --> J
+    I5 --> J
+
+    J --> K{"¿Se entiende la fila?"}
+    K -->|No| L["Apartarla con su motivo, sin frenar el resto"]
+    K -->|Sí| M{"¿El producto es conocido?"}
+    M -->|No| N["Apartarlo con su motivo, sin darlo de alta"]
+    M -->|Sí| O["Registrar su precio vigente y, si cambió, agregar un punto a su historial"]
+    O --> P{"¿Subió más que el porcentaje definido por el dueño?"}
+    P -->|Sí| Q["Destacar el producto"]
+    P -->|No| R["Dejarlo sin destacar"]
+
+    L --> S["Al terminar de recorrer la lista"]
+    N --> S
+    Q --> S
+    R --> S
+
+    S --> T["Conservar el último precio de los productos conocidos que no vinieron, y señalarlos"]
+    T --> U["Informar cuántas filas quedaron apartadas"]
+    U --> V["Guardar la fecha y la hora de esta actualización exitosa"]
+    V --> Z

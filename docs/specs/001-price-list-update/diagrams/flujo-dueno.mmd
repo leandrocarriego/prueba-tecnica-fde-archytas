@@ -1,0 +1,20 @@
+---
+title: El dueño — qué puede hacer y qué ve
+---
+flowchart TD
+    A["El dueño abre la aplicación"] --> B["Pantalla de precios"]
+    B --> C["La fecha y la hora de la última actualización que terminó con éxito"]
+    B --> D["Los productos que subieron más que el porcentaje que él definió, destacados"]
+    B --> E["El aviso visible cuando la actualización lleva dos consultas seguidas sin funcionar"]
+
+    A --> F["Ajusta los dos parámetros de la actualización"]
+    F --> G["Cada cuánto se consulta el portal"]
+    F --> H["A partir de qué porcentaje de suba se destaca un producto"]
+    G --> I["La frecuencia nueva rige desde la consulta siguiente"]
+    H --> J["Cambia qué productos quedan destacados"]
+    F --> K["Mientras no cambie un parámetro rige su valor inicial: cada 12 horas y subas mayores al 10%"]
+
+    A --> L["Puede pedir la lista a mano, sin esperar a la próxima consulta"]
+
+    M["La actualización lleva dos consultas seguidas sin éxito"] --> N["Le llega un aviso por WhatsApp"]
+    N --> O["Mientras la causa siga siendo la misma, no se repite"]

@@ -1,0 +1,33 @@
+---
+title: Ciclo de vida de una actualización de precios
+---
+stateDiagram-v2
+    state "Programada" as Programada
+    state "En curso" as EnCurso
+    state "No iniciada por superposición" as Rechazada
+    state "Terminada con éxito" as Exitosa
+    state "Fallida" as Fallida
+
+    [*] --> Programada
+    Programada --> EnCurso: llega el momento, o alguien la pide a mano
+    Programada --> Rechazada: ya hay otra en curso
+    EnCurso --> Exitosa: el portal respondió y se procesó la lista
+    EnCurso --> Fallida: el portal no respondió
+    Exitosa --> Programada: queda agendada la siguiente
+    Fallida --> Programada: queda agendada la siguiente
+    Rechazada --> [*]
+
+    note right of Exitosa
+        Es la que fecha la pantalla de precios.
+        Si la pidió una persona, se le informa
+        el resultado y queda registrado quién
+        la pidió y cuándo
+    end note
+
+    note right of Fallida
+        Se registra con su motivo. Recién cuando
+        se acumulan dos consultas programadas
+        seguidas sin una exitosa, el sistema lo
+        señala en pantalla y avisa al dueño por
+        WhatsApp, una sola vez por interrupción
+    end note
