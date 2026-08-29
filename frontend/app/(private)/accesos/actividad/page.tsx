@@ -2,6 +2,7 @@ import { getSession } from '@/app/actions/auth'
 import { listAccessEvents } from '@/app/actions/access'
 import { NoPermission } from '@/components/common/NoPermission'
 import { canSee } from '@/lib/auth/permissions'
+import { SHORT_MOMENT_FORMAT } from '@/lib/time'
 
 /** What each kind of event is called on screen, in the owner's words. */
 const EVENT_LABELS: Record<string, { label: string; tone: string }> = {
@@ -16,9 +17,9 @@ const EVENT_LABELS: Record<string, { label: string; tone: string }> = {
 }
 
 // Shorter than `formatMoment` in lib/catalog/format on purpose: this table
-// has one row per event and the full date pushes everything else off the line.
+// has one row per event and the seconds push everything else off the line.
 function shortMoment(iso: string): string {
-  return new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+  return SHORT_MOMENT_FORMAT.format(new Date(iso))
 }
 
 /**
