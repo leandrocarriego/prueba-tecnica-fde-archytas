@@ -29,6 +29,7 @@ import asyncio
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -46,6 +47,8 @@ from app.modules.identity import middleware as identity_middleware
 from app.modules.identity.models import Session as UserSession
 from app.modules.identity.models import User, UserRole
 from app.modules.identity.security import generate_token, hash_token
+from app.modules.notifications import tasks as notification_tasks
+from app.modules.portal import handlers as portal_handlers
 from tests.factories.user_factory import UserFactory
 
 BASE_URL = "http://testserver"
@@ -166,6 +169,71 @@ async def session(connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
         join_transaction_mode="create_savepoint",
     ) as open_session:
         yield open_session
+
+
+# --- The broker: never reached -------------------------------------------
+#
+# A handler that queues work returns immediately by design (`GEN-09`), and in a
+# test the queue is exactly the part that must not be exercised: the suite runs
+# with RabbitMQ down, like it runs with the portal down.
+#
+# It is autouse and it lives here, not beside the feature tests, because the
+# rule belongs to the suite and not to one package. Kept local, it passes on
+# the machine that happens to have the broker up and fails in CI, which is the
+# worst place to find out.
+
+
+class Queued:
+    """Records what would have been queued, instead of queueing it."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def apply_async(self, **kwargs: Any) -> None:
+        self.calls.append(kwargs)
+
+    def delay(self, *args: Any, **kwargs: Any) -> None:
+        self.calls.append({"args": args, "kwargs": kwargs})
+
+    @property
+    def count(self) -> int:
+        return len(self.calls)
+
+
+@pytest.fixture
+def queued_history(monkeypatch: pytest.MonkeyPatch) -> Iterator[Queued]:
+    """The history visits a registered product would trigger (RF-38)."""
+    recorder = Queued()
+    monkeypatch.setattr(portal_handlers, "extract_product_history", recorder)
+    yield recorder
+
+
+@pytest.fixture
+def queued_alerts(monkeypatch: pytest.MonkeyPatch) -> Iterator[Queued]:
+    """The WhatsApp messages an interruption would send (RF-12)."""
+    recorder = Queued()
+    monkeypatch.setattr(notification_tasks, "send_whatsapp", recorder)
+    yield recorder
+
+
+@pytest.fixture
+def queued_access_links(monkeypatch: pytest.MonkeyPatch) -> Iterator[Queued]:
+    """The invitations and recovery links an access change would send.
+
+    Recorded rather than sent, and the recording is the assertion: what a test
+    checks is that the platform *decided* to send one, which is what the
+    handler is responsible for. Whether Evolution API accepted it is the
+    task's problem and the channel's test.
+    """
+    recorder = Queued()
+    monkeypatch.setattr(notification_tasks, "send_access_link", recorder)
+    yield recorder
+
+
+@pytest.fixture(autouse=True)
+def no_broker(queued_history: Queued, queued_alerts: Queued, queued_access_links: Queued) -> None:
+    """No test in this suite ever reaches RabbitMQ."""
+    return None
 
 
 # --- HTTP client ---------------------------------------------------------

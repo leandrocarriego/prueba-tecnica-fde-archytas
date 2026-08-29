@@ -28,7 +28,7 @@ from app.modules.operations.models import JobStatus
 from app.modules.operations.service import PRICE_UPDATE_TASK, OperationsService
 from app.modules.portal.client import UNREADABLE, PortalClient
 from app.shared.events import JobRunFailed, JobRunSucceeded, events
-from tests.integration.features.conftest import Queued
+from tests.conftest import Queued
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
 

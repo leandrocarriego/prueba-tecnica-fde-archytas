@@ -21,7 +21,7 @@ from app.modules.operations.service import (
     OperationsService,
 )
 from app.shared.errors import ConflictError
-from tests.integration.features.conftest import Queued
+from tests.conftest import Queued
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
 

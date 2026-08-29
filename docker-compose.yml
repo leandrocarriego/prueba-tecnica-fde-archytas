@@ -71,6 +71,27 @@ x-backend-env: &backend-env
   PORTAL_HEADLESS: ${PORTAL_HEADLESS:-true}
   PORTAL_DOWNLOAD_TTL_SECONDS: ${PORTAL_DOWNLOAD_TTL_SECONDS:-45}
   PORTAL_NAVIGATION_TIMEOUT_MS: ${PORTAL_NAVIGATION_TIMEOUT_MS:-15000}
+  PORTAL_HISTORY_SPACING_SECONDS: ${PORTAL_HISTORY_SPACING_SECONDS:-20}
+  # Where the links inside a message point. Unlike the API's own address this
+  # one cannot be hard-coded: it is the public domain on the server and
+  # localhost on a laptop, and an invitation pointing at localhost is an
+  # invitation nobody can open.
+  FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+  # WhatsApp, through Evolution API. Empty means the channel is off and every
+  # message is only written to the log — which is a platform where nobody can
+  # be invited and therefore nobody can log in. On a server these are set.
+  EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+  EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+  EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+  EVOLUTION_TIMEOUT_SECONDS: ${EVOLUTION_TIMEOUT_SECONDS:-15}
+  NOTIFICATIONS_WHATSAPP_TO: ${NOTIFICATIONS_WHATSAPP_TO:-}
+  NOTIFICATIONS_TO_DISK: ${NOTIFICATIONS_TO_DISK:-false}
+  NOTIFICATIONS_OUTBOX_DIR: ${NOTIFICATIONS_OUTBOX_DIR:-./outbox}
+  # The first access. It is created by the bootstrap command and by nothing
+  # else, so without these the installed platform has no owner to hand it to.
+  OWNER_EMAIL: ${OWNER_EMAIL:-}
+  OWNER_NAME: ${OWNER_NAME:-}
+  OWNER_PHONE: ${OWNER_PHONE:-}
 
 x-app-defaults: &app-defaults
   restart: ${RESTART_POLICY:-unless-stopped}

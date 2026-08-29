@@ -16,7 +16,7 @@ ALL := --profile full --profile deploy --profile tools
 
 .PHONY: help dev full tools up down logs build clean \
         test test-unit test-integration test-cov lint format \
-        playwright-install db-migrate db-revision \
+        playwright-install db-migrate db-revision db-owner \
         frontend-api-types backend-shell frontend-shell \
         pre-commit-install pre-commit-run \
         diagrams diagrams-check client-docs deploy
@@ -73,6 +73,7 @@ deploy: ## Traer los cambios y levantar el stack detras de Traefik — se corre 
 	@echo "Desplegado $$(git log --oneline -1)."
 	@echo "Traefik publica el dominio de DOMAIN en cuanto emita el certificado."
 	@echo "Recorda aplicar las migraciones:  make db-migrate"
+	@echo "Y, la primera vez, crear el dueno:  make db-owner"
 
 tools: ## Levantar Flower para inspeccionar las tasks de Celery (profile tools)
 	$(COMPOSE) --profile tools up -d
@@ -142,6 +143,12 @@ db-migrate: ## Aplicar las migraciones pendientes (alembic upgrade head)
 
 db-revision: ## Crear una migración nueva (usar: make db-revision MESSAGE="descripción")
 	cd backend && uv run alembic revision --autogenerate -m "$(MESSAGE)"
+
+# The one account that cannot be created from a screen: everybody else is
+# invited by the owner, so the first one is created here, from the environment.
+# It is idempotent — running it twice leaves one owner, not two.
+db-owner: ## Crear el primer acceso (el dueno) en los contenedores — OWNER_* del .env
+	$(COMPOSE) $(ALL) exec backend python -m app.modules.identity.bootstrap
 
 # ── Utilities ───────────────────────────────────────────────────────────────
 

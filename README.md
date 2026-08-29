@@ -261,6 +261,17 @@ Actualizar el deploy es entonces una sola línea:
 ssh <servidor> 'cd /srv/projects/<org>/<proyecto> && make deploy'
 ```
 
+Después de desplegar quedan dos pasos que el target no hace solo, a propósito: `make db-migrate`
+aplica las migraciones, y `make db-owner` crea el primer acceso —el del dueño, el único que no
+puede nacer de una pantalla porque a todos los demás los invita él—. El segundo es idempotente y
+se corre una sola vez.
+
+El `.env` del servidor necesita, además de `DOMAIN`, tres cosas sin las cuales la plataforma
+levanta pero **nadie puede entrar**: `FRONTEND_URL=https://$DOMAIN` (a dónde apuntan los enlaces
+que salen por WhatsApp), las cuatro variables `EVOLUTION_*` con `NOTIFICATIONS_WHATSAPP_TO` (el
+canal por el que viaja la invitación) y `OWNER_EMAIL`/`OWNER_NAME`/`OWNER_PHONE` (a quién se le
+entrega). Están todas en `.env.example`.
+
 **Sólo el frontend queda publicado.** La API no tiene router: el navegador habla con Next, y sólo
 Next habla con la API por la red interna, a través de `app/api/proxy/[...path]`, que además le
 adosa el token de sesión. No hay nginx. El TLS lo resuelve Traefik por labels, con el certificado

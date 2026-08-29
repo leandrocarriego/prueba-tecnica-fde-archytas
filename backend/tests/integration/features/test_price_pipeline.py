@@ -31,12 +31,12 @@ from app.modules.triage.service import (
 )
 from app.shared.errors import ExtractionError
 from app.shared.events import NormalizedHistoryPoint
+from tests.conftest import Queued
 from tests.factories.portal_factory import (
     FakePortal,
     broken_list_bytes,
     price_list_with,
 )
-from tests.integration.features.conftest import Queued
 
 pytestmark = [pytest.mark.integration, pytest.mark.database, pytest.mark.portal]
 
