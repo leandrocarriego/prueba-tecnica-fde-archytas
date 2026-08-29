@@ -9,10 +9,14 @@ import pkgutil
 from importlib import import_module
 
 from celery import Celery
-from celery.signals import worker_shutdown
+from celery.signals import worker_init, worker_process_init, worker_shutdown
 
 from app.config import settings
+from app.logging import get_logger
+from app.shared.events import discover_handlers
 from app.worker.bridge import shutdown_loop
+
+logger = get_logger(__name__)
 
 
 def _module_packages() -> list[str]:
@@ -54,6 +58,24 @@ celery_app.conf.update(
 # for `celery_app` to dispatch a task by name imported its own module's tasks
 # back, half-initialised, through this line.
 celery_app.autodiscover_tasks(packages=_module_packages())
+
+
+# Subscriptions are per process, and a task publishes events like any other
+# caller. Without this the worker runs the nightly extraction, publishes what it
+# found and reaches nobody: the pipeline stops at `raw` and nothing says so.
+#
+# It cannot go at import time — `handlers.py` imports the very `tasks.py` that
+# Celery is in the middle of loading. On the signals it is safe, because by then
+# every task module is imported and the application is finalised.
+#
+# Both signals on purpose: `worker_init` covers the parent (and the solo pool,
+# where tasks run in it), `worker_process_init` each forked child. Imports are
+# cached, so the second call is a no-op and never registers a handler twice.
+@worker_init.connect
+@worker_process_init.connect
+def _on_worker_start(**_: object) -> None:
+    """Register every module's subscriptions in the process that will publish."""
+    logger.info("Handlers discovered", extra={"modules": len(discover_handlers())})
 
 
 @worker_shutdown.connect
