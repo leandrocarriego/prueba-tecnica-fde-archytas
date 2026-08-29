@@ -8,12 +8,12 @@ import Link from 'next/link'
  * their session broke when it did not. The refusal is also recorded, so the
  * owner sees it — this screen is only the half the person reads.
  */
-export function NoPermission({ que }: { que?: string }) {
+export function NoPermission({ what }: { what?: string }) {
   return (
     <main className="mx-auto max-w-2xl px-6 py-24 text-center">
       <h1 className="mb-4 text-2xl font-semibold">No tenés permiso</h1>
       <p className="mb-8 text-muted-foreground">
-        {que ? `Tu acceso no llega a ${que}.` : 'Tu acceso no llega a esta parte del sistema.'} Si
+        {what ? `Tu acceso no llega a ${what}.` : 'Tu acceso no llega a esta parte del sistema.'} Si
         creés que debería, pedíselo al dueño.
       </p>
       <Link href="/" className="underline underline-offset-4">

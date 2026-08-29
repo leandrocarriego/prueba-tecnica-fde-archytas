@@ -6,15 +6,15 @@ import { NoPermission } from '@/components/common/NoPermission'
 import { canEdit } from '@/lib/auth/permissions'
 
 /** Administering the accesses. The owner's, and only the owner's (RF-24). */
-export default async function AccesosPage() {
+export default async function AccessesPage() {
   const session = await getSession()
   if (!session || !canEdit(session.permissions, 'ACCESS_ADMIN')) {
-    return <NoPermission que="la administración de accesos" />
+    return <NoPermission what="la administración de accesos" />
   }
 
-  const accesos = await listAccesses()
-  if (!accesos) {
-    return <NoPermission que="la administración de accesos" />
+  const accesses = await listAccesses()
+  if (!accesses) {
+    return <NoPermission what="la administración de accesos" />
   }
 
   return (
@@ -27,7 +27,7 @@ export default async function AccesosPage() {
       </div>
 
       <NewAccessForm />
-      <AccessTable accesos={accesos.items} yo={session.user.id} />
+      <AccessTable accesses={accesses.items} viewerId={session.user.id} />
     </main>
   )
 }

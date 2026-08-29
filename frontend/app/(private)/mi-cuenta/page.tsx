@@ -11,7 +11,7 @@ const ROLES: Record<string, string> = {
 }
 
 /** Your own account: who you are, and the one credential you control (RF-25). */
-export default async function MiCuentaPage() {
+export default async function MyAccountPage() {
   const session = await getSession()
   if (!session) {
     redirect('/login')
@@ -40,7 +40,7 @@ export default async function MiCuentaPage() {
         <p className="text-xs text-muted-foreground">
           Al cambiarla se cierran las sesiones que tengas abiertas en otros navegadores.
         </p>
-        <PasswordForm action={changeOwnPassword} etiqueta="Cambiar la clave" pideClaveActual />
+        <PasswordForm action={changeOwnPassword} label="Cambiar la clave" asksCurrentPassword />
       </section>
     </main>
   )

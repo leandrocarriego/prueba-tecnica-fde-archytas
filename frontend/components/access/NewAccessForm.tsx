@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom'
 
 import { createAccess, type ActionResult } from '@/app/actions/access'
 
-function Enviar() {
+function SubmitButton() {
   const { pending } = useFormStatus()
   return (
     <button
@@ -60,7 +60,7 @@ export function NewAccessForm() {
         No le pongas una clave: le va a llegar una invitación por WhatsApp para que la elija ella.
       </p>
 
-      <Enviar />
+      <SubmitButton />
 
       {result && (
         <p className={`text-sm ${result.ok ? 'text-green-700' : 'text-red-700'}`}>

@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom'
 
 import type { ActionResult } from '@/app/actions/access'
 
-function Enviar({ etiqueta }: { etiqueta: string }) {
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return (
     <button
@@ -13,7 +13,7 @@ function Enviar({ etiqueta }: { etiqueta: string }) {
       disabled={pending}
       className="w-full cursor-pointer rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
     >
-      {pending ? 'Guardando...' : etiqueta}
+      {pending ? 'Guardando...' : label}
     </button>
   )
 }
@@ -26,7 +26,7 @@ function Enviar({ etiqueta }: { etiqueta: string }) {
  * different action. The only difference is whether the current password is
  * asked for, and that is the point: from a link there is nothing to ask.
  *
- * `unaSolaVez` says the action behind it can only succeed once, which is the
+ * `singleUse` says the action behind it can only succeed once, which is the
  * case for both links: the token is spent on use. Once it worked, the form goes
  * away. Leaving it on screen offers an action that can no longer succeed, and
  * somebody who presses it again reads "el enlace no sirve" and concludes their
@@ -34,24 +34,24 @@ function Enviar({ etiqueta }: { etiqueta: string }) {
  */
 export function PasswordForm({
   action,
-  etiqueta,
-  pideClaveActual = false,
-  unaSolaVez = false,
+  label,
+  asksCurrentPassword = false,
+  singleUse = false,
 }: {
   action: (formData: FormData) => Promise<ActionResult>
-  etiqueta: string
-  pideClaveActual?: boolean
-  unaSolaVez?: boolean
+  label: string
+  asksCurrentPassword?: boolean
+  singleUse?: boolean
 }) {
   const [result, setResult] = useState<ActionResult | null>(null)
 
-  if (unaSolaVez && result?.ok) {
+  if (singleUse && result?.ok) {
     return <p className="text-sm text-green-700">{result.message}</p>
   }
 
   return (
     <form action={async formData => setResult(await action(formData))} className="space-y-3">
-      {pideClaveActual && (
+      {asksCurrentPassword && (
         <input
           name="current_password"
           type="password"
@@ -78,7 +78,7 @@ export function PasswordForm({
       />
       <p className="text-xs text-muted-foreground">Al menos 8 caracteres.</p>
 
-      <Enviar etiqueta={etiqueta} />
+      <SubmitButton label={label} />
 
       {result && (
         <p className={`text-sm ${result.ok ? 'text-green-700' : 'text-red-700'}`}>
