@@ -8,7 +8,7 @@ Es deliberadamente corto. No repite la arquitectura (`ARCHITECTURE.md`), las reg
 plan, ninguna feature y ninguna urgencia pueden violar**. Si una regla admite excepciones
 razonables, no pertenece acá.
 
-**Versión** 2.0.0 · **Ratificada** 2026-08-28 · **Última reforma** 2026-08-28 (Artículo IV)
+**Versión** 2.0.1 · **Ratificada** 2026-08-28 · **Última reforma** 2026-08-29 (Artículo III)
 
 ---
 
@@ -44,6 +44,11 @@ quien lo mira.
 `raw` guarda lo extraído tal cual llegó, con su hash, y **nunca se sobrescribe ni se corrige**.
 Toda corrección ocurre en la transformación hacia `staging`, y por lo tanto es reproducible: se
 puede reconstruir el estado desde el origen sin volver a extraer.
+
+Lo inmutable es **lo extraído**: el contenido, su hash, su tipo y el momento en que llegó. Una
+columna de contabilidad propia —que registre que el pipeline ya lo leyó, y nada más— no lo
+sobrescribe y está permitida. La diferencia es verificable y por eso es una regla y no una
+interpretación: el test enumera qué columnas no se pueden tocar.
 
 *Por qué es no negociable:* si se puede editar `raw`, se pierde la única evidencia de qué dijo
 el portal, y ninguna diferencia con el origen vuelve a ser explicable.
