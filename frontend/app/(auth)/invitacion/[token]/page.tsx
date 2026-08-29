@@ -28,8 +28,9 @@ export default async function Page({ params }: { params: Promise<{ token: string
               return setPasswordWithToken('invitacion', token, formData)
             }}
             etiqueta="Definir mi clave"
+            unaSolaVez
           />
-          <Link href="/login" className="mt-6 text-center text-sm underline underline-offset-4">
+          <Link href="/login" className="mt-6 rounded bg-gray-900 px-4 py-2 text-center text-white">
             Ir a la pantalla de ingreso
           </Link>
         </>
