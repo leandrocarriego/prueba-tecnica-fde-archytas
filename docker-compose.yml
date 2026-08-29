@@ -80,9 +80,13 @@ x-backend-env: &backend-env
   # WhatsApp, through Evolution API. Empty means the channel is off and every
   # message is only written to the log — which is a platform where nobody can
   # be invited and therefore nobody can log in. On a server these are set.
-  EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+  # `evolution_api` is a service of this same file, so the address is not a
+  # setting anybody has to know: it is Docker's DNS name on `cordillera_network`.
+  EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution_api:8080}
+  # One key, two readers: the gateway authenticates callers with it and the
+  # backend calls with it. Two variables for one secret is how they drift.
   EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
-  EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+  EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-cordillera}
   EVOLUTION_TIMEOUT_SECONDS: ${EVOLUTION_TIMEOUT_SECONDS:-15}
   NOTIFICATIONS_WHATSAPP_TO: ${NOTIFICATIONS_WHATSAPP_TO:-}
   NOTIFICATIONS_TO_DISK: ${NOTIFICATIONS_TO_DISK:-false}
@@ -191,6 +195,110 @@ services:
     depends_on: *depends-on-infra
     mem_limit: 256m
 
+  # ── WhatsApp · the way out to a person ────────────────────────────────────
+  # Everything the platform has to tell somebody goes by WhatsApp — the
+  # invitation, the recovery link, the alert when the update stops working —
+  # and this is what puts it on the wire. It is a third party's software
+  # holding somebody's WhatsApp session, so two decisions are load-bearing:
+  #
+  # **It is never published.** No Traefik router, and the port is bound to
+  # loopback. Whoever needs the QR reaches it through the SSH tunnel that
+  # already gets them to the server. Publishing it would put a WhatsApp account
+  # that is not ours on the open internet.
+  #
+  # **It does not keep the conversations.** Only the instance is persisted,
+  # which is what lets the session survive a restart. Messages, contacts, chats
+  # and history are off: they belong to whoever is talking, not to us.
+  #
+  # No `CONFIG_SESSION_PHONE_VERSION`, on purpose. It pins the WhatsApp Web
+  # version the socket presents as; v2.2.3 carried one hardcoded and expired,
+  # and WhatsApp answered by closing the socket — Baileys then retried every
+  # two seconds, emitting no QR and no error. v2.3.7 resolves it on its own and
+  # was checked to emit a QR without the pin, so pinning it here would be
+  # planting tomorrow's version of the same failure. If it ever stops
+  # connecting and the log repeats "Baileys version env" every two seconds,
+  # that is the symptom: read the number Baileys publishes and pin it while it
+  # lasts.
+  evolution_api:
+    image: evoapicloud/evolution-api:v2.3.7
+    container_name: cordillera_evolution
+    profiles: ["full", "deploy"]
+    restart: ${RESTART_POLICY:-unless-stopped}
+    networks: [cordillera_network]
+    depends_on:
+      evolution_postgres:
+        condition: service_healthy
+      evolution_redis:
+        condition: service_started
+    ports:
+      # Loopback only: this is how the SSH tunnel reaches the pairing QR.
+      - "${BIND_HOST:-127.0.0.1}:8080:8080"
+    environment:
+      SERVER_URL: http://evolution_api:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "false"
+      DEL_INSTANCE: "false"
+      LOG_LEVEL: ERROR,WARN
+      LOG_BAILEYS: error
+      QRCODE_LIMIT: "10"
+      CONFIG_SESSION_PHONE_CLIENT: Cordillera
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_POSTGRES_PASSWORD:-evolution}@evolution_postgres:5432/evolution?schema=public
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://evolution_redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_LOCAL_ENABLED: "false"
+    volumes:
+      - evolution_instances:/evolution/instances
+    mem_limit: 768m
+
+  # Its own database, and not a second schema in ours. `raw`, `staging`, `core`
+  # and `operations` are the pipeline (Artículo III); a third party's tables
+  # living beside them would blur what that database is for, and its migrations
+  # would run against the one thing this product cannot afford to lose.
+  evolution_postgres:
+    image: postgres:17-alpine
+    container_name: cordillera_evolution_postgres
+    profiles: ["full", "deploy"]
+    restart: ${RESTART_POLICY:-unless-stopped}
+    networks: [cordillera_network]
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_POSTGRES_PASSWORD:-evolution}
+      POSTGRES_DB: evolution
+    volumes:
+      - evolution_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  # Not RabbitMQ: this is the gateway's own cache, on its own terms, and the
+  # queue our tasks run on has nothing to do with it.
+  evolution_redis:
+    image: redis:7-alpine
+    container_name: cordillera_evolution_redis
+    profiles: ["full", "deploy"]
+    restart: ${RESTART_POLICY:-unless-stopped}
+    networks: [cordillera_network]
+    command: redis-server --appendonly yes
+    volumes:
+      - evolution_redis:/data
+    mem_limit: 128m
+
   # Two frontends, one image, never both at once. They differ in how they are
   # reached, and in nothing else: locally through a published port, on the VPS
   # through Traefik. Keeping them apart is what lets `full` run on a laptop
@@ -261,6 +369,10 @@ services:
 volumes:
   postgres_data:
   rabbitmq_data:
+  # The paired WhatsApp session. Losing these means pairing the phone again.
+  evolution_instances:
+  evolution_pgdata:
+  evolution_redis:
 
 networks:
   cordillera_network:

@@ -18,7 +18,8 @@ Preparar y desplegar la Plataforma Cordillera en producción con Docker Compose.
 
 ## Servicios desplegados
 `frontend` (Next.js) · `backend` (FastAPI) · `postgres` · `rabbitmq` · `celery_worker` ·
-`celery_beat`.
+`celery_beat` · `evolution_api` con su `evolution_postgres` y su `evolution_redis` (la salida a
+WhatsApp).
 
 ## Pasos (ORDEN OBLIGATORIO)
 
@@ -74,20 +75,51 @@ servidor no hay `uv`: todo corre adentro.
   eventos que nadie escucha, y eso no falla — la extracción guarda en `raw` y ahí se termina.
 - Sin errores críticos en los logs.
 
-### 6) Crear el primer acceso (sólo la primera vez)
+### 6) Vincular el WhatsApp (sólo la primera vez)
+
+Evolution API sostiene una sesión de WhatsApp, y una sesión la abre una persona con su teléfono.
+La instancia se llama como `EVOLUTION_INSTANCE` y **no se publica**: se la alcanza por el túnel
+SSH que ya te trae al servidor.
+
+```bash
+KEY=$(grep ^EVOLUTION_API_KEY= .env | cut -d= -f2)
+curl -s -X POST http://127.0.0.1:8080/instance/create -H "apikey: $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"instanceName":"cordillera","qrcode":true,"integration":"WHATSAPP-BAILEYS"}'
+
+# Un código de ocho caracteres para el número que va a MANDAR los mensajes:
+curl -s -H "apikey: $KEY" \
+  "http://127.0.0.1:8080/instance/connect/cordillera?number=<549...>"
+```
+
+En ese teléfono: WhatsApp → **Dispositivos vinculados** → **Vincular con número de teléfono** →
+el código. Vence en pocos minutos, así que conviene pedirlo con la pantalla ya abierta; pedir otro
+es repetir el segundo comando.
+
+Queda vinculado cuando el estado es `open`:
+
+```bash
+curl -s -H "apikey: $KEY" http://127.0.0.1:8080/instance/connectionState/cordillera
+```
+
+Recién entonces `NOTIFICATIONS_TO_DISK=false`. Antes de eso los mensajes se escriben a disco, que
+es lo correcto: un canal a medio configurar que dice haber mandado algo es peor que uno apagado.
+
+### 7) Crear el primer acceso (sólo la primera vez)
 ```bash
 make db-owner
 ```
 Es idempotente: correrlo dos veces deja un dueño, no dos. Verificar que la invitación **salió**,
-no que el comando lo dijo: con `NOTIFICATIONS_TO_DISK=true` el mensaje queda como archivo en el
-worker, y con el canal configurado el log de la task dice si Evolution API lo aceptó.
+no que el comando lo dijo: el log del worker tiene que decir `WhatsApp message sent` y la task
+terminar en `{'sent': True}`. Con `NOTIFICATIONS_TO_DISK=true` el mensaje queda como archivo en el
+worker, y ahí se lee el enlace.
 
-### 7) Verificar la extracción
+### 8) Verificar la extracción
 - Disparar una corrida de extracción controlada y verificar que deja filas en `raw`.
 - Revisar `operations` para confirmar que el job quedó registrado y que la cola de excepciones no
   explotó.
 
-### 8) Monitorear
+### 9) Monitorear
 - Logs de la aplicación y del worker.
 - Tasa de errores y de excepciones en `operations.exception`.
 - Conexiones a la base y profundidad de las colas de RabbitMQ.
@@ -97,6 +129,7 @@ worker, y con el canal configurado el log de la task dice si Evolution API lo ac
 - Las migraciones se aplicaron correctamente y los modelos están sincronizados.
 - La API y el frontend responden.
 - El worker ejecuta tasks, registró sus handlers y `beat` dispara la extracción programada.
+- La instancia de WhatsApp está en `open` y un mensaje real salió (`WhatsApp message sent`).
 - Hay un dueño, y el enlace que le llegó **se abre sin sesión**: una invitación detrás del guard
   de rutas redirige a un login que esa persona todavía no puede pasar.
 - Los logs no muestran errores críticos.
@@ -128,5 +161,10 @@ worker, y con el canal configurado el log de la task dice si Evolution API lo ac
   cierra solo.
 - El enlace de la invitación redirige a `/login` → la ruta no está en `publicPaths` de
   `frontend/proxy.ts`.
+- La instancia de WhatsApp no sale de `connecting` y nunca emite un QR, con el log repitiendo
+  `Baileys version env` cada dos segundos → la versión de WhatsApp Web que el socket presenta está
+  vencida. Ver el comentario de `evolution_api` en `docker-compose.yml`.
+- Las tasks de notificación terminan en `{'sent': False}` → mirar `connectionState`: si alguien
+  desvinculó el dispositivo desde el teléfono, la sesión se cerró y hay que vincular de nuevo.
 - La extracción falla en producción y no en desarrollo → verificar que el navegador de
   Playwright esté instalado en la imagen del worker.
