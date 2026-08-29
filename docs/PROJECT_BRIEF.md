@@ -169,7 +169,7 @@ no cuando está escrita.
 
 | ID | Estado | Feature |
 |----|--------|---------|
-| P1 · Precios | Pendiente | — |
+| P1 · Precios | Resuelto | 001-price-list-update |
 | P2 · Facturas | Pendiente | — |
 | P3 · No ver nada | Pendiente | — |
 | P4 · Proveedores | Pendiente | — |
@@ -178,7 +178,7 @@ no cuando está escrita.
 | P7 · Rubros | Pendiente | — |
 | P8 · Avisos | Pendiente | — |
 | P9 · Control propio | Pendiente | — |
-| P10 · Accesos | Pendiente | — |
+| P10 · Accesos | Resuelto | 002-access-control |
 | P11 · Fechas | Pendiente | — |
 | P12 · Recibos | Pendiente | — |
 
