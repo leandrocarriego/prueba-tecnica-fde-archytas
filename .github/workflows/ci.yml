@@ -84,13 +84,22 @@ jobs:
       - name: Frontmatter de los comandos
         run: uv run --quiet --with pyyaml python scripts/validate_command_frontmatter.py
 
-      # DB-01: models and tables describe the same thing. Checked after the
-      # tests, which are what apply the migrations to the database.
+      # DB-01: models and tables describe the same thing.
+      #
+      # On a database of its own, raised by the migration chain — not on the
+      # suite's. The suite builds its schema from `Base.metadata` on purpose,
+      # so it never stamps a revision and `check` would only ever find it out
+      # of date. Migrating first is also the stronger question: it asks whether
+      # the migrations produce the models, which is what DB-01 promises.
       - name: Migraciones sincronizadas (DB-01)
         working-directory: backend
         env:
-          POSTGRES_DB: cordillera_test
-        run: uv run alembic check
+          POSTGRES_DB: cordillera_migrations
+        run: |
+          PGPASSWORD=$POSTGRES_PASSWORD psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" \
+            -U "$POSTGRES_USER" -d postgres -c 'CREATE DATABASE cordillera_migrations'
+          uv run alembic upgrade head
+          uv run alembic check
 
   frontend:
     name: Frontend
