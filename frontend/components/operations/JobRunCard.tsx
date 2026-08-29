@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { getJobStatusColor, getJobStatusLabel } from '@/lib/operations/taskStateUtils'
 import type { JobRun } from '@/lib/operations/types'
+import { MOMENT_FORMAT } from '@/lib/time'
 
 interface JobRunCardProps {
   run: JobRun
@@ -8,7 +9,7 @@ interface JobRunCardProps {
 
 function formatTimestamp(value: string | null): string {
   if (value === null) return '—'
-  return new Date(value).toLocaleString('es-AR')
+  return MOMENT_FORMAT.format(new Date(value))
 }
 
 /**

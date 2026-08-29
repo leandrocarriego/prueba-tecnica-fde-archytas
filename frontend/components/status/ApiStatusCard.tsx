@@ -5,6 +5,7 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import type { HealthProbe } from '@/lib/health'
+import { CLOCK_FORMAT } from '@/lib/time'
 
 /** How often the card re-asks on its own, in milliseconds. */
 const REFRESH_MS = 15_000
@@ -79,12 +80,6 @@ function describe(probe: HealthProbe): StatusView {
     facts,
   }
 }
-
-const TIME_FORMAT = new Intl.DateTimeFormat('es-AR', {
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-})
 
 export function ApiStatusCard({ initial }: { initial: HealthProbe }) {
   const [probe, setProbe] = React.useState<HealthProbe>(initial)
@@ -165,7 +160,7 @@ export function ApiStatusCard({ initial }: { initial: HealthProbe }) {
 
       <CardFooter className="justify-between gap-4">
         <p className="text-xs text-muted-foreground">
-          {checkedAt ? `Última comprobación: ${TIME_FORMAT.format(checkedAt)}` : 'Comprobando…'}
+          {checkedAt ? `Última comprobación: ${CLOCK_FORMAT.format(checkedAt)}` : 'Comprobando…'}
         </p>
         <Button variant="outline" size="sm" onClick={() => void check()} disabled={checking}>
           {checking ? 'Comprobando…' : 'Reintentar'}
