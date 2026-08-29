@@ -268,9 +268,24 @@ se corre una sola vez.
 
 El `.env` del servidor necesita, además de `DOMAIN`, tres cosas sin las cuales la plataforma
 levanta pero **nadie puede entrar**: `FRONTEND_URL=https://$DOMAIN` (a dónde apuntan los enlaces
-que salen por WhatsApp), las cuatro variables `EVOLUTION_*` con `NOTIFICATIONS_WHATSAPP_TO` (el
-canal por el que viaja la invitación) y `OWNER_EMAIL`/`OWNER_NAME`/`OWNER_PHONE` (a quién se le
-entrega). Están todas en `.env.example`.
+que salen por WhatsApp), `EVOLUTION_API_KEY` con `NOTIFICATIONS_WHATSAPP_TO` (el canal por el que
+viaja la invitación) y `OWNER_EMAIL`/`OWNER_NAME`/`OWNER_PHONE` (a quién se le entrega). Están
+todas en `.env.example`.
+
+### WhatsApp
+
+Todo lo que la plataforma tiene que decirle a una persona sale por ahí, y quien lo pone en el
+cable es **Evolution API**, un servicio más de este `docker-compose.yml`. Sostiene una sesión de
+WhatsApp real, así que **no se publica**: no tiene router de Traefik y su puerto va a loopback.
+Se la alcanza por el túnel SSH que ya te trae al servidor.
+
+Vincular el teléfono es un paso manual y de una sola vez —una sesión de WhatsApp la abre una
+persona—, y está en `agents/skills/deploy.md`. Hasta que el estado de la instancia sea `open`,
+`NOTIFICATIONS_TO_DISK=true` deja cada mensaje como archivo en el worker en lugar de mandarlo:
+un canal a medio configurar que dice haber mandado algo es peor que uno apagado.
+
+Guarda la instancia y nada más. Los mensajes, los contactos y los chats quedan desactivados a
+propósito: son de quien está conversando, no nuestros.
 
 **Sólo el frontend queda publicado.** La API no tiene router: el navegador habla con Next, y sólo
 Next habla con la API por la red interna, a través de `app/api/proxy/[...path]`, que además le
