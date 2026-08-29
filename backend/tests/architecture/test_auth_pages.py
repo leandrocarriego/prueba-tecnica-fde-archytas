@@ -1,4 +1,14 @@
-"""Every authentication page is reachable without a session.
+"""The two static rules that hold the authentication pages together.
+
+Both were found by using the deployed site, and both are checked here because
+the frontend has no test runner: adding one to hold a couple of rules is a
+bigger change than they deserve. The checks are static, the same shape as the
+rest of this package, and they fail for the right reason. If a frontend suite
+ever exists, they belong there.
+
+---
+
+**One. Every authentication page is reachable without a session.**
 
 The pages under `frontend/app/(auth)/` are, by definition, the ones visited by
 somebody who **cannot** log in: an invitation, a recovery link, the login form
@@ -10,11 +20,12 @@ public while the links that go out by WhatsApp point at `/invitacion/<token>`
 and `/recuperar/<token>`, so the first access to the platform bounced to the
 login page — every time, for everybody.
 
-Why a Python test for a TypeScript file: the frontend has no test runner, and
-adding one to hold a two-line list is a bigger change than the rule deserves.
-The check is static — the same shape as the other tests in this package — and
-it fails for the right reason, which is what makes it worth having. If a
-frontend suite ever exists, this belongs there.
+**Two. A page that redeems a single-use link stops offering the action.**
+
+The recovery page saved the password, said so, and left the form exactly where
+it was — same two fields, same "Guardar la clave". Pressing it again spends
+nothing and answers "el enlace no sirve", which reads as *your password was
+never saved*. It was.
 """
 
 import re
@@ -68,4 +79,32 @@ class TestAuthenticationPagesArePublic:
         assert excluded is not None, "matcher not found in proxy.ts"
         assert route in excluded.group(1).split("|"), (
             f"/{route} is an authentication page and the matcher still runs on it."
+        )
+
+
+# Pages that redeem a token: their action works once, so the form must not
+# survive it. `mi-cuenta` deliberately does not qualify — changing your own
+# password is something you may do again tomorrow.
+SINGLE_USE = re.compile(r"unaSolaVez")
+
+
+def token_pages() -> list[Path]:
+    """Every `(auth)` page that takes a token in its path."""
+    return sorted(page for page in AUTH_PAGES.rglob("[[]token[]]/page.tsx"))
+
+
+@pytest.mark.unit
+class TestASingleUseLinkStopsOfferingItself:
+    """A link that is spent on use, and a screen that says so."""
+
+    def test_there_are_token_pages_to_check(self) -> None:
+        """A rename that empties the search must not quietly pass this file."""
+        assert token_pages(), f"no [token]/page.tsx under {AUTH_PAGES}"
+
+    @pytest.mark.parametrize("page", token_pages(), ids=lambda p: p.parts[-3])
+    def test_it_asks_the_form_to_go_away(self, page: Path) -> None:
+        """Otherwise it offers an action that can no longer succeed."""
+        assert SINGLE_USE.search(page.read_text(encoding="utf-8")), (
+            f"{page.parts[-3]} redeems a single-use token and does not pass `unaSolaVez`: "
+            "after saving, the form stays on screen offering to save again."
         )

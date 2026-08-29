@@ -25,17 +25,29 @@ function Enviar({ etiqueta }: { etiqueta: string }) {
  * for the same thing and repeat it back, so they are one component with a
  * different action. The only difference is whether the current password is
  * asked for, and that is the point: from a link there is nothing to ask.
+ *
+ * `unaSolaVez` says the action behind it can only succeed once, which is the
+ * case for both links: the token is spent on use. Once it worked, the form goes
+ * away. Leaving it on screen offers an action that can no longer succeed, and
+ * somebody who presses it again reads "el enlace no sirve" and concludes their
+ * password was never saved — the opposite of what happened.
  */
 export function PasswordForm({
   action,
   etiqueta,
   pideClaveActual = false,
+  unaSolaVez = false,
 }: {
   action: (formData: FormData) => Promise<ActionResult>
   etiqueta: string
   pideClaveActual?: boolean
+  unaSolaVez?: boolean
 }) {
   const [result, setResult] = useState<ActionResult | null>(null)
+
+  if (unaSolaVez && result?.ok) {
+    return <p className="text-sm text-green-700">{result.message}</p>
+  }
 
   return (
     <form action={async formData => setResult(await action(formData))} className="space-y-3">
