@@ -13,6 +13,7 @@ from app.modules.notifications.client import NOT_CONFIGURED, WhatsAppChannel
 from app.modules.notifications.service import (
     NEVER,
     NotificationService,
+    conflict_message,
     recovered_message,
     stalled_message,
 )
@@ -79,3 +80,102 @@ class TestAChannelThatIsNotConfigured:
 
         # Assert
         assert channel.is_configured is False
+
+
+@pytest.mark.unit
+class TestTheConflictAlert:
+    """RF-29: the owner finds out without having to be looking at the screen."""
+
+    def test_it_carries_the_three_values(self) -> None:
+        """What the portal said, what a person corrected it to, and what it says now."""
+        # Act
+        message = conflict_message(
+            field="price", original="1000", corrected="1200", incoming="1500"
+        )
+
+        # Assert
+        assert "1000" in message
+        assert "1200" in message
+        assert "1500" in message
+
+    def test_it_says_the_correction_still_stands(self) -> None:
+        """The system flags and waits: it never picks one of the two (RF-28)."""
+        # Act
+        message = conflict_message(field="price", original="1", corrected="2", incoming="3")
+
+        # Assert
+        assert "sigue en pie" in message
+
+    def test_the_field_is_named_in_spanish(self) -> None:
+        """It travels as another module's code and is read by a person."""
+        # Assert
+        assert "precio" in conflict_message(
+            field="price", original="1", corrected="2", incoming="3"
+        )
+
+    def test_a_field_nobody_translated_still_names_itself(self) -> None:
+        """A message missing a word still says what happened."""
+        # Assert
+        assert "invoice_number" in conflict_message(
+            field="invoice_number", original="1", corrected="2", incoming="3"
+        )
+
+    def test_it_names_the_datum_the_conflict_is_about(self) -> None:
+        """Two conflicts in one nightly run carry the same field and can carry
+        the same numbers: the datum is the only thing that tells them apart."""
+        # Act
+        message = conflict_message(
+            field="price",
+            original="1",
+            corrected="2",
+            incoming="3",
+            entity_type="catalog.product_price",
+            entity_id="12",
+        )
+
+        # Assert
+        assert "Producto #12" in message
+
+    def test_it_gives_a_way_to_reach_that_screen(self) -> None:
+        """RF-29: the alert is read at night, on a phone, away from the system.
+
+        The id is internal — no screen shows it — so knowing which product
+        disagrees is worth nothing without the address of its screen.
+        """
+        # Act
+        message = conflict_message(
+            field="price",
+            original="1",
+            corrected="2",
+            incoming="3",
+            entity_type="catalog.product_price",
+            entity_id="12",
+        )
+
+        # Assert
+        assert "/precios/12" in message
+
+    def test_an_entity_nobody_named_never_reaches_the_owner_as_code(self) -> None:
+        """A namespace with a dot in it is not something a person reads."""
+        # Act
+        message = conflict_message(
+            field="price",
+            original="1",
+            corrected="2",
+            incoming="3",
+            entity_type="catalog.invoice",
+            entity_id="7",
+        )
+
+        # Assert
+        assert "catalog.invoice" not in message
+        assert "Dato #7" in message
+
+    def test_without_a_reference_it_does_not_invent_one(self) -> None:
+        """Naming one datum «#None» reads like a bug and says less than silence."""
+        # Act
+        message = conflict_message(field="price", original="1", corrected="2", incoming="3")
+
+        # Assert
+        assert "#" not in message
+        assert "Revisala en la pantalla del dato." in message

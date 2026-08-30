@@ -86,7 +86,10 @@ Al ser un proyecto único, las specs viven en **un solo árbol numerado**.
 │   │   ├── logging.py          # Logging estructurado
 │   │   ├── models.py           # Registro de modelos para el mapper y Alembic
 │   │   ├── shared/             # Kernel: errores, repositorio base, normalización
-│   │   │   └── events/         # El bus y el catálogo de eventos de dominio
+│   │   │   ├── events/         # El bus y el catálogo de eventos de dominio
+│   │   │   ├── parameters.py   # Catálogo de parámetros del negocio: rango y valor inicial
+│   │   │   ├── sections.py     # Las secciones del negocio, vocabulario de nadie
+│   │   │   └── corrections.py  # Forma de una corrección manual: estados y motivos
 │   │   ├── worker/             # Celery: app, puente async, scheduler
 │   │   └── modules/            # Módulos de dominio
 │   │       ├── identity/       # Usuarios, roles, sesión (RBAC)

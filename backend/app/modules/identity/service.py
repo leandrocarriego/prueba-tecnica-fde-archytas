@@ -47,6 +47,7 @@ from app.shared.events import (
     UserRoleChanged,
     events,
 )
+from app.shared.parameters import initial_value
 
 logger = get_logger(__name__)
 
@@ -55,7 +56,15 @@ IDLE_MINUTES_KEY = "access.session_idle_minutes"
 MAX_ATTEMPTS_KEY = "access.max_failed_attempts"
 LOCKOUT_MINUTES_KEY = "access.lockout_minutes"
 
-DEFAULT_IDLE_MINUTES = 480
+# The idle timeout is one of the parameters the owner sets from the settings
+# panel, so its starting value is declared once, in the catalog, and read from
+# there. Writing 60 here as well would be a second answer to the same question,
+# and the day somebody moved one the platform would obey whichever it happened
+# to read.
+DEFAULT_IDLE_MINUTES = int(initial_value(IDLE_MINUTES_KEY))
+
+# These two are deliberately **not** on the panel, so their starting value
+# lives here, next to the rule that uses it.
 DEFAULT_MAX_ATTEMPTS = 5
 DEFAULT_LOCKOUT_MINUTES = 15
 

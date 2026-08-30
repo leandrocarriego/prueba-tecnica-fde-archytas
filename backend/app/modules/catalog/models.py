@@ -2,6 +2,14 @@
 
 Only rows that could be interpreted reach this schema. Everything here is fed
 from `staging`, never straight from `raw`.
+
+`Correction` is the exception to that sentence and the reason it is worth
+reading twice: it is what a **person** put on top of what the portal said, and
+it lives here, in the module that owns the datum, rather than in a central
+table somewhere. That is not a preference. While a new price is being applied,
+this module has to know whether the datum carries a correction and what the
+portal had originally reported (RF-28), and asking another module for that
+would be reading its table — the import Artículo IV forbids.
 """
 
 import enum
@@ -20,11 +28,13 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.shared.corrections import CorrectionColumns, CorrectionStatus
 
 CORE_SCHEMA = "core"
 
@@ -37,7 +47,12 @@ class ProductStatus(enum.StrEnum):
 
 
 class PriceSource(enum.StrEnum):
-    """Where a point of the history came from."""
+    """Where a value came from: a list the portal published, or this platform.
+
+    It answers the question RF-33 rests on — whether there is a value the
+    portal reported underneath this one — so it marks the rows that hold a
+    value, not only the points of the history.
+    """
 
     PORTAL = "PORTAL"
     SYSTEM = "SYSTEM"
@@ -71,6 +86,15 @@ class Product(Base):
     # Which learned rule brought it in, when a person decided to incorporate it.
     # It is what lets revoking that rule undo exactly what it did (RF-37).
     registered_by_rule_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    # Whether the portal reported this product or a person typed it into the
+    # review queue. It is a different question from the one above — a product
+    # that came in the daily list has no rule either — and RF-33 needs this one:
+    # a value nobody reported offers no way back to "what the portal said".
+    source: Mapped[PriceSource] = mapped_column(
+        Enum(PriceSource, name="price_source", schema=CORE_SCHEMA),
+        default=PriceSource.PORTAL,
+        server_default=PriceSource.PORTAL.value,
+    )
 
     def __repr__(self) -> str:
         return f"<Product id={self.id} code={self.code} status={self.status}>"
@@ -99,6 +123,18 @@ class ProductPrice(Base):
     is_highlighted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # The product did not come in the last list and keeps its last price (RF-08).
     is_stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Who last wrote this row. One flag for the whole row because the row is
+    # written whole: whoever reports an amount reports the unit beside it.
+    #
+    # It belongs here and not on the product on purpose. The next daily list
+    # re-prices a product a person loaded by hand, and from that morning on the
+    # amount *is* the portal's even though the product never was — so RF-33 has
+    # to be answered per value, not per product.
+    source: Mapped[PriceSource] = mapped_column(
+        Enum(PriceSource, name="price_source", schema=CORE_SCHEMA),
+        default=PriceSource.PORTAL,
+        server_default=PriceSource.PORTAL.value,
+    )
 
     def __repr__(self) -> str:
         return f"<ProductPrice product_id={self.product_id} price={self.price}>"
@@ -161,3 +197,49 @@ class CatalogSetting(Base):
 
     def __repr__(self) -> str:
         return f"<CatalogSetting key={self.key}>"
+
+
+class Correction(Base, CorrectionColumns):
+    """A value a person put on top of what the portal reported, for this module.
+
+    The columns come from `app.shared.corrections`: when purchase invoices are
+    built they get a table of their own with the same shape, in their own
+    schema, and neither module learns about the other.
+
+    A datum has **at most one correction in force**, and the database is what
+    says so: the partial unique index below covers every row that is not
+    `REVERTED`. Undone corrections stay — nothing is deleted here either, and a
+    log entry that pointed at a row somebody removed would explain nothing
+    (Artículo II).
+    """
+
+    __tablename__ = "correction"
+    __table_args__ = (
+        Index(
+            "uq_correction_in_force",
+            "entity_type",
+            "entity_id",
+            "field",
+            unique=True,
+            postgresql_where=text("status <> 'REVERTED'"),
+        ),
+        {"schema": CORE_SCHEMA},
+    )
+
+    def __repr__(self) -> str:
+        return f"<Correction {self.entity_type}:{self.entity_id}.{self.field} {self.status}>"
+
+
+# Re-exported so the rest of the module names the status without reaching past
+# `models.py` for it.
+__all__ = [
+    "CORE_SCHEMA",
+    "CatalogSetting",
+    "Correction",
+    "CorrectionStatus",
+    "PricePoint",
+    "PriceSource",
+    "Product",
+    "ProductPrice",
+    "ProductStatus",
+]

@@ -51,6 +51,10 @@ PATH_PARAMETERS: dict[str, str] = {
     "product_id": "999999",
     "case_id": "999999",
     "rule_id": "999999",
+    "correction_id": "999999",
+    # The log of one datum is addressed by the publisher's own words for it.
+    "entity_type": "catalog.product",
+    "entity_id": "999999",
 }
 
 

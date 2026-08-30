@@ -32,6 +32,7 @@ class Section(enum.StrEnum):
     ACCESS_ADMIN = "ACCESS_ADMIN"
     ACCESS_LOG = "ACCESS_LOG"
     SYSTEM_PARAMETERS = "SYSTEM_PARAMETERS"
+    MANUAL_CORRECTIONS = "MANUAL_CORRECTIONS"
 
 
 class Level(enum.IntEnum):
@@ -58,6 +59,13 @@ _SALES = "SALES"
 #   RF-24 and RF-31 the access screens are the owner's alone.
 #
 # Nobody *edits* a dashboard, so it has no write level for anyone.
+#
+# `MANUAL_CORRECTIONS` is the odd one out, and worth a sentence. Making a
+# correction is authorised by the section the datum belongs to — the catalog
+# for a price, purchase invoices for an invoice — because that is what RF-24 of
+# 003 says. **Undoing** one is the owner's alone, whatever the datum, and that
+# is a different question from who may reach any single section. So it gets its
+# own entry rather than borrowing a section whose name would be a lie.
 MATRIX: dict[Section, dict[str, Level]] = {
     Section.PRICES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.READ},
     Section.CALENDAR: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.READ},
@@ -74,6 +82,11 @@ MATRIX: dict[Section, dict[str, Level]] = {
     Section.ACCESS_ADMIN: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.NONE},
     Section.ACCESS_LOG: {_OWNER: Level.READ, _PURCHASING: Level.NONE, _SALES: Level.NONE},
     Section.SYSTEM_PARAMETERS: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.NONE},
+    Section.MANUAL_CORRECTIONS: {
+        _OWNER: Level.WRITE,
+        _PURCHASING: Level.NONE,
+        _SALES: Level.NONE,
+    },
 }
 
 

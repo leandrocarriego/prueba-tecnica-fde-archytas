@@ -12,6 +12,7 @@ accounts for.
 
 from app.modules.catalog.models import (
     CatalogSetting,
+    Correction,
     PricePoint,
     PriceSource,
     Product,
@@ -36,7 +37,7 @@ from app.modules.ingestion.models import (
     ResolutionRuleProjection,
     RowStatus,
 )
-from app.modules.operations.models import JobRun, JobStatus, Parameter
+from app.modules.operations.models import AuditEntry, JobRun, JobStatus, Parameter
 from app.modules.portal.models import PortalDocument
 from app.modules.triage.models import CaseStatus, ExceptionCase, ResolutionRule
 
@@ -44,8 +45,10 @@ __all__: list[str] = [
     "AccessEvent",
     "AccessEventKind",
     "AccessSetting",
+    "AuditEntry",
     "CaseStatus",
     "CatalogSetting",
+    "Correction",
     "CredentialToken",
     "ExceptionCase",
     "JobRun",

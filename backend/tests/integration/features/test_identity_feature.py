@@ -27,10 +27,12 @@ from app.modules.identity.models import (
 from app.modules.identity.schemas import UserCreate, UserUpdate
 from app.modules.identity.security import hash_token, verify_password
 from app.modules.identity.service import (
+    IDLE_MINUTES_KEY,
     MAX_ATTEMPTS_KEY,
     IdentityService,
 )
 from app.shared.errors import AuthenticationError, ConflictError, NotFoundError, ValidationError
+from app.shared.parameters import initial_value
 from tests.factories.user_factory import DEFAULT_PASSWORD, UserFactory
 
 NEW_PASSWORD = "una-clave-nueva-2026"
@@ -70,6 +72,34 @@ async def _events_of(session: AsyncSession, kind: AccessEventKind) -> list[Acces
     """Every access event of one kind."""
     result = await session.execute(select(AccessEvent).where(AccessEvent.kind == kind))
     return list(result.scalars().all())
+
+
+def _idle_window() -> int:
+    """The idle window the platform starts with, read from the catalog.
+
+    Read and not written: RF-04 promises that a parameter nobody has changed
+    governs with the value `app/shared/parameters.py` declares, so the border
+    the two tests below stand on has to move the day that declaration moves. A
+    60 typed here would keep passing on the morning the catalog said one thing
+    and the platform obeyed another, which is the only failure worth catching.
+    """
+    window = int(initial_value(IDLE_MINUTES_KEY))
+    assert window > 1, "a step of one minute either side needs a window wider than one minute"
+    return window
+
+
+async def _last_used_minutes_ago(
+    service: IdentityService, session: AsyncSession, token: str, minutes: int
+) -> None:
+    """Backdate the live session behind this token, as if nobody had touched it.
+
+    Idleness is measured from `last_seen_at`, so this is the only way to ask
+    what happens after an idle window without waiting for one.
+    """
+    stored = await service.users.get_live_session(hash_token(token))
+    assert stored is not None
+    stored.last_seen_at = datetime.now(UTC) - timedelta(minutes=minutes)
+    await session.flush()
 
 
 @pytest.mark.integration
@@ -496,6 +526,51 @@ class TestSessionLifetime:
 
         # Assert
         assert await service.resolve_session(token) is None
+
+    async def test_a_minute_inside_the_starting_window_still_resolves(
+        self, service: IdentityService, session: AsyncSession
+    ) -> None:
+        """RF-04 at the near edge of the window the catalog declares.
+
+        The two tests above pass whether the window is one hour or eight —
+        seven hours with a use a minute ago is alive under both, nine hours
+        untouched is dead under both — so neither of them notices a platform
+        that stopped obeying the value the client signed. This one does,
+        because it stands one minute inside whatever
+        `access.session_idle_minutes` says today.
+        """
+        # Arrange
+        window = _idle_window()
+        user = await UserFactory.create(session)
+        token, _ = await service.authenticate(user.email, DEFAULT_PASSWORD)
+        await _last_used_minutes_ago(service, session, token, window - 1)
+
+        # Act
+        resolved = await service.resolve_session(token)
+
+        # Assert
+        assert resolved is not None
+        assert resolved.id == user.id
+
+    async def test_a_minute_past_the_starting_window_no_longer_resolves(
+        self, service: IdentityService, session: AsyncSession
+    ) -> None:
+        """The far side of the same edge, one minute later: the screen asks again.
+
+        The pair is what pins the number. Alone, either half would also pass
+        under a window twice as wide or half as narrow.
+        """
+        # Arrange
+        window = _idle_window()
+        user = await UserFactory.create(session)
+        token, _ = await service.authenticate(user.email, DEFAULT_PASSWORD)
+        await _last_used_minutes_ago(service, session, token, window + 1)
+
+        # Act
+        resolved = await service.resolve_session(token)
+
+        # Assert
+        assert resolved is None
 
     async def test_logging_out_ends_that_session_only(
         self, service: IdentityService, session: AsyncSession

@@ -19,6 +19,7 @@ const ENTRIES: ReadonlyArray<{ href: string; label: string; section: Section }> 
   { href: '/revision', label: 'Revisión', section: 'PRICES' },
   { href: '/accesos', label: 'Accesos', section: 'ACCESS_ADMIN' },
   { href: '/accesos/actividad', label: 'Actividad', section: 'ACCESS_LOG' },
+  { href: '/configuracion', label: 'Parámetros', section: 'SYSTEM_PARAMETERS' },
 ]
 
 export function Navigation({ user, permissions }: { user: UserRead; permissions: Permissions }) {
@@ -40,6 +41,19 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
         </nav>
 
         <div className="flex items-center gap-3 text-sm">
+          {/*
+            Two more that name no section, for the same reason `/health` does
+            not: any session reaches them. The history narrows what it *shows*
+            to the sections the caller reaches (RF-19) rather than closing the
+            door, and the actions screen lists whatever that person may run,
+            which for somebody with nothing is an honest empty state.
+          */}
+          <Link href="/acciones" className="text-muted-foreground hover:underline">
+            Acciones
+          </Link>
+          <Link href="/historial" className="text-muted-foreground hover:underline">
+            Historial
+          </Link>
           {/*
             Not in ENTRIES, and not an oversight: every entry there names the
             section its route demands, and this one demands none — any session

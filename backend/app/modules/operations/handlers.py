@@ -1,16 +1,22 @@
 """What `operations` does when something happens elsewhere.
 
 It is the module that watches the platform operate, so it listens to how the
-work of other modules ended. It never learns who did it: the extraction task
-reports that a run finished, and this is where that becomes a row somebody can
-read tomorrow morning.
+work of other modules ended, and to every change a person made by hand. It
+never learns who did it or what the datum was: another module reports a fact,
+and this is where that becomes a row somebody can read tomorrow morning.
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.operations.service import PRICE_UPDATE_TASK, OperationsService
-from app.shared.events import JobRunFailed, JobRunSucceeded, ProductPricesUpdated, events
+from app.shared.events import (
+    JobRunFailed,
+    JobRunSucceeded,
+    ManualChangeRecorded,
+    ProductPricesUpdated,
+    events,
+)
 
 logger = get_logger(__name__)
 
@@ -46,3 +52,16 @@ async def record_run_result(event: ProductPricesUpdated, session: AsyncSession) 
             "quarantined": event.quarantined,
         },
     )
+
+
+@events.subscribe(ManualChangeRecorded)
+async def write_the_log(event: ManualChangeRecorded, session: AsyncSession) -> None:
+    """Turn a manual change made anywhere into a line of the log (RF-09, RF-10, RF-12).
+
+    Nothing is caught here, deliberately. This runs in the transaction of
+    whoever made the change, so a log line that cannot be written takes the
+    change down with it (`GEN-09`). That is the behaviour the feature promises:
+    the alternative is a corrected value nobody can explain, which is the one
+    outcome Artículo II rules out.
+    """
+    await OperationsService(session).record_manual_change(event)

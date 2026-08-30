@@ -14,6 +14,7 @@ apagado**. Por eso estos archivos se versionan.
 | `invoice-F-8411-text.pdf` | Factura en PDF **con capa de texto** | El lector de PDF (004) |
 | `invoice-F-9936-scanned.pdf` | Factura en PDF **escaneado**: un JPEG, sin texto | El OCR (004) |
 | `invoice-F-7797.xlsx` | Factura en planilla, con el encabezado corrido | El lector de planillas (004) |
+| `suppliers-ledger-page-2026-08-29.html` | `/estado-cuenta` con la primera fila **ya expandida** | El padrón: los ocho proveedores y su ficha (004) |
 | `purchase-orders-page-2026-08-29.html` | La sección `/ordenes-compra` renderizada, las 40 filas | La navegación y el parser de órdenes de compra (007) |
 
 ## El archivo del día
@@ -106,6 +107,24 @@ Y dos hechos que **no** son del parser sino de la feature, y que conviene no vol
 > **Ninguna de las 40 repite el par (proveedor, producto).** El caso que RF-15 tiene que detectar no
 > existe en los datos reales: para testear la detección de pedido repetido hay que derivar un
 > fixture a mano, como se hizo con `price-list-broken`.
+
+## El padrón de proveedores (004)
+
+**No hay una sección `/proveedores` en el portal.** El padrón es `/estado-cuenta`: ocho filas, una
+por proveedor real, con el saldo y un control *Ver detalle*. Lo dice la propia pantalla —"cuenta
+corriente agrupada por proveedor real"—, y es lo que hace de esas ocho razones sociales el padrón
+canónico contra el que se resuelven las 24 grafías.
+
+Dos cosas que el extractor tiene que saber:
+
+- **El detalle se expande con un click y la URL no cambia.** No hay enlace que seguir: son ocho
+  clicks en la misma pantalla. Por eso el fixture se capturó con una fila ya expandida.
+- **Ahí, y sólo ahí, están el CUIT, el correo, el teléfono y la condición de pago** —`45 dias`, en
+  texto—. Ninguna otra pantalla del portal publica un CUIT de proveedor: el único CUIT que aparece
+  en `/configuracion` y en los archivos de factura es el de **Cordillera**, el cliente.
+
+El detalle expandido trae además los movimientos de cuenta corriente —facturas y pagos con su
+saldo—. Eso es **P5**, y la 004 no lo carga.
 
 ## Recapturar
 

@@ -6,6 +6,8 @@ it is answering. Both live here for the same reason `DatabaseProbe` gives —
 nothing else in the module opens a connection of its own.
 """
 
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -13,8 +15,9 @@ from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.modules.operations.models import JobRun, JobStatus, Parameter
+from app.modules.operations.models import AuditEntry, JobRun, JobStatus, Parameter
 from app.shared.repository import BaseRepository
+from app.shared.sections import BusinessSection
 
 
 class JobRunRepository(BaseRepository[JobRun]):
@@ -137,6 +140,124 @@ class ParameterRepository(BaseRepository[Parameter]):
         await self.session.flush()
         await self.session.refresh(parameter)
         return parameter
+
+
+class AuditEntryRepository:
+    """Reads and appends the log of manual changes. It cannot do anything else.
+
+    Deliberately **not** a `BaseRepository`: that one comes with `update` and
+    `delete`, and this table admits neither (RF-16, RF-17). Inheriting them and
+    promising not to call them would be a convention; not having them is a
+    fact. The database says the same thing with its own trigger, for whoever
+    reaches the table without going through here.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def insert(self, entry: AuditEntry) -> AuditEntry:
+        """Append one entry. The only way a row gets into this table."""
+        self.session.add(entry)
+        await self.session.flush()
+        await self.session.refresh(entry)
+        return entry
+
+    @staticmethod
+    def _filtered(
+        statement: Select[Any],
+        *,
+        sections: Sequence[BusinessSection] | None,
+        actor_user_id: int | None,
+        since: datetime | None,
+        until: datetime | None,
+    ) -> Select[Any]:
+        """Apply the filters the history screen offers (RF-14, RF-19).
+
+        `sections` is not one of them: it is the authorisation, applied to
+        every read so that whoever asks never sees a section they cannot
+        reach. `None` means "every section", which is the owner.
+        """
+        if sections is not None:
+            statement = statement.where(AuditEntry.section.in_(list(sections)))
+        if actor_user_id is not None:
+            statement = statement.where(AuditEntry.actor_user_id == actor_user_id)
+        if since is not None:
+            statement = statement.where(AuditEntry.occurred_at >= since)
+        if until is not None:
+            statement = statement.where(AuditEntry.occurred_at <= until)
+        return statement
+
+    async def list(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+        sections: Sequence[BusinessSection] | None = None,
+        actor_user_id: int | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        # `Sequence` and not `list`: a method named `list` shadows the builtin for
+        # every annotation in this class body.
+    ) -> Sequence[AuditEntry]:
+        """A page of the log, newest first (RF-13)."""
+        statement = self._filtered(
+            select(AuditEntry),
+            sections=sections,
+            actor_user_id=actor_user_id,
+            since=since,
+            until=until,
+        )
+        result = await self.session.execute(
+            # `id` breaks the tie: two changes inside the same transaction share
+            # `occurred_at` to the microsecond, and an unstable order would make
+            # the second page repeat or skip a row.
+            statement.order_by(AuditEntry.occurred_at.desc(), AuditEntry.id.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def count(
+        self,
+        *,
+        sections: Sequence[BusinessSection] | None = None,
+        actor_user_id: int | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> int:
+        """How many entries match the same filters as `list`."""
+        statement = self._filtered(
+            select(func.count()).select_from(AuditEntry),
+            sections=sections,
+            actor_user_id=actor_user_id,
+            since=since,
+            until=until,
+        )
+        result = await self.session.execute(statement)
+        return int(result.scalar_one())
+
+    async def list_for_entity(
+        self,
+        entity_type: str,
+        entity_id: str,
+        *,
+        sections: Sequence[BusinessSection] | None = None,
+        limit: int = 100,
+    ) -> Sequence[AuditEntry]:
+        """The history of one datum, newest first (RF-15)."""
+        statement = self._filtered(
+            select(AuditEntry).where(
+                AuditEntry.entity_type == entity_type, AuditEntry.entity_id == entity_id
+            ),
+            sections=sections,
+            actor_user_id=None,
+            since=None,
+            until=None,
+        )
+        result = await self.session.execute(
+            statement.order_by(AuditEntry.occurred_at.desc(), AuditEntry.id.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
 
 
 class DatabaseProbe:

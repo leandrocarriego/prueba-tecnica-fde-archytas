@@ -14,13 +14,9 @@ from app.modules.catalog.service import CatalogService
 from app.modules.identity.models import User
 from app.modules.operations.models import JobRun, JobStatus
 from app.modules.operations.schemas import PriceUpdateSettingsWrite
-from app.modules.operations.service import (
-    DEFAULT_HIGHLIGHT_THRESHOLD,
-    DEFAULT_INTERVAL_HOURS,
-    PRICE_UPDATE_TASK,
-    OperationsService,
-)
+from app.modules.operations.service import PRICE_UPDATE_TASK, OperationsService
 from app.shared.errors import ConflictError
+from app.shared.parameters import initial_value
 from tests.conftest import Queued
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
@@ -280,13 +276,21 @@ class TestTheTwoSettings:
     async def test_the_starting_values_are_in_force_until_somebody_changes_them(
         self, session: AsyncSession
     ) -> None:
-        """RF-20: twelve hours and 10%, out of the box."""
+        """RF-20: twelve hours and 10%, out of the box.
+
+        Read from the catalog of business parameters rather than from a
+        constant here: since 003 that catalog is where a starting value is
+        declared, and a copy in the test would keep passing after somebody
+        changed the real one.
+        """
         # Act
         settings = await OperationsService(session).price_update_settings()
 
         # Assert
-        assert settings.interval_hours == DEFAULT_INTERVAL_HOURS
-        assert settings.highlight_threshold_pct == DEFAULT_HIGHLIGHT_THRESHOLD
+        assert settings.interval_hours == initial_value("price_update.interval_hours")
+        assert settings.highlight_threshold_pct == initial_value(
+            "price_update.highlight_threshold_pct"
+        )
 
     async def test_the_owner_can_change_them(self, session: AsyncSession) -> None:
         """RF-18 and RF-19, and the change is what is read afterwards."""
@@ -295,7 +299,7 @@ class TestTheTwoSettings:
 
         # Act
         saved = await service.set_price_update_settings(
-            PriceUpdateSettingsWrite(interval_hours=6, highlight_threshold_pct=15)
+            PriceUpdateSettingsWrite(interval_hours=6, highlight_threshold_pct=15), actor_user_id=1
         )
 
         # Assert
@@ -311,7 +315,7 @@ class TestTheTwoSettings:
 
         # Act
         await service.set_price_update_settings(
-            PriceUpdateSettingsWrite(interval_hours=12, highlight_threshold_pct=25)
+            PriceUpdateSettingsWrite(interval_hours=12, highlight_threshold_pct=25), actor_user_id=1
         )
 
         # Assert
@@ -337,7 +341,7 @@ class TestTheTwoSettings:
 
         # …and the owner moving it to six makes the next query due now.
         await service.set_price_update_settings(
-            PriceUpdateSettingsWrite(interval_hours=6, highlight_threshold_pct=10)
+            PriceUpdateSettingsWrite(interval_hours=6, highlight_threshold_pct=10), actor_user_id=1
         )
         assert await service.due_for_update() is True
 

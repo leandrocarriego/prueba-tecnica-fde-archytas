@@ -61,7 +61,10 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("token_hash", sa.String(length=64), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
@@ -98,7 +101,10 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -160,7 +166,10 @@ def upgrade() -> None:
         sa.Column("value", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.PrimaryKeyConstraint("key"),
     )
@@ -239,7 +248,11 @@ def downgrade() -> None:
         sa.Column("token", sa.VARCHAR(length=255), autoincrement=False, nullable=False),
         sa.Column("expires_at", postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column(
-            "used", sa.BOOLEAN(), server_default=sa.text("false"), autoincrement=False, nullable=False
+            "used",
+            sa.BOOLEAN(),
+            server_default=sa.text("false"),
+            autoincrement=False,
+            nullable=False,
         ),
         sa.Column(
             "created_at",
