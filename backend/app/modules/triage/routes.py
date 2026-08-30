@@ -14,7 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.modules.identity.dependencies import CurrentUser, Level, Section, require_section
 from app.modules.triage.models import CaseStatus
-from app.modules.triage.schemas import CaseList, CaseRead, ResolutionRequest, RuleRead
+from app.modules.triage.schemas import (
+    CaseList,
+    CaseRead,
+    RedecisionRequest,
+    ResolutionRequest,
+    RuleRead,
+)
 from app.modules.triage.service import TriageService
 
 DEFAULT_PAGE_SIZE = 50
@@ -93,9 +99,10 @@ async def resolve_case(
 async def list_rules(
     service: TriageDep,
     include_revoked: Annotated[bool, Query(description="Also the ones already revoked")] = False,
+    kind: KindParam = None,
 ) -> list[RuleRead]:
     """The owner and purchasing (RF-36)."""
-    return await service.list_rules(include_revoked=include_revoked)
+    return await service.list_rules(include_revoked=include_revoked, kind=kind)
 
 
 @router.delete(
@@ -111,3 +118,20 @@ async def revoke_rule(rule_id: int, current_user: CurrentUser, service: TriageDe
     the queue (RF-37).
     """
     await service.revoke_rule(rule_id, user_id=current_user.id)
+
+
+@router.patch(
+    "/rules/{rule_id}",
+    dependencies=[require_section(Section.PRICES, Level.WRITE)],
+    summary="Point a rule at another decision",
+)
+async def redecide_rule(
+    rule_id: int, payload: RedecisionRequest, current_user: CurrentUser, service: TriageDep
+) -> RuleRead:
+    """The owner and purchasing.
+
+    The rule stays in force and what it had resolved is re-pointed — nothing
+    comes back to the queue. That is the difference from `DELETE` right below,
+    and it is the whole of RF-28 and RF-29 of 008.
+    """
+    return await service.redecide_rule(rule_id, decision=payload.decision, user_id=current_user.id)

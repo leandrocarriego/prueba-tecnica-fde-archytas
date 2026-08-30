@@ -90,7 +90,12 @@ class ResolutionRule(Base):
     kind: Mapped[str] = mapped_column(String(50), index=True)
     matcher: Mapped[dict[str, Any]] = mapped_column(JSONB)
     decision: Mapped[dict[str, Any]] = mapped_column(JSONB)
-    created_by_user_id: Mapped[int] = mapped_column(Integer)
+    # Nullable, and that is a statement about honesty rather than convenience:
+    # an equivalence **seeded from the table the client signed** was decided by
+    # nobody. Stamping the owner's id on it would be more comfortable and would
+    # be a lie in an audit record, which is the one place a comfortable lie
+    # cannot be afforded (RF-27 of 008).
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
     # Who took it, in the words the screen shows (RF-36). Kept next to the id
     # for the same reason as on the case: it is a record of a decision, and a
     # person who later leaves does not stop having taken it.
@@ -98,6 +103,12 @@ class ResolutionRule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     revoked_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Who corrected where this rule points, and when. It is what lets a rule be
+    # re-pointed **without** losing who created it — and therefore what makes
+    # re-pointing something other than a contradiction of "revoked, never
+    # deleted": nothing is lost, one more fact is added (RF-28 of 008).
+    updated_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     @property
     def is_active(self) -> bool:

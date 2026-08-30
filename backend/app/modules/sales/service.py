@@ -1,0 +1,356 @@
+"""Sales business logic: count what can be counted, hold what cannot, say which.
+
+The client asked for this in one sentence — *"que se nos avise cuáles son, no
+que se sumen como si fueran válidas"* — and the whole module is that sentence:
+
+* a record that repeats another **identically** is counted once, and how many
+  were merged is reported (RF-11, RF-12);
+* one that repeats another with a **different** datum is held until a person
+  decides which is valid (RF-13);
+* one that is broken — no date, an impossible date, no total, a negative
+  quantity, a product that does not exist, an amount wildly out of line — is
+  held with its reason (RF-16 to RF-23);
+* nothing is ever completed by assumption (RF-24), and every indicator says how
+  many records it left out of itself (RF-25, RF-27).
+"""
+
+from datetime import UTC, date, datetime
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.logging import get_logger
+from app.modules.sales.models import Sale, SaleState
+from app.modules.sales.repository import SalesRepository
+from app.modules.sales.schemas import (
+    Indicator,
+    MonthTotal,
+    ReviewQueue,
+    SaleGroup,
+    SaleList,
+    SaleRead,
+    SalesDashboard,
+)
+from app.shared.errors import ConflictError, NotFoundError, ValidationError
+from app.shared.events import NormalizedSale
+from app.shared.parameters import initial_value
+
+logger = get_logger(__name__)
+
+OUTLIER_KEY = "sales.outlier_threshold_pct"
+
+# What a person reads next to a held record (RF-23), in Spanish like every
+# user-facing string.
+UNKNOWN_PRODUCT = "La venta apunta a un producto que no existe"
+OUTLIER_TOTAL = "El total se aleja de lo habitual para ese producto"
+DUPLICATE_WITH_DIFFERENCES = "Hay otra venta con el mismo código y datos distintos"
+DUPLICATE_IDENTICAL = "Repetida idéntica: se cuenta una sola vez"
+
+NO_SUCH_SALE = "No encontramos esa venta"
+NOT_HELD = "Esa venta no está apartada"
+NOTHING_TO_UNDO = "Esa venta no tiene una resolución que deshacer"
+
+# The fields that decide whether two records with the same code are the same
+# sale. The code itself is not among them: it is what grouped them.
+COMPARED = ("sold_on", "product_code", "quantity", "total")
+
+HUNDRED = Decimal(100)
+
+
+class SalesService:
+    """Registers sales records, holds what cannot be added, and answers the dashboard."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.sales = SalesRepository(session)
+
+    # --- Registering what the sales screen brought -----------------------
+
+    async def register_sales(self, *, batch_id: int, sales: tuple[NormalizedSale, ...]) -> None:
+        """Bring a batch of sales records in, counting only what may be counted."""
+        known = await self.sales.known_products()
+        threshold = Decimal(str(await self._setting(OUTLIER_KEY)))
+        merged = held = counted = 0
+
+        for row in sales:
+            reason = await self._why_not_countable(row, known=known, threshold=threshold)
+            siblings = await self.sales.with_code_key(row.code_key)
+            twin = self._identical_among(siblings, row)
+
+            if twin is not None:
+                # The same sale arriving twice with nothing different about it.
+                # It is counted once and kept, so what was merged can be seen.
+                await self.sales.add(
+                    self._sale_of(row, state=SaleState.DISCARDED, reason=DUPLICATE_IDENTICAL)
+                )
+                merged += 1
+                continue
+
+            if siblings and reason is None:
+                # Same code, something different: neither of them is added up
+                # until somebody says which is valid (RF-13, RF-15).
+                reason = DUPLICATE_WITH_DIFFERENCES
+                for sibling in siblings:
+                    if sibling.state is SaleState.COUNTED:
+                        sibling.state = SaleState.HELD
+                        sibling.reason = DUPLICATE_WITH_DIFFERENCES
+
+            sale = await self.sales.add(
+                self._sale_of(
+                    row,
+                    state=SaleState.COUNTED if reason is None else SaleState.HELD,
+                    reason=reason,
+                )
+            )
+            counted += int(sale.state is SaleState.COUNTED)
+            held += int(sale.state is SaleState.HELD)
+
+        await self.session.flush()
+        logger.info(
+            "Sales registered",
+            extra={"batch_id": batch_id, "counted": counted, "held": held, "merged": merged},
+        )
+
+    @staticmethod
+    def _sale_of(row: NormalizedSale, *, state: SaleState, reason: str | None) -> Sale:
+        """Build the record, keeping what the portal said about it (RF-41)."""
+        return Sale(
+            code=row.code,
+            code_key=row.code_key,
+            sold_on=row.sold_on,
+            product_code=row.product_code,
+            quantity=row.quantity,
+            total=row.total,
+            state=state,
+            reason=reason,
+            portal_values={
+                "sold_on": row.sold_on.isoformat() if row.sold_on else None,
+                "product_code": row.product_code,
+                "quantity": row.quantity,
+                "total": str(row.total) if row.total is not None else None,
+            },
+            staging_row_id=row.staging_row_id,
+        )
+
+    async def _why_not_countable(
+        self, row: NormalizedSale, *, known: set[str], threshold: Decimal
+    ) -> str | None:
+        """Why this record may not be added up, or nothing.
+
+        The parser already refused what is not readable — no date, a date that
+        does not exist, no total, a negative quantity. What is decided here is
+        what needs the rest of the platform to answer: whether the product
+        exists, and whether the amount is wildly out of line for it.
+        """
+        if row.product_code and row.product_code not in known:
+            return UNKNOWN_PRODUCT
+        if row.product_code and row.total is not None:
+            usual = await self.sales.average_total_for(row.product_code)
+            if usual is not None and usual > 0:
+                drift = abs(row.total - usual) / usual * HUNDRED
+                if drift > threshold:
+                    return OUTLIER_TOTAL
+        return None
+
+    @staticmethod
+    def _identical_among(siblings: list[Sale], row: NormalizedSale) -> Sale | None:
+        """A record already stored that this one repeats with nothing different."""
+        for sibling in siblings:
+            if all(getattr(sibling, field) == getattr(row, field) for field in COMPARED):
+                return sibling
+        return None
+
+    async def _setting(self, key: str) -> Any:
+        """A business parameter, from this module's projection or its initial value."""
+        stored = await self.sales.setting(key)
+        return initial_value(key) if stored is None else stored
+
+    async def remember_setting(self, key: str, value: Any) -> None:
+        """Keep a business parameter this module reads."""
+        await self.sales.put_setting(key, value)
+
+    async def remember_product(self, product_code: str) -> None:
+        """Keep a product the catalog started to know (RF-20)."""
+        await self.sales.put_product(product_code)
+
+    # --- Reading -----------------------------------------------------------
+
+    async def list_sales(
+        self,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+        state: SaleState | None = None,
+        since: date | None = None,
+        until: date | None = None,
+    ) -> SaleList:
+        """The sales records, filtered the way the screen filters them."""
+        records = await self.sales.list_sales(
+            skip=skip, limit=limit, state=state, since=since, until=until
+        )
+        return SaleList(
+            items=[SaleRead.model_validate(sale) for sale in records],
+            total=await self.sales.count_sales(state=state, since=since, until=until),
+            skip=skip,
+            limit=limit,
+        )
+
+    async def review_queue(self) -> ReviewQueue:
+        """What is waiting for a person: the repeated ones and the broken ones.
+
+        A group is shown with its versions face to face and the fields they
+        disagree on named (RF-30), which is what turns "these two are different"
+        into a decision somebody can take in a second.
+        """
+        grouped = await self.sales.held_groups()
+        groups: list[SaleGroup] = []
+        broken: list[SaleRead] = []
+        for code_key, records in grouped.items():
+            if len(records) < 2:
+                broken.extend(SaleRead.model_validate(sale) for sale in records)
+                continue
+            groups.append(
+                SaleGroup(
+                    code_key=code_key,
+                    versions=[SaleRead.model_validate(sale) for sale in records],
+                    differences=self._differences_among(records),
+                )
+            )
+        return ReviewQueue(
+            groups=groups,
+            broken=broken,
+            pending_groups=len(groups),
+            held=sum(len(records) for records in grouped.values()),
+        )
+
+    @staticmethod
+    def _differences_among(records: list[Sale]) -> list[str]:
+        """The fields on which the versions of a sale disagree."""
+        return [field for field in COMPARED if len({getattr(sale, field) for sale in records}) > 1]
+
+    async def dashboard(
+        self, *, since: date | None = None, until: date | None = None
+    ) -> SalesDashboard:
+        """The commercial dashboard over one window.
+
+        Every indicator carries how many records it left out, **including when
+        it left out none** (RF-25, RF-27), and says whether any value behind it
+        was estimated by a person rather than reported (RF-40).
+        """
+        invoiced, counted = await self.sales.totals(since=since, until=until)
+        held = await self.sales.count_sales(state=SaleState.HELD, since=since, until=until)
+        discarded = await self.sales.count_sales(
+            state=SaleState.DISCARDED, since=since, until=until
+        )
+        queue = await self.review_queue()
+        return SalesDashboard(
+            since=since,
+            until=until,
+            invoiced=Indicator(
+                value=invoiced,
+                sales=counted,
+                excluded=held + discarded,
+                has_estimates=await self.sales.has_estimates(since=since, until=until),
+            ),
+            by_month=[
+                MonthTotal(month=month, total=total, sales=count)
+                for month, total, count in await self.sales.monthly_totals(since=since, until=until)
+            ],
+            held_total=await self.sales.count_sales(state=SaleState.HELD),
+            pending_groups=queue.pending_groups,
+        )
+
+    # --- Deciding ----------------------------------------------------------
+
+    async def resolve_group(
+        self, code_key: str, *, action: str, sale_id: int | None, actor_user_id: int
+    ) -> list[SaleRead]:
+        """Decide about a repeated sale (RF-31 to RF-34, RF-36, RF-37 of 009).
+
+        Choosing a version counts that one and keeps the others visible beside
+        it, discarded but never deleted. Declaring them different sales counts
+        all of them: they were never the same sale, and the code they share is
+        the mistake.
+        """
+        records = await self.sales.with_code_key(code_key)
+        if not records:
+            raise NotFoundError(NO_SUCH_SALE, details={"code_key": code_key})
+
+        now = datetime.now(UTC)
+        decision = {"action": action, "sale_id": sale_id}
+        for sale in records:
+            if action == "distinct":
+                sale.state = SaleState.COUNTED
+                sale.duplicate_of_sale_id = None
+            else:
+                chosen = sale.id == sale_id
+                sale.state = SaleState.COUNTED if chosen else SaleState.DISCARDED
+                sale.duplicate_of_sale_id = None if chosen else sale_id
+            sale.reason = None if sale.state is SaleState.COUNTED else DUPLICATE_IDENTICAL
+            sale.decision = decision
+            sale.resolved_by_user_id = actor_user_id
+            sale.resolved_at = now
+        await self.session.flush()
+        await self.session.commit()
+        logger.info("Sales group resolved", extra={"code_key": code_key, "action": action})
+        return [SaleRead.model_validate(sale) for sale in records]
+
+    async def undo_resolution(self, code_key: str) -> list[SaleRead]:
+        """Put a resolved group back in the queue and recalculate (RF-35 of 009)."""
+        records = await self.sales.with_code_key(code_key)
+        if not records:
+            raise NotFoundError(NO_SUCH_SALE, details={"code_key": code_key})
+        if not any(sale.decision for sale in records):
+            raise ConflictError(NOTHING_TO_UNDO, details={"code_key": code_key})
+        for sale in records:
+            sale.state = SaleState.HELD
+            sale.reason = DUPLICATE_WITH_DIFFERENCES
+            sale.decision = None
+            sale.duplicate_of_sale_id = None
+            sale.resolved_by_user_id = None
+            sale.resolved_at = None
+        await self.session.flush()
+        await self.session.commit()
+        return [SaleRead.model_validate(sale) for sale in records]
+
+    async def correct_sale(
+        self,
+        sale_id: int,
+        *,
+        values: dict[str, Any],
+        is_estimated: bool,
+        actor_user_id: int,
+    ) -> SaleRead:
+        """Correct a held record, keeping what the portal said (RF-38, RF-39, RF-41).
+
+        A record that becomes readable is counted from here on; one that still
+        is not stays held with the reason it already had. The platform does not
+        pretend a correction fixed something it did not.
+        """
+        sale = await self.sales.sale(sale_id)
+        if sale is None:
+            raise NotFoundError(NO_SUCH_SALE, details={"sale_id": sale_id})
+        if sale.state is not SaleState.HELD:
+            raise ConflictError(NOT_HELD, details={"sale_id": sale_id})
+
+        for field, value in values.items():
+            if value is not None:
+                setattr(sale, field, value)
+        sale.is_estimated = sale.is_estimated or is_estimated
+        sale.resolved_by_user_id = actor_user_id
+        sale.resolved_at = datetime.now(UTC)
+
+        if sale.sold_on is None or sale.total is None:
+            raise ValidationError(
+                "La venta sigue sin fecha o sin total", details={"sale_id": sale_id}
+            )
+        known = await self.sales.known_products()
+        if sale.product_code and sale.product_code not in known:
+            sale.reason = UNKNOWN_PRODUCT
+        else:
+            sale.state = SaleState.COUNTED
+            sale.reason = None
+        await self.session.flush()
+        await self.session.commit()
+        return SaleRead.model_validate(sale)

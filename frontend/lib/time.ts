@@ -68,3 +68,20 @@ export const CLOCK_FORMAT = new Intl.DateTimeFormat('es-AR', {
   minute: '2-digit',
   second: '2-digit',
 })
+
+/**
+ * A plain date — `2026-06-17` — written the way the team reads it.
+ *
+ * Split rather than parsed on purpose, and this is the one place where that is
+ * the right answer. `new Date('2026-06-17')` is midnight **UTC**, which in
+ * Buenos Aires is nine at night of the sixteenth: a due date shown one day
+ * early, every time, for a value that never had a time of day to begin with.
+ *
+ * A due date, an invoice date and a sale date are days, not instants. There is
+ * no zone to convert them into, so none is applied.
+ */
+export function formatPlainDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const [year, month, day] = value.slice(0, 10).split('-')
+  return year && month && day ? `${day}/${month}/${year}` : '—'
+}

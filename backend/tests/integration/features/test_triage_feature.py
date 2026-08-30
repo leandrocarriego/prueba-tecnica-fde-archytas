@@ -330,7 +330,11 @@ class TestTheRules:
         )
 
         # Act
-        rules = await TriageService(session).list_rules()
+        # Scoped by kind: the platform ships with the table of category
+        # equivalences the client signed already seeded as rules (008), so the
+        # list is never empty. What is asserted is that this decision produced
+        # exactly one rule of its own.
+        rules = await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT)
 
         # Assert
         assert len(rules) == 1
@@ -352,7 +356,7 @@ class TestTheRules:
         )
 
         # Assert
-        assert await TriageService(session).list_rules() == []
+        assert await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT) == []
 
     async def test_revoking_a_rule_undoes_what_it_did(
         self, session: AsyncSession, owner: User
@@ -364,7 +368,7 @@ class TestTheRules:
         await TriageService(session).resolve(
             case.id, decision={"action": "incorporate"}, user_id=owner.id
         )
-        rule = (await TriageService(session).list_rules())[0]
+        rule = (await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT))[0]
 
         # Act
         await TriageService(session).revoke_rule(rule.id, user_id=owner.id)
@@ -406,13 +410,15 @@ class TestTheRules:
         await TriageService(session).resolve(
             case.id, decision={"action": "incorporate"}, user_id=owner.id
         )
-        rule = (await TriageService(session).list_rules())[0]
+        rule = (await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT))[0]
 
         # Act
         await TriageService(session).revoke_rule(rule.id, user_id=owner.id)
 
         # Assert
-        revoked = await TriageService(session).list_rules(include_revoked=True)
+        revoked = await TriageService(session).list_rules(
+            include_revoked=True, kind=UNKNOWN_PRODUCT
+        )
         assert len(revoked) == 1
         assert revoked[0].revoked_by_user_id == owner.id
 

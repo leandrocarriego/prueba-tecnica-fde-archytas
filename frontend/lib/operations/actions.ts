@@ -15,10 +15,11 @@
  * win and this list would simply be lying.
  *
  * Every feature adds its line here when it lands, the same way it adds its
- * parameter to the catalog. The four below are what exists today — the two
- * 003 brings, and the two that were already there and belong to purchasing.
- * Without those two, whoever handles purchasing opens the screen and sees
- * nothing.
+ * parameter to the catalog. The first four are what 003 left; the rest arrived
+ * with 004 to 009, and between them they are what makes this screen useful to
+ * somebody who does not touch prices: whoever handles purchasing loads a
+ * payment and issues a receipt, whoever handles sales classifies a product and
+ * resolves a repeated sale.
  */
 import { canEdit, canSee, type Permissions, type Section } from '@/lib/auth/permissions'
 
@@ -67,6 +68,78 @@ export const MANUAL_ACTIONS: readonly ManualAction[] = [
     description: 'Devolvé un dato al valor que había informado el portal.',
     href: '/precios',
     section: 'MANUAL_CORRECTIONS',
+    writes: true,
+  },
+  {
+    id: 'resolve-invoice-review',
+    label: 'Resolver una factura apartada',
+    description: 'Decí de qué proveedor es, o que la factura está bien como está.',
+    href: '/facturas/revision',
+    section: 'PURCHASE_INVOICES',
+    writes: true,
+  },
+  {
+    id: 'correct-supplier',
+    label: 'Corregir los datos de un proveedor',
+    description: 'Cambiá el correo, el teléfono o el plazo pactado. Se guarda lo que decía.',
+    href: '/proveedores',
+    section: 'SUPPLIERS',
+    writes: true,
+  },
+  {
+    id: 'register-payment',
+    label: 'Registrar un pago a mano',
+    description: 'Cargá un pago sobre una factura, con su monto y su fecha.',
+    href: '/facturas',
+    section: 'PAYMENTS',
+    writes: true,
+  },
+  {
+    id: 'issue-receipt',
+    label: 'Emitir el recibo de recepción de una factura',
+    description: 'Se puede hasta el día del vencimiento, y queda con tu nombre.',
+    href: '/facturas',
+    section: 'RECEIPTS',
+    writes: true,
+  },
+  {
+    id: 'add-due-date',
+    label: 'Agregar o mover un vencimiento',
+    description: 'Cargá algo que vence, o corré una fecha diciendo por qué.',
+    href: '/calendario',
+    section: 'CALENDAR',
+    writes: true,
+  },
+  {
+    id: 'dismiss-repeat-order',
+    label: 'Descartar un aviso de pedido repetido',
+    description: 'Si la orden no repite a otra, sacale el señalamiento.',
+    href: '/ordenes',
+    section: 'PURCHASE_ORDERS',
+    writes: true,
+  },
+  {
+    id: 'resolve-message',
+    label: 'Resolver un mensaje de la bandeja',
+    description: 'Marcá que ya lo atendiste, o dejá una nota sobre qué falta.',
+    href: '/mensajes',
+    section: 'SUPPLIER_MESSAGES',
+    writes: true,
+  },
+  {
+    id: 'classify-product',
+    label: 'Darle su rubro a un producto',
+    description: 'Confirmá la propuesta del sistema, o elegí otro rubro.',
+    href: '/rubros/sin-clasificar',
+    section: 'PRODUCT_CATEGORIES',
+    writes: true,
+  },
+  {
+    id: 'resolve-sale',
+    label: 'Resolver una venta apartada',
+    description: 'Decidí cuál versión de una venta repetida vale, o corregí un dato roto.',
+    href: '/ventas/revision',
+    section: 'SALES',
     writes: true,
   },
 ]

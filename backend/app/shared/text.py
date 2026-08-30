@@ -63,3 +63,21 @@ def normalize_entity_name(value: str) -> str:
     return " ".join(
         token for token in tokens if token not in LEGAL_SUFFIXES and token not in STOP_WORDS
     )
+
+
+def collapse_written_form(value: str) -> str:
+    """Collapse a written form down to the only differences that are not real.
+
+    Deliberately dumb, and that is the feature: trim the ends, collapse inner
+    whitespace, casefold. It does **not** strip accents, does not expand `/`
+    into ` y `, and does not undo an abbreviation — so `ELECTRICIDAD` and
+    `Electricidad` become one key, while `Ferreteria Gral.` and
+    `Ferreteria General` stay two, each pointing at its rubro through the table
+    of equivalences somebody signed.
+
+    The temptation is to make it clever. A clever normaliser gets `Herram.`
+    right and, some day, silently joins two rubros the business tells apart —
+    an opinion hidden in code where Artículo II wants a person. Everything this
+    function does not resolve goes to review, and that is the whole design.
+    """
+    return _WHITESPACE.sub(" ", value.strip()).casefold()

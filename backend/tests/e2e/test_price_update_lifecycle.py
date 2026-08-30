@@ -188,13 +188,18 @@ class TestThePriceUpdateLifecycle:
         assert after["total"] == 1
 
         # --- And the platform remembers why (RF-36) -----------------------
+        #
+        # Filtered by kind rather than counted: the platform ships with the
+        # table of category equivalences the client signed already seeded (008),
+        # so the queue is not empty before this story begins. What this asserts
+        # is that *this* decision became exactly one rule of its own.
         rules = (await purchasing_client.get(f"{TRIAGE}/rules")).json()
-        assert len(rules) == 1
-        assert rules[0]["kind"] == "unknown_product"
+        learned = [rule for rule in rules if rule["kind"] == "unknown_product"]
+        assert len(learned) == 1
 
         # --- Until somebody says otherwise (RF-37) ------------------------
         assert (
-            await purchasing_client.delete(f"{TRIAGE}/rules/{rules[0]['id']}")
+            await purchasing_client.delete(f"{TRIAGE}/rules/{learned[0]['id']}")
         ).status_code == 204
         assert (await sales_client.get(PRICES, params={"q": UNKNOWN_CODE})).json()["total"] == 0
 

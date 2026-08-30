@@ -86,7 +86,14 @@ repos:
       # --- Frontend --------------------------------------------------------
       - id: prettier
         name: prettier (frontend)
-        entry: bash -c 'cd frontend && npx prettier --write "$@"' --
+        # Run from the repository root, with Prettier's own binary. pre-commit
+        # hands over paths relative to the root (`frontend/lib/time.ts`), so a
+        # `cd frontend` first made every one of them miss — the hook printed
+        # "No files matching the pattern" for each file and exited 2, which is
+        # to say it never formatted anything and failed every time a frontend
+        # file was staged. Prettier finds `frontend/.prettierrc` by walking up
+        # from each file, so nothing is lost by staying here.
+        entry: frontend/node_modules/.bin/prettier --write
         language: system
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md)$
 

@@ -17,3 +17,11 @@ export type JobRun = components['schemas']['JobRunRead']
 export type Correction = components['schemas']['CorrectionRead']
 export type CorrectionMark = components['schemas']['CorrectionMark']
 export type CorrectionStatus = components['schemas']['CorrectionStatus']
+
+// --- The rubros of the catalog (008) ---
+export type Category = components['schemas']['CategoryRead']
+export type CategoryList = components['schemas']['CategoryList']
+export type CategoryAlias = components['schemas']['CategoryAliasRead']
+export type UnclassifiedProduct = components['schemas']['UnclassifiedProduct']
+export type UnclassifiedList = components['schemas']['UnclassifiedList']
+export type Rule = components['schemas']['RuleRead']

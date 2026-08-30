@@ -24,6 +24,7 @@ class Section(enum.StrEnum):
     PAYMENTS = "PAYMENTS"
     PURCHASE_ORDERS = "PURCHASE_ORDERS"
     RECEIPTS = "RECEIPTS"
+    SUPPLIER_MESSAGES = "SUPPLIER_MESSAGES"
     SALES = "SALES"
     DASHBOARD = "DASHBOARD"
     STOCK = "STOCK"
@@ -58,6 +59,10 @@ _SALES = "SALES"
 #   editing it · RF-35 only the owner and purchasing act on prices ·
 #   RF-24 and RF-31 the access screens are the owner's alone.
 #
+# `SUPPLIER_MESSAGES` is the portal inbox that 007 empties. It sits with the
+# rest of purchasing because that is who answers a supplier's claim, and sales
+# is kept out of it by RF-46 of that spec.
+#
 # Nobody *edits* a dashboard, so it has no write level for anyone.
 #
 # `MANUAL_CORRECTIONS` is the odd one out, and worth a sentence. Making a
@@ -74,6 +79,7 @@ MATRIX: dict[Section, dict[str, Level]] = {
     Section.PAYMENTS: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.PURCHASE_ORDERS: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.RECEIPTS: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
+    Section.SUPPLIER_MESSAGES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.SALES: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
     Section.DASHBOARD: {_OWNER: Level.READ, _PURCHASING: Level.NONE, _SALES: Level.READ},
     Section.STOCK: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},

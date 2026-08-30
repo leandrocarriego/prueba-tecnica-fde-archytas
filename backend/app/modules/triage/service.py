@@ -19,7 +19,12 @@ from app.modules.triage.models import CaseStatus, ExceptionCase
 from app.modules.triage.repository import TriageRepository
 from app.modules.triage.schemas import CaseList, CaseRead, RuleRead
 from app.shared.errors import ConflictError, NotFoundError
-from app.shared.events import QuarantineCaseResolved, QuarantineRuleRevoked, events
+from app.shared.events import (
+    QuarantineCaseResolved,
+    QuarantineRuleRedecided,
+    QuarantineRuleRevoked,
+    events,
+)
 
 logger = get_logger(__name__)
 
@@ -29,13 +34,18 @@ UNREADABLE_ROW = "unreadable_row"
 UNKNOWN_PRODUCT = "unknown_product"
 MISSING_PRODUCT = "missing_product"
 UNREADABLE_HISTORY = "unreadable_history"
+# The kind 008 adds. The queue did not have to change to take it: that is the
+# point of a generic queue with learned rules.
+UNKNOWN_CATEGORY = "unknown_category"
 
 # What the person reads in the review screen (RF-26), in Spanish like every
 # other user-facing string.
 UNKNOWN_PRODUCT_REASON = "El producto no está entre los conocidos"
 MISSING_PRODUCT_REASON = "El producto dejó de figurar en la lista"
+UNKNOWN_CATEGORY_REASON = "No sabemos a qué rubro corresponde esta forma escrita"
 
 ALREADY_RESOLVED = "This case has already been resolved"
+ALREADY_REVOKED = "This rule is already revoked"
 
 
 def fingerprint_of(kind: str, key: str) -> str:
@@ -102,11 +112,19 @@ class TriageService:
         """How many cases are waiting for somebody."""
         return await self.triage.count_cases(status=CaseStatus.PENDING, batch_id=batch_id)
 
-    async def list_rules(self, *, include_revoked: bool = False) -> list[RuleRead]:
-        """The decisions being applied on their own, with who took them (RF-36)."""
+    async def list_rules(
+        self, *, include_revoked: bool = False, kind: str | None = None
+    ) -> list[RuleRead]:
+        """The decisions being applied on their own, with who took them (RF-36).
+
+        `kind` narrows the list to one family of decision. It exists because
+        the queue stopped being about one problem: the equivalences screen of
+        008 wants its own, and reading the whole list to filter it in the
+        browser would send the seeded table down the wire on every visit.
+        """
         return [
             RuleRead.model_validate(rule)
-            for rule in await self.triage.list_rules(include_revoked=include_revoked)
+            for rule in await self.triage.list_rules(include_revoked=include_revoked, kind=kind)
         ]
 
     # --- Deciding ---------------------------------------------------------
@@ -176,7 +194,7 @@ class TriageService:
         if rule is None:
             raise NotFoundError("Rule not found", details={"rule_id": rule_id})
         if not rule.is_active:
-            raise ConflictError("This rule is already revoked", details={"rule_id": rule_id})
+            raise ConflictError(ALREADY_REVOKED, details={"rule_id": rule_id})
 
         await self.triage.revoke_rule(rule, user_id=user_id, moment=datetime.now(UTC))
         reopened = await self.triage.reopen_by_rule(rule_id)
@@ -192,6 +210,46 @@ class TriageService:
         await self.session.commit()
         logger.info("Rule revoked", extra={"rule_id": rule_id, "cases_reopened": reopened})
 
+    async def redecide_rule(
+        self, rule_id: int, *, decision: dict[str, Any], user_id: int
+    ) -> RuleRead:
+        """Point a rule in force at another decision (RF-28 of 008).
+
+        Nothing goes back to the queue and nothing is deleted: the rule keeps
+        who created it and gains who corrected it. Revoking and re-creating —
+        the purist alternative — is ruled out by the spec itself, because
+        revoking sends the products back to review and RF-29 asks for the
+        opposite, that they be reassigned.
+
+        A rule already revoked is refused: reviving an equivalence somebody
+        switched off, without anybody deciding it, is the failure this guard
+        exists for.
+        """
+        rule = await self.triage.get_rule(rule_id)
+        if rule is None:
+            raise NotFoundError("Rule not found", details={"rule_id": rule_id})
+        if not rule.is_active:
+            raise ConflictError(ALREADY_REVOKED, details={"rule_id": rule_id})
+
+        previous = dict(rule.decision)
+        await self.triage.redecide_rule(
+            rule, decision=decision, user_id=user_id, moment=datetime.now(UTC)
+        )
+        await events.publish(
+            QuarantineRuleRedecided(
+                rule_id=rule.id,
+                kind=rule.kind,
+                matcher=dict(rule.matcher),
+                decision=decision,
+                previous_decision=previous,
+                decided_by_user_id=user_id,
+            ),
+            self.session,
+        )
+        await self.session.commit()
+        logger.info("Rule re-pointed", extra={"rule_id": rule_id, "kind": rule.kind})
+        return RuleRead.model_validate(rule)
+
     # --- Internals --------------------------------------------------------
 
     async def _require_case(self, case_id: int) -> ExceptionCase:
@@ -206,6 +264,14 @@ class TriageService:
         """What a future case has to look like for this decision to apply to it."""
         payload = case.payload
         matcher: dict[str, Any] = {"kind": case.kind}
+        # A decision about a **written form** matches on the text, never on the
+        # product that happened to carry it: matching by product would apply an
+        # equivalence to one row and leave the other ninety-nine in the queue,
+        # and RF-25 of 008 would fail while everything else looked fine.
+        if case.kind == UNKNOWN_CATEGORY:
+            if payload.get("category_text"):
+                matcher["category_text"] = payload["category_text"]
+            return matcher
         if payload.get("product_code"):
             matcher["product_code"] = payload["product_code"]
         if payload.get("product_id"):

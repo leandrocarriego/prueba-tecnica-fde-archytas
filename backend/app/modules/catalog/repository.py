@@ -1,16 +1,19 @@
 """Data access for the catalog module. Private to this module."""
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.catalog.models import (
+    AliasSource,
     CatalogSetting,
+    Category,
+    CategoryAlias,
     Correction,
     CorrectionStatus,
     PricePoint,
@@ -18,6 +21,7 @@ from app.modules.catalog.models import (
     Product,
     ProductPrice,
     ProductStatus,
+    StockPoint,
 )
 
 
@@ -248,3 +252,231 @@ class CatalogRepository:
         await self.session.flush()
         await self.session.refresh(correction)
         return correction
+
+    # --- The rubros and their equivalences (008) -------------------------
+
+    async def add_category(self, name: str) -> Category:
+        """Create a rubro."""
+        category = Category(name=name)
+        self.session.add(category)
+        await self.session.flush()
+        await self.session.refresh(category)
+        return category
+
+    async def get_category(self, category_id: int) -> Category | None:
+        """Return a rubro by id, or None."""
+        return await self.session.get(Category, category_id)
+
+    async def category_named(self, name: str) -> Category | None:
+        """Return the rubro with this exact name, or None.
+
+        Compared case-insensitively: the uniqueness in the database is exact,
+        and two rubros that differ only in case are the loading mistake the
+        service refuses before the constraint has to.
+        """
+        result = await self.session.execute(
+            select(Category).where(func.lower(Category.name) == name.strip().lower())
+        )
+        return result.scalars().first()
+
+    async def list_categories(self) -> list[Category]:
+        """Every rubro, by name."""
+        result = await self.session.execute(select(Category).order_by(Category.name))
+        return list(result.scalars().all())
+
+    async def delete_category(self, category: Category) -> None:
+        """Remove a rubro. The service checks first that nothing points at it."""
+        await self.session.delete(category)
+        await self.session.flush()
+
+    async def products_per_category(self) -> dict[int | None, int]:
+        """How many products each rubro has, «sin rubro» included as `None`.
+
+        The null key is not a special case handled later: it is the group RF-09
+        asks for, and it comes out of the same `GROUP BY` as the rest.
+        """
+        result = await self.session.execute(
+            select(Product.category_id, func.count())
+            .where(Product.status == ProductStatus.ACTIVE)
+            .group_by(Product.category_id)
+        )
+        return {row[0]: int(row[1]) for row in result.all()}
+
+    async def aliases(self) -> list[CategoryAlias]:
+        """Every equivalence in force, newest last."""
+        result = await self.session.execute(select(CategoryAlias).order_by(CategoryAlias.id))
+        return list(result.scalars().all())
+
+    async def alias_for(self, text_normalized: str) -> CategoryAlias | None:
+        """The equivalence that resolves this written form, or None."""
+        result = await self.session.execute(
+            select(CategoryAlias).where(CategoryAlias.text_normalized == text_normalized)
+        )
+        return result.scalars().first()
+
+    async def alias_by_rule(self, rule_id: int) -> CategoryAlias | None:
+        """The equivalence a rule projects, or None."""
+        result = await self.session.execute(
+            select(CategoryAlias).where(CategoryAlias.rule_id == rule_id)
+        )
+        return result.scalars().first()
+
+    async def put_alias(
+        self,
+        *,
+        text_normalized: str,
+        text_original: str,
+        category_id: int,
+        rule_id: int | None,
+        source: AliasSource = AliasSource.LEARNED,
+    ) -> CategoryAlias:
+        """Record (or re-point) an equivalence in the projection.
+
+        Only the handlers call this: the decision belongs to `triage`, and this
+        table is the copy this module reads while it classifies a batch.
+        """
+        alias = await self.alias_for(text_normalized)
+        if alias is None:
+            alias = CategoryAlias(
+                text_normalized=text_normalized,
+                text_original=text_original,
+                category_id=category_id,
+                rule_id=rule_id,
+                source=source,
+            )
+            self.session.add(alias)
+        else:
+            alias.category_id = category_id
+            alias.rule_id = rule_id
+            alias.text_original = text_original
+        await self.session.flush()
+        return alias
+
+    async def drop_alias_by_rule(self, rule_id: int) -> None:
+        """Take an equivalence out of the projection: its rule was revoked."""
+        await self.session.execute(delete(CategoryAlias).where(CategoryAlias.rule_id == rule_id))
+        await self.session.flush()
+
+    async def unclassified(self, *, skip: int = 0, limit: int = 50) -> list[Product]:
+        """The products with no rubro, oldest first: the queue somebody empties."""
+        result = await self.session.execute(
+            select(Product)
+            .where(Product.category_id.is_(None), Product.status == ProductStatus.ACTIVE)
+            .order_by(Product.id)
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def count_unclassified(self) -> int:
+        """How many products are «sin rubro» (RF-11)."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Product)
+            .where(Product.category_id.is_(None), Product.status == ProductStatus.ACTIVE)
+        )
+        return int(result.scalar_one())
+
+    async def rubro_of_subcategory(self) -> dict[str, set[int]]:
+        """Which rubros each subcategory resolves to, among what is classified.
+
+        The proposal is derived from this and never stored: with no column to
+        write it in, there is no "proposed but unconfirmed" state a product
+        could sit in while counting as classified (RF-16).
+        """
+        result = await self.session.execute(
+            select(Product.subcategory_raw, Product.category_id)
+            .where(Product.subcategory_raw.is_not(None), Product.category_id.is_not(None))
+            .group_by(Product.subcategory_raw, Product.category_id)
+        )
+        found: dict[str, set[int]] = {}
+        for subcategory, category_id in result.all():
+            found.setdefault(str(subcategory), set()).add(int(category_id))
+        return found
+
+    async def products_classified_by(self, rule_id: int) -> list[Product]:
+        """Exactly what one equivalence classified, and nothing else.
+
+        A product somebody classified by hand has this column null, does not
+        depend on any equivalence, and is neither re-pointed nor sent back.
+        """
+        result = await self.session.execute(
+            select(Product).where(Product.classified_by_rule_id == rule_id)
+        )
+        return list(result.scalars().all())
+
+    async def add_stock_point(
+        self, *, product_id: int, quantity: int, observed_on: date, batch_id: int | None
+    ) -> None:
+        """Record the stock of a product for one day, once.
+
+        Re-running the same day's list leaves the day as it was: the conflict
+        is decided by the unique key, not by a check that could race with it.
+        """
+        await self.session.execute(
+            insert(StockPoint)
+            .values(
+                product_id=product_id,
+                quantity=quantity,
+                observed_on=observed_on,
+                batch_id=batch_id,
+            )
+            .on_conflict_do_update(
+                constraint="uq_stock_point_product_day",
+                set_={"quantity": quantity, "batch_id": batch_id},
+            )
+        )
+
+    # --- The cuts the dashboard reads (009) ------------------------------
+
+    async def price_curve(
+        self, *, since: date | None, until: date | None
+    ) -> list[tuple[date, Decimal, int]]:
+        """How the prices the supplier publishes moved, month by month (RF-42).
+
+        The average of the points of the history, which is what the supplier
+        actually reported: a curve built from the price in force today would
+        redraw the past every time a price changes.
+        """
+        month = func.date_trunc("month", PricePoint.changed_at)
+        statement = select(month, func.avg(PricePoint.price), func.count())
+        if since is not None:
+            statement = statement.where(PricePoint.changed_at >= since)
+        if until is not None:
+            statement = statement.where(PricePoint.changed_at <= until)
+        result = await self.session.execute(statement.group_by(month).order_by(month))
+        return [(row[0].date(), Decimal(row[1] or 0), int(row[2])) for row in result.all()]
+
+    async def stock_at(self, moment: date, *, latest: bool) -> dict[int, int]:
+        """The stock of every product on the nearest day up to (or from) a date.
+
+        The photograph closest to the edge of the window, not the one exactly on
+        it: the list is published on the days it is published, and demanding an
+        exact date would leave the cut empty whenever the window starts on a
+        Sunday.
+        """
+        ordering = StockPoint.observed_on.desc() if latest else StockPoint.observed_on.asc()
+        comparison = (
+            StockPoint.observed_on <= moment if latest else StockPoint.observed_on >= moment
+        )
+        result = await self.session.execute(
+            select(StockPoint.product_id, StockPoint.quantity, StockPoint.observed_on)
+            .where(comparison)
+            .order_by(StockPoint.product_id, ordering)
+        )
+        found: dict[int, int] = {}
+        for product_id, quantity, _ in result.all():
+            found.setdefault(int(product_id), int(quantity))
+        return found
+
+    async def products_first_seen_between(
+        self, since: date | None, until: date | None
+    ) -> list[Product]:
+        """The products the catalog started to know inside a window (RF-45)."""
+        statement = select(Product)
+        if since is not None:
+            statement = statement.where(Product.first_seen_at >= since)
+        if until is not None:
+            statement = statement.where(Product.first_seen_at <= until)
+        result = await self.session.execute(statement.order_by(Product.first_seen_at))
+        return list(result.scalars().all())

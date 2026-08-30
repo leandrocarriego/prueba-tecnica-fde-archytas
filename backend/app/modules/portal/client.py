@@ -35,14 +35,49 @@ HTML_CONTENT_TYPE = "text/html; charset=utf-8"
 
 PRICES_PATH = "/precios"
 LOGIN_PATH = "/login"
+# The sections 004, 007 and 009 read. There is no `/proveedores`: the register
+# of suppliers is `/estado-cuenta`, which the portal itself describes as the
+# current account "agrupada por proveedor real", and that is what makes those
+# eight legal names the canonical register.
+INVOICES_PATH = "/facturas"
+SUPPLIER_LEDGER_PATH = "/estado-cuenta"
+PURCHASE_ORDERS_PATH = "/ordenes-compra"
+MESSAGES_PATH = "/mensajes"
+SALES_PATH = "/ventas"
 
 DOWNLOAD_BUTTON = re.compile("Descargar planilla", re.IGNORECASE)
 HISTORY_LINK = re.compile("Ver historial", re.IGNORECASE)
+INVOICE_BUTTON = re.compile("Descargar factura", re.IGNORECASE)
+LEDGER_DETAIL_BUTTON = re.compile("Ver detalle", re.IGNORECASE)
+
+PDF_CONTENT_TYPE = "application/pdf"
 
 # What the caller is told when the portal cannot be read. The underlying
 # Playwright error is logged, never propagated: its message can carry the URL
 # the browser was on, and a login URL carries the account (Artículo VII).
 UNREADABLE = "The portal could not be read"
+
+# How long the register's table is given to redraw after a row is expanded. The
+# detail is rendered by the portal's own script, and there is no request to wait
+# on: `wait_for_selector` would return immediately on the row that is already
+# open.
+EXPAND_SETTLE_MS = 200
+
+
+def _content_type_of(filename: str) -> str:
+    """What kind of document the portal handed over, by its own file name.
+
+    The three formats are the ones the invoices table declares — a PDF with a
+    text layer, a scanned PDF, and a spreadsheet. Anything else keeps a generic
+    type and reaches the readers all the same: whichever manages to read it
+    wins, and if none does the invoice goes to a person with the file attached.
+    """
+    lowered = filename.lower()
+    if lowered.endswith(".pdf"):
+        return PDF_CONTENT_TYPE
+    if lowered.endswith((".xlsx", ".xlsm")):
+        return XLSX_CONTENT_TYPE
+    return "application/octet-stream"
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +109,18 @@ class PortalReader(Protocol):
     async def download_price_list(self) -> DownloadedDocument: ...
 
     async def fetch_product_history(self, product_code: str) -> DownloadedDocument: ...
+
+    async def fetch_invoices(self) -> DownloadedDocument: ...
+
+    async def download_invoice_file(self, invoice_number: str) -> DownloadedDocument: ...
+
+    async def fetch_supplier_ledger(self) -> DownloadedDocument: ...
+
+    async def fetch_purchase_orders(self) -> DownloadedDocument: ...
+
+    async def fetch_messages(self) -> DownloadedDocument: ...
+
+    async def fetch_sales(self) -> DownloadedDocument: ...
 
 
 class PortalClient:
@@ -185,7 +232,113 @@ class PortalClient:
             filename=f"{product_code}.html",
         )
 
+    # --- The sections of 004, 007 and 009 --------------------------------
+
+    async def fetch_invoices(self) -> DownloadedDocument:
+        """Read the invoices screen, rendered. A hundred rows, no pagination."""
+        return await self._rendered(INVOICES_PATH, "invoices", "facturas.html")
+
+    async def fetch_purchase_orders(self) -> DownloadedDocument:
+        """Read the purchase orders screen, rendered."""
+        return await self._rendered(PURCHASE_ORDERS_PATH, "purchase-orders", "ordenes.html")
+
+    async def fetch_messages(self) -> DownloadedDocument:
+        """Read the inbox of the portal, rendered."""
+        return await self._rendered(MESSAGES_PATH, "messages", "mensajes.html")
+
+    async def fetch_sales(self) -> DownloadedDocument:
+        """Read the sales screen, rendered."""
+        return await self._rendered(SALES_PATH, "sales", "ventas.html")
+
+    async def fetch_supplier_ledger(self) -> DownloadedDocument:
+        """Read the register, expanding every supplier before taking the page.
+
+        The detail opens with a click and the URL does not change, so there is
+        no link to follow: it is eight clicks on the same screen, exactly what
+        a person does. The page is captured **after** the last one, because the
+        tax id, the email, the phone and the payment term exist nowhere else.
+        """
+        page = self._require_page()
+        try:
+            await page.goto(self._url(SUPPLIER_LEDGER_PATH), wait_until="domcontentloaded")
+            await page.wait_for_selector("table.datos tbody tr")
+            buttons = page.get_by_role("button", name=LEDGER_DETAIL_BUTTON)
+            for index in range(await buttons.count()):
+                # Re-read the locator each time: expanding a row rewrites the
+                # table, and a handle taken before that points at nothing.
+                remaining = page.get_by_role("button", name=LEDGER_DETAIL_BUTTON)
+                if await remaining.count() == 0:
+                    break
+                await remaining.first.click()
+                await page.wait_for_timeout(EXPAND_SETTLE_MS)
+                del index
+            content = (await page.content()).encode("utf-8")
+        except PlaywrightError as error:
+            raise self._unreadable("supplier-ledger", error) from None
+
+        logger.info("Supplier ledger read", extra={"bytes": len(content)})
+        return DownloadedDocument(
+            content=content, content_type=HTML_CONTENT_TYPE, filename="estado-cuenta.html"
+        )
+
+    async def download_invoice_file(self, invoice_number: str) -> DownloadedDocument:
+        """Download the document of one invoice, from its row of the table.
+
+        The click that generates the link and the download that consumes it
+        happen together, like the price list: the link expires in 45 seconds.
+        """
+        page = self._require_page()
+        try:
+            await page.goto(self._url(INVOICES_PATH), wait_until="domcontentloaded")
+            await page.wait_for_selector("table.datos tbody tr")
+            row = page.locator("table.datos tbody tr").filter(has_text=invoice_number).first
+            if await row.count() == 0:
+                raise ExtractionError(
+                    "The invoice is not listed in the invoices section",
+                    details={"invoice_number": invoice_number},
+                )
+            async with page.expect_download(
+                timeout=settings.PORTAL_DOWNLOAD_TTL_SECONDS * 1000
+            ) as pending:
+                await row.get_by_role("button", name=INVOICE_BUTTON).click()
+            download = await pending.value
+            path = await download.path()
+            if path is None:  # pragma: no cover - Playwright kept no file
+                raise ExtractionError(UNREADABLE, details={"section": "invoice-file"})
+            content = Path(path).read_bytes()
+            filename = download.suggested_filename
+        except PlaywrightError as error:
+            raise self._unreadable("invoice-file", error) from None
+
+        logger.info(
+            "Invoice file downloaded",
+            extra={"invoice_number": invoice_number, "bytes": len(content)},
+        )
+        return DownloadedDocument(
+            content=content, content_type=_content_type_of(filename), filename=filename
+        )
+
     # --- Internals -------------------------------------------------------
+
+    async def _rendered(self, path: str, section: str, filename: str) -> DownloadedDocument:
+        """Open a section and return its rendered table, or say it is unreadable.
+
+        Four sections read the same way — go, wait for the table, take the DOM —
+        so they share this instead of four copies of it. What differs between
+        them is the parser, and the parser is not this module's business.
+        """
+        page = self._require_page()
+        try:
+            await page.goto(self._url(path), wait_until="domcontentloaded")
+            await page.wait_for_selector("table.datos tbody tr")
+            content = (await page.content()).encode("utf-8")
+        except PlaywrightError as error:
+            raise self._unreadable(section, error) from None
+
+        logger.info("Section read", extra={"section": section, "bytes": len(content)})
+        return DownloadedDocument(
+            content=content, content_type=HTML_CONTENT_TYPE, filename=filename
+        )
 
     async def _login(self, page: Page) -> None:
         """Sign in with the credentials that live only in the environment."""

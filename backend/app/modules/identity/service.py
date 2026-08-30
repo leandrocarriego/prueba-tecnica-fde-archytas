@@ -140,7 +140,13 @@ class IdentityService:
             details={"role": user.role.value},
         )
         await events.publish(
-            UserRegistered(user_id=user.id, email=user.email, role=user.role.value), self.session
+            UserRegistered(
+                user_id=user.id,
+                email=user.email,
+                role=user.role.value,
+                phone=user.phone,
+            ),
+            self.session,
         )
         await self.invite(user, INVITE_NEW_ACCESS)
         await self.session.commit()

@@ -49,7 +49,7 @@ Dos detalles que importan al revisarlas:
   ruta **declare** autenticación, y que un request anónimo real **reciba 401**. Una ruta pública
   nueva se agrega a `PUBLIC_ROUTES` con el motivo escrito.
 
-**Todo lo demás depende de que el Developer lo aplique y el Code-Reviewer lo recorra.** 
+**Todo lo demás depende de que el Developer lo aplique y el Code-Reviewer lo recorra.**
 
 Cuando una convención de esa clase se rompe seguido, la respuesta correcta no es repetirla en otro documento: es escribirle un test o un grep.
 

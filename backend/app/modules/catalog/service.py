@@ -12,7 +12,7 @@ Three decisions live here, and all three come straight from the spec:
 """
 
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.catalog.models import (
+    Category,
     Correction,
     CorrectionStatus,
     PriceSource,
@@ -29,15 +30,24 @@ from app.modules.catalog.models import (
 )
 from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.schemas import (
+    CatalogDashboard,
+    CategoryAliasRead,
+    CategoryList,
+    CategoryRead,
     CorrectionMark,
     CorrectionRead,
+    NewProductRead,
+    PriceCurvePoint,
     PriceHistoryRead,
     PriceList,
     PricePointRead,
     PriceRead,
+    StockCut,
+    UnclassifiedList,
+    UnclassifiedProduct,
 )
 from app.shared.corrections import CorrectionReason
-from app.shared.errors import NotFoundError, ValidationError
+from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
     AuditAction,
     CorrectionConflicted,
@@ -49,11 +59,15 @@ from app.shared.events import (
     ProductPricesUpdated,
     ProductsRegistered,
     RegisteredProduct,
+    UnknownCategory,
+    UnknownCategoryObserved,
     UnknownProduct,
     UnknownProductsObserved,
     events,
 )
 from app.shared.sections import BusinessSection
+from app.shared.text import collapse_written_form
+from app.shared.time import BUSINESS_TIME_ZONE
 
 logger = get_logger(__name__)
 
@@ -69,6 +83,21 @@ HUNDRED = Decimal("100")
 UNREADABLE_ROW = "unreadable_row"
 UNKNOWN_PRODUCT = "unknown_product"
 MISSING_PRODUCT = "missing_product"
+# The kind 008 adds to the same generic queue. A written form of a category
+# nobody has decided about is a case, exactly like a product nobody knows.
+UNKNOWN_CATEGORY = "unknown_category"
+
+CATEGORY_ENTITY = "catalog.product_category"
+CATEGORY_FIELD = "category_id"
+
+NO_SUCH_CATEGORY = "No encontramos ese rubro"
+CATEGORY_ALREADY_EXISTS = "Ya hay un rubro con ese nombre"
+CATEGORY_HAS_PRODUCTS = "El rubro tiene productos asignados y por eso no se puede eliminar"
+
+# How many unclassified products one decision reaches in a single pass. The
+# catalog is a hundred products today and the whole queue fits well inside
+# this; the bound is here so a decision can never turn into an unbounded scan.
+MAX_RECLASSIFIED = 5000
 
 # --- Correcting a value by hand -------------------------------------------
 #
@@ -134,6 +163,15 @@ class CatalogService:
         known = await self.catalog.products_by_code([row.product_code for row in rows])
         registered: list[RegisteredProduct] = []
         unknown: list[UnknownProduct] = []
+        # Classifying a batch is a lookup against the table of equivalences,
+        # not a call to anybody: the rules belong to `triage` and this module
+        # reads its own projection of them (Artículo IV).
+        equivalences = {
+            alias.text_normalized: (alias.category_id, alias.rule_id)
+            for alias in await self.catalog.aliases()
+        }
+        unresolved: dict[str, list[str]] = defaultdict(list)
+        observed_on = now.astimezone(BUSINESS_TIME_ZONE).date()
         updated = unchanged = highlighted = 0
 
         for row in rows:
@@ -172,6 +210,15 @@ class CatalogService:
             unchanged += int(not changed)
             highlighted += int(was_highlighted)
 
+            self._classify(product, row, equivalences, unresolved)
+            if row.stock is not None:
+                await self.catalog.add_stock_point(
+                    product_id=product.id,
+                    quantity=row.stock,
+                    observed_on=observed_on,
+                    batch_id=batch_id,
+                )
+
         # Everything the file carried, not only what could be read: a product
         # whose row was unreadable is already a case, and reporting it a second
         # time as one that stopped coming would be a lie (RF-28).
@@ -205,6 +252,19 @@ class CatalogService:
             await events.publish(
                 KnownProductsMissing(batch_id=batch_id, products=tuple(missing)), self.session
             )
+        if unresolved:
+            # One case per written form, never one per product: a hundred rows
+            # spelled the same way are one question (RF-21, RF-22 of 008).
+            await events.publish(
+                UnknownCategoryObserved(
+                    batch_id=batch_id,
+                    cases=tuple(
+                        UnknownCategory(category_text=text, product_codes=tuple(codes))
+                        for text, codes in sorted(unresolved.items())
+                    ),
+                ),
+                self.session,
+            )
 
         logger.info(
             "Price batch applied",
@@ -216,6 +276,7 @@ class CatalogService:
                 "registered": len(registered),
                 "unknown": len(unknown),
                 "missing": len(missing),
+                "unresolved_categories": len(unresolved),
             },
         )
 
@@ -362,6 +423,353 @@ class CatalogService:
     async def remember_setting(self, key: str, value: object) -> None:
         """Keep the business parameter this module reads while it applies a batch."""
         await self.catalog.put_setting(key, value)
+
+    # --- The rubros of the catalog (008) ----------------------------------
+
+    @staticmethod
+    def _classify(
+        product: Product,
+        row: NormalizedPriceRow,
+        equivalences: dict[str, tuple[int, int | None]],
+        unresolved: dict[str, list[str]],
+    ) -> None:
+        """Give a product its rubro, or leave it for a person. Never guess.
+
+        Three outcomes, and they are the whole of H4 of the spec:
+
+        * the written form has an equivalence → the rubro of that equivalence,
+          stamped with the rule that decided it (RF-02, RF-25);
+        * it has none → the product stays «sin rubro» and the written form is
+          collected so one case is opened for it (RF-21, RF-22);
+        * the row brought no category at all → «sin rubro», and it waits in the
+          queue of unclassified with the proposal derived from its subcategory
+          (RF-09 to RF-12).
+
+        What somebody decided by hand is never overwritten by an equivalence: a
+        product with `classified_by_user_id` is a decision, not a match.
+        """
+        product.category_raw = row.category_raw
+        product.subcategory_raw = row.subcategory_raw
+        if row.category_raw is None or not row.category_raw.strip():
+            return
+        if product.classified_by_user_id is not None:
+            return
+
+        found = equivalences.get(collapse_written_form(row.category_raw))
+        if found is None:
+            unresolved[row.category_raw.strip()].append(product.code)
+            return
+        category_id, rule_id = found
+        product.category_id = category_id
+        product.classified_by_rule_id = rule_id
+
+    async def list_categories(self) -> CategoryList:
+        """The rubros with their count and their written forms (RF-01, RF-03, RF-04).
+
+        «Sin rubro» travels beside the list rather than inside it, because it
+        is not a row of `core.category` — but it is reported, so the cuts add
+        up to the total the screen shows (RF-09, RF-10, RF-11).
+        """
+        categories = await self.catalog.list_categories()
+        counts = await self.catalog.products_per_category()
+        aliases: dict[int, list[CategoryAliasRead]] = defaultdict(list)
+        for alias in await self.catalog.aliases():
+            aliases[alias.category_id].append(CategoryAliasRead.model_validate(alias))
+        return CategoryList(
+            items=[
+                CategoryRead(
+                    id=category.id,
+                    name=category.name,
+                    product_count=counts.get(category.id, 0),
+                    aliases=aliases.get(category.id, []),
+                )
+                for category in categories
+            ],
+            unclassified_count=counts.get(None, 0),
+            total_products=sum(counts.values()),
+        )
+
+    async def create_category(self, *, name: str, actor_user_id: int) -> CategoryRead:
+        """Add a rubro to the list (RF-05)."""
+        clean = name.strip()
+        if await self.catalog.category_named(clean) is not None:
+            raise ConflictError(CATEGORY_ALREADY_EXISTS, details={"name": clean})
+        category = await self.catalog.add_category(clean)
+        await self._record_category_change(
+            category, AuditAction.CREATED, actor_user_id, old_value=None, new_value=clean
+        )
+        await self.session.commit()
+        logger.info("Category created", extra={"category_id": category.id})
+        return CategoryRead(id=category.id, name=category.name, product_count=0, aliases=[])
+
+    async def rename_category(
+        self, category_id: int, *, name: str, actor_user_id: int
+    ) -> CategoryRead:
+        """Change the name of a rubro (RF-06)."""
+        category = await self._require_category(category_id)
+        clean = name.strip()
+        existing = await self.catalog.category_named(clean)
+        if existing is not None and existing.id != category.id:
+            raise ConflictError(CATEGORY_ALREADY_EXISTS, details={"name": clean})
+        previous, category.name = category.name, clean
+        await self.session.flush()
+        await self._record_category_change(
+            category, AuditAction.UPDATED, actor_user_id, old_value=previous, new_value=clean
+        )
+        await self.session.commit()
+        counts = await self.catalog.products_per_category()
+        return CategoryRead(
+            id=category.id,
+            name=category.name,
+            product_count=counts.get(category.id, 0),
+            aliases=[
+                CategoryAliasRead.model_validate(alias)
+                for alias in await self.catalog.aliases()
+                if alias.category_id == category.id
+            ],
+        )
+
+    async def delete_category(self, category_id: int, *, actor_user_id: int) -> None:
+        """Remove a rubro, unless something still points at it (RF-07).
+
+        The check is here and not left to the foreign key on purpose: the
+        system has to be able to say *why* it refuses, and an integrity error
+        of PostgreSQL is not a sentence a person reads.
+        """
+        category = await self._require_category(category_id)
+        counts = await self.catalog.products_per_category()
+        in_use = counts.get(category.id, 0)
+        if in_use:
+            raise ConflictError(
+                CATEGORY_HAS_PRODUCTS, details={"category_id": category_id, "products": in_use}
+            )
+        aliases = [
+            alias for alias in await self.catalog.aliases() if alias.category_id == category.id
+        ]
+        if aliases:
+            raise ConflictError(
+                "El rubro todavía tiene formas escritas asignadas",
+                details={"category_id": category_id, "aliases": len(aliases)},
+            )
+        name = category.name
+        await self._record_category_change(
+            category, AuditAction.UPDATED, actor_user_id, old_value=name, new_value=None
+        )
+        await self.catalog.delete_category(category)
+        await self.session.commit()
+        logger.info("Category deleted", extra={"category_id": category_id})
+
+    async def unclassified(self, *, skip: int = 0, limit: int = 50) -> UnclassifiedList:
+        """The queue of products with no rubro, each with its proposal or none.
+
+        The proposal is derived here and stored nowhere (RF-16). A subcategory
+        that resolves to **exactly one** rubro among what is already classified
+        proposes it (RF-14); zero or more than one proposes nothing (RF-17) —
+        breaking a tie would be the system deciding, which is the one thing
+        this feature does not do.
+        """
+        products = await self.catalog.unclassified(skip=skip, limit=limit)
+        total = await self.catalog.count_unclassified()
+        by_subcategory = await self.catalog.rubro_of_subcategory()
+        names = {category.id: category.name for category in await self.catalog.list_categories()}
+
+        items: list[UnclassifiedProduct] = []
+        for product in products:
+            rubros = by_subcategory.get(product.subcategory_raw or "", set())
+            proposed = next(iter(rubros)) if len(rubros) == 1 else None
+            items.append(
+                UnclassifiedProduct(
+                    product_id=product.id,
+                    code=product.code,
+                    description=product.description,
+                    category_raw=product.category_raw,
+                    subcategory_raw=product.subcategory_raw,
+                    proposed_category_id=proposed,
+                    proposed_category_name=names.get(proposed) if proposed else None,
+                )
+            )
+        return UnclassifiedList(items=items, total=total, skip=skip, limit=limit)
+
+    async def set_product_category(
+        self, product_id: int, *, category_id: int, actor_user_id: int
+    ) -> UnclassifiedProduct:
+        """Assign — or change — the rubro of a product (RF-13, RF-15, RF-20).
+
+        Confirming a proposal and correcting it are the same write: only the
+        rubro that travels differs, and the system has no reason to tell them
+        apart. Who decided and when is recorded on the product (RF-18) and
+        published as a manual change, so it reaches the one log of the platform
+        without this module learning that the log exists.
+        """
+        product = await self.catalog.get_product(product_id)
+        if product is None:
+            raise NotFoundError(NO_SUCH_PRODUCT, details={"product_id": product_id})
+        category = await self._require_category(category_id)
+
+        previous = product.category_id
+        product.category_id = category.id
+        product.classified_by_user_id = actor_user_id
+        product.classified_at = datetime.now(UTC)
+        # A decision by hand does not belong to any equivalence: revoking one
+        # must not take this product with it.
+        product.classified_by_rule_id = None
+        await self.session.flush()
+
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=PRODUCT_ENTITY,
+                entity_id=str(product.id),
+                action=AuditAction.UPDATED,
+                actor_user_id=actor_user_id,
+                section=CATALOG_SECTION,
+                field=CATEGORY_FIELD,
+                old_value=previous,
+                new_value=category.id,
+            ),
+            self.session,
+        )
+        await self.session.commit()
+        logger.info(
+            "Product classified", extra={"product_id": product.id, "category_id": category.id}
+        )
+        return UnclassifiedProduct(
+            product_id=product.id,
+            code=product.code,
+            description=product.description,
+            category_raw=product.category_raw,
+            subcategory_raw=product.subcategory_raw,
+            proposed_category_id=category.id,
+            proposed_category_name=category.name,
+        )
+
+    async def list_aliases(self) -> list[CategoryAliasRead]:
+        """Every equivalence in force (RF-27).
+
+        Who decided each one and when lives in `triage`, with the rule: the
+        screen reads both and joins them by `rule_id`, and this module never
+        touches somebody else's table to say a name.
+        """
+        return [CategoryAliasRead.model_validate(alias) for alias in await self.catalog.aliases()]
+
+    async def learn_category_alias(
+        self, *, rule_id: int | None, category_text: str, category_id: int
+    ) -> None:
+        """Project a decision about a written form, and apply it (RF-24, RF-25).
+
+        Applying it here and not waiting for the next list is what makes the
+        decision retroactive: the products that were left «sin rubro» by that
+        written form get their rubro the moment somebody decides.
+        """
+        if await self.catalog.get_category(category_id) is None:
+            logger.warning(
+                "A decision named a rubro that does not exist", extra={"rule_id": rule_id}
+            )
+            return
+        normalized = collapse_written_form(category_text)
+        await self.catalog.put_alias(
+            text_normalized=normalized,
+            text_original=category_text.strip(),
+            category_id=category_id,
+            rule_id=rule_id,
+        )
+        classified = 0
+        for product in await self.catalog.unclassified(limit=MAX_RECLASSIFIED):
+            if product.category_raw and collapse_written_form(product.category_raw) == normalized:
+                product.category_id = category_id
+                product.classified_by_rule_id = rule_id
+                classified += 1
+        await self.session.flush()
+        logger.info(
+            "Category equivalence learned",
+            extra={"rule_id": rule_id, "category_id": category_id, "classified": classified},
+        )
+
+    async def repoint_category_alias(self, *, rule_id: int, category_id: int) -> None:
+        """Point an equivalence at another rubro and move what it had classified.
+
+        RF-28 and RF-29, and the line that separates them from revoking:
+        **nothing goes back to the queue**. The scope is exact —
+        `classified_by_rule_id = rule_id` — so a product somebody classified by
+        hand does not move, because it never depended on this equivalence.
+        """
+        alias = await self.catalog.alias_by_rule(rule_id)
+        if alias is None or await self.catalog.get_category(category_id) is None:
+            return
+        alias.category_id = category_id
+        moved = await self.catalog.products_classified_by(rule_id)
+        for product in moved:
+            product.category_id = category_id
+        await self.session.flush()
+        logger.info(
+            "Category equivalence re-pointed",
+            extra={"rule_id": rule_id, "category_id": category_id, "products": len(moved)},
+        )
+
+    async def forget_category_alias(self, rule_id: int) -> None:
+        """Drop an equivalence and send back what it was resolving (RF-30, RF-31).
+
+        The products are unclassified and go through the **same** step a batch
+        goes through, so they end up as an `UnknownCategoryObserved` and the
+        queue opens their case: one path, not a special branch for revocation.
+        """
+        alias = await self.catalog.alias_by_rule(rule_id)
+        if alias is None:
+            return
+        affected = await self.catalog.products_classified_by(rule_id)
+        text = alias.text_original
+        await self.catalog.drop_alias_by_rule(rule_id)
+        for product in affected:
+            product.category_id = None
+            product.classified_by_rule_id = None
+        await self.session.flush()
+        if affected:
+            await events.publish(
+                UnknownCategoryObserved(
+                    batch_id=0,
+                    cases=(
+                        UnknownCategory(
+                            category_text=text,
+                            product_codes=tuple(product.code for product in affected),
+                        ),
+                    ),
+                ),
+                self.session,
+            )
+        logger.info(
+            "Category equivalence forgotten",
+            extra={"rule_id": rule_id, "products": len(affected)},
+        )
+
+    async def _require_category(self, category_id: int) -> Category:
+        """Return the rubro, or say plainly that it is not there."""
+        category = await self.catalog.get_category(category_id)
+        if category is None:
+            raise NotFoundError(NO_SUCH_CATEGORY, details={"category_id": category_id})
+        return category
+
+    async def _record_category_change(
+        self,
+        category: Category,
+        action: AuditAction,
+        actor_user_id: int,
+        *,
+        old_value: Any,
+        new_value: Any,
+    ) -> None:
+        """Send a change of the rubro list to the one log of the platform."""
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=CATEGORY_ENTITY,
+                entity_id=str(category.id),
+                action=action,
+                actor_user_id=actor_user_id,
+                section=CATALOG_SECTION,
+                field="name",
+                old_value=old_value,
+                new_value=new_value,
+            ),
+            self.session,
+        )
 
     # --- Correcting a value by hand ---------------------------------------
 
@@ -1067,4 +1475,66 @@ class CatalogService:
                 None if price is None else price.price, previous_month
             ),
             corrections=self._marks(corrections),
+        )
+
+    # --- The cuts of the dashboard that come from the catalog (009) -------
+
+    async def dashboard(
+        self, *, since: date | None = None, until: date | None = None
+    ) -> CatalogDashboard:
+        """What the supplier charged, what the stock did, and what is new.
+
+        Three cuts of 009 that are about the catalog rather than about sales,
+        and they live here for the reason the boundary exists: the prices, the
+        stock and the products are this module's, and the dashboard reads them
+        through its own endpoint rather than by another module reaching in.
+
+        Each cut reports what it left out, **including when it left out
+        nothing** (RF-46, RF-27): a product with no photograph at one end of the
+        window is not counted as a zero, it is counted as excluded.
+        """
+        curve = await self.catalog.price_curve(since=since, until=until)
+        opening = {} if since is None else await self.catalog.stock_at(since, latest=False)
+        closing = {} if until is None else await self.catalog.stock_at(until, latest=True)
+        products = await self.catalog.active_products()
+
+        cuts: list[StockCut] = []
+        excluded = 0
+        for product in products:
+            first, last = opening.get(product.id), closing.get(product.id)
+            if first is None and last is None:
+                # No photograph at either end: this product cannot be part of
+                # this cut, and saying zero would be inventing a stock.
+                excluded += 1
+                continue
+            cuts.append(
+                StockCut(
+                    product_id=product.id,
+                    code=product.code,
+                    description=product.description,
+                    opening=first,
+                    closing=last,
+                    ran_out=last == 0,
+                )
+            )
+
+        return CatalogDashboard(
+            since=since,
+            until=until,
+            price_curve=[
+                PriceCurvePoint(month=month, average_price=average, changes=changes)
+                for month, average, changes in curve
+            ],
+            price_curve_excluded=0,
+            stock=cuts,
+            stock_excluded=excluded,
+            new_products=[
+                NewProductRead(
+                    product_id=product.id,
+                    code=product.code,
+                    description=product.description,
+                    first_seen_at=product.first_seen_at,
+                )
+                for product in await self.catalog.products_first_seen_between(since, until)
+            ],
         )

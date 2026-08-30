@@ -210,6 +210,7 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=0,
         maximum=90,
         unit="días",
+        consumed_by="purchases",
     ),
     ParameterSpec(
         key="purchase_order.stalled_days",
@@ -220,6 +221,7 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=1,
         maximum=365,
         unit="días",
+        consumed_by="purchases",
     ),
     ParameterSpec(
         key="receipt.notice_days",
@@ -230,6 +232,7 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=0,
         maximum=90,
         unit="días",
+        consumed_by="purchases",
     ),
     ParameterSpec(
         key="daily_digest.time",
@@ -237,6 +240,97 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         effect="Cambia a qué hora del día el sistema manda el resumen de lo que pasó.",
         kind=ParameterKind.TIME_OF_DAY,
         initial="08:00",
+        consumed_by="notifications",
+    ),
+    ParameterSpec(
+        key="invoice_sync.interval_hours",
+        label="Cada cuántas horas se traen facturas, pagos y proveedores",
+        effect="Cambia cada cuánto el sistema le pide al portal las facturas, los comprobantes de "
+        "pago y el padrón de proveedores.",
+        kind=ParameterKind.INTEGER,
+        initial=12,
+        minimum=1,
+        maximum=168,
+        unit="horas",
+        consumed_by="purchases",
+    ),
+    ParameterSpec(
+        key="supplier_match.threshold_pct",
+        label="Parecido mínimo para dar por identificado a un proveedor",
+        effect="Cambia cuánto se tiene que parecer un nombre al del padrón para que el sistema lo "
+        "dé por identificado sin preguntarle a nadie. Más alto, pregunta más veces.",
+        kind=ParameterKind.INTEGER,
+        initial=92,
+        minimum=50,
+        maximum=100,
+        unit="%",
+        consumed_by="purchases",
+    ),
+    ParameterSpec(
+        key="purchase_order.repeat_window_days",
+        label="Ventana en la que dos pedidos iguales se marcan como repetidos",
+        effect="Cambia dentro de cuántos días dos órdenes del mismo producto al mismo proveedor "
+        "se señalan como posible pedido repetido.",
+        kind=ParameterKind.INTEGER,
+        initial=15,
+        minimum=1,
+        maximum=365,
+        unit="días",
+        consumed_by="purchases",
+    ),
+    ParameterSpec(
+        key="message_sync.interval_minutes",
+        label="Cada cuántos minutos se trae la bandeja de mensajes",
+        effect="Cambia cada cuánto el sistema entra a la bandeja del portal a buscar mensajes "
+        "nuevos. Un mensaje no puede tardar más de una hora en llegar.",
+        kind=ParameterKind.INTEGER,
+        initial=30,
+        minimum=5,
+        maximum=60,
+        unit="minutos",
+        consumed_by="messaging",
+    ),
+    ParameterSpec(
+        key="alerts.window_start",
+        label="Hora desde la que se mandan avisos inmediatos",
+        effect="Cambia a partir de qué hora el sistema puede mandar un aviso al teléfono. Lo que "
+        "pase antes espera a esta hora.",
+        kind=ParameterKind.TIME_OF_DAY,
+        initial="08:00",
+        consumed_by="notifications",
+    ),
+    ParameterSpec(
+        key="alerts.window_end",
+        label="Hora hasta la que se mandan avisos inmediatos",
+        effect="Cambia hasta qué hora el sistema puede mandar un aviso al teléfono. Lo que pase "
+        "después espera a la franja siguiente.",
+        kind=ParameterKind.TIME_OF_DAY,
+        initial="18:00",
+        consumed_by="notifications",
+    ),
+    ParameterSpec(
+        key="sales_sync.interval_hours",
+        label="Cada cuántas horas se traen las ventas",
+        effect="Cambia cada cuánto el sistema le pide al portal los registros de ventas que "
+        "alimentan el tablero.",
+        kind=ParameterKind.INTEGER,
+        initial=24,
+        minimum=1,
+        maximum=168,
+        unit="horas",
+        consumed_by="sales",
+    ),
+    ParameterSpec(
+        key="sales.outlier_threshold_pct",
+        label="Diferencia a partir de la cual el total de una venta es atípico",
+        effect="Cambia cuánto se puede alejar el total de una venta de lo habitual para ese "
+        "producto antes de que el sistema la aparte en vez de sumarla.",
+        kind=ParameterKind.DECIMAL,
+        initial=Decimal("300"),
+        minimum=Decimal("10"),
+        maximum=Decimal("10000"),
+        unit="%",
+        consumed_by="sales",
     ),
 )
 

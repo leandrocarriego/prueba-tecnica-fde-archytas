@@ -26,9 +26,12 @@ not end in `_test`.
 """
 
 import asyncio
+import importlib.util
+import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -109,9 +112,81 @@ async def _create_schema() -> None:
         await engine.dispose()
 
 
+def _signed_category_seed() -> object:
+    """The seeded rubros, read from the migration that seeds them.
+
+    The suite builds its schema from the models and not from Alembic, so the
+    **data** a migration loads would simply not be here — and 008 seeds the
+    table of equivalences the client signed. Without it every test would see a
+    system where nothing is classified and eighteen written forms are waiting
+    in the review queue, which is not the system that gets deployed.
+
+    It is read from the migration file rather than copied, because two copies
+    of a seed are one seed and one bug: the day somebody adds a rubro there,
+    this reads it without being edited.
+    """
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    location = next(path.glob("0010_*.py"))
+    spec = importlib.util.spec_from_file_location("category_seed_migration", location)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def _seed_reference_data() -> None:
+    """Load what the migrations seed, so the suite runs on the deployed system."""
+    migration = _signed_category_seed()
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    try:
+        async with engine.begin() as connection:
+            for name, written_forms in migration.SEED:  # type: ignore[attr-defined]
+                category_id = await connection.scalar(
+                    text("INSERT INTO core.category (name) VALUES (:name) RETURNING id"),
+                    {"name": name},
+                )
+                seen: set[str] = set()
+                for form in written_forms:
+                    key = migration._key(form)  # type: ignore[attr-defined] # noqa: SLF001
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    rule_id = await connection.scalar(
+                        text(
+                            "INSERT INTO operations.resolution_rule "
+                            "(kind, matcher, decision, created_by_user_id, created_by_name) "
+                            "VALUES ('unknown_category', CAST(:matcher AS jsonb), "
+                            "CAST(:decision AS jsonb), NULL, :author) RETURNING id"
+                        ),
+                        {
+                            "matcher": json.dumps(
+                                {"kind": "unknown_category", "category_text": form}
+                            ),
+                            "decision": json.dumps({"category_id": category_id}),
+                            "author": "Sembrado en la puesta en marcha",
+                        },
+                    )
+                    await connection.execute(
+                        text(
+                            "INSERT INTO core.category_alias "
+                            "(category_id, text_normalized, text_original, rule_id, source) "
+                            "VALUES (:category_id, :key, :original, :rule_id, 'SEED')"
+                        ),
+                        {
+                            "category_id": category_id,
+                            "key": key,
+                            "original": form,
+                            "rule_id": rule_id,
+                        },
+                    )
+    finally:
+        await engine.dispose()
+
+
 async def _provision() -> None:
     await _create_database_if_missing()
     await _create_schema()
+    await _seed_reference_data()
 
 
 @pytest.fixture(scope="session", autouse=True)

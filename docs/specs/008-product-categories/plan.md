@@ -294,3 +294,34 @@ import, el diseño se rompió. Después `GEN-08` y `GEN-09`, por el evento nuevo
 inmutable, con identificadores y no entidades, y su handler no puede tragarse una excepción.
 `PY-09` en las ocho rutas nuevas, con `require_sales()` en las cuatro de escritura, y `DB-01` en
 la migración `0003` —modelos y tablas sincronizados, siembra incluida—.
+
+---
+
+## Lo que la implementación encontró
+
+**Once equivalencias, no dieciocho.** Este plan y `data-model.md` dicen que las 18 grafías firmadas
+producen 18 filas en `core.category_alias`, y dos párrafos antes dicen que la clave de matcheo
+colapsa los pares que difieren sólo en mayúsculas — que `ELECTRICIDAD` y `Electricidad` **son la
+misma clave**. Las dos cosas no pueden ser ciertas a la vez con un índice único sobre la clave.
+
+Gana la regla de normalización, que es la que tiene una razón detrás. Las 18 grafías quedan
+cubiertas por **11 equivalencias**:
+
+| Rubro | Grafías firmadas | Filas |
+|---|---|---|
+| Electricidad | `ELECTRICIDAD` · `Electricidad` | 1 |
+| Ferretería General | `FERRETERIA GENERAL` · `Ferreteria General` · `Ferreteria Gral.` | 2 |
+| Herramientas | `HERRAMIENTAS` · `Herramientas` · `Herram.` | 2 |
+| Instrumental | `INSTRUMENTAL` · `Instrumental` | 1 |
+| Pinturas y Adhesivos | `PINTURAS Y ADHESIVOS` · `Pinturas y Adhesivos` · `Pinturas/Adhesivos` | 2 |
+| Sanitarios | `SANITARIOS` · `Sanitarios` | 1 |
+| Seguridad Industrial | `SEGURIDAD INDUSTRIAL` · `Seguridad Industrial` · `Seg. Industrial` | 2 |
+
+Las que difieren en algo más que mayúsculas —`Ferreteria Gral.`, `Herram.`, `Pinturas/Adhesivos`,
+`Seg. Industrial`— siguen siendo filas propias apuntando al mismo rubro, que es exactamente para lo
+que existe una tabla de equivalencias.
+
+**Nada del comportamiento cambia**: las 18 formas se resuelven igual, y cada equivalencia tiene su
+regla en `triage`, así que RF-28 a RF-31 alcanzan a todas. Lo que cambia es el número que la
+documentación afirma. `data-model.md` sigue diciendo 18 y hay que corregirlo — queda anotado acá
+porque corregir un documento firmado es del humano.

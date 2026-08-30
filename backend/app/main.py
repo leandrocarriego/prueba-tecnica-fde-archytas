@@ -24,12 +24,32 @@ from app import models  # noqa: F401
 from app.config import settings
 from app.database import engine
 from app.logging import get_logger, setup_logging
-from app.modules.catalog.routes import corrections_router
+from app.modules.catalog.routes import (
+    catalog_dashboard_router,
+    categories_router,
+    corrections_router,
+    products_router,
+)
 from app.modules.catalog.routes import router as catalog_router
 from app.modules.identity.middleware import record_refusals
 from app.modules.identity.routes import access_log_router, auth_router, users_router
+from app.modules.messaging.routes import router as messages_router
+from app.modules.notifications.routes import router as alerts_router
 from app.modules.operations.routes import health_router, price_updates_router
 from app.modules.operations.routes import router as operations_router
+from app.modules.purchases.routes import (
+    aliases_router,
+    calendar_router,
+    incidents_router,
+    invoices_router,
+    orders_router,
+    payments_router,
+    receipts_router,
+    review_router,
+    suppliers_router,
+)
+from app.modules.sales.routes import dashboard_router as sales_dashboard_router
+from app.modules.sales.routes import router as sales_router
 from app.modules.triage.routes import router as triage_router
 from app.shared.errors import (
     AuthenticationError,
@@ -75,6 +95,32 @@ TAGS_METADATA: list[dict[str, str]] = [
     {
         "name": "Price updates",
         "description": "The state of the price update, asking for one, and its settings.",
+    },
+    {
+        "name": "Categories",
+        "description": "The rubros of the catalog and the written forms that resolve to them.",
+    },
+    {
+        "name": "Invoices",
+        "description": "Purchase invoices, what their documents said, and what is held.",
+    },
+    {
+        "name": "Suppliers",
+        "description": "The register of suppliers and the ways their names arrive written.",
+    },
+    {"name": "Payments", "description": "What was paid on each invoice, and what is still owed."},
+    {
+        "name": "Receipts",
+        "description": "Reception receipts and the invoices that fell due without one.",
+    },
+    {"name": "Calendar", "description": "The due dates, on the day they fall."},
+    {"name": "Purchase orders", "description": "What was ordered, and what has not moved."},
+    {"name": "Alerts", "description": "Who the platform tells what, and on which number."},
+    {"name": "Messages", "description": "The inbox of the portal, with a state and an owner."},
+    {"name": "Sales", "description": "The sales records, and the ones no indicator may add."},
+    {
+        "name": "Dashboard",
+        "description": "How the business is doing, and what each number left out.",
     },
     {
         "name": "Triage",
@@ -199,7 +245,23 @@ def register_routers(application: FastAPI) -> None:
     application.include_router(price_updates_router, prefix=API_PREFIX)
     application.include_router(catalog_router, prefix=API_PREFIX)
     application.include_router(corrections_router, prefix=API_PREFIX)
+    application.include_router(categories_router, prefix=API_PREFIX)
+    application.include_router(products_router, prefix=API_PREFIX)
     application.include_router(triage_router, prefix=API_PREFIX)
+    application.include_router(invoices_router, prefix=API_PREFIX)
+    application.include_router(suppliers_router, prefix=API_PREFIX)
+    application.include_router(review_router, prefix=API_PREFIX)
+    application.include_router(aliases_router, prefix=API_PREFIX)
+    application.include_router(payments_router, prefix=API_PREFIX)
+    application.include_router(receipts_router, prefix=API_PREFIX)
+    application.include_router(incidents_router, prefix=API_PREFIX)
+    application.include_router(calendar_router, prefix=API_PREFIX)
+    application.include_router(orders_router, prefix=API_PREFIX)
+    application.include_router(messages_router, prefix=API_PREFIX)
+    application.include_router(alerts_router, prefix=API_PREFIX)
+    application.include_router(sales_router, prefix=API_PREFIX)
+    application.include_router(sales_dashboard_router, prefix=API_PREFIX)
+    application.include_router(catalog_dashboard_router, prefix=API_PREFIX)
 
 
 def register_exception_handlers(application: FastAPI) -> None:

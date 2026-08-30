@@ -1,6 +1,6 @@
 """What `notifications` does when something happens elsewhere.
 
-Every subscription here **queues and returns**. A handler runs inside the
+Every subscription that delivers something **queues and returns**. A handler runs inside the
 transaction of whoever published, and a call to a third-party HTTP service has
 no business inside the transaction that just recorded a failed extraction, or
 the one applying a price list (`GEN-09`).
@@ -11,19 +11,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.logging import get_logger
 from app.modules.notifications import tasks
+from app.modules.notifications.delivery import AlertRouter
+from app.modules.notifications.models import AlertKind
+from app.modules.notifications.repository import NotificationsRepository
 from app.modules.notifications.service import (
+    DIGEST_TIME_KEY,
+    WINDOW_END_KEY,
+    WINDOW_START_KEY,
     conflict_message,
+    due_soon_message,
     invitation_message,
+    message_due_message,
+    payment_claim_message,
     recovered_message,
     recovery_message,
     stalled_message,
 )
 from app.shared.events import (
+    BusinessParameterChanged,
     CorrectionConflicted,
+    InvoiceDueSoon,
     PasswordResetRequested,
     PriceUpdateRecovered,
     PriceUpdateStalled,
+    SupplierMessageReceived,
+    UserDeactivated,
     UserInvited,
+    UserReactivated,
+    UserRegistered,
+    UserRoleChanged,
     events,
 )
 
@@ -98,4 +114,91 @@ async def warn_about_a_contradicted_correction(
     logger.info(
         "Correction conflict alert queued",
         extra={"correction_id": event.correction_id, "entity_id": event.entity_id},
+    )
+
+
+# --- The alerts of 005 and 007 -------------------------------------------
+#
+# Four more subscriptions, and the same rule as above: queue and return. What
+# is different here is **when** they go out — an immediate alert whose cause
+# happens outside the window the owner allows is delayed until the window
+# opens, never dropped (RF-42 of 007).
+
+
+@events.subscribe(UserRegistered)
+async def remember_recipient(event: UserRegistered, session: AsyncSession) -> None:
+    """Keep somebody an alert can reach (RF-44 of 007)."""
+    await NotificationsRepository(session).put_recipient(
+        user_id=event.user_id, role=event.role, phone=event.phone
+    )
+
+
+@events.subscribe(UserDeactivated)
+async def stop_alerting(event: UserDeactivated, session: AsyncSession) -> None:
+    """Somebody lost their access, so their alerts stop (RF-45 of 007)."""
+    await NotificationsRepository(session).set_active(event.user_id, active=False)
+
+
+@events.subscribe(UserReactivated)
+async def resume_alerting(event: UserReactivated, session: AsyncSession) -> None:
+    """Their access came back, and so do their alerts."""
+    await NotificationsRepository(session).set_active(event.user_id, active=True)
+
+
+@events.subscribe(UserRoleChanged)
+async def follow_the_role(event: UserRoleChanged, session: AsyncSession) -> None:
+    """Which alerts are theirs changed with their role."""
+    await NotificationsRepository(session).set_role(event.user_id, event.role)
+
+
+@events.subscribe(BusinessParameterChanged)
+async def remember_window(event: BusinessParameterChanged, session: AsyncSession) -> None:
+    """Keep the window and the digest hour this module obeys (RF-36, RF-43)."""
+    if event.key not in {WINDOW_START_KEY, WINDOW_END_KEY, DIGEST_TIME_KEY}:
+        return
+    await AlertRouter(session).remember(event.key, event.value)
+
+
+@events.subscribe(InvoiceDueSoon)
+async def warn_about_a_due_invoice(event: InvoiceDueSoon, session: AsyncSession) -> None:
+    """An invoice is about to fall due with no receipt (RF-38 of 005)."""
+    await _deliver(
+        session,
+        AlertKind.DUE_SOON,
+        due_soon_message(
+            number=event.number,
+            supplier=event.supplier_name,
+            due_on=event.due_on.isoformat(),
+            days_ahead=event.days_ahead,
+        ),
+    )
+
+
+@events.subscribe(SupplierMessageReceived)
+async def warn_about_a_message(event: SupplierMessageReceived, session: AsyncSession) -> None:
+    """A claim or a due-date notice landed in the inbox (RF-33, RF-34 of 007)."""
+    kind = AlertKind.PAYMENT_CLAIM if event.kind == "PAYMENT_CLAIM" else AlertKind.DUE_SOON
+    build = payment_claim_message if kind is AlertKind.PAYMENT_CLAIM else message_due_message
+    await _deliver(
+        session,
+        kind,
+        build(supplier=event.supplier_name, subject=event.subject, body=event.body),
+    )
+
+
+async def _deliver(session: AsyncSession, kind: AlertKind, message: str) -> None:
+    """Queue one alert per recipient, waiting for the window if it is closed.
+
+    The delay is what RF-42 asks for and it is applied by the broker rather than
+    by a process holding the message: something that has to go out at eight in
+    the morning must not depend on a worker being alive at midnight.
+    """
+    router = AlertRouter(session)
+    countdown = await router.delay_until_window()
+    phones = await router.phones_for(kind)
+    for phone in phones:
+        tasks.send_alert.apply_async(args=[phone, message], countdown=countdown)
+    logger.info(
+        "Alert queued",
+        extra={"kind": kind.value, "recipients": len(phones), "countdown": countdown},
     )

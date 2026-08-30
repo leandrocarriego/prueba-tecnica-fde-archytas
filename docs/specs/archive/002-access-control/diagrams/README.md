@@ -266,4 +266,3 @@ flowchart TD
     M --> X{"¿El dueño desactivó ese acceso?"}
     X -->|Sí| W
 ```
-

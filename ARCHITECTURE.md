@@ -95,12 +95,10 @@ Al ser un proyecto único, las specs viven en **un solo árbol numerado**.
 │   │       ├── identity/       # Usuarios, roles, sesión (RBAC)
 │   │       ├── portal/         # Extracción: cliente Playwright + parsers por sección
 │   │       ├── ingestion/      # raw → staging → core: hash, tipado, cuarentena
-│   │       ├── suppliers/      # Padrón de proveedores + resolución de entidades
-│   │       ├── catalog/        # Productos, precios, categorías
-│   │       ├── purchasing/     # Órdenes de compra y recepciones
-│   │       ├── billing/        # Facturas, comprobantes de pago, estado de cuenta
-│   │       ├── sales/          # Ventas y deduplicación
-│   │       ├── messaging/      # Mensajes internos del portal
+│   │       ├── catalog/        # Productos, precios, rubros y stock
+│   │       ├── purchases/      # Padrón, facturas, pagos, recibos, calendario y órdenes
+│   │       ├── sales/          # Ventas, deduplicación y tablero comercial
+│   │       ├── messaging/      # La bandeja de mensajes del portal
 │   │       ├── notifications/  # Avisos al equipo por WhatsApp (Evolution API)
 │   │       ├── triage/         # Cola de excepciones y reglas aprendidas
 │   │       └── operations/     # Jobs, parámetros, auditoría
@@ -154,10 +152,10 @@ La regla es una sola y se verifica en cada review:
 > **Un módulo nunca importa otro módulo. Se comunican por eventos.**
 
 Concretamente:
-- ❌ `from app.modules.suppliers.service import SupplierService`
-- ❌ `from app.modules.suppliers.repository import SupplierRepository`
-- ❌ `from app.modules.suppliers.models import Supplier`
-- ✅ `from app.shared.events import events, InvoiceRegistered`
+- ❌ `from app.modules.purchases.service import PurchasesService`
+- ❌ `from app.modules.purchases.repository import PurchasesRepository`
+- ❌ `from app.modules.purchases.models import Supplier`
+- ✅ `from app.shared.events import events, InvoicesRegistered`
 
 Todo lo que hay dentro de un módulo es privado, `service.py` incluido. Lo genuinamente transversal
 —normalización de texto, tipos de dinero, paginación, errores de dominio, el bus— vive en
@@ -175,9 +173,9 @@ a propósito, que es exactamente la fricción que se busca.
 ### Cómo se comunican, entonces
 
 ```
-  purchasing.service                app.shared.events              billing.handlers
+  ingestion.service                 app.shared.events            purchases.handlers
         │                                  │                              │
-        │  publish(InvoiceRegistered)      │                              │
+        │  publish(InvoicesNormalized)     │                              │
         ├─────────────────────────────────►│                              │
         │                                  │   await handler(event, ss)   │
         │                                  ├─────────────────────────────►│
@@ -186,7 +184,7 @@ a propósito, que es exactamente la fricción que se busca.
 ```
 
 - **El catálogo es compartido.** Los eventos viven en `app/shared/events/catalog.py`, no dentro del
-  módulo que los publica: si `billing` tuviera que importar `purchasing.events`, volvería el
+  módulo que los publica: si `purchases` tuviera que importar `ingestion.events`, volvería el
   acoplamiento que la regla prohíbe. Es el precio de que los módulos no se conozcan.
 - **Un evento es un hecho consumado.** Va en pasado (`InvoiceRegistered`, no `RegisterInvoice`), es
   inmutable, y lleva identificadores y valores planos — nunca un modelo de SQLAlchemy.
@@ -205,6 +203,25 @@ Cuando eso parece imposible —cuando dos módulos necesitan leerse mutuamente t
 siempre significa que son en realidad uno solo, y la respuesta es corregir la frontera, no agregar
 el import. Escalá al `Backend-Architect` antes de romper la regla.
 
+Hoy hay cuatro proyecciones, y cada una existe por una lectura que no podía ser un evento:
+
+| Proyección | La mantiene | Alimentada por | Contesta |
+|---|---|---|---|
+| `staging.resolution_rule` | `ingestion` | `QuarantineCaseResolved`, `QuarantineRuleRevoked` | ¿alguien ya decidió sobre una fila así? |
+| `core.category_alias` | `catalog` | los mismos, más `QuarantineRuleRedecided` | ¿a qué rubro corresponde esta forma escrita? |
+| `core.messaging_supplier` | `messaging` | `SuppliersNormalized` | ¿quién de los proveedores mandó este mensaje? |
+| `core.sales_product` | `sales` | `ProductsRegistered` | ¿existe el producto que esta venta menciona? |
+
+Y cuatro tablas de parámetros —`catalog_setting`, `purchase_setting`, `sales_setting`,
+`notification_setting`— por lo mismo: los parámetros son de `operations`, y cada módulo guarda los
+que lee, alimentado por `BusinessParameterChanged`.
+
+**El resumen diario es el caso raro y vale leerlo.** Es un mensaje sobre el negocio de dos módulos
+que no pueden leerse entre sí, y que quien lo manda tampoco puede leer. Se arma **preguntando**:
+`notifications` publica `DailyDigestRequested`, cada módulo que tiene algo que decir contesta con un
+`DailyDigestContribution`, y como el bus es en proceso y sincrónico, para cuando `publish` vuelve ya
+están todas las respuestas.
+
 ## Flujo de datos
 
 La extracción no escribe nunca directamente sobre el modelo canónico. Atraviesa cuatro
@@ -216,6 +233,23 @@ SIGProv ──(Playwright)──> raw ──> staging ──> core
                            │        └── cuarentena ──> operations.exception ──> revisión humana
                            └── verbatim + hash · nunca se sobrescribe
 ```
+
+**Siete secciones del portal recorren ese camino**, y todas de la misma forma: `portal` navega y
+guarda, `ingestion` tipa, y el módulo de negocio se queda con lo que se pudo leer.
+
+| Sección | `raw` | `staging` | `core` |
+|---|---|---|---|
+| `/precios` | `PRICES` | `price_row` | `catalog` |
+| pantalla de historial de un producto | `PRICE_HISTORY` | `price_history_row` | `catalog` |
+| `/facturas` | `INVOICES` | `invoice_row` | `purchases` |
+| el archivo de cada factura | `INVOICE_FILE` | `invoice_file_read` | `purchases` |
+| `/estado-cuenta` | `SUPPLIER_LEDGER` | `supplier_row`, `payment_row` | `purchases` |
+| `/ordenes-compra` | `PURCHASE_ORDERS` | `purchase_order_row` | `purchases` |
+| `/mensajes` | `MESSAGES` | `message_row` | `messaging` |
+| `/ventas` | `SALES` | `sale_row` | `sales` |
+
+El archivo de la factura es el único que no es una pantalla: es la evidencia que la revisión le
+muestra a una persona, y se guarda como todo lo que viene de afuera.
 
 | Esquema | Contenido | Regla |
 |---|---|---|

@@ -18,17 +18,26 @@ crosses a module boundary — a request has to know whether it may continue
 before its handler runs, and an event cannot answer that in time.
 """
 
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.modules.catalog.schemas import (
+    CatalogDashboard,
+    CategoryAliasRead,
+    CategoryList,
+    CategoryRead,
+    CategoryWrite,
     CorrectionRead,
     CorrectionWrite,
     PriceHistoryRead,
     PriceList,
+    ProductCategoryWrite,
+    UnclassifiedList,
+    UnclassifiedProduct,
 )
 from app.modules.catalog.service import CatalogService
 from app.modules.identity.dependencies import (
@@ -130,3 +139,125 @@ async def revert_correction(
     rather than inventing one to undo (RF-33).
     """
     return await service.revert_correction(correction_id, actor_user_id=current_user.id)
+
+
+# --- The rubros of the catalog (008) --------------------------------------
+#
+# Reading is for the three roles, writing is sales alone. That is the business
+# rule of the signed spec, and it lines up with what `002` fixed for the
+# product catalog. The literal paths are declared **before** `/{category_id}`
+# so `/unclassified` is never read as an id.
+
+categories_router = APIRouter(prefix="/categories", tags=["Categories"])
+products_router = APIRouter(prefix="/products", tags=["Categories"])
+
+
+@categories_router.get(
+    "",
+    dependencies=[Depends(get_current_user)],
+    summary="The rubros, with their count and their written forms",
+)
+async def list_categories(service: CatalogDep) -> CategoryList:
+    """Every authenticated role (RF-01, RF-03, RF-04, RF-09 to RF-11)."""
+    return await service.list_categories()
+
+
+@categories_router.get(
+    "/unclassified",
+    dependencies=[Depends(get_current_user)],
+    summary="The products waiting for a rubro",
+)
+async def list_unclassified(
+    service: CatalogDep, skip: SkipParam = 0, limit: LimitParam = DEFAULT_PAGE_SIZE
+) -> UnclassifiedList:
+    """Every authenticated role. Each product carries its proposal, or none."""
+    return await service.unclassified(skip=skip, limit=limit)
+
+
+@categories_router.get(
+    "/aliases",
+    dependencies=[Depends(get_current_user)],
+    summary="The equivalences in force",
+)
+async def list_aliases(service: CatalogDep) -> list[CategoryAliasRead]:
+    """Every authenticated role (RF-27)."""
+    return await service.list_aliases()
+
+
+@categories_router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.WRITE)],
+    summary="Add a rubro",
+)
+async def create_category(
+    payload: CategoryWrite, current_user: CurrentUser, service: CatalogDep
+) -> CategoryRead:
+    """The owner and sales (RF-05)."""
+    return await service.create_category(name=payload.name, actor_user_id=current_user.id)
+
+
+@categories_router.patch(
+    "/{category_id}",
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.WRITE)],
+    summary="Change the name of a rubro",
+)
+async def rename_category(
+    category_id: int, payload: CategoryWrite, current_user: CurrentUser, service: CatalogDep
+) -> CategoryRead:
+    """The owner and sales (RF-06)."""
+    return await service.rename_category(
+        category_id, name=payload.name, actor_user_id=current_user.id
+    )
+
+
+@categories_router.delete(
+    "/{category_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.WRITE)],
+    summary="Remove a rubro",
+)
+async def delete_category(category_id: int, current_user: CurrentUser, service: CatalogDep) -> None:
+    """The owner and sales. Refused, with the reason, if anything points at it (RF-07)."""
+    await service.delete_category(category_id, actor_user_id=current_user.id)
+
+
+@products_router.put(
+    "/{product_id}/category",
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.WRITE)],
+    summary="Give a product its rubro",
+)
+async def set_product_category(
+    product_id: int,
+    payload: ProductCategoryWrite,
+    current_user: CurrentUser,
+    service: CatalogDep,
+) -> UnclassifiedProduct:
+    """The owner and sales.
+
+    Confirming the proposal and correcting it are this same call (RF-13, RF-15,
+    RF-20). Who decided comes from the token, never from the body (RF-18).
+    """
+    return await service.set_product_category(
+        product_id, category_id=payload.category_id, actor_user_id=current_user.id
+    )
+
+
+catalog_dashboard_router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+@catalog_dashboard_router.get(
+    "/catalog",
+    dependencies=[require_section(Section.DASHBOARD, Level.READ)],
+    summary="What the supplier charged, what the stock did, and what is new",
+)
+async def catalog_dashboard(
+    service: CatalogDep,
+    since: Annotated[date | None, Query(description="From this date")] = None,
+    until: Annotated[date | None, Query(description="Up to this date")] = None,
+) -> CatalogDashboard:
+    """The owner and sales (RF-42 to RF-46 of 009).
+
+    Its own window, independent of the other cuts of the dashboard (RF-05).
+    """
+    return await service.dashboard(since=since, until=until)

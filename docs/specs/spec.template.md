@@ -70,21 +70,21 @@ Como **[actor]**, quiero **[qué]**, para **[por qué]**.
 
 <!-- Lo que siempre vale, independientemente del flujo. Si una regla viene de la constitución (nada se descarta, el portal es de sólo lectura), nombrala en términos del negocio, no del artículo. -->
 
-- 
+-
 
 ## Criterios de aceptación
 
 <!-- Uno por requisito funcional, redactado como algo observable. Es lo que el cliente marca cuando lo ve andando, y lo que /converge contrasta contra el código. -->
 
-- [ ] **RF-01** — 
-- [ ] **RF-02** — 
-- [ ] **RF-03** — 
+- [ ] **RF-01** —
+- [ ] **RF-02** —
+- [ ] **RF-03** —
 
 ## Fuera de alcance
 
 <!-- Lo que alguien podría suponer incluido y no lo está. Esta sección evita discusiones en la entrega. -->
 
-- 
+-
 
 ## Preguntas abiertas
 

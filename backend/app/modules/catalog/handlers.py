@@ -13,6 +13,7 @@ from app.logging import get_logger
 from app.modules.catalog.service import (
     HIGHLIGHT_THRESHOLD_KEY,
     MISSING_PRODUCT,
+    UNKNOWN_CATEGORY,
     UNKNOWN_PRODUCT,
     UNREADABLE_ROW,
     CatalogService,
@@ -22,6 +23,7 @@ from app.shared.events import (
     PriceHistoryNormalized,
     PriceListNormalized,
     QuarantineCaseResolved,
+    QuarantineRuleRedecided,
     QuarantineRuleRevoked,
     events,
 )
@@ -83,6 +85,16 @@ async def apply_decision(event: QuarantineCaseResolved, session: AsyncSession) -
         code = str(event.decision.get("product_code") or payload.get("product_code") or "")
         if price is not None and code:
             await service.set_price_by_code(product_code=code, price=price)
+    elif event.kind == UNKNOWN_CATEGORY:
+        # The decision is about a **written form**, not about one product: the
+        # matcher carries the text, and applying it classifies every product
+        # that came with it (RF-24, RF-25 of 008).
+        category_id = event.decision.get("category_id")
+        text = str(event.matcher.get("category_text") or payload.get("category_text") or "")
+        if category_id is not None and text:
+            await service.learn_category_alias(
+                rule_id=event.rule_id, category_text=text, category_id=int(category_id)
+            )
     elif event.kind == MISSING_PRODUCT:
         product_id = int(payload.get("product_id", 0) or 0)
         if product_id and action == DISCONTINUE:
@@ -93,8 +105,35 @@ async def apply_decision(event: QuarantineCaseResolved, session: AsyncSession) -
 
 @events.subscribe(QuarantineRuleRevoked)
 async def undo_rule(event: QuarantineRuleRevoked, session: AsyncSession) -> None:
-    """Undo what that rule had done here, so its cases come back (RF-37)."""
-    await CatalogService(session).undo_rule(event.rule_id)
+    """Undo what that rule had done here, so its cases come back (RF-37).
+
+    Two shapes of rule reach this module, and each undoes its own thing: a
+    product this rule incorporated is removed, and an equivalence this rule
+    projected is dropped, leaving its products «sin rubro» and back in the
+    queue (RF-30, RF-31 of 008).
+    """
+    service = CatalogService(session)
+    await service.undo_rule(event.rule_id)
+    if event.kind == UNKNOWN_CATEGORY:
+        await service.forget_category_alias(event.rule_id)
+
+
+@events.subscribe(QuarantineRuleRedecided)
+async def repoint_rule(event: QuarantineRuleRedecided, session: AsyncSession) -> None:
+    """Point an equivalence at another rubro and move what it classified.
+
+    Not a revocation: nothing goes back to review. That distinction is the
+    easiest thing to get wrong in 008 — if the products show up in the queue
+    after this, RF-31 was implemented where RF-29 went.
+    """
+    if event.kind != UNKNOWN_CATEGORY:
+        return
+    category_id = event.decision.get("category_id")
+    if category_id is None:
+        return
+    await CatalogService(session).repoint_category_alias(
+        rule_id=event.rule_id, category_id=int(category_id)
+    )
 
 
 @events.subscribe(BusinessParameterChanged)

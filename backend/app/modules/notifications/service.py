@@ -181,3 +181,68 @@ class NotificationService:
     async def notify_owner(self, message: str) -> Delivery:
         """Send the owner a message. A failure is reported, never raised here."""
         return await self.channel.send(message)
+
+
+# --- The alerts of 005 and 007 -------------------------------------------
+
+# Who receives each kind of alert while nobody has said otherwise. These are the
+# values the client signed: the claims and the due dates go to whoever handles
+# purchasing, and the daily digest to the owner.
+DEFAULT_ROUTES: dict[str, str] = {
+    "PAYMENT_CLAIM": "PURCHASING",
+    "DUE_SOON": "PURCHASING",
+    "DAILY_DIGEST": "OWNER",
+}
+
+# The window inside which an immediate alert is delivered (RF-43 of 007). What
+# happens outside it is not dropped: it waits for the window to open (RF-42).
+WINDOW_START_KEY = "alerts.window_start"
+WINDOW_END_KEY = "alerts.window_end"
+DIGEST_TIME_KEY = "daily_digest.time"
+
+# Monday to Friday, as signed. Saturday is 5 in `weekday()`.
+WORKING_DAYS = frozenset({0, 1, 2, 3, 4})
+
+
+def due_soon_message(*, number: str, supplier: str, due_on: object, days_ahead: int) -> str:
+    """The alert for an invoice that is about to fall due with no receipt (RF-38)."""
+    when = "hoy" if days_ahead == 0 else f"en {days_ahead} día{'s' if days_ahead != 1 else ''}"
+    return (
+        "📄 Cordillera: una factura vence sin recibo de recepción.\n"
+        f"Factura {number}, de {supplier}.\n"
+        f"Vence {when} ({due_on}).\n"
+        "Todavía se le puede emitir el recibo."
+    )
+
+
+def payment_claim_message(*, supplier: str, subject: str, body: str) -> str:
+    """The alert for a supplier claiming a payment (RF-33 of 007)."""
+    return (
+        f"📣 Cordillera: un proveedor reclama un pago.\n{supplier}: {subject}\n{body[:280]}"
+    ).strip()
+
+
+def message_due_message(*, supplier: str, subject: str, body: str) -> str:
+    """The alert for a message announcing something about to fall due (RF-34)."""
+    return (
+        "⏰ Cordillera: aviso de vencimiento en la bandeja del portal.\n"
+        f"{supplier}: {subject}\n"
+        f"{body[:280]}"
+    ).strip()
+
+
+def daily_digest_message(*, pending_messages: int, stalled_orders: int, lines: list[str]) -> str:
+    """The summary of what is still open, once a day (RF-35 of 007).
+
+    A summary of nothing is still worth sending: it is the difference between
+    "there is nothing pending" and "the digest stopped working", and only one of
+    those is good news.
+    """
+    header = (
+        "🗒️ Cordillera — resumen del día\n"
+        f"Mensajes sin resolver: {pending_messages}.\n"
+        f"Órdenes estancadas: {stalled_orders}."
+    )
+    if not lines:
+        return f"{header}\nNo hay nada pendiente."
+    return "\n".join([header, "", *lines[:10]])

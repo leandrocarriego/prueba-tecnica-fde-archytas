@@ -71,6 +71,14 @@ STARTING_VALUES: dict[str, Any] = {
     "purchase_order.stalled_days": 15,
     "receipt.notice_days": 3,
     "daily_digest.time": "08:00",
+    "invoice_sync.interval_hours": 12,
+    "supplier_match.threshold_pct": 92,
+    "purchase_order.repeat_window_days": 15,
+    "message_sync.interval_minutes": 30,
+    "alerts.window_start": "08:00",
+    "alerts.window_end": "18:00",
+    "sales_sync.interval_hours": 24,
+    "sales.outlier_threshold_pct": "300",
 }
 
 # Keys that are not parameters. Four of them look like a credential, which is
@@ -592,12 +600,15 @@ class TestWhoReachesThePanel:
 @pytest.mark.integration
 @pytest.mark.database
 class TestWhatTheScreenCanTellApart:
-    """RF-05 and the knobs that do not move anything yet.
+    """RF-05 and the distinction between a knob that moves something and one that does not.
 
-    Some of these parameters are still waiting for the feature that will read
-    them. The screen shows them anyway — the owner fixes them from day one —
-    and marks them, because a panel that hid the difference would be lying.
-    The half that can be verified from here is that the API says which is which.
+    The panel says, per parameter, whether some built functionality reads it.
+    It mattered while five of them were waiting for their feature; since 004 to
+    009 landed, **every** parameter of the catalog is consumed by somebody. So
+    what is asserted here is the rule and not the census: `has_effect` is never
+    an opinion of its own — it is exactly whether a module was named — and a
+    parameter added tomorrow without a consumer shows up marked, instead of
+    offering the owner a knob that moves nothing.
     """
 
     async def test_every_parameter_says_what_changes_if_it_moves(
@@ -618,18 +629,18 @@ class TestWhatTheScreenCanTellApart:
             spec.key: (spec.label, spec.effect) for spec in PARAMETERS
         }
 
-    async def test_the_panel_marks_the_parameters_that_have_no_effect_yet(
+    async def test_the_panel_names_the_module_that_reads_each_parameter(
         self, owner_client: AsyncClient
     ) -> None:
-        """One of each class, named: one that is read today and one that is not."""
+        """Named one by one: the owner is told *what* obeys the knob they move."""
         # Act
         panel = by_key((await owner_client.get(PANEL)).json())
 
         # Assert
         assert panel[INTERVAL]["has_effect"] is True
         assert panel[INTERVAL]["consumed_by"] == "catalog"
-        assert panel[NOTICE_DAYS]["has_effect"] is False
-        assert panel[NOTICE_DAYS]["consumed_by"] == ""
+        assert panel[NOTICE_DAYS]["has_effect"] is True
+        assert panel[NOTICE_DAYS]["consumed_by"] == "purchases"
 
     async def test_the_two_classes_agree_with_each_other_everywhere(
         self, owner_client: AsyncClient
@@ -640,8 +651,10 @@ class TestWhatTheScreenCanTellApart:
 
         # Assert
         assert all(parameter["has_effect"] is bool(parameter["consumed_by"]) for parameter in panel)
-        assert any(parameter["has_effect"] for parameter in panel)
-        assert any(not parameter["has_effect"] for parameter in panel)
+        # Today that means every one of them: there is no parameter left whose
+        # feature has not been built. The rule above is what keeps the panel
+        # honest the next time one is added ahead of its feature.
+        assert all(parameter["has_effect"] for parameter in panel)
 
 
 @pytest.mark.integration

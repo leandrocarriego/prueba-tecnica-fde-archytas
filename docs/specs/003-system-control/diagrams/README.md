@@ -247,4 +247,3 @@ flowchart TD
     U["El historial de cambios"] --> V["No se puede modificar"]
     U --> W["No se puede eliminar"]
 ```
-

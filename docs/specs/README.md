@@ -217,4 +217,3 @@ lee en un PDF con su logo deja de leerse como hipótesis.
 Un artefacto nuevo queda **excluido por defecto** — para que llegue al cliente hay que agregarlo
 a mano a `CLIENT_FACING_DOCS` en `scripts/docs/export_client.py`, que es una decisión sobre qué
 se le pide leer al cliente, no una conveniencia.
-

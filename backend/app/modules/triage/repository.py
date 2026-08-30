@@ -137,7 +137,7 @@ class TriageRepository:
         kind: str,
         matcher: dict[str, Any],
         decision: dict[str, Any],
-        created_by_user_id: int,
+        created_by_user_id: int | None,
         created_by_name: str | None = None,
     ) -> ResolutionRule:
         """Store what a person decided, so it is not asked again."""
@@ -157,11 +157,15 @@ class TriageRepository:
         """Return a rule by id, or None."""
         return await self.session.get(ResolutionRule, rule_id)
 
-    async def list_rules(self, *, include_revoked: bool = False) -> list[ResolutionRule]:
+    async def list_rules(
+        self, *, include_revoked: bool = False, kind: str | None = None
+    ) -> list[ResolutionRule]:
         """Return the rules, newest first."""
         statement = select(ResolutionRule)
         if not include_revoked:
             statement = statement.where(ResolutionRule.revoked_at.is_(None))
+        if kind is not None:
+            statement = statement.where(ResolutionRule.kind == kind)
         result = await self.session.execute(statement.order_by(ResolutionRule.id.desc()))
         return list(result.scalars().all())
 
@@ -169,4 +173,18 @@ class TriageRepository:
         """Leave a rule without effect. It is never deleted."""
         rule.revoked_by_user_id = user_id
         rule.revoked_at = moment
+        await self.session.flush()
+
+    async def redecide_rule(
+        self,
+        rule: ResolutionRule,
+        *,
+        decision: dict[str, Any],
+        user_id: int,
+        moment: datetime,
+    ) -> None:
+        """Point a rule in force at another decision, keeping who created it."""
+        rule.decision = decision
+        rule.updated_by_user_id = user_id
+        rule.updated_at = moment
         await self.session.flush()
