@@ -40,9 +40,13 @@ Los otros nueve —`portal`, `ingestion`, `suppliers`, `catalog`, `purchasing`, 
 ## Puesta en marcha
 
 La versión de Python está fijada en `.python-version`, y `uv sync` se la trae sola. No es un
-detalle de gusto: sin ese archivo `uv` elegía lo que encontrara —3.14 en una máquina, 3.12 en
-CI— y la cobertura salía distinta en cada lado sobre el mismo código. Un build que no es
-reproducible no es verificable (Artículo IX).
+detalle de gusto: sin ese archivo había **tres** versiones distintas —3.14 en una máquina, 3.12
+en CI y 3.14 en la imagen de producción—, así que **CI verificaba sobre un intérprete que
+producción nunca usó**, y la misma cobertura daba distinta según dónde se midiera.
+
+El número sale del Dockerfile (`python:3.14-slim`), que es el que efectivamente se despliega: si
+los tres tienen que coincidir, el que manda es el que ships. Un build que no es reproducible no
+es verificable (Artículo IX).
 
 ```bash
 # Dependencias (uv es el único gestor soportado)
