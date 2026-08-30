@@ -69,6 +69,30 @@ deploy: ## Traer los cambios y levantar el stack detras de Traefik — se corre 
 	@echo "Trayendo los cambios..."
 	@git pull --ff-only
 	$(COMPOSE) --profile deploy up -d --build
+	@# Every rebuild leaves the previous image behind with its tag taken away.
+	@# Nothing ever collects them, so they pile up at ~660 MB a turn until the
+	@# disk is the thing that fails — and it fails for every project on the
+	@# host, not just this one.
+	@#
+	@# Scoped to this project's label on purpose. The blunt `docker image
+	@# prune` would reach across a shared VPS and throw away images belonging
+	@# to other people's stacks; a deploy cleans up after itself and nothing
+	@# else. Volumes are never touched here: the untagged ones on this host
+	@# hold other projects' databases.
+	@echo ""
+	@echo "Limpiando las imagenes sin tag que dejo este build..."
+	@# The project name is read back off the container Compose just created,
+	@# not derived from the directory: Compose normalises the name it stamps,
+	@# so a checkout called `Archytas` would build a filter matching nothing
+	@# and still print that it cleaned up. If it cannot be read, nothing is
+	@# deleted — a cleanup that is unsure what it owns deletes nothing.
+	@PROJECT=$$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' \
+		cordillera_backend 2>/dev/null); \
+	if [ -n "$$PROJECT" ]; then \
+		docker image prune -f --filter "label=com.docker.compose.project=$$PROJECT" | tail -1; \
+	else \
+		echo "No se pudo leer el proyecto de Compose: no se borro nada."; \
+	fi
 	@echo ""
 	@echo "Desplegado $$(git log --oneline -1)."
 	@echo "Traefik publica el dominio de DOMAIN en cuanto emita el certificado."

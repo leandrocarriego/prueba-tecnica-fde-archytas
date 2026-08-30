@@ -255,6 +255,12 @@ que se despliega es lo que está en git, y dejar eso como un paso aparte es cóm
 termina corriendo algo que nadie puede señalar. Si encuentra cambios sin commitear en el
 servidor, se detiene.
 
+Y **limpia lo que ensucia**: cada rebuild deja atrás la imagen anterior sin su tag, unos 660 MB
+por vez, y nadie las junta. `make deploy` borra las que quedaron sin tag **de este proyecto**,
+leyendo la etiqueta que Compose le puso al contenedor que acaba de crear. Nunca borra volúmenes
+ni toca imágenes de otros stacks: el VPS es compartido, y los volúmenes sueltos que hay ahí son
+bases de datos de otros proyectos.
+
 Actualizar el deploy es entonces una sola línea:
 
 ```bash
