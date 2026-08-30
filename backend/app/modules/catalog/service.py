@@ -12,6 +12,7 @@ Three decisions live here, and all three come straight from the spec:
 """
 
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -66,7 +67,7 @@ from app.shared.events import (
     events,
 )
 from app.shared.sections import BusinessSection
-from app.shared.text import collapse_written_form
+from app.shared.text import collapse_written_form, normalize
 from app.shared.time import BUSINESS_TIME_ZONE
 
 logger = get_logger(__name__)
@@ -173,6 +174,11 @@ class CatalogService:
         unresolved: dict[str, list[str]] = defaultdict(list)
         observed_on = now.astimezone(BUSINESS_TIME_ZONE).date()
         updated = unchanged = highlighted = 0
+        # Every correction the list could contradict, read once. A product the
+        # catalog does not know yet cannot have one, so only what came back
+        # from `products_by_code` is asked about — and asking per row turned
+        # the cheapest part of a run into a query per product of the catalogue.
+        standing = await self._standing_corrections(product.id for product in known.values())
 
         for row in rows:
             product = known.get(row.product_code)
@@ -197,6 +203,29 @@ class CatalogService:
                     RegisteredProduct(product_id=product.id, product_code=product.code)
                 )
 
+            corrections = standing.get(product.id, {})
+            corrected_description = corrections.get(DESCRIPTION_FIELD)
+            if corrected_description is not None and row.description.strip():
+                # RF-28 is written about *a datum corrected by hand*, and the
+                # description is one of the three (RF-23). It is checked here
+                # and not inside `_register_price` because a run never rewrites
+                # a known product's description: without this line the one
+                # field the pipeline cannot overwrite would also be the one
+                # that never gets flagged, and the owner would never hear that
+                # the portal started calling the product something else.
+                #
+                # A row that carries no description at all is not the portal
+                # calling the product something else, it is the portal not
+                # saying — and a conflict raised over it would put the owner in
+                # front of a case with nothing to decide (RF-29), which is how
+                # an alert stops being read.
+                await self._check_conflict(
+                    corrected_description,
+                    incoming=row.description,
+                    against=corrected_description.portal_value,
+                    moment=now,
+                )
+
             changed, was_highlighted = await self._register_price(
                 product=product,
                 price=row.price,
@@ -205,6 +234,7 @@ class CatalogService:
                 threshold=threshold,
                 batch_id=batch_id,
                 source=PriceSource.PORTAL,
+                corrections=corrections,
             )
             updated += int(changed)
             unchanged += int(not changed)
@@ -320,8 +350,17 @@ class CatalogService:
         currency: str = "ARS",
         rule_id: int | None = None,
         batch_id: int = 0,
+        actor_user_id: int | None = None,
+        decided_at: datetime | None = None,
     ) -> None:
-        """Add a product a person decided to incorporate (RF-30)."""
+        """Add a product a person decided to incorporate (RF-30).
+
+        `actor_user_id` and `decided_at` are who asked for it and when, and
+        they are what turns this into a line of the log: incorporating a
+        product from the review queue is the platform's one way of **loading**
+        a datum by hand, and RF-09 covers loading with the same words it covers
+        modifying.
+        """
         if await self.catalog.get_by_code(product_code) is not None:
             return
         now = datetime.now(UTC)
@@ -360,7 +399,42 @@ class CatalogService:
                 threshold=await self.highlight_threshold(),
                 batch_id=None,
                 source=price_source,
+                # Empty and not looked up: a product that did not exist a line
+                # ago cannot carry a correction against it.
+                corrections={},
             )
+        # **One decision, one line.** The line names the **product**, and its
+        # description, because that is the datum a person loaded: the product
+        # page links its history by `catalog.product` and the product's id
+        # (RF-15), so this is where somebody asking "who put this here?" is
+        # already looking. `old_value` stays empty, and truthfully — there was
+        # no product to say anything about before this one. The amount
+        # underneath is the row's own number as often as the person's, and
+        # `source` on the price row is what says which.
+        #
+        # The asymmetry that leaves, written down so the next reader finds it
+        # instead of rediscovering it: when the amount is the person's
+        # (`price_source is PriceSource.SYSTEM`), the same act through the
+        # other door — `set_price_by_code`, for a row nobody could read — does
+        # leave a second line under `catalog.product_price`, and this one does
+        # not. So the product page's «Historial de cambios del precio» comes
+        # back empty for a product loaded here. It is deliberate: there the
+        # price is the only datum that came into being, and here it arrives
+        # inside the birth of the product, which is the datum the person
+        # actually decided about. Two lines for one decision would say twice
+        # what happened once, and the second would be filed under a screen
+        # nobody reached that morning. If RF-09's «sin excepciones» is ever
+        # read as covering the amount on its own, this is the line to add —
+        # the fact needed to decide it is already on the row (`source`).
+        await self._record_manual_load(
+            entity_type=PRODUCT_ENTITY,
+            entity_id=str(product.id),
+            field=DESCRIPTION_FIELD,
+            old_value=None,
+            new_value=description,
+            actor_user_id=actor_user_id,
+            moment=decided_at,
+        )
         await events.publish(
             ProductsRegistered(
                 batch_id=batch_id,
@@ -371,12 +445,28 @@ class CatalogService:
         logger.info("Product incorporated", extra={"product_code": product_code})
 
     async def set_price_by_code(
-        self, *, product_code: str, price: Decimal, currency: str = "ARS"
+        self,
+        *,
+        product_code: str,
+        price: Decimal,
+        currency: str = "ARS",
+        actor_user_id: int | None = None,
+        decided_at: datetime | None = None,
     ) -> None:
-        """Register the price a person indicated for a known product (RF-29)."""
+        """Register the price a person indicated for a known product (RF-29).
+
+        The second way a datum gets loaded by hand, and so the second one that
+        leaves a line behind (RF-09): the portal's row could not be read, and
+        the amount in force from here on is one a person typed.
+        """
         product = await self.catalog.get_by_code(product_code)
         if product is None:
             raise NotFoundError(NO_SUCH_PRODUCT, details={"product_code": product_code})
+        current = await self.catalog.get_price(product.id)
+        previous = None if current is None else current.price
+        # Read here and handed down, because the answer is needed twice: to
+        # write the row, and to know afterwards whether the write reached it.
+        standing = (await self._standing_corrections([product.id])).get(product.id, {})
         await self._register_price(
             product=product,
             price=price,
@@ -387,7 +477,27 @@ class CatalogService:
             # The number a person wrote while resolving an unreadable row:
             # `triage` takes it from their decision, never from the portal.
             source=PriceSource.SYSTEM,
+            corrections=standing,
         )
+        if PRICE_FIELD not in standing:
+            # Recorded whether or not the number moved: somebody confirming the
+            # amount already in force took a manual decision like any other, and
+            # it is recorded like any other (RF-09) — the same answer
+            # `apply_correction` gives to a correction back to the value a datum
+            # already had. The one case that leaves no line is the one where
+            # nothing was loaded: a standing correction holds this amount back on
+            # purpose, and writing «cargó 1500» over a value the screen never
+            # showed would be a line of the log that contradicts the screen it
+            # explains.
+            await self._record_manual_load(
+                entity_type=PRICE_ENTITY,
+                entity_id=str(product.id),
+                field=PRICE_FIELD,
+                old_value=previous,
+                new_value=price,
+                actor_user_id=actor_user_id,
+                moment=decided_at,
+            )
 
     async def discontinue(self, product_id: int) -> None:
         """Give a product up for discontinued (RF-31)."""
@@ -423,6 +533,53 @@ class CatalogService:
     async def remember_setting(self, key: str, value: object) -> None:
         """Keep the business parameter this module reads while it applies a batch."""
         await self.catalog.put_setting(key, value)
+
+    async def _record_manual_load(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+        field: str,
+        old_value: Any,
+        new_value: Any,
+        actor_user_id: int | None,
+        moment: datetime | None,
+    ) -> None:
+        """Send a datum somebody loaded by hand to the one log of the platform (RF-09).
+
+        `CREATED` and not `CORRECTED`: nobody is disagreeing with the portal
+        here. The portal reported nothing — that is exactly why a person had to
+        type it — so there is no original for the value to be measured against
+        and no correction row underneath it (RF-33).
+
+        **No reason is asked for, and that is deliberate.** RF-11 demands one
+        when somebody modifies a datum *that already existed*; a load brings
+        into being a datum that did not, and there is nothing for the reason to
+        be about. Verified against the signed text on 2026-08-30.
+
+        The moment is the one the decision carried and not `now()`: what the
+        history has to say is when the person decided, and the two differ by
+        however long the queue behind them took.
+        """
+        if actor_user_id is None:
+            # Nothing manual happened, so there is nothing to record about who
+            # did it. Inventing an author would put a name on the platform's
+            # own work, which is worse than the silence.
+            return
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                field=field,
+                action=AuditAction.CREATED,
+                actor_user_id=actor_user_id,
+                section=CATALOG_SECTION,
+                old_value=self._jsonable(old_value),
+                new_value=self._jsonable(new_value),
+                occurred_at=moment or datetime.now(UTC),
+            ),
+            self.session,
+        )
 
     # --- The rubros of the catalog (008) ----------------------------------
 
@@ -1012,17 +1169,25 @@ class CatalogService:
         await self.session.flush()
         return correction
 
-    async def _corrections_on_the_price(self, product_id: int) -> dict[str, Correction]:
-        """The corrections standing on a product's price row, by field.
+    async def _standing_corrections(
+        self, product_ids: Iterable[int]
+    ) -> dict[int, dict[str, Correction]]:
+        """The corrections in force on these products, by product and by field.
 
-        One query for the whole row rather than one per correctable field: a
-        daily list walks this once per product it carries.
+        One query for a whole daily list rather than one per row: the list
+        carries the entire catalogue, and the corrections it could contradict
+        are a handful.
+
+        Keyed by field and not by entity because a field belongs to exactly one
+        entity — `CORRECTABLE_FIELDS` is what says so — and both entities are
+        filed under the same `entity_id`, the product's. A product and its
+        price in force cannot collide as long as they share no field name.
         """
-        return {
-            correction.field: correction
-            for correction in await self.catalog.corrections_in_force([str(product_id)])
-            if correction.entity_type == PRICE_ENTITY
-        }
+        by_product: dict[int, dict[str, Correction]] = defaultdict(dict)
+        entity_ids = [str(product_id) for product_id in product_ids]
+        for correction in await self.catalog.corrections_in_force(entity_ids):
+            by_product[int(correction.entity_id)][correction.field] = correction
+        return by_product
 
     async def _check_conflict(
         self, correction: Correction, *, incoming: Any, against: Any, moment: datetime
@@ -1161,11 +1326,23 @@ class CatalogService:
         Amounts are compared as numbers and not as text: `portal_value` keeps a
         price as «1000.0000» and a list brings `Decimal("1000")`, which is one
         number written twice.
+
+        Text is compared normalised, for the same reason one step further out:
+        «TORNILLO HEX.» and «Tornillo hex.» are one description written twice,
+        and a list that changed the shift key is not the portal contradicting
+        anybody. Flagging that as a conflict would put the owner in front of a
+        case with nothing to decide (RF-28, RF-29), which is how an alert stops
+        being read.
+
+        `normalize` and not a comparison written here: it is the platform's one
+        answer to "is this the same text?", the same one entity resolution
+        asks, and two ways of comparing the same text in one repository is a
+        disagreement waiting for the morning nobody remembers both.
         """
         _, numeric = cls._correctable(field)
         if numeric:
             return cls._as_number(left, field) == cls._as_number(right, field)
-        return str(left) == str(right)
+        return normalize(str(left)) == normalize(str(right))
 
     @staticmethod
     def _jsonable(value: Any) -> Any:
@@ -1280,6 +1457,7 @@ class CatalogService:
         threshold: Decimal,
         batch_id: int | None,
         source: PriceSource,
+        corrections: dict[str, Correction],
     ) -> tuple[bool, bool]:
         """Write the price in force. Returns (it changed, it is highlighted).
 
@@ -1291,6 +1469,18 @@ class CatalogService:
         platform on somebody's decision. It is stamped on the row even when the
         amount did not move, because a list repeating a number a person typed
         is still the portal reporting that number (RF-33).
+
+        `corrections` is what already stands on this product, by field, and
+        the caller always brings it already read: a whole list reads the lot in
+        one query, a price written onto a known product reads that product's,
+        and a product being created passes `{}` because a product that did not
+        exist a line ago cannot be contradicting anything.
+
+        There is no default and no lookup down here on purpose. The query
+        belongs where the caller can amortise it — re-asking from in here is
+        what put one query per row into a run that carries the whole
+        catalogue — and a required argument is what keeps the next caller from
+        getting the cheap-looking version by saying nothing.
         """
         product.last_seen_at = moment
 
@@ -1299,7 +1489,7 @@ class CatalogService:
         # fields of this row (RF-23), so a correction on either has to hold.
         # The comparison is local — the corrections live in this module
         # precisely so that these lines do not have to ask anybody anything.
-        standing = await self._corrections_on_the_price(product.id)
+        standing = corrections
         corrected_price = standing.get(PRICE_FIELD)
         corrected_currency = standing.get(CURRENCY_FIELD)
         # Only the portal can contradict a correction. This same method writes

@@ -8,8 +8,14 @@ producción. Termina leyendo la spec de una feature entregada como si fuera el e
 
 ## Reglas
 
-- **Mueve el Release-Manager**, como último paso de `/ship`, una vez que el PR está mergeado.
-  Antes de eso la feature sigue viva y su carpeta se queda en `docs/specs/`.
+- **Mueve el Release-Manager**, como último paso de `/ship`, una vez que el PR está mergeado a
+  `main` **y desplegado**. Antes de eso la feature sigue viva y su carpeta se queda en
+  `docs/specs/`.
+
+  Las dos condiciones, no una. Mergeado no es entregado: entre el merge y el deploy la feature
+  todavía no la usa nadie, y archivarla ahí dejaría a `docs/specs/` diciendo que está en
+  producción algo que no está. Es la misma condición que pide `agents/skills/ship_changes.md`
+  y la que enuncia la primera línea de este archivo.
 - **La numeración nunca se reutiliza.** `docs/specs/archive/003-…` significa que el `003` está
   gastado para siempre: la próxima feature toma el número siguiente al mayor entre los dos
   árboles. Reutilizar un número rompe la trazabilidad con las ramas y los PRs.

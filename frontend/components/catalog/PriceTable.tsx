@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { isConflicted, markFor } from '@/lib/catalog/corrections'
+import { FIELD_NOUNS, isConflicted, markFor } from '@/lib/catalog/corrections'
 import { formatMoment, formatPrice, formatVariation, variationTone } from '@/lib/catalog/format'
 import type { Price } from '@/lib/catalog/types'
 
@@ -51,6 +51,11 @@ export function PriceTable({ items }: PriceTableProps) {
         <tbody>
           {items.map(item => {
             const corrected = markFor(item.corrections, 'price')
+            // Every contradicted field, not just the price. The row carries the
+            // marks of all three correctable fields, and reading only one of
+            // them was how a contradicted **description** reached this screen
+            // saying nothing at all (RF-26, RF-28).
+            const contradicted = item.corrections.filter(isConflicted)
             return (
               <tr
                 key={item.product_id}
@@ -76,11 +81,16 @@ export function PriceTable({ items }: PriceTableProps) {
                       No vino en la última lista
                     </span>
                   )}
-                  {isConflicted(corrected) && (
-                    <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900">
-                      El portal informa {formatPrice(corrected?.conflict_value as string)}
+                  {contradicted.map(mark => (
+                    <span
+                      className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900"
+                      key={mark.field}
+                    >
+                      {mark.field === 'price'
+                        ? `El portal informa ${formatPrice(mark.conflict_value as string)}`
+                        : `El portal informa otra ${FIELD_NOUNS[mark.field] ?? mark.field}`}
                     </span>
-                  )}
+                  ))}
                 </td>
                 <td className="p-3 text-right font-medium">
                   {formatPrice(item.price)}

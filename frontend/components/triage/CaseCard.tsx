@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { resolveCase } from '@/app/actions/triage'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/toast'
 import { formatMoment, formatPrice } from '@/lib/catalog/format'
 import { caseKindLabel, type Case } from '@/lib/triage/types'
 
@@ -25,9 +26,21 @@ function payloadText(item: Case, key: string): string {
  * kind offers exactly the decisions the spec names, so the person is never
  * asked to type what the system already knows — RF-30 for an unknown product,
  * RF-31 for one that stopped coming, RF-29 for a row nobody could read.
+ *
+ * How it went is read in two different places, and the split is the same one
+ * `RevertCorrectionButton` makes for the same reason (RF-22 of 003, which is
+ * the feature that published resolving a case as a manual action). A refusal
+ * leaves this card where it was, so its message goes inside it, over the case
+ * that was not resolved — there is one card per pending case, and a message off
+ * in a corner would not say which one failed. Deciding takes the card away:
+ * `/revision` lists only what is still pending, so the refreshed page drops
+ * this case and unmounts the component along with anything it had written in
+ * its own state. That confirmation is announced to the toaster in the root
+ * layout, which is the only thing still on screen once the card is gone.
  */
 export function CaseCard({ item }: CaseCardProps) {
   const router = useRouter()
+  const { addToast } = useToast()
   const [price, setPrice] = useState(payloadText(item, 'price'))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +51,11 @@ export function CaseCard({ item }: CaseCardProps) {
     const result = await resolveCase(item.id, decision)
     setSaving(false)
     if (result.ok) {
+      addToast({
+        type: 'success',
+        title: 'Caso resuelto',
+        description: 'La decisión quedó registrada y el caso sale de la cola.',
+      })
       router.refresh()
       return
     }

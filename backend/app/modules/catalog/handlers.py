@@ -68,7 +68,15 @@ async def import_history(event: PriceHistoryNormalized, session: AsyncSession) -
 
 @events.subscribe(QuarantineCaseResolved)
 async def apply_decision(event: QuarantineCaseResolved, session: AsyncSession) -> None:
-    """Do what the person decided: incorporate, price, discontinue or keep."""
+    """Do what the person decided: incorporate, price, discontinue or keep.
+
+    Two of those four are the platform's only way of **loading** a datum by
+    hand, and RF-09 covers loading with the same words it covers modifying. So
+    who decided and when travel down with the decision: the event already knows
+    both, and the module that writes the datum is the one that has to say so
+    (`ManualChangeRecorded`). Reading them off `datetime.now()` here would date
+    the line by however long the queue behind that person took.
+    """
     service = CatalogService(session)
     action = str(event.decision.get("action", ""))
     payload = event.payload
@@ -79,12 +87,19 @@ async def apply_decision(event: QuarantineCaseResolved, session: AsyncSession) -
             description=str(payload.get("description", "")),
             price=_price_of(event.decision) or _price_of(payload),
             rule_id=event.rule_id,
+            actor_user_id=event.decided_by_user_id,
+            decided_at=event.decided_at,
         )
     elif event.kind == UNREADABLE_ROW:
         price = _price_of(event.decision)
         code = str(event.decision.get("product_code") or payload.get("product_code") or "")
         if price is not None and code:
-            await service.set_price_by_code(product_code=code, price=price)
+            await service.set_price_by_code(
+                product_code=code,
+                price=price,
+                actor_user_id=event.decided_by_user_id,
+                decided_at=event.decided_at,
+            )
     elif event.kind == UNKNOWN_CATEGORY:
         # The decision is about a **written form**, not about one product: the
         # matcher carries the text, and applying it classifies every product
