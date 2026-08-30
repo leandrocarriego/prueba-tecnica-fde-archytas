@@ -8,7 +8,7 @@ type WireHealth = components['schemas']['HealthRead']
  *
  * Every field is typed *from* the generated schema, so a change in the backend
  * still breaks this at compile time rather than rendering `undefined` in front
- * of a visitor. What it drops is `database.detail`: the backend writes it in
+ * of a visitor. What it drops is the two `detail` fields: the backend writes it in
  * English for operators, this page is public and Spanish, and the card does not
  * show it. A field nothing renders has no reason to be serialised into the HTML
  * of a page anyone can open.
@@ -19,6 +19,7 @@ export type HealthReport = {
   environment: WireHealth['environment']
   database: { status: WireHealth['database']['status'] }
   whatsapp: { status: WireHealth['whatsapp']['status'] }
+  quality: WireHealth['quality']
 }
 
 /**
@@ -54,8 +55,21 @@ function isWireHealth(value: unknown): value is WireHealth {
     isState(database.status) &&
     typeof whatsapp === 'object' &&
     whatsapp !== null &&
-    isState(whatsapp.status)
+    isState(whatsapp.status) &&
+    isQuality(candidate.quality)
   )
+}
+
+/**
+ * The snapshot is optional: an image built without one reports nothing, which
+ * is the honest answer to "we do not know". What is not acceptable is a half
+ * shape, so a present `quality` has to carry both numbers.
+ */
+function isQuality(value: unknown): value is WireHealth['quality'] {
+  if (value === null || value === undefined) return true
+  if (typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return typeof candidate.tests === 'number' && typeof candidate.coverage === 'number'
 }
 
 function isState(value: unknown): value is WireHealth['status'] {
@@ -70,6 +84,7 @@ function toReport(wire: WireHealth): HealthReport {
     environment: wire.environment,
     database: { status: wire.database.status },
     whatsapp: { status: wire.whatsapp.status },
+    quality: wire.quality,
   }
 }
 

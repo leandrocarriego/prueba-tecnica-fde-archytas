@@ -60,3 +60,6 @@ logs/
 Thumbs.db
 
 outbox/
+
+# JUnit report, an input to `make quality`. The snapshot it produces IS committed.
+.pytest-report.xml

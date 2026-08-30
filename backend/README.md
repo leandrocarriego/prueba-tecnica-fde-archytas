@@ -39,6 +39,11 @@ Los otros nueve —`portal`, `ingestion`, `suppliers`, `catalog`, `purchasing`, 
 
 ## Puesta en marcha
 
+La versión de Python está fijada en `.python-version`, y `uv sync` se la trae sola. No es un
+detalle de gusto: sin ese archivo `uv` elegía lo que encontrara —3.14 en una máquina, 3.12 en
+CI— y la cobertura salía distinta en cada lado sobre el mismo código. Un build que no es
+reproducible no es verificable (Artículo IX).
+
 ```bash
 # Dependencias (uv es el único gestor soportado)
 uv sync
