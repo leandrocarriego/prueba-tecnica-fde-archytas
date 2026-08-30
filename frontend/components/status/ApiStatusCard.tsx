@@ -48,6 +48,13 @@ type StatusView = {
  * nobody configured the channel. Calling it "No responde" would train whoever
  * reads this card to ignore the one time it is real.
  */
+/** The coverage figure, on the same clock and the same locale as everything else. */
+const PERCENT = new Intl.NumberFormat('es-AR', {
+  style: 'percent',
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
+
 const WHATSAPP_LABELS: Record<HealthReport['whatsapp']['status'], string> = {
   ok: 'Conectado',
   down: 'Desconectado',
@@ -77,6 +84,15 @@ function describe(probe: HealthProbe): StatusView {
     { label: 'WhatsApp', value: WHATSAPP_LABELS[report.whatsapp.status] },
     { label: 'Respuesta HTTP', value: String(httpStatus) },
   ]
+
+  // Only when the image carries a snapshot. Nothing is shown rather than a
+  // number nobody measured — see `app/quality.py`.
+  if (report.quality) {
+    facts.push({
+      label: 'Tests',
+      value: `${report.quality.tests} en verde · ${PERCENT.format(report.quality.coverage / 100)} de cobertura`,
+    })
+  }
 
   if (report.status === 'ok') {
     // WhatsApp is reported but never demotes the headline: the platform works

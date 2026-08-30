@@ -77,7 +77,15 @@ jobs:
       # The coverage gate (TEST-05) lives in pyproject's addopts.
       - name: Tests y cobertura
         working-directory: backend
-        run: uv run pytest
+        run: uv run pytest --junitxml=.pytest-report.xml
+
+      # The status page shows the test count and the coverage. This is what
+      # keeps those two numbers from drifting into a lie: the committed
+      # snapshot has to match the run that just happened, so a stale one fails
+      # the build instead of reaching the page.
+      - name: La foto de calidad sigue siendo verdad
+        working-directory: backend
+        run: uv run python ../scripts/quality_snapshot.py --check
 
       # Pre-commit checks this too, but a hook is skipped by --no-verify and a
       # command that fails to register does so in silence.

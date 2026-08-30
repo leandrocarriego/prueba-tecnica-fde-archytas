@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.operations.models import JobStatus
+from app.quality import Quality
 
 KEY_MAX = 100
 
@@ -55,6 +56,10 @@ class HealthRead(BaseModel):
     environment: str
     database: ComponentHealth
     whatsapp: ComponentHealth
+    # What the suite measured for the code this image was built from. `None`
+    # when the image carries no snapshot, which is the honest way to say "we do
+    # not know" — the screen shows nothing rather than a number nobody checked.
+    quality: Quality | None = None
 
 
 class JobRunRead(BaseModel):

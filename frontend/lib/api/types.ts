@@ -744,6 +744,7 @@ export interface components {
             environment: string;
             database: components["schemas"]["ComponentHealth"];
             whatsapp: components["schemas"]["ComponentHealth"];
+            quality?: components["schemas"]["Quality"] | null;
         };
         /**
          * HealthState
@@ -1063,6 +1064,16 @@ export interface components {
          * @enum {string}
          */
         ProductStatus: "ACTIVE" | "DISCONTINUED";
+        /**
+         * Quality
+         * @description How many tests passed, and how much of the code they covered.
+         */
+        Quality: {
+            /** Tests */
+            tests: number;
+            /** Coverage */
+            coverage: number;
+        };
         /**
          * ResolutionRequest
          * @description What a person decided about a case.

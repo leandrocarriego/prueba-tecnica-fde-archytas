@@ -36,6 +36,7 @@ from app.modules.operations.schemas import (
     PriceUpdateSettingsWrite,
     PriceUpdateStatusRead,
 )
+from app.quality import get_quality
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.events import (
     BusinessParameterChanged,
@@ -528,6 +529,7 @@ class OperationsService:
             environment=settings.ENVIRONMENT,
             database=database,
             whatsapp=await self._whatsapp_health(),
+            quality=get_quality(),
         )
 
     async def _whatsapp_health(self) -> ComponentHealth:

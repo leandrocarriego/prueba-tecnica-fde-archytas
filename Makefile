@@ -16,7 +16,7 @@ ALL := --profile full --profile deploy --profile tools
 
 .PHONY: help dev full tools up down logs build clean \
         test test-unit test-integration test-cov lint format \
-        playwright-install db-migrate db-revision db-owner \
+        playwright-install db-migrate db-revision db-owner quality \
         frontend-api-types backend-shell frontend-shell \
         pre-commit-install pre-commit-run \
         diagrams diagrams-check client-docs deploy
@@ -168,6 +168,10 @@ playwright-install: ## Instalar el navegador Chromium que usa la extracción
 # two places — and it was wrong in the one that matters, because `make deploy`
 # ends by telling you to run them.
 IN_CONTAINERS := docker ps --format '{{.Names}}' | grep -q '^cordillera_backend$$'
+
+quality: ## Medir tests y cobertura y dejarlo en app/quality.json (la pantalla de estado lo muestra)
+	cd backend && uv run pytest --junitxml=.pytest-report.xml
+	cd backend && uv run python ../scripts/quality_snapshot.py
 
 db-migrate: ## Aplicar las migraciones pendientes (alembic upgrade head)
 	@if $(IN_CONTAINERS); then \
