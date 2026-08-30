@@ -54,11 +54,15 @@ failed. That one is not about the registry but about the components where a
 correction is actually made and undone — and it is checked the same way, and
 for the same reason, because it is the same missing test runner. Those
 components are searched for rather than named, which is the lesson of how RF-22
-was missed: the rule was right and one of the two screens was simply never
-inside it. The search covers `@/app/actions/corrections`; what it still leaves
-out — a registered action of this feature run through another Server Action
-module — and what no reading of the source can settle — whether a successful
-run takes the component off the screen — are both written down where the search
+was missed **three times**: the rule was right, and the screens it did not name
+were simply never inside it. So the search asks for the four actions the
+registry publishes, by their exported name, wherever they are imported from —
+naming the module instead would drag in the rule and alias screens of 001, which
+this rule has nothing to say about.
+
+What no reading of the source can settle — whether a successful run takes the
+component off the screen, and therefore whether its verdict may live in local
+state or has to be announced to the toaster — is written down where the search
 is defined, because a gap nobody wrote down is the same mistake again.
 """
 
@@ -427,18 +431,13 @@ LAYOUT = APP / "layout.tsx"
 # defect survived in `CaseCard` after being fixed twice next door: resolving a
 # case is one of the four manual actions 003 published, and it imports from
 # `@/app/actions/triage`.
-#
-# `@/app/actions/prices` is the fourth and is deliberately still out. Its
-# component does report both outcomes, through a third shape neither channel
-# here recognises; teaching the rule that shape is a change to the rule, not to
-# the component, and it does not belong in the same edit as a defect fix.
-ACTION_MODULES = ("corrections", "triage")
+ACTION_MODULES = ("corrections", "triage", "prices")
 # The module is not the unit: `@/app/actions/triage` also exports the rule and
 # alias management of 001, whose components are not manual actions of the
 # registry and have nothing to do with this rule. What the rule is about is the
-# actions `frontend/lib/operations/actions.ts` publishes as 003's, so those are
+# four actions `frontend/lib/operations/actions.ts` publishes, so those are
 # named here — by their **exported** name, which is what survives an alias.
-THE_FOUR = frozenset({"correctProduct", "revertCorrection", "resolveCase"})
+THE_FOUR = frozenset({"correctProduct", "revertCorrection", "resolveCase", "requestPriceUpdate"})
 CORRECTION_ACTIONS = re.compile(
     r"^import\s*\{(?P<names>[^}]*)\}\s*from\s*'@/app/actions/(?:"
     + "|".join(ACTION_MODULES)
@@ -485,7 +484,25 @@ SUCCEEDED = re.compile(r"if\s*\(\s*[^()!]*\.ok\b[^()]*\)\s*\{")
 # `setSomething({ ok: true, … })` — recording that it was applied in the
 # component's own state. The setter is captured because the state it writes is
 # what the JSX renders, and the name of that state follows from it.
-RECORDS_SUCCESS = re.compile(r"\b(?P<setter>set[A-Z]\w*)\(\s*\{[^{}]*\bok:\s*true\b[^{}]*\}\s*\)")
+# Recording the verdict for this component's own JSX to render. Two spellings,
+# because the repository has two and neither is wrong: a boolean `ok: true`, and
+# a discriminant whose value names the good case (`tone: 'ok'`, `status:
+# 'success'`). What is **not** accepted is a bare setter call with no literal in
+# it — that says the run stored something, not that it stored good news.
+RECORDS_SUCCESS = re.compile(
+    r"\b(?P<setter>set[A-Z]\w*)\(\s*\{[^{}]*"
+    r"(?:\bok:\s*true\b|:\s*'(?:ok|success)')"
+    r"[^{}]*\}\s*\)"
+)
+# `setOutcome(await follow(id))` — the verdict computed somewhere else and only
+# stored here. `UpdateNowButton` is written this way because it has to follow a
+# run it started before it can say how it went, and the answer is built by the
+# function that does the following. Reading only the run body would call that
+# component mute, which it is not.
+HANDS_OVER_THE_VERDICT = re.compile(r"\bset[A-Z]\w*\(\s*(?:await\s+)?(?P<fn>\w+)\s*\(")
+# And what that function does is **return** the verdict, not store it: the
+# setter is at the call site. Same two spellings of a good case as above.
+RETURNS_SUCCESS = re.compile(r"\breturn\s*\{[^{}]*(?:\bok:\s*true\b|:\s*'(?:ok|success)')[^{}]*\}")
 # The other honest channel: saying it out loud, to something that is not this
 # component. Either spelling of the project's helper counts.
 ANNOUNCES_SUCCESS = re.compile(
@@ -693,16 +710,38 @@ def state_behind(setter: str) -> str:
     return setter[3].lower() + setter[4:]
 
 
-def says_it_was_applied(run: str) -> bool:
+def body_of(source: str, name: str) -> str:
+    """The body of the function declared under that name, or nothing."""
+    declared = re.compile(
+        rf"\bfunction\s+{re.escape(name)}\s*(?=\()"
+        rf"|\b(?:const|let)\s+{re.escape(name)}\s*(?::[^=;]*)?=\s*(?:async\s+)?(?=[(\w])"
+    )
+    bodies = blocks(source, [found.end() for found in declared.finditer(source)])
+    return bodies[0][2] if bodies else ""
+
+
+def says_it_was_applied(run: str, source: str = "") -> bool:
     """Whether this run leaves anything behind that says the action worked.
 
-    Two honest channels: record `{ ok: true }` for the component's own JSX to
-    render, or announce it to the toaster in the root layout. A run that does
-    neither answers only half of RF-22 — and one that does either of them only
-    on the way out of a failure answers neither half.
+    Three honest channels, and the third is why this takes the file too. The
+    first two are written in the run itself: record the verdict for the
+    component's own JSX to render, or announce it to the toaster in the root
+    layout. The third hands the verdict over — `setOutcome(await follow(id))` —
+    and then what says the action worked is written in the function that was
+    called, not here. Judging that run by its own body alone would call it mute
+    while it is the most talkative of the three.
+
+    A run that does none of the three answers only half of RF-22 — and one that
+    does any of them only on the way out of a failure answers neither half.
     """
     on_success = what_a_successful_run_does(run)
-    return bool(RECORDS_SUCCESS.search(on_success) or ANNOUNCES_SUCCESS.search(on_success))
+    if RECORDS_SUCCESS.search(on_success) or ANNOUNCES_SUCCESS.search(on_success):
+        return True
+    for handed in HANDS_OVER_THE_VERDICT.finditer(on_success):
+        computed = body_of(source, handed["fn"])
+        if RETURNS_SUCCESS.search(computed) or ANNOUNCES_SUCCESS.search(computed):
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -880,11 +919,12 @@ class TestTheResultOfACorrectionReachesTheScreen:
 
         # Act / Assert
         for run in screen.runs:
-            assert says_it_was_applied(run.body), (
+            assert says_it_was_applied(run.body, path.read_text(encoding="utf-8")), (
                 f"{path.name} finishes a manual action and its successful run says "
-                "nothing: it neither records `{ ok: true }` for its own JSX to render "
-                "nor announces it to the toaster. RF-22 asks for «si se aplicó o si "
-                "falló», and this screen only ever answers the second half."
+                "nothing: it records no verdict for its own JSX to render, hands none "
+                "to a function that would, and announces none to the toaster. RF-22 "
+                "asks for «si se aplicó o si falló», and this screen only ever answers "
+                "the second half."
             )
 
     @pytest.mark.parametrize("path", screens_that_finish_a_correction(), ids=lambda path: path.name)
