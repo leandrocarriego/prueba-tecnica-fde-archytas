@@ -214,7 +214,8 @@ class TestTheHighlightThreshold:
         """RF-19: a rise of 15% stops being remarkable once the owner says 20%."""
         # Arrange
         await OperationsService(session).set_price_update_settings(
-            PriceUpdateSettingsWrite(interval_hours=12, highlight_threshold_pct=20)
+            PriceUpdateSettingsWrite(interval_hours=12, highlight_threshold_pct=20),
+            actor_user_id=1,
         )
         product = await ProductFactory.create(session, price=100)
         await session.commit()

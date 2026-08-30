@@ -304,6 +304,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tests and coverage of the build this image came from
+         * @description Every authenticated role, and nobody else.
+         *
+         *     `/health` is public and deliberately says nothing about this: how well the
+         *     system is tested is a fact about the people who build it, not something to
+         *     be read off the internet by anyone who finds the domain.
+         *
+         *     `None` when the image carries no snapshot. Saying nothing is the honest
+         *     answer to "we do not know"; a number nobody measured would not be.
+         */
+        get: operations["read_quality_api_v1_operations_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/operations/jobs": {
         parameters: {
             query?: never;
@@ -341,12 +368,85 @@ export interface paths {
         get: operations["list_parameters_api_v1_operations_parameters_get"];
         /**
          * Update the business parameters
-         * @description Owner only.
+         * @description Owner only (RF-02, RF-03).
          *
          *     The whole set is written in one transaction, so the platform never runs on
-         *     half of the old rules and half of the new ones.
+         *     half of the old rules and half of the new ones. A key outside the catalog
+         *     or a value outside its range is refused with the range in the message
+         *     (RF-06), and who changed what is taken from the token, never from the body
+         *     (RF-08).
          */
         put: operations["update_parameters_api_v1_operations_parameters_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The history of manual changes
+         * @description Every authenticated role, each seeing their own sections.
+         *
+         *     The owner reaches all three and therefore sees everybody (RF-18); anybody
+         *     else sees the sections they reach and nothing else (RF-19). Newest first
+         *     (RF-13), filterable by person and by date range (RF-14).
+         */
+        get: operations["list_audit_api_v1_operations_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/audit/{entity_type}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The history of one datum
+         * @description Every authenticated role, filtered by section like the listing.
+         *
+         *     It exists so a corrected datum leads to its own history without anybody
+         *     having to go looking for it on another screen (RF-15).
+         */
+        get: operations["audit_for_entity_api_v1_operations_audit__entity_type___entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/corrections/reasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The reasons a correction may be given
+         * @description Every authenticated role.
+         *
+         *     Served by the API because the API is what validates the code (RF-11): the
+         *     list and the rule that checks it come from the same place.
+         */
+        get: operations["correction_reasons_api_v1_operations_corrections_reasons_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -417,6 +517,10 @@ export interface paths {
         /**
          * Change how often and what counts as a big rise
          * @description Owner only (RF-18, RF-19). The new frequency applies from the next query.
+         *
+         *     The two keys it writes are the same ones the general parameters panel
+         *     writes, so a change here is validated, logged and published exactly like
+         *     one made there.
          */
         put: operations["write_price_update_settings_api_v1_price_updates_settings_put"];
         post?: never;
@@ -485,6 +589,55 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/products/{product_id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correct a value of a product by hand
+         * @description The owner and sales: the catalog and its prices are theirs (RF-24).
+         *
+         *     Any field the portal brought, not only the amounts (RF-23), always with a
+         *     reason picked from the list (RF-11). What the portal had said is kept
+         *     (RF-25), and who changed it is taken from the token rather than the body.
+         */
+        post: operations["correct_product_api_v1_catalog_products__product_id__corrections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/corrections/{correction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo a manual correction
+         * @description The owner alone (RF-30), even over a datum somebody else corrected.
+         *
+         *     The datum goes back to the value the portal reported (RF-31) and the
+         *     correction is marked as undone with who and when — never deleted (RF-32).
+         *     A datum the portal never brought has no correction, so this answers 404
+         *     rather than inventing one to undo (RF-33).
+         */
+        delete: operations["revert_correction_api_v1_catalog_corrections__correction_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -636,6 +789,73 @@ export interface components {
             } | null;
         };
         /**
+         * AuditAction
+         * @description What a manual change did to the datum it touched.
+         *
+         *     One vocabulary rather than four events. Four — created, updated, corrected,
+         *     correction reverted — would be four handlers writing into the same table,
+         *     and the log would have four doors instead of one. The distinction survives
+         *     as a field, typed, in `shared/` so both the event and the row that stores it
+         *     read it from the same place.
+         * @enum {string}
+         */
+        AuditAction: "CREATED" | "UPDATED" | "CORRECTED" | "CORRECTION_REVERTED";
+        /**
+         * AuditEntryList
+         * @description A page of the history.
+         */
+        AuditEntryList: {
+            /** Items */
+            items: components["schemas"]["AuditEntryRead"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
+        /**
+         * AuditEntryRead
+         * @description One line of the history of manual changes (RF-12, RF-13).
+         */
+        AuditEntryRead: {
+            /** Id */
+            id: number;
+            /** Entity Type */
+            entity_type: string;
+            /** Entity Id */
+            entity_id: string;
+            /** Field */
+            field: string | null;
+            action: components["schemas"]["AuditAction"];
+            /** Old Value */
+            old_value: unknown;
+            /** New Value */
+            new_value: unknown;
+            /** Reason Code */
+            reason_code: string | null;
+            /** Reason Label */
+            reason_label: string | null;
+            /** Reason Detail */
+            reason_detail: string | null;
+            /** Actor User Id */
+            actor_user_id: number;
+            /** Actor Name */
+            actor_name?: string | null;
+            section: components["schemas"]["BusinessSection"];
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /**
+         * BusinessSection
+         * @description The part of the business a fact belongs to.
+         * @enum {string}
+         */
+        BusinessSection: "PURCHASING" | "SALES" | "SYSTEM";
+        /**
          * CaseList
          * @description A page of cases.
          */
@@ -705,6 +925,91 @@ export interface components {
             detail?: string | null;
         };
         /**
+         * CorrectionMark
+         * @description A field of this row that a person corrected by hand.
+         *
+         *     It is what makes a corrected value tell itself apart at a glance (RF-26)
+         *     and show what the portal had said right next to it (RF-27). A row with an
+         *     empty list is a row exactly as the portal delivered it.
+         */
+        CorrectionMark: {
+            /** Correction Id */
+            correction_id: number;
+            /** Field */
+            field: string;
+            /** Portal Value */
+            portal_value: unknown;
+            /** Corrected Value */
+            corrected_value: unknown;
+            status: components["schemas"]["CorrectionStatus"];
+            /** Conflict Value */
+            conflict_value?: unknown | null;
+        };
+        /**
+         * CorrectionRead
+         * @description What a correction did, as the screen that asked for it gets it back.
+         *
+         *     `correction_id` is null when the datum was never brought from the portal:
+         *     the change is recorded in the history all the same (RF-09), but there is no
+         *     original value to keep and nothing to give back (RF-33).
+         */
+        CorrectionRead: {
+            /** Correction Id */
+            correction_id: number | null;
+            /** Product Id */
+            product_id: number;
+            /** Entity Type */
+            entity_type: string;
+            /** Field */
+            field: string;
+            /** Portal Value */
+            portal_value: unknown | null;
+            /** Value */
+            value: unknown;
+            status: components["schemas"]["CorrectionStatus"] | null;
+        };
+        /**
+         * CorrectionReasonRead
+         * @description One of the reasons a correction may be given (RF-11).
+         *
+         *     Served by the API because the API is what validates it: a list living in
+         *     the browser would be a second list, and the two would drift.
+         */
+        CorrectionReasonRead: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * CorrectionStatus
+         * @description Where a correction stands.
+         *
+         *     `REVERTED` is a state and not a deletion: undoing a correction has to stay
+         *     readable in the history, and a row that disappeared would leave the log
+         *     pointing at nothing (Artículo II).
+         * @enum {string}
+         */
+        CorrectionStatus: "ACTIVE" | "CONFLICTED" | "REVERTED";
+        /**
+         * CorrectionWrite
+         * @description What somebody has to say to correct a value (RF-11, RF-23).
+         *
+         *     The reason is required by the schema and not only by the service: a
+         *     correction without a reason is a number that appeared, and counting how
+         *     many corrections happened for the same reason is the point of asking.
+         */
+        CorrectionWrite: {
+            /** Field */
+            field: string;
+            /** Value */
+            value: unknown;
+            /** Reason Code */
+            reason_code: string;
+            /** Reason Detail */
+            reason_detail?: string | null;
+        };
+        /**
          * CurrentUser
          * @description Who is working, and what they may reach.
          *
@@ -744,7 +1049,6 @@ export interface components {
             environment: string;
             database: components["schemas"]["ComponentHealth"];
             whatsapp: components["schemas"]["ComponentHealth"];
-            quality?: components["schemas"]["Quality"] | null;
         };
         /**
          * HealthState
@@ -849,23 +1153,44 @@ export interface components {
             message: string;
         };
         /**
+         * ParameterKind
+         * @description What kind of value a parameter holds, and therefore how it is checked.
+         * @enum {string}
+         */
+        ParameterKind: "INTEGER" | "DECIMAL" | "TIME_OF_DAY";
+        /**
          * ParameterRead
-         * @description A business parameter as exposed by the API and to other modules.
+         * @description A business parameter: what it is, what it may be, and what it is worth.
+         *
+         *     Assembled from the declaration in `app.shared.parameters` with the stored
+         *     value on top — **not** read off the table. A parameter nobody ever changed
+         *     has no row and still appears here with its starting value, which is what
+         *     RF-01 and RF-04 ask for together.
          */
         ParameterRead: {
-            /** Id */
-            id: number;
             /** Key */
             key: string;
+            /** Label */
+            label: string;
+            /** Effect */
+            effect: string;
+            kind: components["schemas"]["ParameterKind"];
             /** Value */
             value: unknown;
-            /** Description */
-            description: string | null;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
+            /** Initial */
+            initial: unknown;
+            /** Minimum */
+            minimum: unknown | null;
+            /** Maximum */
+            maximum: unknown | null;
+            /** Unit */
+            unit: string | null;
+            /** Consumed By */
+            consumed_by: string;
+            /** Has Effect */
+            has_effect: boolean;
+            /** Changed At */
+            changed_at: string | null;
         };
         /**
          * ParameterUpdateRequest
@@ -881,18 +1206,17 @@ export interface components {
         };
         /**
          * ParameterWrite
-         * @description A parameter to create or overwrite.
+         * @description A parameter to set.
          *
-         *     Leaving `description` unset keeps the stored one, so a caller that only
-         *     changes the value does not have to resend the text next to the field.
+         *     No description: the sentence beside the field belongs to the catalog, which
+         *     is also where the range that validates this value lives. Two sources for
+         *     one parameter is one source and one bug.
          */
         ParameterWrite: {
             /** Key */
             key: string;
             /** Value */
             value: unknown;
-            /** Description */
-            description?: string | null;
         };
         /**
          * PasswordChangeRequest
@@ -942,6 +1266,11 @@ export interface components {
             monthly_variation_pct: string | null;
             /** Points */
             points: components["schemas"]["PricePointRead"][];
+            /**
+             * Corrections
+             * @default []
+             */
+            corrections: components["schemas"]["CorrectionMark"][];
         };
         /**
          * PriceList
@@ -997,6 +1326,11 @@ export interface components {
             is_stale: boolean;
             /** Monthly Variation Pct */
             monthly_variation_pct?: string | null;
+            /**
+             * Corrections
+             * @default []
+             */
+            corrections: components["schemas"]["CorrectionMark"][];
         };
         /**
          * PriceSource
@@ -1132,7 +1466,7 @@ export interface components {
          * @description The parts of the business a person can be let into.
          * @enum {string}
          */
-        Section: "PRICES" | "CALENDAR" | "SUPPLIERS" | "PURCHASE_INVOICES" | "PAYMENTS" | "PURCHASE_ORDERS" | "RECEIPTS" | "SALES" | "DASHBOARD" | "STOCK" | "PRODUCT_CATEGORIES" | "PRODUCT_CATALOG" | "ACCESS_ADMIN" | "ACCESS_LOG" | "SYSTEM_PARAMETERS";
+        Section: "PRICES" | "CALENDAR" | "SUPPLIERS" | "PURCHASE_INVOICES" | "PAYMENTS" | "PURCHASE_ORDERS" | "RECEIPTS" | "SALES" | "DASHBOARD" | "STOCK" | "PRODUCT_CATEGORIES" | "PRODUCT_CATALOG" | "ACCESS_ADMIN" | "ACCESS_LOG" | "SYSTEM_PARAMETERS" | "MANUAL_CORRECTIONS";
         /**
          * TokenStatus
          * @description Whether a single-use link still works.
@@ -1787,6 +2121,26 @@ export interface operations {
             };
         };
     };
+    read_quality_api_v1_operations_quality_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Quality"] | null;
+                };
+            };
+        };
+    };
     list_jobs_api_v1_operations_jobs_get: {
         parameters: {
             query?: {
@@ -1874,6 +2228,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_api_v1_operations_audit_get: {
+        parameters: {
+            query?: {
+                /** @description Rows to skip */
+                skip?: number;
+                /** @description Rows per page */
+                limit?: number;
+                /** @description Filter by who made the change */
+                actor_user_id?: number | null;
+                /** @description Changes from this moment on */
+                since?: string | null;
+                /** @description Changes up to this moment */
+                until?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_for_entity_api_v1_operations_audit__entity_type___entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The kind of datum */
+                entity_type: string;
+                /** @description Its identifier in its module */
+                entity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntryRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correction_reasons_api_v1_operations_corrections_reasons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionReasonRead"][];
                 };
             };
         };
@@ -2058,6 +2506,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriceHistoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_product_api_v1_catalog_products__product_id__corrections_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectionWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_correction_api_v1_catalog_corrections__correction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                correction_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrectionRead"];
                 };
             };
             /** @description Validation Error */

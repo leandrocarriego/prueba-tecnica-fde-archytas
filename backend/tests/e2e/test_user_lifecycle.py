@@ -224,23 +224,48 @@ class TestUserLifecycle:
             f"{API_PREFIX}/operations/parameters",
             json={
                 "items": [
-                    {
-                        "key": "extraction.hour",
-                        "value": 3,
-                        "description": "Hora de la extracción nocturna",
-                    },
-                    {"key": "matching.threshold", "value": 0.87},
+                    {"key": "price_update.interval_hours", "value": 24},
+                    {"key": "due_date.notice_days", "value": 7},
                 ]
             },
         )
         assert written.status_code == 200
         assert len(written.json()) == 2
 
-        # --- And reads them back ------------------------------------------
+        # --- And reads them back, along with every parameter there is ------
+        # The panel lists the whole catalog, not the rows: a parameter nobody
+        # touched still shows up, with the value it starts at (RF-01, RF-04).
         stored = await owner_client.get(f"{API_PREFIX}/operations/parameters")
         assert stored.status_code == 200
         values = {item["key"]: item["value"] for item in stored.json()}
-        assert values == {"extraction.hour": 3, "matching.threshold": 0.87}
+        assert values["price_update.interval_hours"] == 24
+        assert values["due_date.notice_days"] == 7
+        assert values["receipt.notice_days"] == 3
+
+        # --- A value outside its range is refused, saying which range ------
+        refused = await owner_client.put(
+            f"{API_PREFIX}/operations/parameters",
+            json={"items": [{"key": "price_update.interval_hours", "value": 0}]},
+        )
+        assert refused.status_code == 422
+        assert "168" in refused.json()["error"]["message"]
+
+        # --- And so is a key that is not a parameter of the system ---------
+        unknown = await owner_client.put(
+            f"{API_PREFIX}/operations/parameters",
+            json={"items": [{"key": "portal.password", "value": "hunter2"}]},
+        )
+        assert unknown.status_code == 422
+
+        # --- Every change left its line in the log (RF-08) -----------------
+        history = await owner_client.get(f"{API_PREFIX}/operations/audit")
+        assert history.status_code == 200
+        logged = history.json()["items"]
+        assert {entry["entity_id"] for entry in logged} == {
+            "price_update.interval_hours",
+            "due_date.notice_days",
+        }
+        assert all(entry["section"] == "SYSTEM" for entry in logged)
 
         # --- Purchasing cannot see or change them --------------------------
         assert (

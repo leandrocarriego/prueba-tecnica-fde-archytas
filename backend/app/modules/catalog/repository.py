@@ -1,5 +1,6 @@
 """Data access for the catalog module. Private to this module."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
@@ -10,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.catalog.models import (
     CatalogSetting,
+    Correction,
+    CorrectionStatus,
     PricePoint,
     PriceSource,
     Product,
@@ -197,3 +200,51 @@ class CatalogRepository:
         else:
             setting.value = value
         await self.session.flush()
+
+    # --- Corrections a person made ----------------------------------------
+
+    async def get_correction(self, correction_id: int) -> Correction | None:
+        """Return one correction by id, whatever its state."""
+        return await self.session.get(Correction, correction_id)
+
+    async def correction_in_force(
+        self, entity_type: str, entity_id: str, field: str
+    ) -> Correction | None:
+        """The correction that currently stands on a field, if there is one.
+
+        `ACTIVE` and `CONFLICTED` both count: a conflict does not undo the
+        correction, it flags it (RF-28). Only `REVERTED` stops standing.
+        """
+        result = await self.session.execute(
+            select(Correction).where(
+                Correction.entity_type == entity_type,
+                Correction.entity_id == entity_id,
+                Correction.field == field,
+                Correction.status != CorrectionStatus.REVERTED,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def corrections_in_force(self, entity_ids: Sequence[str]) -> list[Correction]:
+        """Every correction standing on this set of entities.
+
+        One query for a whole page of the prices screen rather than one per
+        row: RF-26 marks every corrected value, so the listing would otherwise
+        ask the same question two hundred times.
+        """
+        if not entity_ids:
+            return []
+        result = await self.session.execute(
+            select(Correction).where(
+                Correction.entity_id.in_(list(entity_ids)),
+                Correction.status != CorrectionStatus.REVERTED,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def add_correction(self, correction: Correction) -> Correction:
+        """Store a correction and return it with its identifier."""
+        self.session.add(correction)
+        await self.session.flush()
+        await self.session.refresh(correction)
+        return correction

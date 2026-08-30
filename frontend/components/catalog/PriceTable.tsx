@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { isConflicted, markFor } from '@/lib/catalog/corrections'
 import { formatMoment, formatPrice, formatVariation, variationTone } from '@/lib/catalog/format'
 import type { Price } from '@/lib/catalog/types'
 
@@ -13,10 +14,17 @@ interface PriceTableProps {
  * A Server Component: it renders data and has no interactivity of its own, so
  * there is no reason to ship it to the browser.
  *
- * Two marks earn their place in the table. A **rise above the threshold** is
+ * Four marks earn their place in the table. A **rise above the threshold** is
  * what the owner asked to see without reading a hundred rows (RF-25), and a
  * product that **did not come in the last list** says so next to the price it
  * is still showing, instead of looking as fresh as the rest (RF-08).
+ *
+ * The other two come from 003. A **corrected** price is told apart at a glance
+ * and carries what the portal had said right beside it (RF-26, RF-27) — a
+ * number nobody can explain is worth less than a number that is slightly off.
+ * And when the portal has since reported something else, the row says **so**
+ * instead of quietly applying it (RF-28): the correction stands until a person
+ * decides, and this is where they find out there is something to decide.
  */
 export function PriceTable({ items }: PriceTableProps) {
   if (items.length === 0) {
@@ -41,39 +49,58 @@ export function PriceTable({ items }: PriceTableProps) {
           </tr>
         </thead>
         <tbody>
-          {items.map(item => (
-            <tr
-              key={item.product_id}
-              className={`border-t ${item.is_highlighted ? 'bg-amber-50' : ''}`}
-            >
-              <td className="p-3 font-mono">
-                <Link className="underline underline-offset-2" href={`/precios/${item.product_id}`}>
-                  {item.code}
-                </Link>
-              </td>
-              <td className="p-3">
-                {item.description}
-                {item.is_highlighted && (
-                  <span className="ml-2 rounded bg-amber-200 px-2 py-0.5 text-xs text-amber-900">
-                    Subió fuerte
-                  </span>
-                )}
-                {item.is_stale && (
-                  <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
-                    No vino en la última lista
-                  </span>
-                )}
-              </td>
-              <td className="p-3 text-right font-medium">{formatPrice(item.price)}</td>
-              <td className="p-3 text-right text-muted-foreground">
-                {formatPrice(item.previous_price)}
-              </td>
-              <td className={`p-3 text-right ${variationTone(item.monthly_variation_pct)}`}>
-                {formatVariation(item.monthly_variation_pct)}
-              </td>
-              <td className="p-3 text-muted-foreground">{formatMoment(item.effective_at)}</td>
-            </tr>
-          ))}
+          {items.map(item => {
+            const corrected = markFor(item.corrections, 'price')
+            return (
+              <tr
+                key={item.product_id}
+                className={`border-t ${item.is_highlighted ? 'bg-amber-50' : ''}`}
+              >
+                <td className="p-3 font-mono">
+                  <Link
+                    className="underline underline-offset-2"
+                    href={`/precios/${item.product_id}`}
+                  >
+                    {item.code}
+                  </Link>
+                </td>
+                <td className="p-3">
+                  {item.description}
+                  {item.is_highlighted && (
+                    <span className="ml-2 rounded bg-amber-200 px-2 py-0.5 text-xs text-amber-900">
+                      Subió fuerte
+                    </span>
+                  )}
+                  {item.is_stale && (
+                    <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                      No vino en la última lista
+                    </span>
+                  )}
+                  {isConflicted(corrected) && (
+                    <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900">
+                      El portal informa {formatPrice(corrected?.conflict_value as string)}
+                    </span>
+                  )}
+                </td>
+                <td className="p-3 text-right font-medium">
+                  {formatPrice(item.price)}
+                  {corrected && (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Corregido a mano · el portal decía{' '}
+                      {formatPrice(corrected.portal_value as string)}
+                    </span>
+                  )}
+                </td>
+                <td className="p-3 text-right text-muted-foreground">
+                  {formatPrice(item.previous_price)}
+                </td>
+                <td className={`p-3 text-right ${variationTone(item.monthly_variation_pct)}`}>
+                  {formatVariation(item.monthly_variation_pct)}
+                </td>
+                <td className="p-3 text-muted-foreground">{formatMoment(item.effective_at)}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

@@ -17,10 +17,29 @@ Rules for an event:
   SQLAlchemy model — models are private to their module.
 """
 
+import enum
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
+
+from app.shared.sections import BusinessSection
+
+
+class AuditAction(enum.StrEnum):
+    """What a manual change did to the datum it touched.
+
+    One vocabulary rather than four events. Four — created, updated, corrected,
+    correction reverted — would be four handlers writing into the same table,
+    and the log would have four doors instead of one. The distinction survives
+    as a field, typed, in `shared/` so both the event and the row that stores it
+    read it from the same place.
+    """
+
+    CREATED = "CREATED"
+    UPDATED = "UPDATED"
+    CORRECTED = "CORRECTED"
+    CORRECTION_REVERTED = "CORRECTION_REVERTED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,3 +386,57 @@ class BusinessParameterChanged(DomainEvent):
 
     key: str
     value: Any
+
+
+# ── manual changes, in any module ────────────────────────────────────────────
+#
+# The two events of the platform operating on itself. Neither belongs to a
+# module: whoever edits a datum by hand publishes the first, and whoever owns a
+# datum the portal contradicted publishes the second.
+
+
+@dataclass(frozen=True, slots=True)
+class ManualChangeRecorded(DomainEvent):
+    """Somebody changed a datum by hand, and the log has to say so.
+
+    Published by the module that owns the datum, consumed by `operations`,
+    which turns it into a row. The publisher never learns that a log exists,
+    and `operations` never learns whose datum it was — the boundary used in
+    favour instead of worked around.
+
+    The handler runs in the publisher's transaction, so a change without its
+    record does not exist: if writing the row fails, the edit fails with it
+    (`GEN-09`).
+
+    Values travel as plain JSON — a price, a date and a description have to fit
+    the same two columns, and an event never carries a model (`GEN-08`).
+    """
+
+    entity_type: str
+    entity_id: str
+    action: AuditAction
+    actor_user_id: int
+    section: BusinessSection
+    field: str | None = None
+    old_value: Any = None
+    new_value: Any = None
+    reason_code: str | None = None
+    reason_detail: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CorrectionConflicted(DomainEvent):
+    """The portal came back with something other than what it had said.
+
+    The correction is **not** overwritten (RF-28): the module that owns the
+    datum marks the conflict and says so here, and the owner is told without
+    having to be looking at that screen (RF-29).
+    """
+
+    entity_type: str
+    entity_id: str
+    field: str
+    correction_id: int
+    original_value: Any
+    corrected_value: Any
+    incoming_value: Any

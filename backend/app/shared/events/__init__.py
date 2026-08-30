@@ -7,11 +7,14 @@ vocabulary.
 
 from app.shared.events.bus import EventBus, Handler, discover_handlers, events
 from app.shared.events.catalog import (
+    AuditAction,
     BusinessParameterChanged,
+    CorrectionConflicted,
     DomainEvent,
     JobRunFailed,
     JobRunSucceeded,
     KnownProductsMissing,
+    ManualChangeRecorded,
     MissingProduct,
     NormalizedHistoryPoint,
     NormalizedPriceRow,
@@ -40,13 +43,16 @@ from app.shared.events.catalog import (
 )
 
 __all__ = [
+    "AuditAction",
     "BusinessParameterChanged",
+    "CorrectionConflicted",
     "DomainEvent",
     "EventBus",
     "Handler",
     "JobRunFailed",
     "JobRunSucceeded",
     "KnownProductsMissing",
+    "ManualChangeRecorded",
     "MissingProduct",
     "NormalizedHistoryPoint",
     "NormalizedPriceRow",

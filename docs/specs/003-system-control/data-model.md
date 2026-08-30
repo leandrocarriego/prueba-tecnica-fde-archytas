@@ -30,10 +30,16 @@ Una fila por cambio manual, de cualquier módulo, sobre cualquier dato. Es la ta
 **Índices**: `(entity_type, entity_id)` para RF-15, `(occurred_at DESC)` para RF-13,
 `(actor_user_id, occurred_at DESC)` para RF-14, `(section)` para RF-19.
 
-**Inmutabilidad (RF-16, RF-17).** La migración instala un trigger `BEFORE UPDATE OR DELETE` que
-levanta una excepción. No es defensa en profundidad decorativa: el requisito dice *"el sistema debe
-impedir"*, y un método que el repositorio no expone sólo impide hasta que alguien lo agregue. El
-repositorio expone `insert`, `list` y `list_for_entity`, y nada más.
+**Inmutabilidad (RF-16, RF-17).** La migración instala **dos** triggers sobre la misma función,
+y los dos hacen falta: uno `BEFORE UPDATE OR DELETE ... FOR EACH ROW`, y otro
+`BEFORE TRUNCATE ... FOR EACH STATEMENT`, porque **un trigger de fila no se dispara nunca ante un
+`TRUNCATE`** — sin el segundo, una sola sentencia borra el historial entero sin una palabra.
+Postgres sólo admite triggers a nivel sentencia sobre `TRUNCATE`, así que son dos y no un evento
+más del primero.
+
+No es defensa en profundidad decorativa: el requisito dice *"el sistema debe impedir"*, y un
+método que el repositorio no expone sólo impide hasta que alguien lo agregue. El repositorio
+expone `insert`, `list` y `list_for_entity`, y nada más.
 
 **Sin FK a `users`, a propósito.** `identity` es un módulo y `operations` es otro; una FK sería una
 dependencia de esquema entre dos módulos que no se conocen. El nombre de quien hizo el cambio se

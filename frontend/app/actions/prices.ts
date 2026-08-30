@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 
-import type { JobRun, PriceUpdateSettings } from '@/lib/catalog/types'
+import type { JobRun } from '@/lib/catalog/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const API_PREFIX = '/api/v1'
@@ -61,23 +61,4 @@ export async function requestPriceUpdate(): Promise<ActionResult<{ job_run_id: n
 /** How that run ended, so whoever asked finds out either way (RF-16). */
 export async function readPriceUpdate(jobRunId: number): Promise<ActionResult<JobRun>> {
   return call<JobRun>(`/price-updates/${jobRunId}`, { method: 'GET' })
-}
-
-/** The owner changes how often, and what counts as a big rise (RF-18, RF-19). */
-export async function savePriceUpdateSettings(
-  intervalHours: number,
-  highlightThresholdPct: number
-): Promise<ActionResult<PriceUpdateSettings>> {
-  const result = await call<PriceUpdateSettings>('/price-updates/settings', {
-    method: 'PUT',
-    body: JSON.stringify({
-      interval_hours: intervalHours,
-      highlight_threshold_pct: highlightThresholdPct,
-    }),
-  })
-  if (result.ok) {
-    revalidatePath('/precios')
-    revalidatePath('/precios/configuracion')
-  }
-  return result
 }

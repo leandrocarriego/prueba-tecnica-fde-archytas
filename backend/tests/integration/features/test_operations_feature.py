@@ -6,15 +6,25 @@ the business changes without a deploy. Both are exercised against a real
 session, since both are about what ends up stored.
 """
 
+from decimal import Decimal
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.operations.models import JobStatus
 from app.modules.operations.schemas import HealthState, ParameterWrite
 from app.modules.operations.service import OperationsService
-from app.shared.errors import NotFoundError
+from app.shared.errors import NotFoundError, ValidationError
+from app.shared.parameters import PARAMETERS
+from app.shared.sections import BusinessSection
 
 TASK = "portal.extract_invoices"
+
+INTERVAL = "price_update.interval_hours"
+THRESHOLD = "price_update.highlight_threshold_pct"
+# Who is making the change. The log needs somebody, and these tests are about
+# what gets stored, not about who may store it — that is `test_rbac.py`.
+ACTOR = 1
 
 
 @pytest.fixture
@@ -190,106 +200,139 @@ class TestJobRunListing:
 @pytest.mark.integration
 @pytest.mark.database
 class TestParameters:
-    """Business rules that change without a deploy."""
+    """Business rules that change without a deploy, and only within their range.
 
-    async def test_set_parameters_creates_the_batch(self, service: OperationsService) -> None:
-        """The whole set is written at once, so the platform never runs on half of it."""
-        # Arrange
-        items = [
-            ParameterWrite(key="extraction.hour", value=3, description="Nightly extraction"),
-            ParameterWrite(key="matching.threshold", value=0.87, description="Fuzzy matching"),
-        ]
+    The table stopped being the list of parameters when 003 landed: it holds the
+    values the owner changed, and everything else — that a parameter exists, what
+    it starts at, how far it may move — is declared in `app.shared.parameters`.
+    These tests are about that seam.
+    """
 
-        # Act
-        written = await service.set_parameters(items)
-
-        # Assert
-        assert {parameter.key for parameter in written} == {
-            "extraction.hour",
-            "matching.threshold",
-        }
-        assert await service.get_parameter_value("extraction.hour") == 3
-
-    async def test_set_parameters_overwrites_by_key(self, service: OperationsService) -> None:
-        """A second write updates the row instead of adding a duplicate key."""
-        # Arrange
-        await service.set_parameters([ParameterWrite(key="extraction.hour", value=3)])
-
-        # Act
-        await service.set_parameters([ParameterWrite(key="extraction.hour", value=5)])
-        stored = await service.list_parameters()
-
-        # Assert
-        assert len(stored) == 1
-        assert stored[0].value == 5
-
-    async def test_omitting_the_description_keeps_the_stored_one(
+    async def test_the_whole_catalog_is_listed_before_anybody_changes_anything(
         self, service: OperationsService
     ) -> None:
-        """A caller changing only a value should not have to resend the label."""
-        # Arrange
-        await service.set_parameters(
-            [ParameterWrite(key="extraction.hour", value=3, description="Nightly extraction")]
+        """RF-01 and RF-04 together: every parameter, each with a value."""
+        # Act
+        listed = await service.list_parameters()
+
+        # Assert
+        assert {parameter.key for parameter in listed} == {spec.key for spec in PARAMETERS}
+        assert all(parameter.changed_at is None for parameter in listed)
+        assert all(parameter.value == parameter.initial for parameter in listed)
+
+    async def test_a_parameter_nobody_touched_reports_its_starting_value(
+        self, service: OperationsService
+    ) -> None:
+        """RF-04: the platform behaves on day one without a row anywhere."""
+        # Assert
+        assert await service.get_parameter_value(INTERVAL) == 12
+
+    async def test_setting_a_parameter_puts_the_new_value_in_force(
+        self, service: OperationsService
+    ) -> None:
+        """RF-02, and RF-07: nothing else has to happen for it to take effect."""
+        # Act
+        written = await service.set_parameters(
+            [ParameterWrite(key=INTERVAL, value=24)], actor_user_id=ACTOR
         )
 
-        # Act
-        await service.set_parameters([ParameterWrite(key="extraction.hour", value=5)])
-        parameter = await service.get_parameter("extraction.hour")
-
         # Assert
-        assert parameter.value == 5
-        assert parameter.description == "Nightly extraction"
+        assert written[0].value == 24
+        assert written[0].changed_at is not None
+        assert await service.get_parameter_value(INTERVAL) == 24
 
-    async def test_a_value_can_be_any_json(self, service: OperationsService) -> None:
-        """JSONB, so a parameter can be a number, a flag or a small structure."""
+    async def test_setting_it_twice_overwrites_instead_of_duplicating(
+        self, service: OperationsService
+    ) -> None:
+        """One key, one row: the second decision replaces the first."""
         # Arrange
-        items = [
-            ParameterWrite(key="alerts.enabled", value=True),
-            ParameterWrite(key="portal.sections", value=["invoices", "orders"]),
-            ParameterWrite(key="limits", value={"per_page": 50}),
-        ]
+        await service.set_parameters([ParameterWrite(key=INTERVAL, value=24)], actor_user_id=ACTOR)
 
         # Act
-        await service.set_parameters(items)
+        await service.set_parameters([ParameterWrite(key=INTERVAL, value=6)], actor_user_id=ACTOR)
 
         # Assert
-        assert await service.get_parameter_value("alerts.enabled") is True
-        assert await service.get_parameter_value("portal.sections") == ["invoices", "orders"]
-        assert await service.get_parameter_value("limits") == {"per_page": 50}
+        assert await service.get_parameter_value(INTERVAL) == 6
+        assert len(await service.list_parameters()) == len(PARAMETERS)
 
-    async def test_list_parameters_is_ordered_by_key(self, service: OperationsService) -> None:
-        """The settings screen shows them in a stable order."""
-        # Arrange
-        await service.set_parameters(
-            [
-                ParameterWrite(key="zeta", value=1),
-                ParameterWrite(key="alfa", value=2),
-            ]
-        )
-
-        # Act
-        stored = await service.list_parameters()
-
-        # Assert
-        assert [parameter.key for parameter in stored] == ["alfa", "zeta"]
-
-    async def test_get_parameter_not_found(self, service: OperationsService) -> None:
-        """Asking for a parameter by key is an explicit read: a miss is an error."""
+    async def test_a_key_outside_the_catalog_is_refused(self, service: OperationsService) -> None:
+        """The list is closed (RF-06), which is also what keeps a secret out of it."""
         # Act / Assert
-        with pytest.raises(NotFoundError) as raised:
+        with pytest.raises(ValidationError):
+            await service.set_parameters(
+                [ParameterWrite(key="portal.password", value="hunter2")], actor_user_id=ACTOR
+            )
+
+    async def test_a_value_outside_the_range_is_refused_with_the_range(
+        self, service: OperationsService
+    ) -> None:
+        """RF-06 with its own example: a frequency of zero is not a frequency."""
+        # Act / Assert
+        with pytest.raises(ValidationError) as refusal:
+            await service.set_parameters(
+                [ParameterWrite(key=INTERVAL, value=0)], actor_user_id=ACTOR
+            )
+
+        assert "1" in refusal.value.message
+        assert "168" in refusal.value.message
+
+    async def test_nothing_is_written_when_one_value_of_the_set_is_refused(
+        self, service: OperationsService
+    ) -> None:
+        """Half-applied settings would leave the business on a mix of rules."""
+        # Act
+        with pytest.raises(ValidationError):
+            await service.set_parameters(
+                [
+                    ParameterWrite(key=INTERVAL, value=24),
+                    ParameterWrite(key=THRESHOLD, value=-1),
+                ],
+                actor_user_id=ACTOR,
+            )
+
+        # Assert — the legal one did not sneak through
+        assert await service.get_parameter_value(INTERVAL) == 12
+
+    async def test_a_change_leaves_its_line_in_the_log(self, service: OperationsService) -> None:
+        """RF-08: the old value, the new one, who changed it and when."""
+        # Arrange
+        await service.set_parameters([ParameterWrite(key=INTERVAL, value=24)], actor_user_id=ACTOR)
+
+        # Act
+        history = await service.list_audit(sections=None)
+
+        # Assert
+        assert history.total == 1
+        entry = history.items[0]
+        assert entry.entity_id == INTERVAL
+        assert entry.old_value == 12
+        assert entry.new_value == 24
+        assert entry.actor_user_id == ACTOR
+        assert entry.section is BusinessSection.SYSTEM
+        assert entry.occurred_at is not None
+
+    async def test_a_decimal_keeps_its_cents_through_jsonb(
+        self, service: OperationsService
+    ) -> None:
+        """Stored as text so a percentage does not come back as a float."""
+        # Act
+        await service.set_parameters(
+            [ParameterWrite(key=THRESHOLD, value="12.50")], actor_user_id=ACTOR
+        )
+
+        # Assert
+        assert await service.get_parameter_value(THRESHOLD) == "12.50"
+        assert await service.highlight_threshold() == Decimal("12.50")
+
+    async def test_asking_for_a_key_that_is_not_a_parameter(
+        self, service: OperationsService
+    ) -> None:
+        """Not "missing": there is no such parameter, and there never was."""
+        # Act / Assert
+        with pytest.raises(ValidationError) as refused:
             await service.get_parameter("nope")
 
-        assert raised.value.details == {"key": "nope"}
-
-    async def test_get_parameter_value_falls_back_to_the_default(
-        self, service: OperationsService
-    ) -> None:
-        """Other modules read parameters this way.
-
-        A parameter nobody configured is a gap in the configuration, not a
-        reason to interrupt a purchase or an extraction.
-        """
-        assert await service.get_parameter_value("nope", default=7) == 7
+        assert refused.value.details["key"] == "nope"
 
 
 @pytest.mark.integration

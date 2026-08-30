@@ -21,7 +21,9 @@ NEW_USER = {
     "phone": "+5491144445555",
     "role": UserRole.SALES.value,
 }
-PARAMETERS = {"items": [{"key": "extraction.hour", "value": 3}]}
+# A key of the catalog: since 003 the list is closed, so an invented key is
+# refused before authorisation ever becomes the interesting part of the test.
+PARAMETERS = {"items": [{"key": "price_update.interval_hours", "value": 24}]}
 
 
 @pytest.mark.integration
@@ -132,7 +134,8 @@ class TestOwnerRole:
 
         # Assert
         assert response.status_code == 200
-        assert response.json()[0]["key"] == "extraction.hour"
+        assert response.json()[0]["key"] == "price_update.interval_hours"
+        assert response.json()[0]["value"] == 24
 
     async def test_can_list_users(self, owner_client: AsyncClient) -> None:
         """The only role that reaches the list at all."""

@@ -14,6 +14,7 @@ from celery.signals import worker_init, worker_process_init, worker_shutdown
 from app.config import settings
 from app.logging import get_logger
 from app.shared.events import discover_handlers
+from app.shared.time import BUSINESS_TIME_ZONE_NAME
 from app.worker.bridge import shutdown_loop
 
 logger = get_logger(__name__)
@@ -35,7 +36,7 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-    timezone="America/Argentina/Buenos_Aires",
+    timezone=BUSINESS_TIME_ZONE_NAME,
     enable_utc=True,
     task_track_started=True,
     task_time_limit=30 * 60,

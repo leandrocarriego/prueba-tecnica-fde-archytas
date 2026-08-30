@@ -35,6 +35,10 @@ EXPECTED: dict[str, dict[str, Level]] = {
     "ACCESS_ADMIN": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.NONE},
     "ACCESS_LOG": {OWNER: Level.READ, PURCHASING: Level.NONE, SALES: Level.NONE},
     "SYSTEM_PARAMETERS": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.NONE},
+    # Undoing a manual correction is the owner's alone, whatever section the
+    # datum belongs to (003, RF-30). Correcting one is authorised by that
+    # section instead, which is why this is not the same row as PRODUCT_CATALOG.
+    "MANUAL_CORRECTIONS": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.NONE},
 }
 
 EVERY_CELL = [
@@ -54,7 +58,7 @@ class TestTheMatrixMatchesTheSpec:
     def test_a_role_reaches_exactly_as_far_as_the_spec_says(
         self, section: str, role: str, level: Level
     ) -> None:
-        """45 cells: 15 sections by 3 roles."""
+        """48 cells: 16 sections by 3 roles."""
         assert level_for(role, Section(section)) is level
 
     def test_no_section_is_missing_from_the_matrix(self) -> None:

@@ -8,6 +8,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.operations.models import JobStatus
+from app.shared.events import AuditAction
+from app.shared.parameters import ParameterKind
+from app.shared.sections import BusinessSection
 
 KEY_MAX = 100
 
@@ -83,27 +86,44 @@ class JobRunList(BaseModel):
 
 
 class ParameterRead(BaseModel):
-    """A business parameter as exposed by the API and to other modules."""
+    """A business parameter: what it is, what it may be, and what it is worth.
 
-    model_config = ConfigDict(from_attributes=True)
+    Assembled from the declaration in `app.shared.parameters` with the stored
+    value on top — **not** read off the table. A parameter nobody ever changed
+    has no row and still appears here with its starting value, which is what
+    RF-01 and RF-04 ask for together.
+    """
 
-    id: int
     key: str
+    # Spanish: the owner reads these two next to the field (RF-05).
+    label: str
+    effect: str
+    kind: ParameterKind
     value: Any
-    description: str | None
-    updated_at: datetime
+    initial: Any
+    minimum: Any | None
+    maximum: Any | None
+    unit: str | None
+    # Which functionality reads the value, and whether any does yet. Five of
+    # the seven are waiting for the feature that will read them, and the screen
+    # says so rather than offering a knob that moves nothing.
+    consumed_by: str
+    has_effect: bool
+    # Null while nobody has changed it: that is what tells apart the starting
+    # value from a decision somebody took.
+    changed_at: datetime | None
 
 
 class ParameterWrite(BaseModel):
-    """A parameter to create or overwrite.
+    """A parameter to set.
 
-    Leaving `description` unset keeps the stored one, so a caller that only
-    changes the value does not have to resend the text next to the field.
+    No description: the sentence beside the field belongs to the catalog, which
+    is also where the range that validates this value lives. Two sources for
+    one parameter is one source and one bug.
     """
 
     key: str = Field(min_length=1, max_length=KEY_MAX)
     value: Any
-    description: str | None = None
 
 
 class ParameterUpdateRequest(BaseModel):
@@ -115,6 +135,53 @@ class ParameterUpdateRequest(BaseModel):
     """
 
     items: list[ParameterWrite] = Field(min_length=1)
+
+
+class AuditEntryRead(BaseModel):
+    """One line of the history of manual changes (RF-12, RF-13)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    entity_type: str
+    entity_id: str
+    field: str | None
+    action: AuditAction
+    old_value: Any
+    new_value: Any
+    reason_code: str | None
+    # What the reason means, in the words the person picked it by. Resolved
+    # from the same catalog that validates it, so the screen never has a list
+    # of its own.
+    reason_label: str | None
+    reason_detail: str | None
+    actor_user_id: int
+    # Filled in by the route, not by the service: `operations` stores the id and
+    # never learns the name, and `identity.dependencies` is the one surface
+    # allowed to translate one into the other.
+    actor_name: str | None = None
+    section: BusinessSection
+    occurred_at: datetime
+
+
+class AuditEntryList(BaseModel):
+    """A page of the history."""
+
+    items: list[AuditEntryRead]
+    total: int
+    skip: int
+    limit: int
+
+
+class CorrectionReasonRead(BaseModel):
+    """One of the reasons a correction may be given (RF-11).
+
+    Served by the API because the API is what validates it: a list living in
+    the browser would be a second list, and the two would drift.
+    """
+
+    code: str
+    label: str
 
 
 # --- The price update ----------------------------------------------------

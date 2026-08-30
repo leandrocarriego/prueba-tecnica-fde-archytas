@@ -6,7 +6,7 @@ record what they did, and the rest of the platform reads its parameters through
 `get_parameter_value` instead of hardcoding thresholds.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -17,15 +17,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.logging import get_logger
-from app.modules.operations.models import JobRun, JobStatus
+from app.modules.operations.models import AuditEntry, JobRun, JobStatus, Parameter
 from app.modules.operations.repository import (
+    AuditEntryRepository,
     DatabaseProbe,
     JobRunRepository,
     ParameterRepository,
     WhatsAppProbe,
 )
 from app.modules.operations.schemas import (
+    AuditEntryList,
+    AuditEntryRead,
     ComponentHealth,
+    CorrectionReasonRead,
     HealthRead,
     HealthState,
     JobRunRead,
@@ -37,13 +41,18 @@ from app.modules.operations.schemas import (
     PriceUpdateStatusRead,
 )
 from app.quality import Quality, get_quality
+from app.shared.corrections import REASON_LABELS, label_for
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.events import (
+    AuditAction,
     BusinessParameterChanged,
+    ManualChangeRecorded,
     PriceUpdateRecovered,
     PriceUpdateStalled,
     events,
 )
+from app.shared.parameters import PARAMETERS, ParameterSpec, spec_for
+from app.shared.sections import BusinessSection
 from app.worker.celery_app import celery_app
 
 logger = get_logger(__name__)
@@ -66,11 +75,15 @@ EXTRACTION_TASK_NAME = "portal.extract_price_list"
 INTERVAL_HOURS_KEY = "price_update.interval_hours"
 HIGHLIGHT_THRESHOLD_KEY = "price_update.highlight_threshold_pct"
 
-# What the platform does on its first day, before the owner touches anything
-# (RF-20). Twelve hours because the supplier publishes twice a day: asking more
-# often brings no new price and knocks on a third party's door for nothing.
-DEFAULT_INTERVAL_HOURS = 12
-DEFAULT_HIGHLIGHT_THRESHOLD = Decimal("10")
+# What the platform does on its first day is no longer written here: the
+# starting value, the range and the sentence the owner reads all come from
+# `app.shared.parameters`, which is the one place a parameter is declared. A
+# constant beside the key would be a second answer to "what is it worth before
+# anybody touched it".
+
+# The log calls a parameter change by this name. A string in this module's own
+# vocabulary, like every `entity_type`.
+PARAMETER_ENTITY = "operations.parameter"
 
 # One key for the whole platform: the advisory lock that serialises the decision
 # to start an update. Arbitrary, stable, and documented so nobody reuses it.
@@ -113,6 +126,7 @@ class OperationsService:
         self.session = session
         self.runs = JobRunRepository(session)
         self.parameters = ParameterRepository(session)
+        self.audit = AuditEntryRepository(session)
         self.database = DatabaseProbe(session)
         self.whatsapp = WhatsAppProbe()
 
@@ -228,48 +242,211 @@ class OperationsService:
         return run
 
     # --- Parameters ------------------------------------------------------
+    #
+    # The screen is drawn from the declaration in `app.shared.parameters`, with
+    # whatever the owner changed laid on top. The table holds only the changes:
+    # a parameter nobody touched has no row and still has a value (RF-04).
 
     async def list_parameters(self) -> list[ParameterRead]:
-        """Return every business parameter, ordered by key."""
-        return [ParameterRead.model_validate(item) for item in await self.parameters.list_all()]
+        """Every parameter of the system, with the value in force (RF-01)."""
+        stored = {parameter.key: parameter for parameter in await self.parameters.list_all()}
+        return [self._parameter_read(spec, stored.get(spec.key)) for spec in PARAMETERS]
 
     async def get_parameter(self, key: str) -> ParameterRead:
-        """Return one parameter by key."""
-        parameter = await self.parameters.get_by_key(key)
-        if parameter is None:
-            raise NotFoundError("Parameter not found", details={"key": key})
-        return ParameterRead.model_validate(parameter)
+        """One parameter, declaration and value together."""
+        spec = spec_for(key)
+        return self._parameter_read(spec, await self.parameters.get_by_key(key))
 
-    async def get_parameter_value(self, key: str, default: Any = None) -> Any:
-        """Return the value of a parameter, or `default` if it is not set.
+    async def get_parameter_value(self, key: str) -> Any:
+        """The value in force, falling back to the starting one (RF-04).
 
-        This is what other modules call: a missing parameter is a configuration
-        gap, not an error worth interrupting a purchase or an extraction over.
+        This is what the rest of the module calls. A parameter nobody changed is
+        not a configuration gap any more: the catalog says what it is worth, so
+        there is nothing to warn about and nothing to guess.
         """
         parameter = await self.parameters.get_by_key(key)
         if parameter is None:
-            logger.warning("Parameter not configured, falling back", extra={"key": key})
-            return default
+            return spec_for(key).stored_initial
         return parameter.value
 
-    async def set_parameters(self, items: list[ParameterWrite]) -> list[ParameterRead]:
-        """Create or overwrite a set of parameters in a single transaction.
+    async def set_parameters(
+        self, items: list[ParameterWrite], *, actor_user_id: int
+    ) -> list[ParameterRead]:
+        """Store what the owner decided, and say so — or refuse and say why.
 
-        All of them land or none of them do: half-applied settings would leave
-        the business running on a mix of old and new rules.
+        Validation happens for the whole set before anything is written, so a
+        rejected value cannot leave the platform running on a mix of the old
+        rules and the new ones. A key outside the catalog and a value outside
+        its range are both refused, and the refusal carries the range (RF-06).
+
+        Each change is logged here rather than published as
+        `ManualChangeRecorded`: the log is this module's own table, and
+        publishing an event to hear it back would be ceremony. The event exists
+        for the changes that come from outside.
         """
-        updated = [
-            await self.parameters.upsert(item.key, item.value, item.description) for item in items
-        ]
-        for item in items:
+        validated = [(spec_for(item.key), item) for item in items]
+        checked = [(spec, spec.coerce(item.value)) for spec, item in validated]
+
+        updated: list[ParameterRead] = []
+        for spec, value in checked:
+            previous = await self.parameters.get_by_key(spec.key)
+            old_value = spec.stored_initial if previous is None else previous.value
+            # The label travels into `description` so a `psql` session reading
+            # the table sees the same sentence the owner does. The catalog is
+            # still the source: nothing reads this column back.
+            parameter = await self.parameters.upsert(spec.key, value, spec.label)
+            await self.record_manual_change(
+                ManualChangeRecorded(
+                    entity_type=PARAMETER_ENTITY,
+                    entity_id=spec.key,
+                    action=AuditAction.UPDATED,
+                    actor_user_id=actor_user_id,
+                    section=BusinessSection.SYSTEM,
+                    old_value=old_value,
+                    new_value=value,
+                )
+            )
             # Whoever needs a parameter keeps its own copy: nobody reads this
             # table from outside the module (Artículo IV).
-            await events.publish(
-                BusinessParameterChanged(key=item.key, value=item.value), self.session
-            )
+            await events.publish(BusinessParameterChanged(key=spec.key, value=value), self.session)
+            updated.append(self._parameter_read(spec, parameter))
+
         await self.session.commit()
-        logger.info("Parameters updated", extra={"keys": [item.key for item in items]})
-        return [ParameterRead.model_validate(parameter) for parameter in updated]
+        logger.info(
+            "Parameters updated",
+            extra={"keys": [spec.key for spec, _ in checked], "actor_user_id": actor_user_id},
+        )
+        return updated
+
+    @staticmethod
+    def _parameter_read(spec: ParameterSpec, stored: Parameter | None) -> ParameterRead:
+        """Put the value in force on top of what the catalog declares."""
+        return ParameterRead(
+            key=spec.key,
+            label=spec.label,
+            effect=spec.effect,
+            kind=spec.kind,
+            value=spec.stored_initial if stored is None else stored.value,
+            initial=spec.stored_initial,
+            minimum=None if spec.minimum is None else str(spec.minimum),
+            maximum=None if spec.maximum is None else str(spec.maximum),
+            unit=spec.unit,
+            consumed_by=spec.consumed_by,
+            has_effect=spec.has_effect,
+            changed_at=None if stored is None else stored.updated_at,
+        )
+
+    # --- The log of manual changes ---------------------------------------
+    #
+    # One door in, and it is this one: `record_manual_change`. The handler of
+    # `ManualChangeRecorded` calls it for what happens in other modules, and
+    # `set_parameters` calls it for what happens here.
+
+    async def record_manual_change(self, event: ManualChangeRecorded) -> None:
+        """Append one line to the log. It cannot be edited afterwards.
+
+        No exception is caught around this on purpose. It runs in the
+        transaction of whoever made the change, so if the line cannot be
+        written the change does not happen either (`GEN-09`): a change without
+        its record is exactly the silent loss Artículo II forbids.
+        """
+        await self.audit.insert(
+            AuditEntry(
+                entity_type=event.entity_type,
+                entity_id=event.entity_id,
+                field=event.field,
+                action=event.action,
+                old_value=event.old_value,
+                new_value=event.new_value,
+                reason_code=event.reason_code,
+                reason_detail=event.reason_detail,
+                actor_user_id=event.actor_user_id,
+                section=event.section,
+                occurred_at=event.occurred_at,
+            )
+        )
+        logger.info(
+            "Manual change recorded",
+            extra={
+                "entity_type": event.entity_type,
+                "entity_id": event.entity_id,
+                "action": event.action.value,
+                "actor_user_id": event.actor_user_id,
+            },
+        )
+
+    async def list_audit(
+        self,
+        *,
+        sections: Sequence[BusinessSection] | None,
+        skip: int = 0,
+        limit: int = 50,
+        actor_user_id: int | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> AuditEntryList:
+        """The history of manual changes, newest first (RF-13, RF-14, RF-18, RF-19).
+
+        `sections` is the caller's own reach, resolved by `identity`, and it is
+        applied to the query rather than checked afterwards: the owner passes
+        `None` and sees everything, everybody else sees their sections only.
+        """
+        entries = await self.audit.list(
+            skip=skip,
+            limit=limit,
+            sections=sections,
+            actor_user_id=actor_user_id,
+            since=since,
+            until=until,
+        )
+        total = await self.audit.count(
+            sections=sections, actor_user_id=actor_user_id, since=since, until=until
+        )
+        return AuditEntryList(
+            items=[self._audit_read(entry) for entry in entries],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+
+    async def audit_for_entity(
+        self, entity_type: str, entity_id: str, *, sections: Sequence[BusinessSection] | None
+    ) -> list[AuditEntryRead]:
+        """The history of one datum, reachable from the datum itself (RF-15)."""
+        entries = await self.audit.list_for_entity(entity_type, entity_id, sections=sections)
+        return [self._audit_read(entry) for entry in entries]
+
+    @staticmethod
+    def correction_reasons() -> list[CorrectionReasonRead]:
+        """The list a person picks a reason from (RF-11).
+
+        Served from here because here is where a `reason_code` is validated. A
+        list kept in the browser would be a second list, and the day they
+        disagree the browser offers something the API refuses.
+        """
+        return [
+            CorrectionReasonRead(code=reason.value, label=label)
+            for reason, label in REASON_LABELS.items()
+        ]
+
+    @staticmethod
+    def _audit_read(entry: AuditEntry) -> AuditEntryRead:
+        """One line of the history, with its reason spelled out."""
+        return AuditEntryRead(
+            id=entry.id,
+            entity_type=entry.entity_type,
+            entity_id=entry.entity_id,
+            field=entry.field,
+            action=entry.action,
+            old_value=entry.old_value,
+            new_value=entry.new_value,
+            reason_code=entry.reason_code,
+            reason_label=label_for(entry.reason_code),
+            reason_detail=entry.reason_detail,
+            actor_user_id=entry.actor_user_id,
+            section=entry.section,
+            occurred_at=entry.occurred_at,
+        )
 
     # --- The price update -------------------------------------------------
 
@@ -432,35 +609,34 @@ class OperationsService:
         )
 
     async def set_price_update_settings(
-        self, payload: PriceUpdateSettingsWrite
+        self, payload: PriceUpdateSettingsWrite, *, actor_user_id: int
     ) -> PriceUpdateSettingsRead:
-        """Store what the owner decided, and tell whoever reads it (RF-18, RF-19)."""
+        """Store what the owner decided, and tell whoever reads it (RF-18, RF-19).
+
+        The same two keys of the catalog, through the same door as the general
+        panel: the validation, the log line and the event are written once.
+        """
         await self.set_parameters(
             [
+                ParameterWrite(key=INTERVAL_HOURS_KEY, value=payload.interval_hours),
                 ParameterWrite(
-                    key=INTERVAL_HOURS_KEY,
-                    value=payload.interval_hours,
-                    description="Cada cuántas horas se consulta el portal",
+                    key=HIGHLIGHT_THRESHOLD_KEY, value=str(payload.highlight_threshold_pct)
                 ),
-                ParameterWrite(
-                    key=HIGHLIGHT_THRESHOLD_KEY,
-                    value=str(payload.highlight_threshold_pct),
-                    description="Porcentaje de suba a partir del cual un producto se destaca",
-                ),
-            ]
+            ],
+            actor_user_id=actor_user_id,
         )
         return await self.price_update_settings()
 
     async def interval_hours(self) -> int:
         """How often the portal is queried."""
-        return self._as_int(
-            await self.get_parameter_value(INTERVAL_HOURS_KEY), DEFAULT_INTERVAL_HOURS
-        )
+        spec = spec_for(INTERVAL_HOURS_KEY)
+        return self._as_int(await self.get_parameter_value(INTERVAL_HOURS_KEY), spec.initial)
 
     async def highlight_threshold(self) -> Decimal:
         """Above which rise a product is highlighted."""
+        spec = spec_for(HIGHLIGHT_THRESHOLD_KEY)
         return self._as_decimal(
-            await self.get_parameter_value(HIGHLIGHT_THRESHOLD_KEY), DEFAULT_HIGHLIGHT_THRESHOLD
+            await self.get_parameter_value(HIGHLIGHT_THRESHOLD_KEY), Decimal(str(spec.initial))
         )
 
     @staticmethod

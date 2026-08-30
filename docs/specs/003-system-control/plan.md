@@ -49,8 +49,9 @@ nada sin decirlo sería exactamente la clase de pantalla que miente.
 transacción del publicador, así que **no existe un cambio sin su registro**: si el handler falla,
 aborta la edición (`GEN-09`). Es el artículo IV usado a favor en lugar de sufrido — el módulo que
 edita no conoce `operations`, y `operations` no conoce a nadie. La inmutabilidad no se delega al
-código: la migración instala un trigger que hace fallar cualquier `UPDATE` o `DELETE` sobre la
-tabla, y el repositorio ni siquiera expone los métodos.
+código: la migración instala dos triggers que hacen fallar cualquier `UPDATE`, `DELETE` o
+`TRUNCATE` sobre la tabla —dos, porque el trigger de fila que frena los dos primeros no se dispara
+ante un `TRUNCATE`—, y el repositorio ni siquiera expone los métodos.
 
 **La corrección la guarda el módulo dueño del dato.** Esta es la decisión que más consecuencias
 tiene y conviene entender por qué no es la obvia. Lo natural sería una tabla central de correcciones
@@ -131,7 +132,7 @@ está en [`data-model.md`](data-model.md). El resumen:
 
 | Schema | Tabla | Dueño | Nota |
 |---|---|---|---|
-| `operations` | `audit_entry` | `operations` | Append-only, con trigger que rechaza `UPDATE` y `DELETE` |
+| `operations` | `audit_entry` | `operations` | Append-only, con dos triggers que rechazan `UPDATE`, `DELETE` y `TRUNCATE` |
 | `operations` | `parameter` *(existe)* | `operations` | Pasa a guardar sólo lo que el dueño cambió; el catálogo declara el resto |
 | `core` | `correction` | `catalog` | El valor del portal, el corregido, el motivo y la marca de conflicto |
 

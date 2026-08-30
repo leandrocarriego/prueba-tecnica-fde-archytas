@@ -64,8 +64,14 @@ export default async function PricesPage({
         <Link className="ml-auto text-muted-foreground underline" href="/revision">
           Revisión
         </Link>
-        <Link className="text-muted-foreground underline" href="/precios/configuracion">
-          Configuración
+        {/*
+          The two parameters of the price update moved to the one parameters
+          panel: the signed spec of 003 forbids a parameter living inside the
+          screen of the feature that reads it. The link points there, and
+          `/precios/configuracion` redirects to the same place.
+        */}
+        <Link className="text-muted-foreground underline" href="/configuracion">
+          Parámetros
         </Link>
       </nav>
 

@@ -24,6 +24,7 @@ from app import models  # noqa: F401
 from app.config import settings
 from app.database import engine
 from app.logging import get_logger, setup_logging
+from app.modules.catalog.routes import corrections_router
 from app.modules.catalog.routes import router as catalog_router
 from app.modules.identity.middleware import record_refusals
 from app.modules.identity.routes import access_log_router, auth_router, users_router
@@ -67,6 +68,10 @@ TAGS_METADATA: list[dict[str, str]] = [
     {"name": "Users", "description": "Accounts and roles. The owner's surface."},
     {"name": "Operations", "description": "Background runs and the business parameters."},
     {"name": "Prices", "description": "The supplier's price list and how each price evolved."},
+    {
+        "name": "Corrections",
+        "description": "Correcting a value by hand, and undoing a correction.",
+    },
     {
         "name": "Price updates",
         "description": "The state of the price update, asking for one, and its settings.",
@@ -193,6 +198,7 @@ def register_routers(application: FastAPI) -> None:
     application.include_router(operations_router, prefix=API_PREFIX)
     application.include_router(price_updates_router, prefix=API_PREFIX)
     application.include_router(catalog_router, prefix=API_PREFIX)
+    application.include_router(corrections_router, prefix=API_PREFIX)
     application.include_router(triage_router, prefix=API_PREFIX)
 
 
