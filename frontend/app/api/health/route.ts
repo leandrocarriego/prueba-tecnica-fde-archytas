@@ -1,22 +1,34 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 import { probeHealth } from '@/lib/health'
 
 /**
- * Public, unauthenticated counterpart of `app/api/proxy/[...path]`.
+ * What the status card re-checks with, from the browser.
  *
- * That one exists to attach a session token; this one exists precisely because
- * there is none. The status page needs to re-check the API from the browser,
- * and the browser has no business reaching the backend directly: in the `full`
- * profile the API is behind the reverse proxy on another host, and CORS is
+ * The browser has no business reaching the backend directly: in the `full`
+ * profile the API sits on another host behind the reverse proxy, and CORS is
  * configured for the app's origin only. So the check goes through Next, which
- * is server-side and already knows how to reach the backend.
+ * is server-side and already knows how to reach it.
+ *
+ * It asks for a session, and that is the point rather than a formality. Only
+ * the frontend is published — the API carries no Traefik router — so this route
+ * is the single way the state of the database and of the WhatsApp channel could
+ * leave the machine. Leaving it open while the page that uses it requires a
+ * session would hide the page and not the answer.
+ *
+ * The backend's own `/health` stays public and must: the container's healthcheck
+ * calls it before anybody logs in, and it is not reachable from outside.
  */
 
 // A cached health check is not a health check.
 export const dynamic = 'force-dynamic'
 
 export async function GET(): Promise<NextResponse> {
+  if (!(await cookies()).get('access_token')) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   const probe = await probeHealth()
 
   // Always 200, even when the probe failed: what this route reports is the

@@ -16,10 +16,6 @@ export function proxy(request: NextRequest) {
     '/reset-password',
     '/invitacion',
     '/recuperar',
-    // Estado del servicio: tiene que poder abrirse justamente cuando la
-    // plataforma no anda. Si esta ruta pidiera sesión, el día que la API se
-    // caiga redirigiría a un login que tampoco puede funcionar.
-    '/estado',
     '/api', // API routes pueden tener su propia autenticación
   ]
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
