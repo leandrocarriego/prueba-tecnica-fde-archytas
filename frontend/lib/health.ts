@@ -18,6 +18,7 @@ export type HealthReport = {
   service: WireHealth['service']
   environment: WireHealth['environment']
   database: { status: WireHealth['database']['status'] }
+  whatsapp: { status: WireHealth['whatsapp']['status'] }
 }
 
 /**
@@ -43,18 +44,22 @@ function isWireHealth(value: unknown): value is WireHealth {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
   const database = candidate.database as Record<string, unknown> | null | undefined
+  const whatsapp = candidate.whatsapp as Record<string, unknown> | null | undefined
   return (
     isState(candidate.status) &&
     typeof candidate.service === 'string' &&
     typeof candidate.environment === 'string' &&
     typeof database === 'object' &&
     database !== null &&
-    isState(database.status)
+    isState(database.status) &&
+    typeof whatsapp === 'object' &&
+    whatsapp !== null &&
+    isState(whatsapp.status)
   )
 }
 
 function isState(value: unknown): value is WireHealth['status'] {
-  return value === 'ok' || value === 'down'
+  return value === 'ok' || value === 'down' || value === 'off'
 }
 
 /** Keep only the fields the page renders. */
@@ -64,6 +69,7 @@ function toReport(wire: WireHealth): HealthReport {
     service: wire.service,
     environment: wire.environment,
     database: { status: wire.database.status },
+    whatsapp: { status: wire.whatsapp.status },
   }
 }
 

@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+import httpx
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,7 @@ from app.modules.operations.repository import (
     DatabaseProbe,
     JobRunRepository,
     ParameterRepository,
+    WhatsAppProbe,
 )
 from app.modules.operations.schemas import (
     ComponentHealth,
@@ -48,6 +50,12 @@ logger = get_logger(__name__)
 # `/health` is public: the caller learns that the database is not answering,
 # never why. The exception itself goes to the log.
 DATABASE_UNAVAILABLE = "The database is not answering"
+# Deliberately generic, like the database's: `/health` is public, so a detail
+# must not name the gateway, its instance or its address. The real exception
+# goes to the log.
+WHATSAPP_UNREACHABLE = "The WhatsApp gateway is not answering"
+WHATSAPP_DISCONNECTED = "The WhatsApp session is not connected"
+WHATSAPP_NOT_CONFIGURED = "The WhatsApp channel is not configured"
 
 # --- The price update ----------------------------------------------------
 
@@ -105,6 +113,7 @@ class OperationsService:
         self.runs = JobRunRepository(session)
         self.parameters = ParameterRepository(session)
         self.database = DatabaseProbe(session)
+        self.whatsapp = WhatsAppProbe()
 
     # --- Job runs --------------------------------------------------------
 
@@ -510,8 +519,34 @@ class OperationsService:
             database = ComponentHealth(status=HealthState.DOWN, detail=DATABASE_UNAVAILABLE)
 
         return HealthRead(
+            # Only the database decides this. See `HealthRead`: the route
+            # answers 503 when it is not OK and Docker restarts on that, so a
+            # WhatsApp outage counting here would restart the API every fifteen
+            # seconds because somebody else's gateway is down.
             status=database.status,
             service=settings.PROJECT_NAME,
             environment=settings.ENVIRONMENT,
             database=database,
+            whatsapp=await self._whatsapp_health(),
         )
+
+    async def _whatsapp_health(self) -> ComponentHealth:
+        """Report the channel the owner is reached through. Never raises.
+
+        Worth reporting even though it changes nothing about serving requests:
+        when the session drops, every invitation and every alert stops arriving
+        and **nothing says so** — the one channel that could carry the warning
+        is the channel that is down. So it is written where somebody can look.
+        """
+        if not self.whatsapp.is_configured:
+            return ComponentHealth(status=HealthState.OFF, detail=WHATSAPP_NOT_CONFIGURED)
+        try:
+            connected = await self.whatsapp.is_connected()
+        except (httpx.HTTPError, OSError):
+            logger.exception("WhatsApp health check failed")
+            return ComponentHealth(status=HealthState.DOWN, detail=WHATSAPP_UNREACHABLE)
+        if not connected:
+            # The gateway answered, and what it said is that the phone is no
+            # longer paired. That is down, not off: nobody turned it off.
+            return ComponentHealth(status=HealthState.DOWN, detail=WHATSAPP_DISCONNECTED)
+        return ComponentHealth(status=HealthState.OK)

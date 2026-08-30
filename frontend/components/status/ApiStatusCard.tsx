@@ -4,7 +4,7 @@ import * as React from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import type { HealthProbe } from '@/lib/health'
+import type { HealthProbe, HealthReport } from '@/lib/health'
 import { CLOCK_FORMAT } from '@/lib/time'
 
 /** How often the card re-asks on its own, in milliseconds. */
@@ -41,6 +41,19 @@ type StatusView = {
   facts: { label: string; value: string }[]
 }
 
+/**
+ * What each state of the WhatsApp channel is called on screen.
+ *
+ * `off` reads as a decision and not as a fault, because that is what it is:
+ * nobody configured the channel. Calling it "No responde" would train whoever
+ * reads this card to ignore the one time it is real.
+ */
+const WHATSAPP_LABELS: Record<HealthReport['whatsapp']['status'], string> = {
+  ok: 'Conectado',
+  down: 'Desconectado',
+  off: 'Sin configurar',
+}
+
 /** Turn a probe into what the card shows. All copy is user-facing, so Spanish. */
 function describe(probe: HealthProbe): StatusView {
   if (!probe.reachable) {
@@ -61,14 +74,22 @@ function describe(probe: HealthProbe): StatusView {
     { label: 'Servicio', value: report.service },
     { label: 'Entorno', value: report.environment },
     { label: 'Base de datos', value: report.database.status === 'ok' ? 'Responde' : 'No responde' },
+    { label: 'WhatsApp', value: WHATSAPP_LABELS[report.whatsapp.status] },
     { label: 'Respuesta HTTP', value: String(httpStatus) },
   ]
 
   if (report.status === 'ok') {
+    // WhatsApp is reported but never demotes the headline: the platform works
+    // without it, and `report.status` already leaves it out for the same
+    // reason. What it does get is a line of its own, because a channel that
+    // silently stopped delivering is exactly what nothing else would say.
+    const whatsappIsDown = report.whatsapp.status === 'down'
     return {
       tone: 'ok',
       headline: 'Operativa',
-      explanation: 'La API responde y sus dependencias también.',
+      explanation: whatsappIsDown
+        ? 'La API responde. Los avisos por WhatsApp no están saliendo.'
+        : 'La API responde y sus dependencias también.',
       facts,
     }
   }

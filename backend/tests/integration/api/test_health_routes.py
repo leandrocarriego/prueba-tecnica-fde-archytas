@@ -1,12 +1,46 @@
 """Integration tests for the health endpoint."""
 
+from types import SimpleNamespace
+from typing import Any
+
+import httpx
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.exc import OperationalError
 
 from app.config import settings
+from app.modules.operations import repository as repository_module
 from app.modules.operations.repository import DatabaseProbe
 from tests.conftest import API_PREFIX
+
+
+def gateway_answering(handler: Any, monkeypatch: pytest.MonkeyPatch) -> list[httpx.Request]:
+    """Point the probe's HTTP client at a transport under the test's control.
+
+    Same shape as the notifications tests: a real `httpx.AsyncClient` over a
+    mock transport, because what is worth checking is the request that actually
+    goes out.
+    """
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return handler(request)
+
+    def build(**kwargs: Any) -> httpx.AsyncClient:
+        return httpx.AsyncClient(transport=httpx.MockTransport(record), **kwargs)
+
+    monkeypatch.setattr(
+        repository_module, "httpx", SimpleNamespace(AsyncClient=build, HTTPError=httpx.HTTPError)
+    )
+    return seen
+
+
+def configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give the probe a gateway to ask about."""
+    monkeypatch.setattr(settings, "EVOLUTION_API_URL", "http://evolution.interno:8099")
+    monkeypatch.setattr(settings, "EVOLUTION_INSTANCE", "cordillera")
+    monkeypatch.setattr(settings, "EVOLUTION_API_KEY", "una-clave-de-prueba")
 
 
 @pytest.mark.integration
@@ -26,6 +60,8 @@ class TestHealthRoutes:
         assert body["service"] == settings.PROJECT_NAME
         assert body["environment"] == settings.ENVIRONMENT
         assert body["database"] == {"status": "ok", "detail": None}
+        # No gateway configured in the suite, which is not a fault: see below.
+        assert body["whatsapp"]["status"] == "off"
 
     async def test_health_is_public(self, client: AsyncClient) -> None:
         """No credentials: Docker's healthcheck runs before anyone logs in."""
@@ -67,3 +103,114 @@ class TestHealthRoutes:
         # The reason stays in the log: `/health` is public and must not leak
         # hostnames or drivers.
         assert "connection refused" not in body["database"]["detail"]
+
+
+@pytest.mark.integration
+@pytest.mark.database
+class TestTheWhatsAppComponent:
+    """The channel is reported, and deliberately does not decide the verdict.
+
+    It is worth reporting because when the session drops, every invitation and
+    every alert stops arriving and nothing says so — the channel that would
+    carry the warning is the one that is down.
+
+    It must not decide the verdict because the route answers 503 when `status`
+    is not OK and Docker restarts on that. A gateway belonging to a third party
+    must never be able to restart this API.
+    """
+
+    async def test_an_unconfigured_channel_is_off_and_not_a_fault(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Nobody asked for it, so nothing is broken."""
+        # Arrange
+        monkeypatch.setattr(settings, "EVOLUTION_API_KEY", "")
+
+        # Act
+        response = await client.get(f"{API_PREFIX}/health")
+
+        # Assert
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["whatsapp"]["status"] == "off"
+
+    async def test_a_connected_session_is_ok(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The gateway says the session is open, and it is asked with the key."""
+        # Arrange
+        configured(monkeypatch)
+        requests = gateway_answering(
+            lambda _r: httpx.Response(200, json={"instance": {"state": "open"}}), monkeypatch
+        )
+
+        # Act
+        response = await client.get(f"{API_PREFIX}/health")
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["whatsapp"] == {"status": "ok", "detail": None}
+        assert requests[0].url.path == "/instance/connectionState/cordillera"
+        assert requests[0].headers["apikey"] == "una-clave-de-prueba"
+
+    async def test_a_gateway_that_does_not_answer_does_not_take_the_api_down(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The one that matters: 200, so Docker does not restart the API."""
+
+        # Arrange
+        def refuse(_request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("connection refused")
+
+        configured(monkeypatch)
+        gateway_answering(refuse, monkeypatch)
+
+        # Act
+        response = await client.get(f"{API_PREFIX}/health")
+
+        # Assert
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["whatsapp"]["status"] == "down"
+
+    async def test_an_unpaired_session_is_down_rather_than_off(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The gateway answered: the phone stopped being paired. Nobody chose that."""
+        # Arrange
+        configured(monkeypatch)
+        gateway_answering(
+            lambda _r: httpx.Response(200, json={"instance": {"state": "close"}}), monkeypatch
+        )
+
+        # Act
+        response = await client.get(f"{API_PREFIX}/health")
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["whatsapp"]["status"] == "down"
+
+    async def test_the_detail_never_leaks_the_gateway(
+        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`/health` is public. It must not hand out the address, key or instance."""
+
+        # Arrange
+        def refuse(_request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("connection refused to http://evolution.interno:8099")
+
+        configured(monkeypatch)
+        gateway_answering(refuse, monkeypatch)
+
+        # Act
+        response = await client.get(f"{API_PREFIX}/health")
+
+        # Assert
+        detail = response.json()["whatsapp"]["detail"]
+        assert "evolution.interno" not in detail
+        assert "8099" not in detail
+        assert "una-clave-de-prueba" not in detail
+        assert "cordillera" not in detail
+        assert "connection refused" not in detail

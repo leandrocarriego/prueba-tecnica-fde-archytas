@@ -1,10 +1,18 @@
-"""Data access for the operations module. Private to this module."""
+"""Where the operations module reaches outside itself. Private to this module.
+
+Mostly its own tables, and at the end the two probes: this is the module that
+watches the platform operate, so it is the one that asks a dependency whether
+it is answering. Both live here for the same reason `DatabaseProbe` gives —
+nothing else in the module opens a connection of its own.
+"""
 
 from typing import Any
 
+import httpx
 from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.modules.operations.models import JobRun, JobStatus, Parameter
 from app.shared.repository import BaseRepository
 
@@ -144,3 +152,45 @@ class DatabaseProbe:
     async def ping(self) -> None:
         """Run a trivial query. Raises if the database is unreachable."""
         await self.session.execute(text("select 1"))
+
+
+class WhatsAppProbe:
+    """Asks the gateway whether its WhatsApp session is still open.
+
+    It reads the settings and talks HTTP; it does **not** import
+    `notifications`. A module never imports another module (Artículo IV), and
+    it does not need to: this is the same shape as pinging the database, which
+    `operations` also does without importing whoever owns it.
+
+    The duplication is one URL, and the alternative was worse. A projection fed
+    by events would only learn the channel is down when something tried to send
+    — which is the moment the answer is least useful, and says nothing at all
+    on a quiet day.
+    """
+
+    # Short on purpose: this runs inside `/health`, which Docker calls every
+    # fifteen seconds with a five second timeout. A slow gateway must not make
+    # the API look unhealthy.
+    TIMEOUT_SECONDS = 2.0
+
+    @property
+    def is_configured(self) -> bool:
+        """Whether there is a gateway to ask about at all."""
+        return bool(
+            settings.EVOLUTION_API_URL
+            and settings.EVOLUTION_INSTANCE
+            and settings.EVOLUTION_API_KEY
+        )
+
+    async def is_connected(self) -> bool:
+        """Whether the session is paired and open. Raises if the gateway is not answering."""
+        url = (
+            f"{settings.EVOLUTION_API_URL.rstrip('/')}"
+            f"/instance/connectionState/{settings.EVOLUTION_INSTANCE}"
+        )
+        async with httpx.AsyncClient(timeout=self.TIMEOUT_SECONDS) as client:
+            response = await client.get(url, headers={"apikey": settings.EVOLUTION_API_KEY})
+            response.raise_for_status()
+            body = response.json()
+        state = body.get("instance", {}).get("state") if isinstance(body, dict) else None
+        return state == "open"
