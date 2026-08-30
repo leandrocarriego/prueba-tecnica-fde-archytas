@@ -727,6 +727,14 @@ export interface components {
         /**
          * HealthRead
          * @description The answer of `/health`: the service plus every dependency it needs.
+         *
+         *     `status` is whether this process can serve a request, and **only the
+         *     database decides it**. WhatsApp is reported beside it and deliberately does
+         *     not count: the route answers 503 when `status` is not OK and Docker
+         *     restarts on that, so letting a WhatsApp outage in would restart the API
+         *     every fifteen seconds because a third party's gateway is down. That is the
+         *     opposite of what the channel promises — a message that cannot be sent never
+         *     takes anything else with it.
          */
         HealthRead: {
             status: components["schemas"]["HealthState"];
@@ -735,13 +743,19 @@ export interface components {
             /** Environment */
             environment: string;
             database: components["schemas"]["ComponentHealth"];
+            whatsapp: components["schemas"]["ComponentHealth"];
         };
         /**
          * HealthState
          * @description How a component is answering right now.
+         *
+         *     `OFF` is not a milder `DOWN`: it means somebody decided this dependency is
+         *     not in use. A channel with no credentials is doing exactly what was asked
+         *     of it, and reporting that as a fault would train whoever reads this to
+         *     ignore the one time it is real.
          * @enum {string}
          */
-        HealthState: "ok" | "down";
+        HealthState: "ok" | "down" | "off";
         /**
          * JobRunList
          * @description A page of runs.
