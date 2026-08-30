@@ -36,7 +36,7 @@ from app.modules.operations.schemas import (
     PriceUpdateSettingsWrite,
     PriceUpdateStatusRead,
 )
-from app.quality import get_quality
+from app.quality import Quality, get_quality
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.events import (
     BusinessParameterChanged,
@@ -529,8 +529,17 @@ class OperationsService:
             environment=settings.ENVIRONMENT,
             database=database,
             whatsapp=await self._whatsapp_health(),
-            quality=get_quality(),
         )
+
+    @staticmethod
+    def quality() -> Quality | None:
+        """What the suite measured for the code this image was built from.
+
+        Not part of `/health`, which is public: how well a system is tested is
+        a fact about the people who build it, and it is theirs to share rather
+        than anyone's to read off the internet. It needs a session.
+        """
+        return get_quality()
 
     async def _whatsapp_health(self) -> ComponentHealth:
         """Report the channel the owner is reached through. Never raises.
