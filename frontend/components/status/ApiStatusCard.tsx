@@ -111,6 +111,13 @@ export function ApiStatusCard({ initial }: { initial: HealthProbe }) {
     setChecking(true)
     try {
       const response = await fetch('/api/health', { cache: 'no-store' })
+      if (response.status === 401) {
+        // The session expired while this page sat open. Parsing the refusal as
+        // a report would render an empty "Sin respuesta" and blame the API for
+        // something that is not its fault.
+        setProbe({ reachable: false, reason: 'La sesión venció. Entrá de nuevo.' })
+        return
+      }
       setProbe((await response.json()) as HealthProbe)
     } catch {
       // The page itself could not reach its own route handler — almost always
