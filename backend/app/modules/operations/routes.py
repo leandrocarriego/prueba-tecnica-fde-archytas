@@ -41,6 +41,7 @@ from app.modules.operations.schemas import (
     PriceUpdateStatusRead,
 )
 from app.modules.operations.service import OperationsService
+from app.quality import Quality
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -80,6 +81,24 @@ async def health(response: Response, service: OperationsDep) -> HealthRead:
     if report.status is not HealthState.OK:
         response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
     return report
+
+
+@router.get(
+    "/quality",
+    dependencies=[Depends(get_current_user)],
+    summary="Tests and coverage of the build this image came from",
+)
+async def read_quality(service: OperationsDep) -> Quality | None:
+    """Every authenticated role, and nobody else.
+
+    `/health` is public and deliberately says nothing about this: how well the
+    system is tested is a fact about the people who build it, not something to
+    be read off the internet by anyone who finds the domain.
+
+    `None` when the image carries no snapshot. Saying nothing is the honest
+    answer to "we do not know"; a number nobody measured would not be.
+    """
+    return service.quality()
 
 
 @router.get(

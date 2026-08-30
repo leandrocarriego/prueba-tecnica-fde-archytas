@@ -221,12 +221,16 @@ class TestTheWhatsAppComponent:
 @pytest.mark.integration
 @pytest.mark.database
 class TestTheQualitySnapshot:
-    """The two numbers the status page shows about the code itself.
+    """The two numbers about the code itself, and who gets to read them.
 
-    They are a claim, so what matters is that the platform can only ever repeat
-    a measurement or say nothing. `scripts/quality_snapshot.py` writes it from
-    the artefacts of a real run and CI fails when the committed file disagrees
-    with the suite; these tests cover the half that runs in production.
+    They are a claim, so the platform can only ever repeat a measurement or say
+    nothing: `scripts/quality_snapshot.py` writes it from the artefacts of a
+    real run and CI fails when the committed file disagrees with the suite.
+    These tests cover the half that runs in production.
+
+    And they need a session. How well a system is tested is a fact about the
+    people who build it, not something to read off the internet by anyone who
+    finds the domain.
     """
 
     @pytest.fixture(autouse=True)
@@ -236,53 +240,62 @@ class TestTheQualitySnapshot:
         yield
         get_quality.cache_clear()
 
-    async def test_it_reports_what_the_suite_measured(
-        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """The numbers reach the page unchanged."""
-        # Arrange
-        monkeypatch.setattr(
-            "app.modules.operations.service.get_quality",
-            lambda: Quality(tests=546, coverage=94.71),
-        )
-
+    async def test_the_public_health_says_nothing_about_it(self, client: AsyncClient) -> None:
+        """The one that matters: `/health` is public and must not carry it."""
         # Act
         response = await client.get(f"{API_PREFIX}/health")
 
         # Assert
         assert response.status_code == 200
-        assert response.json()["quality"] == {"tests": 546, "coverage": 94.71}
+        assert "quality" not in response.json()
+
+    async def test_it_reports_what_the_suite_measured(
+        self, owner_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With a session, the numbers reach the page unchanged."""
+        # Arrange
+        monkeypatch.setattr(
+            "app.modules.operations.service.get_quality",
+            lambda: Quality(tests=550, coverage=94.74),
+        )
+
+        # Act
+        response = await owner_client.get(f"{API_PREFIX}/operations/quality")
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json() == {"tests": 550, "coverage": 94.74}
 
     async def test_an_image_without_a_snapshot_says_nothing(
-        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+        self, owner_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Silence is the honest answer to "we do not know"."""
         # Arrange
         monkeypatch.setattr("app.modules.operations.service.get_quality", lambda: None)
 
         # Act
-        response = await client.get(f"{API_PREFIX}/health")
+        response = await owner_client.get(f"{API_PREFIX}/operations/quality")
 
         # Assert
         assert response.status_code == 200
-        assert response.json()["quality"] is None
+        assert response.json() is None
 
-    async def test_a_missing_file_never_breaks_the_health_check(
-        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    async def test_a_missing_file_never_breaks_the_route(
+        self, owner_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        """The API serves requests perfectly well without knowing its coverage."""
+        """The API works perfectly well without knowing its own coverage."""
         # Arrange
         monkeypatch.setattr("app.quality.SNAPSHOT", tmp_path / "no-esta.json")
 
         # Act
-        response = await client.get(f"{API_PREFIX}/health")
+        response = await owner_client.get(f"{API_PREFIX}/operations/quality")
 
         # Assert
         assert response.status_code == 200
-        assert response.json()["quality"] is None
+        assert response.json() is None
 
     async def test_a_corrupt_file_is_not_a_number_it_made_up(
-        self, client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+        self, owner_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """The one thing it must never do is invent the figure."""
         # Arrange
@@ -291,8 +304,8 @@ class TestTheQualitySnapshot:
         monkeypatch.setattr("app.quality.SNAPSHOT", broken)
 
         # Act
-        response = await client.get(f"{API_PREFIX}/health")
+        response = await owner_client.get(f"{API_PREFIX}/operations/quality")
 
         # Assert
         assert response.status_code == 200
-        assert response.json()["quality"] is None
+        assert response.json() is None

@@ -40,6 +40,15 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
         </nav>
 
         <div className="flex items-center gap-3 text-sm">
+          {/*
+            Not in ENTRIES, and not an oversight: every entry there names the
+            section its route demands, and this one demands none — any session
+            may read it. Giving it a section to fit the list would hide it from
+            whoever lacks that section, which is the opposite of true.
+          */}
+          <Link href="/health" className="text-muted-foreground hover:underline">
+            Salud
+          </Link>
           {/* RF-03: while somebody is working, the screen says who. */}
           <Link href="/mi-cuenta" className="text-muted-foreground hover:underline">
             {user.name}
