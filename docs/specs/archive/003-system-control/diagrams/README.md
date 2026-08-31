@@ -122,7 +122,8 @@ flowchart TD
     U --> V["Ve el valor corregido y, al lado, el que había informado el portal"]
     U --> K2["Llega al historial de ese dato sin buscarlo en otra pantalla"]
     K2 --> K
-    U --> O["Deja sin efecto la corrección, desde acá y no desde el historial"]
+    U --> O["Deja sin efecto la corrección"]
+    K --> O
     O --> P["El dato vuelve a mostrar lo que informó el portal"]
     O --> Q["Queda registrado quién la anuló y cuándo"]
     O --> R["Sobre un dato que el portal nunca informó no hay corrección que anular, y la opción no aparece"]
@@ -258,3 +259,4 @@ flowchart TD
     U["El historial de cambios"] --> V["No se puede modificar"]
     U --> W["No se puede eliminar"]
 ```
+

@@ -229,6 +229,7 @@ Toda ruta declara su autorización con la dependencia de `identity` (`PY-09`, Bl
 | `GET /operations/audit/{entity_type}/{entity_id}` | RF-15 | autenticado · filtrado por sección |
 | `GET /operations/corrections/reasons` | RF-11 | autenticado |
 | `POST /catalog/products/{product_id}/corrections` | RF-11, RF-22 a RF-27 | `PRODUCT_CATALOG` · escritura — dueño y ventas |
+| `GET /catalog/corrections?product_id=…` | RF-30 | `MANUAL_CORRECTIONS` · lectura — sólo el dueño |
 | `DELETE /catalog/corrections/{correction_id}` | RF-30 a RF-33 | `MANUAL_CORRECTIONS` · escritura — sólo el dueño |
 
 Tres cosas sobre esta tabla:

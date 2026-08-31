@@ -29,6 +29,21 @@ class CorrectionMark(BaseModel):
     conflict_value: Any | None = None
 
 
+class CorrectionInForceRead(CorrectionMark):
+    """A standing correction, said in the words a screen away from the datum needs.
+
+    `CorrectionMark` is enough on the product's own page: the page already knows
+    which datum it is about. The change log does not — it shows the corrections
+    of many data at once — so which datum a correction stands on travels with
+    it, in the same vocabulary the log writes (`catalog.product_price`, the
+    product id as text). That is what lets the log offer the undo beside the row
+    that reported the correction (RF-30) instead of only linking away to it.
+    """
+
+    entity_type: str
+    entity_id: str
+
+
 class CorrectionWrite(BaseModel):
     """What somebody has to say to correct a value (RF-11, RF-23).
 
@@ -242,3 +257,4 @@ class CatalogDashboard(BaseModel):
     stock: list[StockCut]
     stock_excluded: int
     new_products: list[NewProductRead]
+    new_products_excluded: int = 0

@@ -618,6 +618,35 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/catalog/corrections': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The corrections still standing on a set of products
+     * @description The owner alone, and for the same reason the undo below is.
+     *
+     *     It is asked by the change log, which lists corrections of many products at
+     *     once and offers the undo beside each row (RF-30): without it the screen
+     *     would know that something was corrected and not which correction to undo.
+     *     Whoever cannot undo never gets here, so the ids are not handed to a screen
+     *     that has no use for them.
+     *
+     *     The products come as repeated `product_id`, bounded like a page of the log:
+     *     one query for the page instead of one request per row.
+     */
+    get: operations['corrections_in_force_api_v1_catalog_corrections_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/catalog/corrections/{correction_id}': {
     parameters: {
       query?: never
@@ -652,13 +681,13 @@ export interface paths {
     }
     /**
      * The rubros, with their count and their written forms
-     * @description Every authenticated role (RF-01, RF-03, RF-04, RF-09 to RF-11).
+     * @description The three roles, sales included (RF-10 of 010).
      */
     get: operations['list_categories_api_v1_categories_get']
     put?: never
     /**
      * Add a rubro
-     * @description The owner and sales (RF-05).
+     * @description The owner and purchasing (RF-01 of 010, which replaces RF-05 of 008).
      */
     post: operations['create_category_api_v1_categories_post']
     delete?: never
@@ -676,7 +705,7 @@ export interface paths {
     }
     /**
      * The products waiting for a rubro
-     * @description Every authenticated role. Each product carries its proposal, or none.
+     * @description The three roles. Each product carries its proposal, or none (RF-13 of 010).
      */
     get: operations['list_unclassified_api_v1_categories_unclassified_get']
     put?: never
@@ -696,7 +725,7 @@ export interface paths {
     }
     /**
      * The equivalences in force
-     * @description Every authenticated role (RF-27).
+     * @description The three roles (RF-27 of 008, RF-10 of 010).
      */
     get: operations['list_aliases_api_v1_categories_aliases_get']
     put?: never
@@ -719,14 +748,14 @@ export interface paths {
     post?: never
     /**
      * Remove a rubro
-     * @description The owner and sales. Refused, with the reason, if anything points at it (RF-07).
+     * @description The owner and purchasing. Refused, with the reason, if anything points at it (RF-03).
      */
     delete: operations['delete_category_api_v1_categories__category_id__delete']
     options?: never
     head?: never
     /**
      * Change the name of a rubro
-     * @description The owner and sales (RF-06).
+     * @description The owner and purchasing (RF-02 of 010, which replaces RF-06 of 008).
      */
     patch: operations['rename_category_api_v1_categories__category_id__patch']
     trace?: never
@@ -741,10 +770,10 @@ export interface paths {
     get?: never
     /**
      * Give a product its rubro
-     * @description The owner and sales.
+     * @description The owner and purchasing (RF-04, RF-05 and RF-13 of 010).
      *
-     *     Confirming the proposal and correcting it are this same call (RF-13, RF-15,
-     *     RF-20). Who decided comes from the token, never from the body (RF-18).
+     *     Confirming the proposal and correcting it are this same call. Who decided
+     *     comes from the token, never from the body (RF-18 of 008).
      */
     put: operations['set_product_category_api_v1_products__product_id__category_put']
     post?: never
@@ -791,6 +820,15 @@ export interface paths {
      *     person who took the decision, and a body could name somebody else. The name
      *     travels as a plain string — the first name, which is how the business names
      *     these people — and not as a user of another module (Artículo IV).
+     *
+     *     A refusal on the way out gets one more name put on it, and that is why this
+     *     route knows about `identity` at all: a decision this queue publishes can be
+     *     turned away by whoever handles the event, and the one refusal that happens
+     *     for a *human* reason — an amount somebody already corrected — names that
+     *     somebody by id, because the module that raised it may not read `identity`.
+     *     Here it may: `dependencies.py` is the one file of `identity` a module is
+     *     allowed to cross, and this is the same trip `operations` makes to put a name
+     *     beside each line of the history.
      */
     post: operations['resolve_case_api_v1_triage_cases__case_id__resolution_post']
     delete?: never
@@ -858,8 +896,12 @@ export interface paths {
       cookie?: never
     }
     /**
-     * The invoices, with every filter of the screen
+     * The invoices, with every filter and every order of the screen
      * @description The owner and purchasing (RF-03, RF-05, RF-39 to RF-46 of 004).
+     *
+     *     `q` searches the invoice number, the supplier name as it arrived written,
+     *     and —for an invoice already attributed— the tax id and the legal name of
+     *     the register (RF-41, RF-42).
      */
     get: operations['list_invoices_api_v1_invoices_get']
     put?: never
@@ -879,7 +921,7 @@ export interface paths {
     }
     /**
      * One invoice, with what its document said
-     * @description The owner and purchasing (RF-03, RF-27, RF-39 of 004).
+     * @description The owner and purchasing (RF-03, RF-27, RF-32, RF-39 of 004).
      */
     get: operations['get_invoice_api_v1_invoices__invoice_id__get']
     put?: never
@@ -956,9 +998,14 @@ export interface paths {
      * What the document of the invoice said
      * @description The owner and purchasing (RF-04 of 004).
      *
-     *     The **excerpt** of the document, as plain text, and not the bytes the portal
-     *     delivered: `raw` is evidence and is never served to a browser, and what a
-     *     person reviewing needs is what the file said next to what the table said.
+     *     The file **as the portal delivered it** — the PDF or the spreadsheet, with
+     *     its own content type — and not a transcription of it. What a person disputes
+     *     is a number, and the answer to «where does that number come from» is the
+     *     paper it was printed on.
+     *
+     *     It is served from this module's own copy (`core.invoice_document.content`),
+     *     never by reading `raw`: that belongs to `portal`. `raw` stays the evidence
+     *     and stays untouched (Artículo III).
      */
     get: operations['invoice_file_api_v1_invoices__invoice_id__file_get']
     put?: never
@@ -1110,6 +1157,10 @@ export interface paths {
     /**
      * The spellings assigned to a supplier
      * @description The owner and purchasing (RF-51 of 004).
+     *
+     *     The name of whoever decided each spelling is resolved here, not in the
+     *     service: the criterion asks for «quién y cuándo», and `purchases` can say
+     *     the id but not the person (Artículo IV).
      */
     get: operations['list_aliases_api_v1_supplier_aliases_get']
     put?: never
@@ -1373,10 +1424,42 @@ export interface paths {
     /**
      * The purchase orders, with their counts
      * @description The owner and purchasing. Sales is refused (RF-09 of 007).
+     *
+     *     `only_in_review` is RF-52, and it is a filter of this same listing rather
+     *     than a screen of its own: the spec decides it that way and gives the reason
+     *     — a queue that costs time is a queue that gets abandoned.
      */
     get: operations['list_orders_api_v1_purchase_orders_get']
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/purchase-orders/{order_id}/resolution': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Say which supplier a held order is from
+     * @description The owner and purchasing; sales is refused (RF-53 of 007).
+     *
+     *     Who resolved it comes from the token, never from the body. With `remember`
+     *     —the default— the spelling is saved as a criterion and **every other order
+     *     and invoice written the same way is resolved with it** (RF-61, RF-62).
+     *
+     *     There is no way to create a supplier from here, and that is the point of
+     *     RF-55: the register is the portal's eight, and adding one is a decision of
+     *     the business taken somewhere else.
+     */
+    post: operations['resolve_order_api_v1_purchase_orders__order_id__resolution_post']
     delete?: never
     options?: never
     head?: never
@@ -1423,6 +1506,32 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/messages/assignees': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Who a message can be handed to
+     * @description The owner and purchasing (RF-30 of 007).
+     *
+     *     Derived from the permission matrix and not from a list of roles written
+     *     here: whoever reaches this section in writing is exactly whoever can be
+     *     made responsible for one of its messages, and keeping the two in one place
+     *     is what stops them from drifting apart. Sales does not reach it, so Julián
+     *     does not appear among the assignable.
+     */
+    get: operations['list_assignees_api_v1_messages_assignees_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/messages/{message_id}/resolution': {
     parameters: {
       query?: never
@@ -1456,6 +1565,11 @@ export interface paths {
     /**
      * Say who is responsible for a message
      * @description The owner and purchasing (RF-30 of 007).
+     *
+     *     **Who may be named is checked, and it used to not be.** The route took any
+     *     `user_id` at all, so a supplier's claim could be handed to whoever does not
+     *     work on suppliers — and the signed acceptance criterion says in as many
+     *     words that Julián is not among the assignable.
      */
     put: operations['assign_message_api_v1_messages__message_id__assignee_put']
     post?: never
@@ -1774,6 +1888,18 @@ export interface components {
       supplier_id: number
     }
     /**
+     * Assignee
+     * @description Somebody a piece of work can be handed to, as another module sees them.
+     */
+    Assignee: {
+      /** User Id */
+      user_id: number
+      /** Name */
+      name: string
+      /** Role */
+      role: string
+    }
+    /**
      * AuditAction
      * @description What a manual change did to the datum it touched.
      *
@@ -1836,7 +1962,19 @@ export interface components {
     }
     /**
      * BusinessSection
-     * @description The part of the business a fact belongs to.
+     * @description The part of the business a fact belongs to — and, once, who decides it.
+     *
+     *     The two readings coincide almost everywhere, and where they do not the
+     *     second wins. A rubro is a datum of the catalog, which is sales', and since
+     *     the 010 it is **maintained by purchasing**; RF-19 of 003 shows somebody the
+     *     manual changes of the sections they reach, so filing that change under
+     *     `SALES` would hide it from the only person who can make it.
+     *
+     *     So `catalog` files a rubro change under `PURCHASING` and everything else it
+     *     owns under `SALES` (`catalog/service.py`, `CATEGORY_SECTION`). It is the
+     *     only place the two readings diverge; if a second one ever appears, this
+     *     enum is being asked to answer two questions and should be split rather than
+     *     stretched.
      * @enum {string}
      */
     BusinessSection: 'PURCHASING' | 'SALES' | 'SYSTEM'
@@ -1937,6 +2075,11 @@ export interface components {
       stock_excluded: number
       /** New Products */
       new_products: components['schemas']['NewProductRead'][]
+      /**
+       * New Products Excluded
+       * @default 0
+       */
+      new_products_excluded: number
     }
     /**
      * CategoryAliasRead
@@ -2006,6 +2149,34 @@ export interface components {
       status: components['schemas']['HealthState']
       /** Detail */
       detail?: string | null
+    }
+    /**
+     * CorrectionInForceRead
+     * @description A standing correction, said in the words a screen away from the datum needs.
+     *
+     *     `CorrectionMark` is enough on the product's own page: the page already knows
+     *     which datum it is about. The change log does not — it shows the corrections
+     *     of many data at once — so which datum a correction stands on travels with
+     *     it, in the same vocabulary the log writes (`catalog.product_price`, the
+     *     product id as text). That is what lets the log offer the undo beside the row
+     *     that reported the correction (RF-30) instead of only linking away to it.
+     */
+    CorrectionInForceRead: {
+      /** Correction Id */
+      correction_id: number
+      /** Field */
+      field: string
+      /** Portal Value */
+      portal_value: unknown
+      /** Corrected Value */
+      corrected_value: unknown
+      status: components['schemas']['CorrectionStatus']
+      /** Conflict Value */
+      conflict_value?: unknown | null
+      /** Entity Type */
+      entity_type: string
+      /** Entity Id */
+      entity_id: string
     }
     /**
      * CorrectionMark
@@ -2320,6 +2491,11 @@ export interface components {
       /** Excluded */
       excluded: number
       /**
+       * Merged
+       * @default 0
+       */
+      merged: number
+      /**
        * Has Estimates
        * @default false
        */
@@ -2346,6 +2522,8 @@ export interface components {
       read_total: string | null
       /** Read Supplier Text */
       read_supplier_text: string | null
+      /** Read Supplier Tax Id */
+      read_supplier_tax_id?: string | null
     }
     /**
      * InvoiceList
@@ -2361,6 +2539,20 @@ export interface components {
       /** Limit */
       limit: number
     }
+    /**
+     * InvoiceOrder
+     * @description How the invoices screen is sorted (RF-45 of 004).
+     *
+     *     Vocabulary and not a column: nothing stores it, and it lives here —beside
+     *     the other words this module answers in— so the ordering travels
+     *     `routes` → `service` → `repository` in one direction. A plain pair of
+     *     strings would have let a screen ask for a column that does not exist.
+     *
+     *     Two fields and both directions, which is exactly what the requirement asks
+     *     for: the date the invoice was issued, and its total.
+     * @enum {string}
+     */
+    InvoiceOrder: 'issued_desc' | 'issued_asc' | 'total_desc' | 'total_asc'
     /**
      * InvoiceRead
      * @description An invoice as every screen of the feature shows it.
@@ -2444,15 +2636,31 @@ export interface components {
        * @default false
        */
       is_overdue_without_receipt: boolean
+      /** Resolved By User Id */
+      resolved_by_user_id?: number | null
+      /** Resolved By Name */
+      resolved_by_name?: string | null
+      /** Resolved At */
+      resolved_at?: string | null
       document?: components['schemas']['InvoiceDocumentRead'] | null
     }
     /**
      * InvoiceReviewResolution
      * @description What a person decided about an invoice held for review.
      *
-     *     `supplier_id` says who it is. `remember` is what turns that decision into a
-     *     saved spelling, so the next invoice written the same way does not ask again
-     *     (RF-31, RF-47 of 004).
+     *     Two decisions travel in the same shape because a person takes them in the
+     *     same breath, looking at the same excerpt:
+     *
+     *     - **Who it is.** `supplier_id` says which supplier, and `remember` turns
+     *       that into a saved spelling so the next invoice written the same way does
+     *       not ask again (RF-47, RF-49).
+     *     - **What it says.** `number`, `issued_on` and `total` are the header fields
+     *       the document put in doubt. Sending one **corrects** it; leaving it out
+     *       **confirms** what the table published, which is the commoner answer and so
+     *       is the one that costs nothing to give (RF-31).
+     *
+     *     Nothing here is a suggestion the platform filled in: an empty field is a
+     *     person saying «what is there is right», never the system deciding for them.
      */
     InvoiceReviewResolution: {
       /** Supplier Id */
@@ -2462,8 +2670,12 @@ export interface components {
        * @default true
        */
       remember: boolean
-      /** Action */
-      action?: string | null
+      /** Number */
+      number?: string | null
+      /** Issued On */
+      issued_on?: string | null
+      /** Total */
+      total?: number | string | null
     }
     /**
      * InvoiceReviewState
@@ -2687,6 +2899,30 @@ export interface components {
        */
       first_seen_at: string
     }
+    /**
+     * OrderResolution
+     * @description Which supplier of the register a held order is from (RF-54, RF-61 of 007).
+     *
+     *     `remember` is what turns the decision into a saved spelling, and it defaults
+     *     to true because that is what the signed spec asks for: the same way of
+     *     writing a name is decided **once** and serves every order and invoice that
+     *     was waiting on it.
+     */
+    OrderResolution: {
+      /** Supplier Id */
+      supplier_id: number
+      /**
+       * Remember
+       * @default true
+       */
+      remember: boolean
+    }
+    /**
+     * OrderReviewState
+     * @description Whether a purchase order could be attributed to a supplier of the register.
+     * @enum {string}
+     */
+    OrderReviewState: 'OK' | 'PENDING' | 'RESOLVED'
     /**
      * ParameterKind
      * @description What kind of value a parameter holds, and therefore how it is checked.
@@ -3070,6 +3306,11 @@ export interface components {
       }
       /** Stalled */
       stalled: number
+      /**
+       * Held
+       * @default 0
+       */
+      held: number
     }
     /**
      * PurchaseOrderRead
@@ -3108,6 +3349,13 @@ export interface components {
       status_since: string
       /** Observed From Start */
       observed_from_start: boolean
+      review_state: components['schemas']['OrderReviewState']
+      /** Review Reason */
+      review_reason?: string | null
+      /** Resolved By User Id */
+      resolved_by_user_id?: number | null
+      /** Resolved At */
+      resolved_at?: string | null
       /**
        * Days In Status
        * @default 0
@@ -3462,6 +3710,8 @@ export interface components {
       rule_id: number | null
       /** Created By User Id */
       created_by_user_id: number | null
+      /** Created By Name */
+      created_by_name?: string | null
       /**
        * Created At
        * Format: date-time
@@ -3489,6 +3739,31 @@ export interface components {
       reason_code: string
       /** Reason Detail */
       reason_detail?: string | null
+    }
+    /**
+     * SupplierCorrectionMark
+     * @description A field of a supplier's card that a person corrected by hand.
+     *
+     *     The same shape the catalog gives a corrected price, because it answers the
+     *     same two questions on the screen: which value is a person's rather than the
+     *     portal's, and what the portal said underneath it (RF-18, RF-19 of 004).
+     *
+     *     `conflict_value` is what the portal came back with **after** the correction
+     *     and was not allowed to write. The screen shows it beside the corrected
+     *     value as a difference to look at, never as the value in force.
+     */
+    SupplierCorrectionMark: {
+      /** Correction Id */
+      correction_id: number
+      /** Field */
+      field: string
+      /** Portal Value */
+      portal_value: unknown
+      /** Corrected Value */
+      corrected_value: unknown
+      status: components['schemas']['CorrectionStatus']
+      /** Conflict Value */
+      conflict_value?: unknown | null
     }
     /**
      * SupplierList
@@ -3532,14 +3807,22 @@ export interface components {
        * @default 0
        */
       invoice_count: number
+      /** Corrections */
+      corrections?: components['schemas']['SupplierCorrectionMark'][]
     }
     /**
      * SupplierTotalsRead
      * @description What a supplier was invoiced, what was paid, and what is still owed.
      *
-     *     `excluded` is not a footnote: an invoice in review or flagged as
-     *     inconsistent is **left out** of the totals, and how many were left out
-     *     travels beside the number (RF-22, RF-23 of 004; RF-28 of 005).
+     *     What was **left out** is not a footnote, and it is not one number either.
+     *     RF-23 asks for one thing in particular — how many invoices the total leaves
+     *     out **because they are in review** — and adding to it the ones that fall
+     *     outside the chosen period made that number mean something else as soon as
+     *     somebody chose a period: «quedaron afuera 12» over a supplier with 3 held
+     *     invoices and 9 from last year is true about nothing anybody asked.
+     *
+     *     So the three reasons are counted apart and `excluded` stays as their sum,
+     *     which is what a screen shows when nobody picked a period.
      */
     SupplierTotalsRead: {
       /** Supplier Id */
@@ -3554,6 +3837,21 @@ export interface components {
       invoices: number
       /** Excluded */
       excluded: number
+      /**
+       * Excluded In Review
+       * @default 0
+       */
+      excluded_in_review: number
+      /**
+       * Excluded Inconsistent
+       * @default 0
+       */
+      excluded_inconsistent: number
+      /**
+       * Excluded Out Of Period
+       * @default 0
+       */
+      excluded_out_of_period: number
       /** Aging */
       aging: components['schemas']['AgingBucket'][]
       /** Average Delay Days */
@@ -4688,6 +4986,37 @@ export interface operations {
       }
     }
   }
+  corrections_in_force_api_v1_catalog_corrections_get: {
+    parameters: {
+      query: {
+        product_id: number[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CorrectionInForceRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   revert_correction_api_v1_catalog_corrections__correction_id__delete: {
     parameters: {
       query?: never
@@ -5113,12 +5442,18 @@ export interface operations {
         review_state?: components['schemas']['InvoiceReviewState'] | null
         /** @description SALDADA, PARCIAL, SIN_PAGOS */
         payment_state?: string | null
+        /** @description Issued from this date */
+        issued_from?: string | null
+        /** @description Issued up to this date */
+        issued_to?: string | null
         /** @description Falling due from */
         due_from?: string | null
         /** @description Falling due up to */
         due_to?: string | null
         /** @description With or without receipt */
         with_receipt?: boolean | null
+        /** @description By date or by total */
+        order?: components['schemas']['InvoiceOrder']
       }
       header?: never
       path?: never
@@ -6043,6 +6378,8 @@ export interface operations {
         supplier_id?: number | null
         /** @description Only the stalled ones */
         only_stalled?: boolean
+        /** @description Only the ones held for review */
+        only_in_review?: boolean
       }
       header?: never
       path?: never
@@ -6057,6 +6394,41 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PurchaseOrderList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  resolve_order_api_v1_purchase_orders__order_id__resolution_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        order_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OrderResolution']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderRead']
         }
       }
       /** @description Validation Error */
@@ -6134,6 +6506,26 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_assignees_api_v1_messages_assignees_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Assignee'][]
         }
       }
     }
