@@ -177,7 +177,7 @@ no cuando está escrita.
 | P6 · Compras que se pierden | En desarrollo | 007-orders-alerts |
 | P7 · Rubros | En desarrollo | 008-product-categories |
 | P8 · Avisos | En desarrollo | 007-orders-alerts |
-| P9 · Control propio | En desarrollo | 003-system-control |
+| P9 · Control propio | Resuelto | 003-system-control |
 | P10 · Accesos | Resuelto | 002-access-control |
 | P11 · Fechas | En desarrollo | 006-due-date-calendar |
 | P12 · Recibos | En desarrollo | 005-payments-receipts |
