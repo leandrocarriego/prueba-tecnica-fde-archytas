@@ -182,6 +182,9 @@ SYNC_JOBS: tuple[SyncJob, ...] = (
 )
 
 SYNC_BY_KEY: dict[str, SyncJob] = {job.key: job for job in SYNC_JOBS}
+# Los nombres de task de las cinco, para que un handler pueda reconocer una
+# corrida programada sin importar el módulo que la publicó.
+SYNC_TASK_NAMES: frozenset[str] = frozenset(job.task_name for job in SYNC_JOBS)
 
 
 def dispatch_price_extraction(job_run_id: int) -> None:
@@ -711,6 +714,41 @@ class OperationsService:
         await self.record_price_update_failure(run_id, ABANDONED)
         await self.session.commit()
         return run_id
+
+    async def close_abandoned_syncs(self) -> list[int]:
+        """Close the scheduled extractions whose worker never came back.
+
+        The price update has had this since 001; the five sections of 004, 007
+        and 009 did not, and the gap was not cosmetic. `request_sync` refuses to
+        open a run while one of the same kind is `RUNNING`, so a section whose
+        worker died kept its run open **for ever** and was skipped by every
+        heartbeat that followed. Five of them sat like that for twelve hours in
+        production, and would have sat there until somebody read the table by
+        hand: nothing failed, nothing warned, and the screens simply stayed
+        empty.
+
+        Same threshold and same path as the price update: past the hard time
+        limit plus a margin, the run is failed with its reason, so the history
+        says what happened instead of showing a run that never ends.
+        """
+        closed: list[int] = []
+        for job in SYNC_JOBS:
+            running = await self.runs.running(job.task_name)
+            if running is None or running.started_at is None:
+                continue
+            if datetime.now(UTC) - running.started_at < ABANDONED_AFTER:
+                continue
+            logger.warning(
+                "Abandoned extraction closed",
+                extra={
+                    "run_id": running.id,
+                    "task_name": job.task_name,
+                    "started_at": running.started_at.isoformat(),
+                },
+            )
+            await self.fail_run(running.id, ABANDONED)
+            closed.append(running.id)
+        return closed
 
     async def due_for_update(self) -> bool:
         """Whether the next scheduled query is due.

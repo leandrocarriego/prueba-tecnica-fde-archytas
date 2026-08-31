@@ -73,6 +73,10 @@ async def tick_extractions() -> dict[str, Any]:
     requested: dict[str, int] = {}
     async with SessionFactory() as session:
         service = OperationsService(session)
+        # First, whatever a dead worker left open. A section with a `RUNNING`
+        # run is skipped by `request_sync`, so without this the heartbeat would
+        # keep passing over it for ever — which is what it did.
+        abandoned = await service.close_abandoned_syncs()
         for job in SYNC_JOBS:
             if not await service.due_for_sync(job):
                 continue
@@ -82,7 +86,7 @@ async def tick_extractions() -> dict[str, Any]:
 
     if requested:
         logger.info("Scheduled extractions requested", extra={"jobs": sorted(requested)})
-    return {"requested": requested}
+    return {"requested": requested, "abandoned": abandoned}
 
 
 celery_app.conf.beat_schedule["extraction-tick"] = {
