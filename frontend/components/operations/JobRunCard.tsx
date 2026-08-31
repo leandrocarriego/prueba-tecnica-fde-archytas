@@ -36,18 +36,18 @@ export function JobRunCard({ run }: JobRunCardProps) {
 
       <CardContent className="space-y-4">
         {run.status === 'SUCCEEDED' && run.result != null && (
-          <div className="p-3 bg-emerald-50 rounded border border-emerald-200">
-            <p className="text-sm font-medium text-emerald-800 mb-2">Resultado:</p>
-            <pre className="text-xs overflow-auto text-emerald-700">
+          <div className="p-3 bg-ok-surface rounded border border-ok-border">
+            <p className="text-sm font-medium text-ok mb-2">Resultado:</p>
+            <pre className="text-xs overflow-auto text-ok">
               {JSON.stringify(run.result, null, 2)}
             </pre>
           </div>
         )}
 
         {run.status === 'FAILED' && run.error !== null && (
-          <div className="p-3 bg-red-50 rounded border border-red-200">
-            <p className="text-sm font-medium text-red-800 mb-2">Error:</p>
-            <p className="text-xs text-red-700">{run.error}</p>
+          <div className="p-3 bg-danger-surface rounded border border-danger-border">
+            <p className="text-sm font-medium text-danger mb-2">Error:</p>
+            <p className="text-xs text-danger">{run.error}</p>
           </div>
         )}
 

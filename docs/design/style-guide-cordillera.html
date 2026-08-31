@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DC;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#1F4B99;text-decoration:none}a:hover{color:#16356E}
+</style></helmet>
+
+<div style="width:1080px;margin:0 auto;background:#fff">
+
+<div style="padding:26px 30px;background:#16191C;color:#fff;display:flex;justify-content:space-between;align-items:flex-end">
+<div>
+<div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#C97B4E;text-transform:uppercase">Guía de estilos · Ferretería Industrial Cordillera</div>
+<div style="font:600 30px/1.15 'Instrument Sans',sans-serif;margin-top:10px;letter-spacing:-.02em">Taller ordenado</div>
+<div style="font:400 14px/1.5 'Instrument Sans',sans-serif;color:rgba(255,255,255,.6);max-width:520px;margin-top:6px">Densidad de herramienta de trabajo, no de tablero de marketing. Nada decorativo: el color sólo aparece cuando algo requiere una decisión.</div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+<div style="width:52px;height:52px;border:2px solid #C24B15;border-radius:10px;display:flex;align-items:center;justify-content:center;font:700 18px/1 'Instrument Sans',sans-serif;color:#fff">FC</div>
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.45);letter-spacing:.1em">MARCA PROVISORIA</div>
+</div>
+</div>
+
+<div style="padding:26px 30px;display:flex;flex-direction:column;gap:26px">
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Paleta</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Dos neutros de fondo, una tinta, un acento. Los semánticos sólo en estados.</div></div>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+<div><div style="height:64px;border-radius:8px;background:#16191C;border:1px solid rgba(0,0,0,.1)"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Tinta</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#16191C</div></div>
+<div><div style="height:64px;border-radius:8px;background:#F4F2ED;border:1px solid #E2DED6"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Papel</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#F4F2ED</div></div>
+<div><div style="height:64px;border-radius:8px;background:#C24B15"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Acento obra</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#C24B15</div></div>
+<div><div style="height:64px;border-radius:8px;background:#1F4B99"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Dato / enlace</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#1F4B99</div></div>
+<div><div style="height:64px;border-radius:8px;background:#2E6B4F"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Conforme</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#2E6B4F</div></div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Colores de estado</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Sólo para comunicar estado de un dato, nunca como decoración.</div></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="border:1px solid #C9DCCF;background:#E9F0EB;border-radius:8px;padding:12px 14px"><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#2E6B4F">Conforme</div><div style="font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">texto #2E6B4F<br>fondo #E9F0EB<br>borde #C9DCCF</div></div>
+<div style="border:1px solid #C8D6EC;background:#E9EEF7;border-radius:8px;padding:12px 14px"><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#1F4B99">Informativo</div><div style="font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">texto #1F4B99<br>fondo #E9EEF7<br>borde #C8D6EC</div></div>
+<div style="border:1px solid #EBD8B6;background:#FBF0DF;border-radius:8px;padding:12px 14px"><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#9A4A0C">Requiere decisión</div><div style="font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">texto #9A4A0C<br>fondo #FBF0DF<br>borde #EBD8B6</div></div>
+<div style="border:1px solid #EFCEC8;background:#FBEAE7;border-radius:8px;padding:12px 14px"><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#A32B1E">Vencido / error</div><div style="font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">texto #A32B1E<br>fondo #FBEAE7<br>borde #EFCEC8</div></div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Tipografía</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Instrument Sans para todo el texto; IBM Plex Mono tabular para plata, fechas y códigos.</div></div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:600 28px/1.1 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Cómo venimos este mes</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">28 / 600 / -2 %</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:600 16px/1.2 'Instrument Sans',sans-serif;color:#16191C">Cuenta corriente del proveedor</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">16 / 600</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:400 13.5px/1.5 'Instrument Sans',sans-serif;color:#3D4249">Texto corrido, listas y descripciones de estado.</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">13,5 / 400</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:500 22px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 1.284.500</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">mono 22 / tabular</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.14em">ETIQUETA DE SECCIÓN</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">10 / .14em</span></div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Componentes</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Radio 8 px, borde 1 px, sombra sólo en lo que flota. Una sola acción llena por pantalla.</div></div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 16px;border-radius:8px">Generar recibo</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:10px 16px;border-radius:8px">Registrar pago</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 16px;border-radius:8px">Ver original</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#1F4B99;padding:10px 6px">Ver las 12</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#F4F2ED;color:#B0ABA1;border:1px solid #E7E3DA;padding:10px 16px;border-radius:8px">Sin permiso</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:5px 9px;border-radius:20px">Saldada</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:5px 9px;border-radius:20px">Parcial 40 %</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:5px 9px;border-radius:20px">Sin recibo</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#A32B1E;background:#FBEAE7;border:1px solid #EFCEC8;padding:5px 9px;border-radius:20px">Vencida</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:5px 9px;border-radius:20px">Archivada</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#16191C;background:#fff;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">Sin confirmar</span>
+</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+<div style="flex:1;min-width:260px;border:1px solid #EBD8B6;background:#FDF8EF;border-radius:10px;padding:12px 14px;display:flex;gap:11px;align-items:flex-start">
+<span style="width:20px;height:20px;border-radius:50%;background:#C24B15;color:#fff;font:700 12px/20px 'Instrument Sans',sans-serif;text-align:center;flex:none">!</span>
+<div><div style="font:600 13px/1.35 'Instrument Sans',sans-serif;color:#16191C">Aviso de excepción</div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:2px">El sistema no adivina: informa qué quedó afuera y por qué, con una acción para resolverlo.</div></div>
+</div>
+<div style="flex:1;min-width:260px;border:1px solid #E2DED6;background:#F4F2ED;border-radius:10px;padding:12px 14px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.14em">CAMPO</div>
+<div style="font:400 13.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px;background:#fff;border:1px solid #D5D0C6;border-radius:8px;padding:9px 11px">Proveedor S.A.</div>
+<div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:5px">Autocompleta contra los nombres ya unificados.</div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Espaciado y radios</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Escala de 4 px. Tarjetas 12 px de radio, controles 8, píldoras 20.</div></div>
+<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end">
+<div style="display:flex;gap:10px;align-items:flex-end">
+<div style="text-align:center"><div style="width:4px;height:28px;background:#D5D0C6;border-radius:2px;margin:0 auto"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">4</div></div>
+<div style="text-align:center"><div style="width:8px;height:28px;background:#D5D0C6;border-radius:2px;margin:0 auto"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">8</div></div>
+<div style="text-align:center"><div style="width:12px;height:28px;background:#D5D0C6;border-radius:2px;margin:0 auto"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">12</div></div>
+<div style="text-align:center"><div style="width:16px;height:28px;background:#D5D0C6;border-radius:2px;margin:0 auto"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">16</div></div>
+<div style="text-align:center"><div style="width:22px;height:28px;background:#D5D0C6;border-radius:2px;margin:0 auto"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">22</div></div>
+<div style="text-align:center"><div style="width:26px;height:28px;background:#D5D0C6;border-radius:2px;margin:0 auto"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">26</div></div>
+</div>
+<div style="display:flex;gap:12px;align-items:flex-end">
+<div style="text-align:center"><div style="width:52px;height:38px;border:1px solid #D5D0C6;border-radius:8px;background:#F4F2ED"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">8 · control</div></div>
+<div style="text-align:center"><div style="width:52px;height:38px;border:1px solid #D5D0C6;border-radius:12px;background:#F4F2ED"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">12 · tarjeta</div></div>
+<div style="text-align:center"><div style="width:52px;height:26px;border:1px solid #D5D0C6;border-radius:20px;background:#F4F2ED"></div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:6px">20 · píldora</div></div>
+</div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Principios</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Las reglas que deciden cuándo usar cada cosa.</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Ante la duda, avisa</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:5px">Ningún número se calcula con datos sin confirmar. Lo dudoso se muestra aparte con su acción para resolverlo.</div></div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Una sola acción llena</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:5px">Por pantalla hay un único botón con el acento; el resto es contorno o enlace. El color naranja significa “decidí acá”.</div></div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">La plata siempre en mono tabular</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:5px">Montos, fechas y códigos usan IBM Plex Mono con cifras tabulares para que las columnas se lean de un golpe.</div></div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Lo que no se puede ver, no aparece</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:5px">Los permisos se resuelven ocultando el ítem del menú, no mostrando un botón que devuelve error.</div></div>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1080}}"></script>
+</body>
+</html>

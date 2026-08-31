@@ -1,11 +1,24 @@
 import type { Metadata } from 'next'
-import { Outfit } from 'next/font/google'
+import { IBM_Plex_Mono, Instrument_Sans } from 'next/font/google'
 import { Toaster } from '@/components/ui/toast'
 import './globals.css'
 
-// Outfit is the platform's typeface. Exposed as a CSS variable so Tailwind's
-// `font-sans` picks it up.
-const outfit = Outfit({ subsets: ['latin'], variable: '--font-sans', display: 'swap' })
+// Two typefaces, and the split is the design system's ("taller ordenado"):
+// Instrument Sans carries every piece of text, IBM Plex Mono carries money,
+// dates and codes so their columns line up. Both are exposed as CSS variables
+// that `app/globals.css` feeds to Tailwind's `font-sans` / `font-mono`.
+const sans = Instrument_Sans({
+  subsets: ['latin'],
+  variable: '--font-instrument-sans',
+  display: 'swap',
+})
+
+const mono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-plex-mono',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Plataforma Cordillera',
@@ -24,7 +37,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={outfit.variable}>
+    <html lang="es" className={`${sans.variable} ${mono.variable}`}>
       <body className="font-sans antialiased">
         {children}
         <Toaster />

@@ -171,7 +171,7 @@ export function LoginForm({ className, renderLogo, renderFooter }: LoginFormProp
                   type="checkbox"
                   name="remember"
                   defaultChecked={true}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="w-4 h-4 rounded border-input text-info focus:ring-ring"
                   style={{ accentColor: branding.colors.primary }}
                 />
                 <span className="text-sm" style={{ color: branding.colors.text }}>

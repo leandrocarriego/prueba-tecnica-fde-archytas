@@ -30,7 +30,7 @@ export default async function Page({ params }: { params: Promise<{ token: string
             label="Guardar la clave"
             singleUse
           />
-          <Link href="/login" className="mt-6 rounded bg-gray-900 px-4 py-2 text-center text-white">
+          <Link href="/login" className="mt-6 rounded bg-primary px-4 py-2 text-center text-white">
             Ir a la pantalla de ingreso
           </Link>
         </>

@@ -50,7 +50,7 @@ export default async function ActionsPage() {
           {actions.map(action => (
             <li key={action.id}>
               <Link
-                className="block h-full rounded border p-4 transition hover:border-slate-400 hover:bg-gray-50"
+                className="block h-full rounded border p-4 transition hover:border-input hover:bg-muted"
                 href={action.href}
               >
                 <span className="block font-medium">{action.label}</span>

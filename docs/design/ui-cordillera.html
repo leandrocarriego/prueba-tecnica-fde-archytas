@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E9E5DC;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#1F4B99;text-decoration:none}a:hover{color:#16356E}
+.dv-turn{padding:44px 48px 36px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 22px}
+.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#16191C;color:#fff;border-radius:4px}
+.dv-tname{font:500 15px/1.3 'Instrument Sans',sans-serif;color:#16191C}
+.dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#16191C;border-radius:5px}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:rgba(22,25,28,.6);max-width:760px;text-wrap:pretty}
+.dv-card{background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.05);overflow:hidden}
+.dv-opt:target .dv-oid{background:#C24B15;color:#fff}
+.dv-next{margin:24px 0 0;font:400 12.5px/1.7 'Instrument Sans',sans-serif;color:rgba(22,25,28,.55)}
+</style></helmet>
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><span class="dv-tid">3</span><span class="dv-tname">UI de alta fidelidad sobre la estructura de 1a — dirección visual definida: “taller ordenado”</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="3a">
+<div class="dv-olabel"><span class="dv-oid">3a</span>Fundamentos: paleta, tipografía, estados y componentes. Papel cálido, tinta grafito, un solo acento naranja de obra reservado para lo urgente y la acción principal. Números en mono tabular para que las columnas de plata siempre se alineen.</div>
+<div class="dv-card" style="padding:0;width:1080px">
+<div style="padding:26px 30px;background:#16191C;color:#fff;display:flex;justify-content:space-between;align-items:flex-end">
+<div>
+<div style="font:600 11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:#C97B4E;text-transform:uppercase">Sistema de gestión · Ferretería Industrial Cordillera</div>
+<div style="font:600 30px/1.15 'Instrument Sans',sans-serif;margin-top:10px;letter-spacing:-.02em">Taller ordenado</div>
+<div style="font:400 14px/1.5 'Instrument Sans',sans-serif;color:rgba(255,255,255,.6);max-width:520px;margin-top:6px">Densidad de herramienta de trabajo, no de tablero de marketing. Nada decorativo: el color sólo aparece cuando algo requiere una decisión.</div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+<div style="width:52px;height:52px;border:2px solid #C24B15;border-radius:10px;display:flex;align-items:center;justify-content:center;font:700 18px/1 'Instrument Sans',sans-serif;color:#fff">FC</div>
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.45);letter-spacing:.1em">MARCA PROVISORIA</div>
+</div>
+</div>
+
+<div style="padding:26px 30px;display:flex;flex-direction:column;gap:26px">
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Paleta</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Dos neutros de fondo, una tinta, un acento. Los semánticos sólo en estados.</div></div>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+<div><div style="height:64px;border-radius:8px;background:#16191C;border:1px solid rgba(0,0,0,.1)"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Tinta</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#16191C</div></div>
+<div><div style="height:64px;border-radius:8px;background:#F4F2ED;border:1px solid #E2DED6"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Papel</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#F4F2ED</div></div>
+<div><div style="height:64px;border-radius:8px;background:#C24B15"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Acento obra</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#C24B15</div></div>
+<div><div style="height:64px;border-radius:8px;background:#1F4B99"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Dato / enlace</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#1F4B99</div></div>
+<div><div style="height:64px;border-radius:8px;background:#2E6B4F"></div><div style="font:500 11.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px">Conforme</div><div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">#2E6B4F</div></div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Tipografía</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Instrument Sans para todo el texto; IBM Plex Mono tabular para plata, fechas y códigos.</div></div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:600 28px/1.1 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Cómo venimos este mes</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">28 / 600 / -2 %</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:600 16px/1.2 'Instrument Sans',sans-serif;color:#16191C">Cuenta corriente del proveedor</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">16 / 600</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:400 13.5px/1.5 'Instrument Sans',sans-serif;color:#3D4249">Texto corrido, listas y descripciones de estado.</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">13,5 / 400</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:500 22px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 1.284.500</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">mono 22 / tabular</span></div>
+<div style="display:flex;align-items:baseline;gap:16px"><span style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.14em">ETIQUETA DE SECCIÓN</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">10 / .14em</span></div>
+</div>
+</div>
+
+<div style="height:1px;background:#EDE9E1"></div>
+
+<div style="display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:start">
+<div><div style="font:600 12px/1.3 'Instrument Sans',sans-serif;color:#16191C">Componentes</div><div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Radio 8 px, borde 1 px, sombra sólo en lo que flota. Una sola acción llena por pantalla.</div></div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 16px;border-radius:8px">Generar recibo</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:10px 16px;border-radius:8px">Registrar pago</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 16px;border-radius:8px">Ver original</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#1F4B99;padding:10px 6px">Ver las 12</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#F4F2ED;color:#B0ABA1;border:1px solid #E7E3DA;padding:10px 16px;border-radius:8px">Sin permiso</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:5px 9px;border-radius:20px">Saldada</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:5px 9px;border-radius:20px">Parcial 40 %</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:5px 9px;border-radius:20px">Sin recibo</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#A32B1E;background:#FBEAE7;border:1px solid #EFCEC8;padding:5px 9px;border-radius:20px">Vencida</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:5px 9px;border-radius:20px">Archivada</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#16191C;background:#fff;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">Sin confirmar</span>
+</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+<div style="flex:1;min-width:260px;border:1px solid #EBD8B6;background:#FDF8EF;border-radius:10px;padding:12px 14px;display:flex;gap:11px;align-items:flex-start">
+<span style="width:20px;height:20px;border-radius:50%;background:#C24B15;color:#fff;font:700 12px/20px 'Instrument Sans',sans-serif;text-align:center;flex:none">!</span>
+<div><div style="font:600 13px/1.35 'Instrument Sans',sans-serif;color:#16191C">Aviso de excepción</div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:2px">El sistema no adivina: informa qué quedó afuera y por qué, con una acción para resolverlo.</div></div>
+</div>
+<div style="flex:1;min-width:260px;border:1px solid #E2DED6;background:#F4F2ED;border-radius:10px;padding:12px 14px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.14em">CAMPO</div>
+<div style="font:400 13.5px/1.5 'Instrument Sans',sans-serif;color:#16191C;margin-top:6px;background:#fff;border:1px solid #D5D0C6;border-radius:8px;padding:9px 11px">Proveedor S.A.</div>
+<div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:5px">Autocompleta contra los nombres ya unificados.</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3b">
+<div class="dv-olabel"><span class="dv-oid">3b</span>Tablero del dueño. La franja de excepciones va antes que cualquier número: primero se dice si se puede confiar en los datos, después se muestran. Sidebar grafito fijo, contenido sobre papel cálido.</div>
+<div class="dv-card" style="width:1280px">
+<div style="display:flex;height:920px;font-size:13px">
+<div style="width:224px;background:#16191C;flex:none;display:flex;flex-direction:column;padding:18px 14px;gap:3px">
+<div style="display:flex;align-items:center;gap:10px;padding:0 6px 18px">
+<span style="width:32px;height:32px;border:1.5px solid #C24B15;border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 12px/1 'Instrument Sans',sans-serif;color:#fff">FC</span>
+<div><div style="font:600 13px/1.2 'Instrument Sans',sans-serif;color:#fff">Cordillera</div><div style="font:400 10.5px/1.2 'IBM Plex Mono',monospace;color:rgba(255,255,255,.4)">Gestión interna</div></div>
+</div>
+<div style="background:#C24B15;border-radius:8px;padding:9px 11px;display:flex;justify-content:space-between;align-items:center"><span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#fff">Tablero</span></div>
+<div style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.35);letter-spacing:.14em;padding:16px 11px 6px">COMPRAS</div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Proveedores</div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Facturas<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#F0B27A">4</span></div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Pagos y recibos<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#F0B27A">3</span></div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Órdenes de compra</div>
+<div style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.35);letter-spacing:.14em;padding:16px 11px 6px">VENTAS Y DATOS</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Ventas</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Catálogo y precios</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Rubros</div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:#fff;background:rgba(194,75,21,.16);border-radius:8px">Revisar esto<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#F0B27A">12</span></div>
+<div style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.35);letter-spacing:.14em;padding:16px 11px 6px">SISTEMA</div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Avisos<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#F0B27A">7</span></div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Calendario</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Configuración</div>
+<div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:12px;display:flex;align-items:center;gap:9px">
+<span style="width:28px;height:28px;border-radius:50%;background:#3D4249;color:#fff;font:600 11px/28px 'Instrument Sans',sans-serif;text-align:center">RD</span>
+<div style="flex:1"><div style="font:500 12px/1.2 'Instrument Sans',sans-serif;color:#fff">Roberto D.</div><div style="font:400 10.5px/1.2 'IBM Plex Mono',monospace;color:rgba(255,255,255,.4)">Dirección</div></div>
+</div>
+</div>
+
+<div style="flex:1;background:#F4F2ED;display:flex;flex-direction:column;min-width:0">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:14px 26px;display:flex;align-items:center;gap:16px">
+<div style="flex:1;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;max-width:420px"><span style="font:400 13px/1 'Instrument Sans',sans-serif;color:#9A9A94">Buscar factura, proveedor, producto…</span><span style="font:500 10.5px/1 'IBM Plex Mono',monospace;color:#B0ABA1">⌘K</span></div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#8A8E93">Sync precios 06:04</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:5px 9px;border-radius:20px">7 avisos</span>
+</div>
+</div>
+
+<div style="padding:24px 26px;display:flex;flex-direction:column;gap:18px;overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 26px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Cómo venimos</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Agosto 2026 · comparado con agosto 2025</div></div>
+<div style="display:flex;gap:6px;background:#fff;border:1px solid #E2DED6;border-radius:8px;padding:3px">
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">Mes</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Trimestre</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Año</span>
+</div>
+</div>
+
+<div style="border:1px solid #EBD8B6;background:#FDF8EF;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px">
+<span style="width:24px;height:24px;border-radius:50%;background:#C24B15;color:#fff;font:700 14px/24px 'Instrument Sans',sans-serif;text-align:center;flex:none">!</span>
+<div style="flex:1"><div style="font:600 14.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Hay 12 cosas para revisar antes de confiar del todo en estos números</div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:3px">8 ventas con código repetido · 3 proveedores posiblemente duplicados · 1 factura ilegible. Nada de eso está sumado abajo.</div></div>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 16px;border-radius:8px;flex:none">Revisar</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">FACTURADO MES</div>
+<div style="font:500 25px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">$ 4.812.400</div>
+<div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#2E6B4F;margin-top:7px">▲ 11,4 % vs. 2025</div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">DEUDA A PROVEEDORES</div>
+<div style="font:500 25px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">$ 2.147.900</div>
+<div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">14 facturas abiertas</div>
+</div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">VENCE EN 7 DÍAS</div>
+<div style="font:500 25px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">6</div>
+<div style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;display:inline-block;margin-top:7px">3 sin recibo</div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">OC SIN RECIBIR</div>
+<div style="font:500 25px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">4</div>
+<div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#A32B1E;margin-top:7px">2 con más de 15 días</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1.6fr 1fr;gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:16px 18px">
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="font:600 14px/1.2 'Instrument Sans',sans-serif;color:#16191C">Facturación mensual</div><div style="display:flex;gap:12px;align-items:center"><span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278"><span style="display:inline-block;width:9px;height:9px;background:#16191C;border-radius:2px;margin-right:5px"></span>2026</span><span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278"><span style="display:inline-block;width:9px;height:9px;background:#D5D0C6;border-radius:2px;margin-right:5px"></span>2025</span></div></div>
+<div style="display:flex;align-items:flex-end;gap:10px;height:150px;margin-top:16px;border-bottom:1px solid #E2DED6;padding-bottom:1px">
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:48%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:56%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:52%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:61%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:44%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:50%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:63%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:72%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:58%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:66%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:71%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:84%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:66%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:76%;background:#16191C;border-radius:3px 3px 0 0"></i></div>
+<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%"><i style="flex:1;height:74%;background:#D5D0C6;border-radius:3px 3px 0 0"></i><i style="flex:1;height:90%;background:#16191C;border-radius:3px 3px 0 0"></i><i style="width:5px;height:12%;background:repeating-linear-gradient(135deg,#F4F2ED 0 4px,#E2DED6 4px 8px);border-radius:2px 2px 0 0"></i></div>
+</div>
+<div style="display:flex;justify-content:space-between;margin-top:7px;font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94"><span>ENE</span><span>FEB</span><span>MAR</span><span>ABR</span><span>MAY</span><span>JUN</span><span>JUL</span><span>AGO</span></div>
+<div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#9A4A0C;margin-top:9px">La barra rayada de agosto es lo que quedó excluido por datos dudosos.</div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:16px 18px;display:flex;flex-direction:column">
+<div style="font:600 14px/1.2 'Instrument Sans',sans-serif;color:#16191C">Gasto por rubro</div>
+<div style="display:flex;flex-direction:column;gap:11px;margin-top:16px">
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Herramientas</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">34 %</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:34%;height:100%;background:#16191C;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Pinturas</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">26 %</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:26%;height:100%;background:#3D4249;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Sanitarios</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">18 %</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:18%;height:100%;background:#6E7278;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Electricidad</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">14 %</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:14%;height:100%;background:#9A9A94;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A4A0C"><span>Sin rubro asignado</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">8 %</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:8%;height:100%;background:repeating-linear-gradient(135deg,#EBD8B6 0 4px,#FBF0DF 4px 8px);border-radius:4px"></i></div></div>
+</div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#1F4B99;margin-top:auto;padding-top:14px">Normalizar 14 productos →</span>
+</div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #E2DED6"><div style="font:600 14px/1.2 'Instrument Sans',sans-serif;color:#16191C">Próximos vencimientos</div><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#1F4B99">Ver calendario →</span></div>
+<div style="display:grid;grid-template-columns:1.6fr .9fr .9fr .9fr .8fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>PROVEEDOR</span><span>FACTURA</span><span>MONTO</span><span>VENCE</span><span>RECIBO</span></div>
+<div style="display:grid;grid-template-columns:1.6fr .9fr .9fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7"><span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#16191C">Ferrum Andina S.A.</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">FC-1051</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 486.200</span><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#A32B1E">en 2 días</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">falta</span></div>
+<div style="display:grid;grid-template-columns:1.6fr .9fr .9fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#16191C">Insumos del Valle SRL</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">FC-1060</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 212.750</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">en 6 días</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">ok</span></div>
+<div style="display:grid;grid-template-columns:1.6fr .9fr .9fr .9fr .8fr;padding:12px 18px;align-items:center"><span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#16191C">Tornillería Sur</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">FC-1064</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 98.400</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">en 11 días</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">ok</span></div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3c">
+<div class="dv-olabel"><span class="dv-oid">3c</span>Ficha de proveedor con cuenta corriente. Los nombres unificados se muestran como evidencia, no se esconden: el usuario ve de dónde viene el dato consolidado.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;padding:0;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px">
+<div style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">Proveedores <span style="color:#C6C0B4">/</span> Ferrum Andina S.A.</div>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:12px">
+<div>
+<div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Ferrum Andina S.A.</div>
+<div style="font:400 12.5px/1.5 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">CUIT 30-71042588-4 · compras@ferrumandina.com · plazo 45 días</div>
+<div style="display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap">
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:5px 9px;border-radius:20px">3 nombres unificados</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8A8E93;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">“Ferrum Andina SA”</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8A8E93;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">“FERRUM ANDINA”</span>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8A8E93;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">“Ferum Andina”</span>
+<span style="font:500 11.5px/1 'Instrument Sans',sans-serif;color:#1F4B99">Deshacer unificación</span>
+</div>
+</div>
+<div style="display:flex;gap:9px;flex:none">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Editar datos</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:10px 15px;border-radius:8px">Registrar pago</span>
+</div>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">LE COMPRÉ (2026)</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">$ 8.412.900</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">LE PAGUÉ</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">$ 7.680.100</div></div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">LE DEBO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">$ 732.800</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PAGO PROMEDIO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">52 días</div><div style="font:500 11.5px/1 'Instrument Sans',sans-serif;color:#9A4A0C;margin-top:6px">7 días más que el plazo</div></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="display:flex;gap:2px;padding:0 18px;border-bottom:1px solid #E2DED6">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#16191C;padding:14px 4px;border-bottom:2px solid #C24B15;margin-bottom:-1px">Cuenta corriente</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Facturas</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Pagos</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Órdenes</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Reclamos <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:3px 6px;border-radius:20px;margin-left:4px">2</span></span>
+</div>
+
+<div style="padding:16px 18px;border-bottom:1px solid #EDE9E1">
+<div style="display:flex;justify-content:space-between;font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278"><span>Estado del saldo de las 14 facturas del año</span><span style="font-family:'IBM Plex Mono',monospace">$ 8.412.900 total</span></div>
+<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:8px;gap:2px">
+<i style="width:71%;background:#2E6B4F"></i><i style="width:17%;background:#1F4B99"></i><i style="width:12%;background:#C24B15"></i>
+</div>
+<div style="display:flex;gap:16px;margin-top:9px;font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278">
+<span><span style="display:inline-block;width:9px;height:9px;background:#2E6B4F;border-radius:2px;margin-right:5px"></span>Saldadas 71 %</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#1F4B99;border-radius:2px;margin-right:5px"></span>Parciales 17 %</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#C24B15;border-radius:2px;margin-right:5px"></span>Sin tocar 12 %</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:.9fr .9fr .9fr .9fr 1fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>FACTURA</span><span>EMITIDA</span><span>TOTAL</span><span>PAGADO</span><span>ESTADO</span></div>
+<div style="display:grid;grid-template-columns:.9fr .9fr .9fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">FC-1044</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">12/06</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 318.000</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 318.000</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Saldada</span></div>
+<div style="display:grid;grid-template-columns:.9fr .9fr .9fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">FC-1051</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">29/06</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 486.200</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 194.480</span><span style="display:flex;gap:5px;align-items:center"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px">Parcial 40 %</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px">Sin recibo</span></span></div>
+<div style="display:grid;grid-template-columns:.9fr .9fr .9fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">FC-1058</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">14/07</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 246.600</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#C6C0B4">—</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#A32B1E;background:#FBEAE7;border:1px solid #EFCEC8;padding:4px 8px;border-radius:20px;justify-self:start">Vencida sin tocar</span></div>
+<div style="display:grid;grid-template-columns:.9fr .9fr .9fr .9fr 1fr;padding:12px 18px;align-items:center"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">FC-1071</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">21/08</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 152.400</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#C6C0B4">—</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">Al día</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3d">
+<div class="dv-olabel"><span class="dv-oid">3d</span>Bandeja “Revisar esto” con el detalle de una excepción y su wizard. Es la pantalla que sostiene la promesa de la propuesta: ante la duda el sistema avisa, no adivina.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Revisar esto</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">12 sin resolver · 2 resueltas hoy · lo pendiente queda fuera de todos los totales</div></div>
+<div style="display:flex;gap:6px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:3px">
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">Todas</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Ventas</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Proveedores</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Rubros</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;gap:16px;align-items:flex-start">
+<div style="width:300px;flex:none;background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="padding:11px 15px;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em;display:flex;justify-content:space-between"><span>12 PENDIENTES</span><span style="color:#1F4B99">ORDENAR ▾</span></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1;border-left:3px solid #C24B15;background:#FDFBF7"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Proveedor duplicado</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:3px 7px;border-radius:20px">alta</span></div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">3 nombres parecidos con el mismo CUIT</div></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">8 ventas con código repetido</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">VT-8891 aparece dos veces con montos distintos</div></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Factura ilegible</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Foto escaneada · total y vencimiento dudosos</div></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">14 productos sin rubro</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Entraron con la última lista de precios</div></div>
+<div style="padding:13px 15px"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Pedido posiblemente repetido</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Mismo producto en dos OC, 8 días de diferencia</div></div>
+</div>
+
+<div style="flex:1;background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:16px;min-width:0">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="width:22px;height:22px;border-radius:50%;background:#16191C;color:#fff;font:600 11px/22px 'IBM Plex Mono',monospace;text-align:center">1</span>
+<span style="flex:1;height:1px;background:#16191C"></span>
+<span style="width:22px;height:22px;border-radius:50%;background:#16191C;color:#fff;font:600 11px/22px 'IBM Plex Mono',monospace;text-align:center">2</span>
+<span style="flex:1;height:1px;background:#E2DED6"></span>
+<span style="width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid #D5D0C6;color:#B0ABA1;font:600 11px/20px 'IBM Plex Mono',monospace;text-align:center">3</span>
+<span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-left:6px">Paso 2 de 3 · elegir el nombre que queda</span>
+</div>
+
+<div><div style="font:600 19px/1.25 'Instrument Sans',sans-serif;color:#16191C">¿Son el mismo proveedor?</div><div style="font:400 13px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Coinciden el CUIT y 8 de 10 dígitos del teléfono. La decisión es tuya.</div></div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:11px">
+<div style="border:1.5px solid #C24B15;background:#FDFBF7;border-radius:10px;padding:13px 14px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#C24B15;letter-spacing:.1em">QUEDA ESTE</div><div style="font:600 14px/1.3 'Instrument Sans',sans-serif;color:#16191C;margin-top:8px">Ferrum Andina S.A.</div><div style="font:400 12px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">CUIT 30-71042588-4<br>18 facturas · $ 8,4 M</div></div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:13px 14px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em">SE ABSORBE</div><div style="font:600 14px/1.3 'Instrument Sans',sans-serif;color:#16191C;margin-top:8px">FERRUM ANDINA</div><div style="font:400 12px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">CUIT igual<br>6 facturas · $ 940 K</div></div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:13px 14px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em">SE ABSORBE</div><div style="font:600 14px/1.3 'Instrument Sans',sans-serif;color:#16191C;margin-top:8px">Ferum Andina</div><div style="font:400 12px/1.6 'IBM Plex Mono',monospace;color:#6E7278;margin-top:5px">Sin CUIT cargado<br>2 facturas · $ 128 K</div></div>
+</div>
+
+<div style="border:1px solid #E2DED6;background:#F4F2ED;border-radius:10px;padding:14px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Qué pasa si unificás</div>
+<div style="display:flex;gap:26px;margin-top:10px">
+<div><div style="font:500 18px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">26</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">facturas se mueven</div></div>
+<div><div style="font:500 18px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">11</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">pagos se reasignan</div></div>
+<div><div style="font:500 18px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">4</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">órdenes de compra</div></div>
+<div><div style="font:500 18px/1 'IBM Plex Mono',monospace;color:#2E6B4F;font-variant-numeric:tabular-nums">Sí</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">se puede deshacer</div></div>
+</div>
+</div>
+
+<div style="border:1px solid #EBD8B6;background:#FDF8EF;border-radius:10px;padding:12px 14px;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#7A6A52">¿No estás segura? Dejalo pendiente: sigue contado acá y ningún total lo usa hasta que se resuelva.</div>
+
+<div style="display:flex;gap:9px;justify-content:flex-end;margin-top:auto">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:11px 16px;border-radius:8px">No son el mismo</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:11px 16px;border-radius:8px">Dejar pendiente</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:11px 18px;border-radius:8px">Unificar los 3</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3e">
+<div class="dv-olabel"><span class="dv-oid">3e</span>Calendario de vencimientos y móvil. El calendario usa color sólo para el estado del recibo; el celular es donde el aviso se convierte en decisión en dos toques.</div>
+<div class="dv-card" style="padding:18px;display:flex;gap:18px;align-items:flex-start;background:#F4F2ED">
+
+<div style="width:660px;background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden;font-size:13px">
+<div style="padding:18px 20px;border-bottom:1px solid #E2DED6;display:flex;justify-content:space-between;align-items:center">
+<div><div style="font:600 20px/1.2 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Agosto 2026</div><div style="font:400 12px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Se actualiza en vivo · Julián también está viendo esta pantalla</div></div>
+<div style="display:flex;gap:8px;align-items:center">
+<span style="width:26px;height:26px;border-radius:50%;background:#3D4249;color:#fff;font:600 10px/26px 'Instrument Sans',sans-serif;text-align:center">MG</span>
+<span style="width:26px;height:26px;border-radius:50%;background:#1F4B99;color:#fff;font:600 10px/26px 'Instrument Sans',sans-serif;text-align:center;margin-left:-10px;border:2px solid #fff">JS</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:9px 14px;border-radius:8px;margin-left:6px">+ Vencimiento</span>
+</div>
+</div>
+<div style="padding:12px 20px;display:flex;gap:14px;border-bottom:1px solid #EDE9E1;font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278">
+<span><span style="display:inline-block;width:9px;height:9px;background:#2E6B4F;border-radius:2px;margin-right:5px"></span>Con recibo</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#C24B15;border-radius:2px;margin-right:5px"></span>Sin recibo</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#1F4B99;border-radius:2px;margin-right:5px"></span>Reprogramado</span>
+<span><span style="display:inline-block;width:9px;height:9px;background:#C6C0B4;border-radius:2px;margin-right:5px"></span>Pagado</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);background:#FAF9F5;border-bottom:1px solid #E2DED6">
+<span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">LUN</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">MAR</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">MIÉ</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">JUE</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">VIE</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">SÁB</span><span style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em;text-align:center;padding:9px 0">DOM</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr)">
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">3</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">4</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border-left:2px solid #2E6B4F;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1042</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">5</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">6</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border-left:2px solid #C6C0B4;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1044</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">7</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border-left:2px solid #1F4B99;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1046</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px;background:#FAF9F5"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#C6C0B4">8</div></div>
+<div style="border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px;background:#FAF9F5"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#C6C0B4">9</div></div>
+
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">10</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border-left:2px solid #C24B15;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1060</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px;box-shadow:inset 0 0 0 2px #16191C"><div style="font:600 11px/1 'IBM Plex Mono',monospace;color:#16191C">11 · HOY</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border-left:2px solid #2E6B4F;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1061</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">12</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">13</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border-left:2px solid #C24B15;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1051</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border-left:2px solid #2E6B4F;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:3px">FC-1065</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">14</div></div>
+<div style="border-right:1px solid #EDE9E1;border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px;background:#FAF9F5"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#C6C0B4">15</div></div>
+<div style="border-bottom:1px solid #EDE9E1;min-height:76px;padding:7px 8px;background:#FAF9F5"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#C6C0B4">16</div></div>
+
+<div style="border-right:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">17</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border-left:2px solid #2E6B4F;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1070</div></div>
+<div style="border-right:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">18</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border-left:2px solid #1F4B99;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1053</div></div>
+<div style="border-right:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">19</div></div>
+<div style="border-right:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">20</div><div style="font:600 10.5px/1.3 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border-left:2px solid #C24B15;border-radius:0 4px 4px 0;padding:4px 5px;margin-top:5px">FC-1064</div></div>
+<div style="border-right:1px solid #EDE9E1;min-height:76px;padding:7px 8px"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#9A9A94">21</div></div>
+<div style="border-right:1px solid #EDE9E1;min-height:76px;padding:7px 8px;background:#FAF9F5"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#C6C0B4">22</div></div>
+<div style="min-height:76px;padding:7px 8px;background:#FAF9F5"><div style="font:500 11px/1 'IBM Plex Mono',monospace;color:#C6C0B4">23</div></div>
+</div>
+<div style="padding:14px 20px;border-top:1px solid #E2DED6;background:#FDF8EF;display:flex;align-items:center;gap:12px">
+<div style="flex:1"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">FC-1051 vence en 2 días y todavía no tiene recibo</div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:2px">Ferrum Andina S.A. · $ 486.200 · pago parcial del 40 % registrado</div></div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:9px 14px;border-radius:8px">Reprogramar</span>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:9px 14px;border-radius:8px">Generar recibo</span>
+</div>
+</div>
+
+<div style="display:flex;gap:14px">
+<div style="width:264px;background:#fff;border:1px solid #E2DED6;border-radius:26px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.07)">
+<div style="background:#16191C;padding:12px 18px 14px">
+<div style="display:flex;justify-content:space-between;font:500 10.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.55)"><span>9:41</span><span>▲ ▮</span></div>
+<div style="font:600 19px/1.2 'Instrument Sans',sans-serif;color:#fff;margin-top:14px">Avisos</div>
+<div style="font:400 12px/1.4 'Instrument Sans',sans-serif;color:rgba(255,255,255,.55);margin-top:2px">3 necesitan tu decisión</div>
+</div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:11px;background:#F4F2ED">
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:13px">
+<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px">VENCE EN 2 DÍAS</span>
+<div style="font:600 13.5px/1.35 'Instrument Sans',sans-serif;color:#16191C;margin-top:9px">FC-1051 · Ferrum Andina</div>
+<div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:2px">$ 486.200 · sin recibo generado</div>
+<div style="display:flex;gap:7px;margin-top:11px"><span style="flex:1;font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:12px 0;border-radius:8px;text-align:center">Generar</span><span style="flex:1;font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:12px 0;border-radius:8px;text-align:center">Después</span></div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:13px">
+<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px">RECLAMO</span>
+<div style="font:600 13.5px/1.35 'Instrument Sans',sans-serif;color:#16191C;margin-top:9px">Insumos del Valle SRL</div>
+<div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:2px">“Nos deben dos facturas” · hace 11 días</div>
+<span style="display:block;font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:12px 0;border-radius:8px;text-align:center;margin-top:11px">Abrir</span>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:13px">
+<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px">PARA REVISAR</span>
+<div style="font:600 13.5px/1.35 'Instrument Sans',sans-serif;color:#16191C;margin-top:9px">¿“Ferum Andina” es el mismo?</div>
+<div style="display:flex;gap:7px;margin-top:11px"><span style="flex:1;font:600 13px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:12px 0;border-radius:8px;text-align:center">Sí</span><span style="flex:1;font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:12px 0;border-radius:8px;text-align:center">No</span></div>
+</div>
+</div>
+<div style="display:flex;justify-content:space-around;border-top:1px solid #E2DED6;background:#fff;padding:11px 0 14px">
+<span style="font:500 10.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Hoy</span><span style="font:600 10.5px/1 'Instrument Sans',sans-serif;color:#C24B15">Avisos</span><span style="font:500 10.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Fechas</span><span style="font:500 10.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Más</span>
+</div>
+</div>
+
+<div style="width:264px;background:#fff;border:1px solid #E2DED6;border-radius:26px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.07)">
+<div style="background:#16191C;padding:12px 18px 14px">
+<div style="display:flex;justify-content:space-between;font:500 10.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.55)"><span>9:41</span><span>▲ ▮</span></div>
+<div style="font:600 19px/1.2 'Instrument Sans',sans-serif;color:#fff;margin-top:14px">Fechas</div>
+<div style="font:400 12px/1.4 'Instrument Sans',sans-serif;color:rgba(255,255,255,.55);margin-top:2px">Agosto · 6 vencimientos</div>
+</div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:10px;background:#F4F2ED">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:12px"><div style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em">MIÉ 13 · EN 2 DÍAS</div><div style="font:600 12.5px/1.4 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border-left:2px solid #C24B15;border-radius:0 5px 5px 0;padding:7px 8px;margin-top:9px">FC-1051 · sin recibo</div><div style="font:600 12.5px/1.4 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border-left:2px solid #2E6B4F;border-radius:0 5px 5px 0;padding:7px 8px;margin-top:6px">FC-1065 · con recibo</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:12px"><div style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em">LUN 18</div><div style="font:600 12.5px/1.4 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border-left:2px solid #1F4B99;border-radius:0 5px 5px 0;padding:7px 8px;margin-top:9px">FC-1053 · reprogramado</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:12px"><div style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em">JUE 20</div><div style="font:600 12.5px/1.4 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border-left:2px solid #C24B15;border-radius:0 5px 5px 0;padding:7px 8px;margin-top:9px">FC-1064 · sin recibo</div></div>
+</div>
+<div style="display:flex;justify-content:space-around;border-top:1px solid #E2DED6;background:#fff;padding:11px 0 14px">
+<span style="font:500 10.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Hoy</span><span style="font:500 10.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Avisos</span><span style="font:600 10.5px/1 'Instrument Sans',sans-serif;color:#C24B15">Fechas</span><span style="font:500 10.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Más</span>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="3f">
+<div class="dv-olabel"><span class="dv-oid">3f</span>Facturas · la entrada de cualquier formato y el detalle. Arriba las tres puertas de ingreso; abajo la cola donde lo dudoso espera decisión en vez de contaminar los totales.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Facturas</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">128 este año · 4 esperando una decisión tuya</div></div>
+<div style="display:flex;gap:9px">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Ver casilla de mail</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 15px;border-radius:8px">Subir archivos</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:12px">
+<div style="background:#fff;border:1.5px dashed #C6C0B4;border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+<div style="font:600 14px/1.3 'Instrument Sans',sans-serif;color:#16191C">Arrastrá los archivos acá</div>
+<div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278">PDF · foto del celular · Excel · ZIP</div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">CASILLA DE MAIL</div>
+<div style="font:500 12.5px/1.4 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px">facturas@cordillera<br>.com.ar</div>
+<div style="font:400 12px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">6 recibidas hoy</div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PORTAL DEL PROVEEDOR</div>
+<div style="font:500 12.5px/1.4 'Instrument Sans',sans-serif;color:#16191C;margin-top:9px">Descarga automática 06:00</div>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;display:inline-block;margin-top:8px">Último intento OK</span>
+</div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="display:flex;gap:2px;padding:0 18px;border-bottom:1px solid #E2DED6">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#16191C;padding:14px 4px;border-bottom:2px solid #C24B15;margin-bottom:-1px">Por revisar <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:3px 6px;border-radius:20px;margin-left:4px">4</span></span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Todas</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Sin recibo</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Parciales</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Vencidas</span>
+</div>
+<div style="display:grid;grid-template-columns:1.5fr .9fr 1.2fr .9fr 1fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>ARCHIVO</span><span>FORMATO</span><span>PROVEEDOR</span><span>TOTAL</span><span>QUÉ FALTA</span></div>
+
+<div style="display:grid;grid-template-columns:1.5fr .9fr 1.2fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15">
+<span style="font:500 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">IMG_4821.jpg</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Foto</span>
+<span style="font:400 12.5px/1.35 'Instrument Sans',sans-serif;color:#9A4A0C">¿Ferrum Andina o Ferro Andes?</span>
+<span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 214.000</span>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:8px 12px;border-radius:7px;justify-self:start">Elegir</span>
+</div>
+<div style="display:grid;grid-template-columns:1.5fr .9fr 1.2fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15">
+<span style="font:500 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">listado-agosto.xlsx</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Excel</span>
+<span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Tornillería Sur</span>
+<span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#C6C0B4">—</span>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:8px 12px;border-radius:7px;justify-self:start">Mapear columnas</span>
+</div>
+<div style="display:grid;grid-template-columns:1.5fr .9fr 1.2fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15">
+<span style="font:500 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">FC-1049-copia.pdf</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">PDF</span>
+<span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Insumos del Valle</span>
+<span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 96.300</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">¿Duplicada?</span>
+</div>
+<div style="display:grid;grid-template-columns:1.5fr .9fr 1.2fr .9fr 1fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center">
+<span style="font:500 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">FC-1072.pdf</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">PDF</span>
+<span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Ferrum Andina S.A.</span>
+<span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 342.800</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Listo</span>
+</div>
+<div style="padding:12px 18px;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;background:#FAF9F5">Si el número, el proveedor y el monto ya existen, la factura no entra dos veces: queda como posible duplicado hasta que alguien decida.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3g">
+<div class="dv-olabel"><span class="dv-oid">3g</span>Detalle de factura. Estado de pago como una sola barra legible, campos dudosos marcados en el lugar donde se corrigen, y todo lo tocado a mano firmado con usuario y fecha.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px">
+<div style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">Facturas <span style="color:#C6C0B4">/</span> FC-1051</div>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:12px">
+<div>
+<div style="display:flex;align-items:baseline;gap:11px"><span style="font:600 24px/1.15 'IBM Plex Mono',sans-serif;color:#16191C;letter-spacing:-.01em">FC-1051</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:5px 9px;border-radius:20px">Vence en 2 días</span></div>
+<div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:6px">Ferrum Andina S.A. · emitida 29/06 · vence 13/08 · plazo 45 días · rubro Herramientas</div>
+</div>
+<div style="display:flex;gap:9px;flex:none">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Ver original</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Registrar pago</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 15px;border-radius:8px">Generar recibo</span>
+</div>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;gap:16px;align-items:flex-start">
+<div style="width:300px;flex:none;display:flex;flex-direction:column;gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">DOCUMENTO ORIGINAL</div>
+<div style="height:270px;border-radius:8px;border:1px solid #E2DED6;background:repeating-linear-gradient(135deg,#FAF9F5 0 8px,#F1EFE9 8px 16px);display:flex;align-items:center;justify-content:center;text-align:center;font:400 12px/1.5 'Instrument Sans',sans-serif;color:#9A9A94;padding:14px">Vista previa del PDF<br>(zoom y descarga)</div>
+</div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">CAMPO SIN CONFIRMAR</div>
+<div style="font:600 14px/1.3 'Instrument Sans',sans-serif;color:#16191C;margin-top:8px">Vencimiento: 13/08/2026</div>
+<div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:3px">Leído del PDF con baja certeza. Confirmalo para que entre al calendario en firme.</div>
+<div style="display:flex;gap:7px;margin-top:11px"><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:9px 14px;border-radius:8px">Confirmar</span><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:9px 14px;border-radius:8px">Corregir</span></div>
+</div>
+</div>
+
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;min-width:0">
+<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">ESTADO DE PAGO</div>
+<div style="display:flex;align-items:baseline;gap:8px;margin-top:9px"><span style="font:500 24px/1.1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 194.480</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">de $ 486.200</span></div>
+<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:11px;gap:2px"><i style="width:40%;background:#1F4B99"></i><i style="width:60%;background:repeating-linear-gradient(135deg,#F4F2ED 0 5px,#E7E3DA 5px 10px)"></i></div>
+<div style="display:flex;gap:6px;margin-top:10px"><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px">Parcial 40 %</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px">Resto $ 291.720</span></div>
+</div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:15px 16px;display:flex;flex-direction:column">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">RECIBO</div>
+<div style="font:600 15px/1.3 'Instrument Sans',sans-serif;color:#16191C;margin-top:9px">Todavía no generado</div>
+<div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:3px">Se puede emitir hasta el 13/08; después queda registrado como faltante.</div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 14px;border-radius:8px;align-self:flex-start;margin-top:auto">Generar ahora</span>
+</div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="display:flex;gap:2px;padding:0 18px;border-bottom:1px solid #E2DED6">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#16191C;padding:14px 4px;border-bottom:2px solid #C24B15;margin-bottom:-1px">Pagos <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:3px 6px;border-radius:20px;margin-left:4px">2</span></span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Ítems</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Orden de compra</span>
+<span style="font:500 13px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:14px 14px">Historial</span>
+</div>
+<div style="display:grid;grid-template-columns:.8fr 1fr 1fr .9fr .8fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>FECHA</span><span>MONTO</span><span>MEDIO</span><span>RECIBO</span><span>CARGÓ</span></div>
+<div style="display:grid;grid-template-columns:.8fr 1fr 1fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">02/07</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 145.860</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249">Transferencia</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">A-0138</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Marcela</span></div>
+<div style="display:grid;grid-template-columns:.8fr 1fr 1fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7"><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">21/07</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 48.620</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249">Cheque</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Falta</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Marcela</span></div>
+<div style="padding:12px 18px;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;background:#FAF9F5">Cada pago, ajuste o corrección queda firmado con usuario y fecha en el historial.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3h">
+<div class="dv-olabel"><span class="dv-oid">3h</span>Pagos y recibos, y el paso final de emisión. Un pago puede cubrir varias facturas: la asignación se ve como un balance que cierra o no, y nunca se fuerza el cierre.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Pagos y recibos</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">3 pagos registrados que todavía no tienen recibo emitido</div></div>
+<div style="display:flex;gap:9px">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Exportar</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 15px;border-radius:8px">Registrar pago</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PAGADO ESTE MES</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">$ 1.964.300</div></div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">PAGOS SIN RECIBO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">3</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#1F4B99;margin-top:7px">Emitir los tres →</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">FACTURAS PARCIALES</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">7</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">$ 812.400 pendientes</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PRÓXIMO N° DE RECIBO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px">A-0142</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">Según Configuración</div></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="display:grid;grid-template-columns:.7fr 1.3fr .9fr 1.1fr .9fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>FECHA</span><span>PROVEEDOR</span><span>MONTO</span><span>APLICA A</span><span>RECIBO</span></div>
+<div style="display:grid;grid-template-columns:.7fr 1.3fr .9fr 1.1fr .9fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15"><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">28/08</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Ferrum Andina S.A.</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 620.000</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">3 facturas</span><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:8px 12px;border-radius:7px;justify-self:start">Generar</span></div>
+<div style="display:grid;grid-template-columns:.7fr 1.3fr .9fr 1.1fr .9fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15"><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">26/08</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Tornillería Sur</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 48.620</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">FC-1051 · parcial</span><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:8px 12px;border-radius:7px;justify-self:start">Generar</span></div>
+<div style="display:grid;grid-template-columns:.7fr 1.3fr .9fr 1.1fr .9fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">21/07</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Insumos del Valle SRL</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 318.000</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">FC-1044</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">A-0139</span></div>
+<div style="display:grid;grid-template-columns:.7fr 1.3fr .9fr 1.1fr .9fr;padding:12px 18px;align-items:center"><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">02/07</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Ferrum Andina S.A.</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 145.860</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">FC-1051 · parcial</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">A-0138</span></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="width:22px;height:22px;border-radius:50%;background:#16191C;color:#fff;font:600 11px/22px 'IBM Plex Mono',monospace;text-align:center">1</span>
+<span style="flex:1;height:1px;background:#16191C"></span>
+<span style="width:22px;height:22px;border-radius:50%;background:#16191C;color:#fff;font:600 11px/22px 'IBM Plex Mono',monospace;text-align:center">2</span>
+<span style="flex:1;height:1px;background:#16191C"></span>
+<span style="width:22px;height:22px;border-radius:50%;background:#C24B15;color:#fff;font:600 11px/22px 'IBM Plex Mono',monospace;text-align:center">3</span>
+<span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-left:6px">Paso 3 de 3 · listo para emitir</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1.15fr;gap:16px;align-items:start">
+<div style="border:1px solid #E2DED6;border-radius:10px;background:#FAF9F5;padding:18px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #E2DED6;padding-bottom:12px">
+<div><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Ferretería Industrial Cordillera</div><div style="font:400 11px/1.5 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:3px">CUIT 30-68094412-7</div></div>
+<div style="text-align:right"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.1em">RECIBO</div><div style="font:600 16px/1.2 'IBM Plex Mono',monospace;color:#16191C;margin-top:4px">A-0142</div></div>
+</div>
+<div style="font:400 11.5px/1.6 'Instrument Sans',sans-serif;color:#6E7278;margin-top:12px">Recibido de <span style="color:#16191C;font-weight:600">Ferrum Andina S.A.</span> la suma de</div>
+<div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:6px;font-variant-numeric:tabular-nums">$ 620.000,00</div>
+<div style="font:400 11.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">seiscientos veinte mil pesos</div>
+<div style="border-top:1px dashed #D5D0C6;margin-top:14px;padding-top:12px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;font:400 11.5px/1 'IBM Plex Mono',monospace;color:#3D4249"><span>FC-1051</span><span style="font-variant-numeric:tabular-nums">$ 291.720</span></div>
+<div style="display:flex;justify-content:space-between;font:400 11.5px/1 'IBM Plex Mono',monospace;color:#3D4249"><span>FC-1058</span><span style="font-variant-numeric:tabular-nums">$ 246.600</span></div>
+<div style="display:flex;justify-content:space-between;font:400 11.5px/1 'IBM Plex Mono',monospace;color:#3D4249"><span>FC-1071</span><span style="font-variant-numeric:tabular-nums">$ 81.680</span></div>
+</div>
+<div style="height:38px;border-bottom:1px solid #D5D0C6;margin-top:22px"></div>
+<div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;margin-top:5px">Firma y aclaración</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">BALANCE DE LA ASIGNACIÓN</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px"><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Monto del pago</span><span style="font:500 14px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 620.000</span></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:7px"><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Asignado a 3 facturas</span><span style="font:500 14px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 620.000</span></div>
+<div style="height:8px;background:#F4F2ED;border-radius:4px;margin-top:11px"><i style="display:block;width:100%;height:100%;background:#2E6B4F;border-radius:4px"></i></div>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;display:inline-block;margin-top:10px">Cierra exacto</span>
+</div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Al emitir</div>
+<div style="font:400 12.5px/1.6 'Instrument Sans',sans-serif;color:#6E7278;margin-top:6px">FC-1051 y FC-1058 quedan saldadas · FC-1071 pasa a parcial 54 % · se cierra el aviso de vencimiento de FC-1051 · el recibo queda descargable e inmutable.</div>
+</div>
+<div style="border:1px solid #EBD8B6;background:#FDF8EF;border-radius:10px;padding:12px 14px;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#7A6A52">Si sobrara o faltara plata, el resto queda como saldo a favor del proveedor y se avisa. Nunca se ajusta a mano para que cierre.</div>
+<div style="display:flex;gap:9px;flex-wrap:wrap">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:11px 16px;border-radius:8px">Emitir y descargar PDF</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:11px 16px;border-radius:8px">Emitir y enviar por mail</span>
+</div>
+<div style="font:400 12px/1.5 'Instrument Sans',sans-serif;color:#9A9A94">Un recibo emitido no se edita: se anula con motivo y queda el rastro.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3i">
+<div class="dv-olabel"><span class="dv-oid">3i</span>Órdenes de compra con la línea de tiempo pedido → recibido → facturado → pagado. Lo que se pidió y nadie siguió aparece arriba, no enterrado en una lista.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Órdenes de compra</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">18 abiertas · 2 con más de 15 días sin novedades</div></div>
+<div style="display:flex;gap:9px">
+<div style="display:flex;gap:6px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:3px">
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">Abiertas</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Atrasadas</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Cerradas</span>
+</div>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 15px;border-radius:8px">Nueva orden</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PENDIENTES</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">18</div></div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">ATRASADAS</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">2</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#7A6A52;margin-top:7px">+15 días sin recibir</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">RECIBIDAS PARCIAL</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">5</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">POSIBLE PEDIDO REPETIDO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">2</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#1F4B99;margin-top:7px">Comparar →</div></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="display:grid;grid-template-columns:.8fr 1.4fr 1fr 1.2fr .9fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>OC</span><span>PROVEEDOR</span><span>PEDIDA</span><span>ESTADO</span><span>FACTURA</span></div>
+<div style="display:grid;grid-template-columns:.8fr 1.4fr 1fr 1.2fr .9fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">OC-0312</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Insumos del Valle SRL</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#A32B1E">hace 22 días</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Sin recibir</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#C6C0B4">—</span></div>
+<div style="display:grid;grid-template-columns:.8fr 1.4fr 1fr 1.2fr .9fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">OC-0318</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Ferrum Andina S.A.</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">hace 9 días</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">Parcial 3 de 5</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">FC-1071</span></div>
+<div style="display:grid;grid-template-columns:.8fr 1.4fr 1fr 1.2fr .9fr;padding:12px 18px;align-items:center"><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">OC-0321</span><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Tornillería Sur</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">hace 4 días</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Recibida</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#6E7278">FC-1072</span></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div><div style="font:600 18px/1.25 'Instrument Sans',sans-serif;color:#16191C">OC-0318 · Ferrum Andina S.A.</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">5 ítems · $ 342.800 · pedida el 22/08 por Marcela</div></div>
+<div style="display:flex;gap:9px"><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:9px 14px;border-radius:8px">Reclamar al proveedor</span><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:9px 14px;border-radius:8px">Registrar recepción</span></div>
+</div>
+
+<div style="display:flex;align-items:flex-start;padding:4px 0">
+<div style="flex:1;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:center"><span style="width:13px;height:13px;border-radius:50%;background:#2E6B4F;flex:none"></span><span style="flex:1;height:2px;background:#2E6B4F"></span></div>
+<div><div style="font:600 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Pedida</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#6E7278;margin-top:2px">22/08 · Marcela</div></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:center"><span style="width:13px;height:13px;border-radius:50%;background:#1F4B99;flex:none"></span><span style="flex:1;height:2px;background:repeating-linear-gradient(90deg,#1F4B99 0 5px,transparent 5px 10px)"></span></div>
+<div><div style="font:600 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Recibida parcial</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#6E7278;margin-top:2px">28/08 · 3 de 5 ítems</div></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:center"><span style="width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid #D5D0C6;flex:none"></span><span style="flex:1;height:2px;background:#E2DED6"></span></div>
+<div><div style="font:600 12.5px/1.3 'Instrument Sans',sans-serif;color:#9A9A94">Facturada</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#C6C0B4;margin-top:2px">FC-1071 · parcial</div></div>
+</div>
+<div style="flex:none;display:flex;flex-direction:column;gap:9px;width:110px">
+<div style="display:flex;align-items:center"><span style="width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid #D5D0C6;flex:none"></span></div>
+<div><div style="font:600 12.5px/1.3 'Instrument Sans',sans-serif;color:#9A9A94">Pagada</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#C6C0B4;margin-top:2px">pendiente</div></div>
+</div>
+</div>
+
+<div style="border:1px solid #E2DED6;border-radius:10px;overflow:hidden">
+<div style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr;padding:9px 16px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>ÍTEM</span><span>PEDIDO</span><span>RECIBIDO</span><span>ESTADO</span></div>
+<div style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr;padding:11px 16px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Amoladora angular 4½"</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">6</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">6</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Completo</span></div>
+<div style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr;padding:11px 16px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7"><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Disco de corte metal 115 mm</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">200</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">120</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Faltan 80</span></div>
+<div style="display:grid;grid-template-columns:2fr .8fr .8fr .8fr;padding:11px 16px;align-items:center;background:#FDFBF7"><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Juego de llaves combinadas</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">4</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#C6C0B4">—</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Sin recibir</span></div>
+</div>
+
+<div style="border:1px solid #C8D6EC;background:#F4F8FD;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px">
+<div style="flex:1;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#3D4249">Hay otra orden abierta con el mismo disco de corte, pedida 8 días antes (OC-0309). Puede ser un pedido duplicado.</div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #C8D6EC;padding:9px 14px;border-radius:8px;flex:none">Comparar órdenes</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3j">
+<div class="dv-olabel"><span class="dv-oid">3j</span>Ventas · el espacio de Julián. Mismo lenguaje visual, sidebar recortado a lo que su rol puede ver: no existe la palabra “deuda” en toda la pantalla.</div>
+<div class="dv-card" style="width:1180px">
+<div style="display:flex;min-height:760px;font-size:13px">
+<div style="width:208px;background:#16191C;flex:none;display:flex;flex-direction:column;padding:18px 14px;gap:3px">
+<div style="display:flex;align-items:center;gap:10px;padding:0 6px 18px">
+<span style="width:32px;height:32px;border:1.5px solid #C24B15;border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 12px/1 'Instrument Sans',sans-serif;color:#fff">FC</span>
+<div><div style="font:600 13px/1.2 'Instrument Sans',sans-serif;color:#fff">Cordillera</div><div style="font:400 10.5px/1.2 'IBM Plex Mono',monospace;color:rgba(255,255,255,.4)">Ventas</div></div>
+</div>
+<div style="background:#C24B15;border-radius:8px;padding:9px 11px;font:600 13px/1 'Instrument Sans',sans-serif;color:#fff">Tablero de ventas</div>
+<div style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.35);letter-spacing:.14em;padding:16px 11px 6px">VENTAS</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Evolución</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Por rubro</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Productos y stock</div>
+<div style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.35);letter-spacing:.14em;padding:16px 11px 6px">DATOS</div>
+<div style="padding:9px 11px;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Lista de precios</div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Revisar esto<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#F0B27A">8</span></div>
+<div style="font:600 9.5px/1 'IBM Plex Mono',monospace;color:rgba(255,255,255,.35);letter-spacing:.14em;padding:16px 11px 6px">SISTEMA</div>
+<div style="padding:9px 11px;display:flex;justify-content:space-between;font:400 13px/1 'Instrument Sans',sans-serif;color:rgba(255,255,255,.75)">Avisos<span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#F0B27A">3</span></div>
+<div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:12px;display:flex;align-items:center;gap:9px">
+<span style="width:28px;height:28px;border-radius:50%;background:#1F4B99;color:#fff;font:600 11px/28px 'Instrument Sans',sans-serif;text-align:center">JS</span>
+<div><div style="font:500 12px/1.2 'Instrument Sans',sans-serif;color:#fff">Julián S.</div><div style="font:400 10.5px/1.2 'IBM Plex Mono',monospace;color:rgba(255,255,255,.4)">Ventas</div></div>
+</div>
+</div>
+
+<div style="flex:1;background:#F4F2ED;padding:24px 26px;display:flex;flex-direction:column;gap:16px;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 26px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Cómo vienen las ventas</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">2023 → hoy · tres años de historia importada</div></div>
+<div style="display:flex;gap:9px;align-items:center">
+<div style="display:flex;gap:6px;background:#fff;border:1px solid #E2DED6;border-radius:8px;padding:3px"><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Mes</span><span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">Año</span></div>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Exportar</span>
+</div>
+</div>
+
+<div style="border:1px solid #EBD8B6;background:#FDF8EF;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+<span style="width:22px;height:22px;border-radius:50%;background:#C24B15;color:#fff;font:700 13px/22px 'Instrument Sans',sans-serif;text-align:center;flex:none">!</span>
+<div style="flex:1;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#7A6A52">8 ventas con código repetido y 2 con fecha ilegible <strong style="color:#16191C;font-weight:600">no están sumadas</strong> en los números de abajo.</div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:9px 14px;border-radius:8px;flex:none">Ver las 10</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">FACTURADO MES</div><div style="font:500 24px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">$ 4.812.400</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#2E6B4F;margin-top:7px">▲ 11,4 % vs. 2025</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">TICKET PROMEDIO</div><div style="font:500 24px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">$ 38.900</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#2E6B4F;margin-top:7px">▲ 4,1 %</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">VARIACIÓN DE PRECIOS</div><div style="font:500 24px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">+ 9,2 %</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">Promedio del proveedor</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:15px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PRODUCTOS NUEVOS</div><div style="font:500 24px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:9px;font-variant-numeric:tabular-nums">18</div><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;display:inline-block;margin-top:7px">14 sin rubro</span></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:18px 20px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div style="font:600 14px/1.2 'Instrument Sans',sans-serif;color:#16191C">Facturación mensual por año</div>
+<div style="display:flex;gap:14px;align-items:center">
+<span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278"><span style="display:inline-block;width:16px;height:2px;background:#16191C;margin-right:5px;vertical-align:middle"></span>2026</span>
+<span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278"><span style="display:inline-block;width:16px;height:2px;background:#1F4B99;margin-right:5px;vertical-align:middle"></span>2025</span>
+<span style="font:400 11.5px/1 'Instrument Sans',sans-serif;color:#6E7278"><span style="display:inline-block;width:16px;height:2px;background:#C6C0B4;margin-right:5px;vertical-align:middle"></span>2024</span>
+</div>
+</div>
+<div style="position:relative;height:190px;margin-top:16px;border-left:1px solid #E2DED6;border-bottom:1px solid #E2DED6">
+<div style="position:absolute;left:0;right:0;top:25%;height:1px;background:#F1EFE9"></div>
+<div style="position:absolute;left:0;right:0;top:50%;height:1px;background:#F1EFE9"></div>
+<div style="position:absolute;left:0;right:0;top:75%;height:1px;background:#F1EFE9"></div>
+<svg viewBox="0 0 800 190" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+<polyline points="20,150 130,142 240,155 350,120 460,128 570,96 680,104 780,82" fill="none" stroke="#C6C0B4" stroke-width="2"></polyline>
+<polyline points="20,132 130,120 240,138 350,100 460,108 570,74 680,84 780,64" fill="none" stroke="#1F4B99" stroke-width="2"></polyline>
+<polyline points="20,118 130,104 240,122 350,80 460,88 570,52 680,62 780,40" fill="none" stroke="#16191C" stroke-width="2.5"></polyline>
+<circle cx="780" cy="40" r="4" fill="#16191C"></circle>
+</svg>
+</div>
+<div style="display:flex;justify-content:space-between;margin-top:8px;font:400 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94"><span>ENE</span><span>FEB</span><span>MAR</span><span>ABR</span><span>MAY</span><span>JUN</span><span>JUL</span><span>AGO</span></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1.2fr;gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:16px 18px">
+<div style="font:600 14px/1.2 'Instrument Sans',sans-serif;color:#16191C">Ventas por rubro</div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Herramientas</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">$ 1.68 M</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:88%;height:100%;background:#16191C;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Pinturas</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">$ 1.14 M</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:60%;height:100%;background:#3D4249;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#3D4249"><span>Sanitarios</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">$ 842 K</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:44%;height:100%;background:#6E7278;border-radius:4px"></i></div></div>
+<div><div style="display:flex;justify-content:space-between;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A4A0C"><span>Sin rubro asignado</span><span style="font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">$ 386 K</span></div><div style="height:7px;background:#F4F2ED;border-radius:4px;margin-top:5px"><i style="display:block;width:20%;height:100%;background:repeating-linear-gradient(135deg,#EBD8B6 0 4px,#FBF0DF 4px 8px);border-radius:4px"></i></div></div>
+</div>
+</div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="padding:14px 18px;border-bottom:1px solid #E2DED6;display:flex;justify-content:space-between;align-items:center"><div style="font:600 14px/1.2 'Instrument Sans',sans-serif;color:#16191C">Qué se mueve y qué no</div><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;color:#1F4B99">Ver productos →</span></div>
+<div style="display:grid;grid-template-columns:2fr .7fr .8fr .9fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>PRODUCTO</span><span>STOCK</span><span>ÚLT. VENTA</span><span>ROTACIÓN</span></div>
+<div style="display:grid;grid-template-columns:2fr .7fr .8fr .9fr;padding:11px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Amoladora angular 4½"</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">14</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">ayer</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Alta</span></div>
+<div style="display:grid;grid-template-columns:2fr .7fr .8fr .9fr;padding:11px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Juego de llaves combinadas</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">38</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A4A0C">hace 4 m</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Dormido</span></div>
+<div style="display:grid;grid-template-columns:2fr .7fr .8fr .9fr;padding:11px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Disco de corte metal 115 mm</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#A32B1E;font-variant-numeric:tabular-nums">6</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">hoy</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Poco stock</span></div>
+<div style="display:grid;grid-template-columns:2fr .7fr .8fr .9fr;padding:11px 18px;align-items:center"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Rodillo antigota 22 cm</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">52</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">nunca</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">Nuevo</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3k">
+<div class="dv-olabel"><span class="dv-oid">3k</span>Catálogo y precios sincronizados, y el normalizador de rubros. La sincronización se muestra como un hecho con hora y resultado, no como un ícono girando.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Lista de precios</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">1.284 productos · última actualización automática hoy 06:04</div></div>
+<div style="display:flex;gap:9px;align-items:center">
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:6px 10px;border-radius:20px">Al día</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Historial de sync</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:10px 15px;border-radius:8px">Actualizar ahora</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">SUBIERON DE PRECIO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">142</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">Promedio + 9,2 %</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">BAJARON</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">9</div></div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">NUEVOS SIN RUBRO</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">14</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#1F4B99;margin-top:7px">Asignar en lote →</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">DEJARON DE FIGURAR</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">6</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">Se conserva el último precio</div></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="padding:13px 18px;border-bottom:1px solid #E2DED6;display:flex;gap:9px;align-items:center">
+<div style="flex:1;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:9px 12px;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Buscar producto o código…</div>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;background:#fff;border:1px solid #D5D0C6;padding:8px 12px;border-radius:20px">Todos los rubros</span>
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:8px 12px;border-radius:20px">Sólo con cambios</span>
+</div>
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr .9fr .8fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>PRODUCTO</span><span>RUBRO</span><span>PRECIO HOY</span><span>ANTERIOR</span><span>VARIACIÓN</span></div>
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Amoladora angular 4½" 820 W</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">Herramientas</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 84.900</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;font-variant-numeric:tabular-nums">$ 75.800</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">+ 12 %</span></div>
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Látex interior mate 20 L</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">Pinturas</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 62.400</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;font-variant-numeric:tabular-nums">$ 62.400</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;justify-self:start">=</span></div>
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr .9fr .8fr;padding:12px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Rodillo antigota 22 cm</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Sin rubro</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 9.800</span><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">nuevo</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">Nuevo</span></div>
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr .9fr .8fr;padding:12px 18px;align-items:center"><span style="font:400 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Codo PVC 110 mm</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">Sanitarios</span><span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 4.120</span><span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:#9A9A94;font-variant-numeric:tabular-nums">$ 4.310</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">− 4 %</span></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+<div><div style="font:600 18px/1.25 'Instrument Sans',sans-serif;color:#16191C">Rubros · unificar categorías escritas de cinco formas</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Se propone la agrupación; la decisión y el nombre final los pone el usuario.</div></div>
+<div style="display:flex;gap:16px;align-items:stretch">
+<div style="width:230px;flex:none;border:1px solid #E2DED6;border-radius:10px;overflow:hidden">
+<div style="padding:11px 14px;border-bottom:1px solid #EDE9E1;background:#FDFBF7;border-left:3px solid #C24B15"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Pinturas</div><div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:2px">5 variantes · 212 productos</div></div>
+<div style="padding:11px 14px;border-bottom:1px solid #EDE9E1"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Herramientas</div><div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:2px">4 variantes · 340 productos</div></div>
+<div style="padding:11px 14px;border-bottom:1px solid #EDE9E1"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Sanitarios</div><div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:2px">3 variantes · 98 productos</div></div>
+<div style="padding:11px 14px"><div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#9A4A0C">Sin rubro</div><div style="font:400 11.5px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:2px">14 productos</div></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;min-width:0">
+<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Se unifican como</span><span style="font:600 13px/1 'Instrument Sans',sans-serif;color:#16191C;background:#fff;border:1px solid #D5D0C6;border-radius:8px;padding:9px 12px">Pinturas</span><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#1F4B99">Cambiar nombre</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">pintura</span>
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">PINTURAS</span>
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">Pinturas y afines</span>
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">pintureria</span>
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px dashed #C6C0B4;padding:5px 9px;border-radius:20px">pint.</span>
+</div>
+<div style="border:1px solid #E2DED6;background:#F4F2ED;border-radius:10px;padding:14px 16px">
+<div style="font:600 12.5px/1.3 'Instrument Sans',sans-serif;color:#16191C">Impacto de unificar</div>
+<div style="display:flex;gap:24px;margin-top:10px">
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">212</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">productos</div></div>
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">46</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">facturas</div></div>
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">2</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">gráficos se recalculan</div></div>
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#2E6B4F">Sí</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">se puede deshacer</div></div>
+</div>
+</div>
+<div style="display:flex;gap:9px;justify-content:flex-end;margin-top:auto"><span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:11px 16px;border-radius:8px">Separar alguna</span><span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:11px 16px;border-radius:8px">Unificar las 5</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3l">
+<div class="dv-olabel"><span class="dv-oid">3l</span>Avisos y reclamos. Cada reclamo llega con el contexto que el sistema ya sabe, para no tener que buscarlo en otra pantalla antes de responder.</div>
+<div class="dv-card" style="width:1000px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Avisos y reclamos</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">7 sin resolver · el más viejo hace 11 días · también salen por mail y push</div></div>
+<div style="display:flex;gap:6px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:3px">
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">Sin resolver</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Reclamos</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Vencimientos</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">Archivados</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;gap:16px;align-items:flex-start">
+<div style="width:290px;flex:none;background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="padding:11px 15px;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em;display:flex;justify-content:space-between"><span>7 SIN RESOLVER</span><span style="color:#1F4B99">MÁS VIEJOS ▾</span></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1;border-left:3px solid #C24B15;background:#FDFBF7"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Reclamo · Insumos del Valle</span><span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#9A4A0C">11 d</span></div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">“Nos deben dos facturas”</div></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Vence en 2 días</span><span style="font:600 10.5px/1 'IBM Plex Mono',monospace;color:#9A9A94">hoy</span></div><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">FC-1051 sin recibo generado</div></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Precio subió 12 %</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Supera el umbral configurado del 10 %</div></div>
+<div style="padding:13px 15px;border-bottom:1px solid #EDE9E1"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">OC-0312 sin recibir</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Pedida hace 22 días</div></div>
+<div style="padding:13px 15px"><span style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Reclamo · Ferrum Andina</span><div style="font:400 12.5px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Pago parcial vencido</div></div>
+</div>
+
+<div style="flex:1;background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-width:0">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div><div style="font:600 18px/1.25 'Instrument Sans',sans-serif;color:#16191C">Reclamo de Insumos del Valle SRL</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Entró por el portal del proveedor el 20/08 · nadie respondió todavía</div></div>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:5px 9px;border-radius:20px;flex:none">Sin resolver · 11 días</span>
+</div>
+
+<div style="border:1px solid #E2DED6;background:#FAF9F5;border-radius:10px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">TEXTO DEL RECLAMO</div>
+<div style="font:400 13px/1.6 'Instrument Sans',sans-serif;color:#3D4249;margin-top:8px;text-wrap:pretty">“Buenas tardes, seguimos esperando el pago de dos facturas de junio y julio. Necesitamos regularizar antes de despachar el próximo pedido.”</div>
+</div>
+
+<div style="border:1px solid #C8D6EC;background:#F4F8FD;border-radius:10px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#1F4B99;letter-spacing:.12em">CONTEXTO QUE EL SISTEMA YA SABE</div>
+<div style="display:flex;gap:26px;margin-top:11px;flex-wrap:wrap">
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 542.900</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">le debemos, en 2 facturas</div></div>
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#A32B1E;font-variant-numeric:tabular-nums">61 días</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">pago promedio (plazo 45)</div></div>
+<div><div style="font:500 17px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">OC-0312</div><div style="font:400 11.5px/1.3 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">además, sin recibir hace 22 días</div></div>
+</div>
+<div style="display:flex;gap:9px;margin-top:13px"><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #C8D6EC;padding:9px 14px;border-radius:8px">Abrir proveedor</span><span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #C8D6EC;padding:9px 14px;border-radius:8px">Ver las 2 facturas</span></div>
+</div>
+
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">RESPUESTA</div>
+<div style="border:1px solid #D5D0C6;border-radius:8px;padding:11px 13px;margin-top:8px;font:400 13px/1.5 'Instrument Sans',sans-serif;color:#9A9A94;min-height:52px">Escribir la respuesta que sale por mail al proveedor…</div>
+<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap"><span style="font:500 11.5px/1 'Instrument Sans',sans-serif;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:6px 10px;border-radius:20px">Adjuntar recibo A-0139</span><span style="font:500 11.5px/1 'Instrument Sans',sans-serif;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:6px 10px;border-radius:20px">Proponer fecha de pago</span></div>
+</div>
+
+<div style="display:flex;gap:9px;justify-content:flex-end;margin-top:auto;flex-wrap:wrap">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:11px 16px;border-radius:8px">Asignar a Marcela</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:11px 16px;border-radius:8px">Marcar resuelto</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:11px 16px;border-radius:8px">Responder por mail</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3m">
+<div class="dv-olabel"><span class="dv-oid">3m</span>Ingreso, usuarios y permisos, y configuración. Los tres cierran el alcance: una cuenta por persona, lo que un rol no ve no aparece, y los parámetros los cambia el dueño sin llamar a nadie.</div>
+<div class="dv-card" style="padding:18px;display:flex;flex-direction:column;gap:16px;background:#F4F2ED">
+
+<div style="display:flex;gap:16px;align-items:stretch">
+<div style="width:480px;flex:none;background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden;display:flex">
+<div style="width:180px;flex:none;background:#16191C;padding:22px 20px;display:flex;flex-direction:column;justify-content:space-between">
+<span style="width:38px;height:38px;border:1.5px solid #C24B15;border-radius:9px;display:flex;align-items:center;justify-content:center;font:700 14px/1 'Instrument Sans',sans-serif;color:#fff">FC</span>
+<div><div style="font:600 15px/1.3 'Instrument Sans',sans-serif;color:#fff">Ferretería Industrial Cordillera</div><div style="font:400 11.5px/1.5 'IBM Plex Mono',monospace;color:rgba(255,255,255,.45);margin-top:6px">Gestión interna</div></div>
+</div>
+<div style="flex:1;padding:24px 22px;display:flex;flex-direction:column;gap:11px;justify-content:center">
+<div style="font:600 20px/1.2 'Instrument Sans',sans-serif;color:#16191C">Entrar</div>
+<div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278">Cada persona con su cuenta. La clave compartida se da de baja.</div>
+<div style="margin-top:6px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">MAIL</div><div style="border:1px solid #D5D0C6;border-radius:8px;padding:10px 12px;margin-top:5px;font:400 13px/1 'Instrument Sans',sans-serif;color:#16191C">marcela@cordillera.com.ar</div></div>
+<div><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">CONTRASEÑA</div><div style="border:1.5px solid #16191C;border-radius:8px;padding:10px 12px;margin-top:5px;font:400 13px/1 'IBM Plex Mono',monospace;color:#16191C">••••••••••</div></div>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:12px 0;border-radius:8px;text-align:center;margin-top:4px">Ingresar</span>
+<div style="display:flex;justify-content:space-between;font:500 12px/1 'Instrument Sans',sans-serif;color:#1F4B99;margin-top:2px"><span>Olvidé mi contraseña</span><span style="color:#9A9A94">Segundo factor opcional</span></div>
+</div>
+</div>
+
+<div style="flex:1;background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden;min-width:0">
+<div style="padding:16px 20px;border-bottom:1px solid #E2DED6;display:flex;justify-content:space-between;align-items:center">
+<div><div style="font:600 16px/1.2 'Instrument Sans',sans-serif;color:#16191C">Usuarios y permisos</div><div style="font:400 12px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:3px">Sólo el dueño accede a esta pantalla</div></div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#16191C;color:#fff;padding:9px 14px;border-radius:8px">Invitar persona</span>
+</div>
+<div style="display:grid;grid-template-columns:1.2fr .9fr .9fr .9fr .8fr;padding:9px 20px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>PERSONA</span><span>ROL</span><span>COMPRAS</span><span>VENTAS</span><span>CONFIG.</span></div>
+<div style="display:grid;grid-template-columns:1.2fr .9fr .9fr .9fr .8fr;padding:12px 20px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Roberto D.</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">Dirección</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Todo</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Todo</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Sí</span></div>
+<div style="display:grid;grid-template-columns:1.2fr .9fr .9fr .9fr .8fr;padding:12px 20px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Marcela G.</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">Compras</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Editar</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#B0ABA1;background:#F4F2ED;border:1px solid #E7E3DA;padding:4px 8px;border-radius:20px;justify-self:start">Sin acceso</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#B0ABA1;background:#F4F2ED;border:1px solid #E7E3DA;padding:4px 8px;border-radius:20px;justify-self:start">No</span></div>
+<div style="display:grid;grid-template-columns:1.2fr .9fr .9fr .9fr .8fr;padding:12px 20px;border-bottom:1px solid #EDE9E1;align-items:center"><span style="font:500 12.5px/1 'Instrument Sans',sans-serif;color:#16191C">Julián S.</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">Ventas</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#B0ABA1;background:#F4F2ED;border:1px solid #E7E3DA;padding:4px 8px;border-radius:20px;justify-self:start">Sin acceso</span><span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">Ver</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#B0ABA1;background:#F4F2ED;border:1px solid #E7E3DA;padding:4px 8px;border-radius:20px;justify-self:start">No</span></div>
+<div style="padding:12px 20px;font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;background:#FAF9F5">Lo que un rol no puede ver no aparece en el menú: no es un botón que devuelve error.</div>
+</div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:20px 22px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 18px/1.25 'Instrument Sans',sans-serif;color:#16191C">Configuración</div><div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Los parámetros que el cliente pidió poder cambiar sin depender de nadie. Cada cambio queda firmado.</div></div>
+<span style="font:600 12.5px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 15px;border-radius:8px">Guardar cambios</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:15px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Actualización de precios</div>
+<div style="font:400 12px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Cada cuánto se baja la lista del portal</div>
+<div style="display:flex;gap:6px;margin-top:10px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:3px"><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 10px">6 h</span><span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 10px;border-radius:6px">1 vez al día</span><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 10px">Manual</span></div>
+<div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:9px">Hora 06:00 · último intento OK</div>
+</div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:15px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Anticipo de vencimientos</div>
+<div style="font:400 12px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Avisar tantos días antes si falta el recibo</div>
+<div style="display:flex;gap:6px;margin-top:10px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:3px"><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">2</span><span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">5 días</span><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">10</span></div>
+</div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:15px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Umbrales de aviso</div>
+<div style="font:400 12px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Avisar cuando una factura supere</div>
+<div style="border:1px solid #D5D0C6;border-radius:8px;padding:9px 11px;margin-top:8px;font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 500.000</div>
+<div style="font:400 12px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:8px">…y cuando un precio suba más de <span style="font:500 12.5px/1 'IBM Plex Mono',monospace;color:#16191C">10 %</span></div>
+</div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:15px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Por dónde llegan los avisos</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+<span style="font:600 11.5px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:6px 10px;border-radius:20px">Mail</span>
+<span style="font:600 11.5px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:6px 10px;border-radius:20px">En la app</span>
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#B0ABA1;background:#F4F2ED;border:1px solid #E7E3DA;padding:6px 10px;border-radius:20px">Push celular</span>
+<span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:#B0ABA1;background:#F4F2ED;border:1px solid #E7E3DA;padding:6px 10px;border-radius:20px">Resumen diario</span>
+</div>
+</div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:15px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Plazos de pago por defecto</div>
+<div style="font:400 12px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Se puede pisar proveedor por proveedor</div>
+<div style="display:flex;gap:6px;margin-top:10px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:3px"><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">30</span><span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:7px 12px;border-radius:6px">45 días</span><span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;padding:7px 12px">60</span></div>
+</div>
+<div style="border:1px solid #E2DED6;border-radius:10px;padding:15px 16px">
+<div style="font:600 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Numeración de recibos</div>
+<div style="font:400 12px/1.45 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">Prefijo y próximo número</div>
+<div style="display:flex;gap:8px;margin-top:8px"><div style="border:1px solid #D5D0C6;border-radius:8px;padding:9px 11px;font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;width:52px">A</div><div style="flex:1;border:1px solid #D5D0C6;border-radius:8px;padding:9px 11px;font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">0142</div></div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+<div class="dv-opt" id="3n">
+<div class="dv-olabel"><span class="dv-oid">3n</span>Índice de proveedores. Ordenado por lo que importa —quién espera plata y quién es problemático— con la salud del dato visible en la misma fila: nombres unificados, CUIT faltante, duplicado sin resolver.</div>
+<div class="dv-card" style="width:1060px">
+<div style="background:#F4F2ED;font-size:13px">
+<div style="background:#fff;border-bottom:1px solid #E2DED6;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-end">
+<div><div style="font:600 24px/1.15 'Instrument Sans',sans-serif;color:#16191C;letter-spacing:-.02em">Proveedores</div><div style="font:400 13px/1.4 'Instrument Sans',sans-serif;color:#6E7278;margin-top:4px">42 activos · 3 con posible duplicado sin resolver</div></div>
+<div style="display:flex;gap:9px">
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#fff;color:#16191C;border:1px solid #D5D0C6;padding:10px 15px;border-radius:8px">Exportar</span>
+<span style="font:600 13px/1 'Instrument Sans',sans-serif;background:#C24B15;color:#fff;padding:10px 15px;border-radius:8px">Nuevo proveedor</span>
+</div>
+</div>
+
+<div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">DEUDA TOTAL</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">$ 2.147.900</div><div style="font:400 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-top:7px">Repartida en 9 proveedores</div></div>
+<div style="background:#fff;border:1px solid #EBD8B6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#9A4A0C;letter-spacing:.12em">CON DEUDA VENCIDA</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">3</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">PAGO PROMEDIO GENERAL</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">54 días</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#9A4A0C;margin-top:7px">9 días sobre el plazo</div></div>
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;padding:14px 16px"><div style="font:600 10px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em">DATOS INCOMPLETOS</div><div style="font:500 22px/1.1 'IBM Plex Mono',monospace;color:#16191C;margin-top:8px;font-variant-numeric:tabular-nums">7</div><div style="font:500 12px/1 'Instrument Sans',sans-serif;color:#1F4B99;margin-top:7px">Completar →</div></div>
+</div>
+
+<div style="background:#fff;border:1px solid #E2DED6;border-radius:12px;overflow:hidden">
+<div style="padding:13px 18px;border-bottom:1px solid #E2DED6;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+<div style="flex:1;min-width:200px;background:#F4F2ED;border:1px solid #E2DED6;border-radius:8px;padding:9px 12px;font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Buscar por nombre o CUIT…</div>
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#fff;background:#16191C;padding:8px 12px;border-radius:20px">Con deuda</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;background:#fff;border:1px solid #D5D0C6;padding:8px 12px;border-radius:20px">Todos</span>
+<span style="font:600 12px/1 'Instrument Sans',sans-serif;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:8px 12px;border-radius:20px">A revisar (3)</span>
+<span style="font:500 12px/1 'Instrument Sans',sans-serif;color:#6E7278;margin-left:auto">Ordenar por <span style="color:#16191C;font-weight:600">deuda ▾</span></span>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:9px 18px;background:#FAF9F5;border-bottom:1px solid #E2DED6;font:600 9.5px/1 'IBM Plex Mono',monospace;color:#8A8E93;letter-spacing:.12em"><span>PROVEEDOR</span><span>LE DEBO</span><span>FACTURAS</span><span>PUNTUALIDAD</span><span>SALUD DEL DATO</span></div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:13px 18px;border-bottom:1px solid #EDE9E1;align-items:center">
+<div><div style="font:500 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Ferrum Andina S.A.</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:2px">30-71042588-4 · plazo 45 d</div></div>
+<span style="font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 732.800</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">14 abiertas</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">52 d · tarde</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#1F4B99;background:#E9EEF7;border:1px solid #C8D6EC;padding:4px 8px;border-radius:20px;justify-self:start">3 nombres unificados</span>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:13px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15">
+<div><div style="font:500 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Insumos del Valle SRL</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:2px">30-69847125-2 · plazo 45 d</div></div>
+<span style="font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 542.900</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">6 abiertas</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#A32B1E;background:#FBEAE7;border:1px solid #EFCEC8;padding:4px 8px;border-radius:20px;justify-self:start">61 d · reclama</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">OK</span>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:13px 18px;border-bottom:1px solid #EDE9E1;align-items:center">
+<div><div style="font:500 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Tornillería Sur</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:2px">27-14523698-5 · plazo 30 d</div></div>
+<span style="font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 412.600</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">8 abiertas</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">28 d · al día</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">OK</span>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:13px 18px;border-bottom:1px solid #EDE9E1;align-items:center;background:#FDFBF7;border-left:3px solid #C24B15">
+<div><div style="font:500 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Ferro Andes</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#9A4A0C;margin-top:2px">Sin CUIT cargado</div></div>
+<span style="font:500 13px/1 'IBM Plex Mono',monospace;color:#16191C;font-variant-numeric:tabular-nums">$ 128.400</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">2 abiertas</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#9A9A94">Sin historial</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">¿Duplicado?</span>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:13px 18px;border-bottom:1px solid #EDE9E1;align-items:center">
+<div><div style="font:500 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Electro Cuyo S.A.</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:2px">30-70441238-9 · plazo 60 d</div></div>
+<span style="font:400 13px/1 'IBM Plex Mono',monospace;color:#C6C0B4;font-variant-numeric:tabular-nums">$ 0</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Ninguna</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">41 d · al día</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#6E7278;background:#F4F2ED;border:1px solid #E2DED6;padding:4px 8px;border-radius:20px;justify-self:start">OK</span>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr .9fr 1fr 1.1fr;padding:13px 18px;align-items:center">
+<div><div style="font:500 13px/1.3 'Instrument Sans',sans-serif;color:#16191C">Sanitarios Uspallata</div><div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:#8A8E93;margin-top:2px">30-71880412-1 · plazo 30 d</div></div>
+<span style="font:400 13px/1 'IBM Plex Mono',monospace;color:#C6C0B4;font-variant-numeric:tabular-nums">$ 0</span>
+<span style="font:400 12.5px/1 'Instrument Sans',sans-serif;color:#6E7278">Ninguna</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#2E6B4F;background:#E9F0EB;border:1px solid #C9DCCF;padding:4px 8px;border-radius:20px;justify-self:start">22 d · al día</span>
+<span style="font:600 11px/1 'IBM Plex Mono',monospace;color:#9A4A0C;background:#FBF0DF;border:1px solid #EBD8B6;padding:4px 8px;border-radius:20px;justify-self:start">Falta mail</span>
+</div>
+</div>
+
+<div style="font:400 12.5px/1.5 'Instrument Sans',sans-serif;color:#6E7278">La columna de salud del dato es la que conecta este listado con la bandeja de excepciones: se entra al problema desde donde se lo ve.</div>
+</div>
+</div>
+</div>
+</div>
+<p class="dv-next">Próximos pasos posibles: “aplicá esta UI a facturas, pagos y órdenes” · “armá el flujo de recibo en hi-fi” · “hacelo interactivo como prototipo navegable” · “cambiá el acento naranja por otro color”.</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}"></script>
+</body>
+</html>

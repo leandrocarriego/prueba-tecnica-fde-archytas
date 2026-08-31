@@ -76,7 +76,7 @@ export function PriceTable({ items }: PriceTableProps) {
             return (
               <tr
                 key={item.product_id}
-                className={`border-t ${item.is_highlighted ? 'bg-amber-50' : ''}`}
+                className={`border-t ${item.is_highlighted ? 'bg-warn-surface' : ''}`}
               >
                 <td className="p-3 font-mono">
                   <Link
@@ -89,12 +89,12 @@ export function PriceTable({ items }: PriceTableProps) {
                 <td className="p-3">
                   {item.description}
                   {item.is_highlighted && (
-                    <span className="ml-2 rounded bg-amber-200 px-2 py-0.5 text-xs text-amber-900">
+                    <span className="ml-2 rounded bg-warn-border px-2 py-0.5 text-xs text-warn">
                       Subió fuerte
                     </span>
                   )}
                   {item.is_stale && (
-                    <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+                    <span className="ml-2 rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                       No vino en la última lista
                     </span>
                   )}
@@ -110,7 +110,7 @@ export function PriceTable({ items }: PriceTableProps) {
                   */}
                   {contradicted.map(mark => (
                     <span
-                      className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900"
+                      className="ml-2 rounded bg-danger-surface px-2 py-0.5 text-xs text-danger"
                       key={mark.field}
                     >
                       {mark.field === 'price'

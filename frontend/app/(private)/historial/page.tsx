@@ -206,7 +206,7 @@ export default async function HistoryPage({
     return (
       <main className="mx-auto max-w-6xl space-y-6 p-8">
         <Header />
-        <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
           El enlace pide el historial de un dato que esta pantalla no conoce.{' '}
           <Link className="underline underline-offset-2" href="/historial">
             Ver todo el historial
@@ -306,7 +306,7 @@ export default async function HistoryPage({
                 : session && <option value={String(session.user.id)}>Sólo mis cambios</option>}
             </select>
           </div>
-          <button className="rounded border px-4 py-2 text-sm hover:bg-gray-50" type="submit">
+          <button className="rounded border px-4 py-2 text-sm hover:bg-muted" type="submit">
             Filtrar
           </button>
           {(filters.desde || filters.hasta || filters.persona) && (
@@ -318,7 +318,7 @@ export default async function HistoryPage({
       )}
 
       {page === null ? (
-        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
           No pudimos traer el historial. Probá de nuevo en unos minutos.
         </p>
       ) : (
@@ -327,7 +327,7 @@ export default async function HistoryPage({
             <p className="text-sm text-muted-foreground">{countLabel(page)}</p>
           )}
           {undoable === null && (
-            <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
               No pudimos traer las correcciones que se pueden deshacer. El historial es el de
               siempre; para deshacer una corrección, entrá al dato o probá de nuevo en unos minutos.
             </p>

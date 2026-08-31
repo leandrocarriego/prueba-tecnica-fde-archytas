@@ -80,7 +80,7 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
         </label>
         {!parameter.has_effect && (
           <span
-            className="rounded bg-slate-200 px-2 py-0.5 text-xs text-slate-700"
+            className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
             title="El valor se guarda y queda listo, pero todavía no hay ninguna funcionalidad que lo lea."
           >
             Todavía sin efecto
@@ -108,7 +108,7 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
         </Button>
         <p
           aria-live="polite"
-          className={`text-sm ${message?.ok ? 'text-emerald-700' : 'text-red-700'}`}
+          className={`text-sm ${message?.ok ? 'text-ok' : 'text-danger'}`}
           role="status"
         >
           {message?.text ?? ''}

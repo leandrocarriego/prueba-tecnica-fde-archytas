@@ -38,7 +38,7 @@ function Outcome({ message }: { message: { ok: boolean; text: string } | null })
   return (
     <p
       aria-live="polite"
-      className={`text-sm ${message?.ok ? 'text-emerald-700' : 'text-red-700'}`}
+      className={`text-sm ${message?.ok ? 'text-ok' : 'text-danger'}`}
       role="status"
     >
       {message?.text ?? ''}

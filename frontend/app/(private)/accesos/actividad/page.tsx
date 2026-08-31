@@ -6,14 +6,14 @@ import { SHORT_MOMENT_FORMAT } from '@/lib/time'
 
 /** What each kind of event is called on screen, in the owner's words. */
 const EVENT_LABELS: Record<string, { label: string; tone: string }> = {
-  LOGIN_SUCCEEDED: { label: 'Entró', tone: 'bg-green-100 text-green-800' },
-  LOGIN_REJECTED: { label: 'No pudo entrar', tone: 'bg-amber-100 text-amber-800' },
-  ACCESS_LOCKED: { label: 'Acceso bloqueado', tone: 'bg-red-100 text-red-800' },
-  PERMISSION_DENIED: { label: 'Quiso ver algo que no le toca', tone: 'bg-red-100 text-red-800' },
-  ACCESS_GRANTED: { label: 'Alta de acceso', tone: 'bg-blue-100 text-blue-800' },
-  ACCESS_ROLE_CHANGED: { label: 'Cambio de rol', tone: 'bg-blue-100 text-blue-800' },
-  ACCESS_DEACTIVATED: { label: 'Acceso desactivado', tone: 'bg-gray-100 text-gray-700' },
-  ACCESS_REACTIVATED: { label: 'Acceso reactivado', tone: 'bg-blue-100 text-blue-800' },
+  LOGIN_SUCCEEDED: { label: 'Entró', tone: 'pill pill-ok' },
+  LOGIN_REJECTED: { label: 'No pudo entrar', tone: 'pill pill-warn' },
+  ACCESS_LOCKED: { label: 'Acceso bloqueado', tone: 'pill pill-danger' },
+  PERMISSION_DENIED: { label: 'Quiso ver algo que no le toca', tone: 'pill pill-danger' },
+  ACCESS_GRANTED: { label: 'Alta de acceso', tone: 'pill pill-info' },
+  ACCESS_ROLE_CHANGED: { label: 'Cambio de rol', tone: 'pill pill-info' },
+  ACCESS_DEACTIVATED: { label: 'Acceso desactivado', tone: 'pill' },
+  ACCESS_REACTIVATED: { label: 'Acceso reactivado', tone: 'pill pill-info' },
 }
 
 // Shorter than `formatMoment` in lib/catalog/format on purpose: this table
@@ -69,13 +69,13 @@ export default async function ActivityPage() {
             {log.items.map(event => {
               const label = EVENT_LABELS[event.kind] ?? {
                 label: event.kind,
-                tone: 'bg-gray-100 text-gray-700',
+                tone: 'pill',
               }
               return (
                 <tr key={event.id} className="border-b last:border-0 align-top">
                   <td className="py-3 whitespace-nowrap">{shortMoment(event.occurred_at)}</td>
                   <td>
-                    <span className={`rounded px-2 py-1 text-xs ${label.tone}`}>{label.label}</span>
+                    <span className={label.tone}>{label.label}</span>
                   </td>
                   <td>
                     {event.user_id

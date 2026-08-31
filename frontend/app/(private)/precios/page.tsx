@@ -76,7 +76,7 @@ export default async function PricesPage({
       </nav>
 
       {prices === null ? (
-        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
           No pudimos traer los precios. Probá de nuevo en unos minutos.
         </p>
       ) : (
