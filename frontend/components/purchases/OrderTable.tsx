@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { dismissRepeat } from '@/app/actions/purchases'
+import { dismissRepeat, resolveOrder } from '@/app/actions/purchases'
 import { Button } from '@/components/ui/button'
 import { count, day, money } from '@/lib/format'
-import type { PurchaseOrder } from '@/lib/purchases/types'
+import type { PurchaseOrder, Supplier } from '@/lib/purchases/types'
 
 /**
  * Las órdenes de compra, con desde cuándo el sistema las viene mirando.
@@ -16,10 +16,35 @@ import type { PurchaseOrder } from '@/lib/purchases/types'
  * plataforma observó, y para las que ya estaban antes de la puesta en marcha se
  * dice cuántos días pasaron desde el pedido (RF-49), que es otra cosa.
  */
-export function OrderTable({ orders, canEdit }: { orders: PurchaseOrder[]; canEdit: boolean }) {
+export function OrderTable({
+  orders,
+  suppliers,
+  canEdit,
+}: {
+  orders: PurchaseOrder[]
+  /**
+   * El padrón, para resolver una orden apartada sin salir de la lista (H8).
+   * **No hay pantalla de revisión aparte**: la spec lo decide así y da el
+   * motivo — una cola que cuesta tiempo se abandona.
+   */
+  suppliers: Supplier[]
+  canEdit: boolean
+}) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  async function resolve(orderId: number, supplierId: number) {
+    setBusy(true)
+    setError(null)
+    const result = await resolveOrder(orderId, supplierId)
+    setBusy(false)
+    if (result.ok) {
+      router.refresh()
+      return
+    }
+    setError(result.message)
+  }
 
   async function dismiss(orderId: number) {
     setBusy(true)
@@ -44,7 +69,9 @@ export function OrderTable({ orders, canEdit }: { orders: PurchaseOrder[]; canEd
   return (
     <div className="space-y-3">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       <div className="overflow-x-auto">
@@ -64,7 +91,7 @@ export function OrderTable({ orders, canEdit }: { orders: PurchaseOrder[]; canEd
             {orders.map(order => (
               <tr
                 key={order.id}
-                className={`border-b align-top ${order.is_stalled ? 'bg-amber-50' : ''}`}
+                className={`border-b align-top ${order.is_stalled ? 'bg-warn-surface' : ''}`}
               >
                 <td className="py-2">
                   {order.number}
@@ -72,7 +99,10 @@ export function OrderTable({ orders, canEdit }: { orders: PurchaseOrder[]; canEd
                 </td>
                 <td className="py-2">
                   {order.supplier_name ?? (
-                    <span className="text-amber-800">{order.supplier_text} · sin identificar</span>
+                    <span className="text-warn">{order.supplier_text} · sin identificar</span>
+                  )}
+                  {order.review_reason && (
+                    <p className="text-xs text-warn">{order.review_reason}</p>
                   )}
                 </td>
                 <td className="py-2">{order.product_text}</td>
@@ -87,13 +117,13 @@ export function OrderTable({ orders, canEdit }: { orders: PurchaseOrder[]; canEd
                     {order.is_stalled && ' · estancada'}
                   </p>
                   {order.repeat_of_number && (
-                    <p className="text-xs text-amber-800">
+                    <p className="text-xs text-warn">
                       Posible pedido repetido de {order.repeat_of_number}
                     </p>
                   )}
                 </td>
                 {canEdit && (
-                  <td className="py-2 text-right">
+                  <td className="space-y-2 py-2 text-right">
                     {order.repeat_of_number && (
                       <Button
                         type="button"
@@ -103,6 +133,36 @@ export function OrderTable({ orders, canEdit }: { orders: PurchaseOrder[]; canEd
                       >
                         No es repetido
                       </Button>
+                    )}
+                    {order.review_state === 'PENDING' && (
+                      /*
+                        H8: la orden apartada se resuelve **acá**, en la misma
+                        lista donde se la mira. Elegir el proveedor guarda además
+                        esa forma de escribir el nombre como criterio, así que las
+                        otras órdenes escritas igual quedan resueltas de una vez
+                        y la que llegue después entra ya identificada.
+
+                        No hay forma de dar de alta un proveedor: el padrón son
+                        los ocho del portal, y sumar uno es una decisión del
+                        negocio que se toma en otro lado (RF-55).
+                      */
+                      <select
+                        className="rounded border px-2 py-1 text-sm"
+                        defaultValue=""
+                        disabled={busy}
+                        onChange={event => {
+                          if (event.target.value) {
+                            void resolve(order.id, Number(event.target.value))
+                          }
+                        }}
+                      >
+                        <option value="">Asignar proveedor…</option>
+                        {suppliers.map(supplier => (
+                          <option key={supplier.id} value={String(supplier.id)}>
+                            {supplier.legal_name}
+                          </option>
+                        ))}
+                      </select>
                     )}
                   </td>
                 )}

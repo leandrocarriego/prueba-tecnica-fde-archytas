@@ -37,6 +37,17 @@ UNREADABLE_HISTORY = "unreadable_history"
 # The kind 008 adds. The queue did not have to change to take it: that is the
 # point of a generic queue with learned rules.
 UNKNOWN_CATEGORY = "unknown_category"
+# The kind 004 adds: a row of the invoices screen that could not be typed. It
+# went to quarantine in `staging` and nowhere else for a year of commits —
+# nobody was subscribed to the event that announced it — so it was not counted,
+# not shown and never decided, which is the one thing the Artículo II forbids.
+UNREADABLE_INVOICE_ROW = "unreadable_invoice_row"
+# The kind 007 adds, and it is the same silence as the one above on the other
+# screen: a row of the purchase orders that could not be typed was quarantined
+# in `staging` and announced to nobody. An order that never arrives is exactly
+# the problem the feature exists to solve, so losing one without a trace is the
+# worst place for the Artículo II to be half-applied.
+UNREADABLE_ORDER_ROW = "unreadable_order_row"
 
 # What the person reads in the review screen (RF-26), in Spanish like every
 # other user-facing string.

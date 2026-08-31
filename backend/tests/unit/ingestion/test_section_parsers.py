@@ -171,25 +171,57 @@ class TestThePurchaseOrders:
 
 
 class TestTheInbox:
-    """007: la bandeja, contra el fixture **derivado**, no capturado."""
+    """007: la bandeja, contra el fixture **capturado del portal real** (2026-08-31).
 
-    def test_it_reads_the_sixty_four_messages(self) -> None:
-        """Los tres tipos y sus conteos son los que midió el relevamiento."""
-        messages = parse_messages(fixture("messages-page-2026-08-29.html"))
+    Hasta esta captura los tests de esta sección corrían contra un fixture
+    **derivado**: el relevamiento contó qué había y no guardó el DOM, así que las
+    columnas eran una deducción. Pasaban, y no decían nada sobre la realidad.
 
-        assert len(messages) == 64
+    Lo que la captura destapó, en orden de gravedad:
+
+    * la sección **no está en `/mensajes`** sino en `/mensajes-internos`, así que
+      la lectura nocturna fallaba siempre;
+    * **no hay columna `Tipo`**. El tipo está en el asunto, y leerlo de una
+      columna inexistente dejaba los sesenta y siete mensajes sin clasificar —
+      con lo que RF-33 y RF-34 no podían dispararse nunca.
+    """
+
+    def test_it_reads_the_whole_inbox(self) -> None:
+        """Sesenta y siete mensajes y treinta y tres sin leer, al 2026-08-31.
+
+        El relevamiento había medido 64 y 30. La diferencia no es un error de
+        nadie: la bandeja recibe mensajes todos los días, y por eso el fixture
+        lleva la fecha de su captura en el nombre.
+        """
+        messages = parse_messages(fixture("messages-page-2026-08-31.html"))
+
+        assert len(messages) == 67
+        assert sum(1 for message in messages if not message.already_read) == 33
+
+    def test_the_kind_is_read_from_where_the_portal_writes_it(self) -> None:
+        """RF-22: los tres tipos que la spec nombra, tomados del asunto.
+
+        Este test es el que hoy fallaría con el parser anterior: sin columna
+        `Tipo` devolvía `None` sesenta y siete veces.
+        """
+        messages = parse_messages(fixture("messages-page-2026-08-31.html"))
+
         counts = {
             kind: sum(1 for message in messages if message.kind_text == kind)
             for kind in {message.kind_text for message in messages}
         }
-        assert counts == {"Vencimiento proximo": 27, "Reclamo de pago": 21, "Stock bajo": 16}
-        assert sum(1 for message in messages if not message.already_read) == 30
+        assert counts == {"Vencimiento proximo": 27, "Reclamo de pago": 24, "Stock bajo": 16}
 
     def test_every_message_can_be_told_apart_from_the_next_reading(self) -> None:
-        """Sin eso, cada lectura de la bandeja registraría los sesenta y cuatro otra vez."""
-        messages = parse_messages(fixture("messages-page-2026-08-29.html"))
+        """Sin eso, cada lectura de la bandeja registraría los sesenta y siete otra vez.
 
-        assert len({message.external_id for message in messages}) == 64
+        La pantalla real **no publica un id**, así que la identidad se arma con
+        la fecha, el remitente y el asunto — y que los sesenta y siete sean
+        distintos entre sí es lo que hace que eso alcance.
+        """
+        messages = parse_messages(fixture("messages-page-2026-08-31.html"))
+
+        assert len({message.external_id for message in messages}) == 67
 
 
 class TestTheSalesScreen:

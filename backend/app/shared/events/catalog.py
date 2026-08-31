@@ -653,6 +653,15 @@ class InvoiceFileRead(DomainEvent):
     issued_on: date | None = None
     total: Decimal | None = None
     supplier_text: str | None = None
+    # The issuer's tax id when the document printed one that is not the
+    # client's. `purchases` identifies with it against the register (RF-11).
+    supplier_tax_id: str | None = None
+    # The document itself. It travels so `purchases` can keep its own copy and
+    # serve it back to whoever opens the invoice (RF-04): the module cannot read
+    # `raw`, which belongs to `portal`, and a projection fed by an event is what
+    # the Artículo IV prescribes for exactly this.
+    content: bytes | None = None
+    content_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -667,6 +676,12 @@ class InvoiceReviewCase:
     # What the resolution has to match on, when the decision is about a way of
     # writing a supplier's name rather than about this one invoice.
     supplier_key: str | None = None
+    # Whether this invoice has just been registered and its file has not been
+    # fetched yet. A held invoice needs its document more than a resolved one
+    # does — it is the evidence the person deciding looks at (RF-30), and the
+    # only place a supplier tax id can come from (RF-11) — and an invoice that
+    # merely arrived again already has it.
+    needs_document: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -867,14 +882,6 @@ class PurchaseOrderRowsQuarantined(DomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
-class PurchaseOrdersStalled(DomainEvent):
-    """Orders that have been observed in the same state for too long (RF-10 of 007)."""
-
-    order_ids: tuple[int, ...]
-    days: int
-
-
-@dataclass(frozen=True, slots=True)
 class SupplierMessagesExtracted(DomainEvent):
     """The portal inbox was read and stored verbatim in `raw`."""
 
@@ -912,6 +919,27 @@ class SupplierMessagesNormalized(DomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class AlertDeliveryFailed(DomainEvent):
+    """An alert could not be delivered, and somebody has to be able to see it.
+
+    RF-38 of 007 asks the failure to be recorded **and shown on the messages
+    screen**, and the screen already draws it — what was missing was anything
+    writing it. The delivery fails inside a Celery task in the worker, which
+    knows a phone and a text and nothing else, and `notifications` may not call
+    `messaging` (Artículo IV). So the fact travels as what it is: a fact.
+
+    `message_id` is nullable because the same task also delivers the due-date
+    alerts of 005, which have no inbox message behind them. Those publish too
+    and nobody records them — 005 has no RF-38 of its own, and the event is
+    ready for the day it does.
+    """
+
+    kind: str
+    reason: str
+    message_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SupplierMessageReceived(DomainEvent):
     """A message worth waking somebody up for just arrived (RF-33, RF-34 of 007)."""
 
@@ -938,17 +966,32 @@ class SalesExtracted(DomainEvent):
 
 @dataclass(frozen=True, slots=True)
 class NormalizedSale:
-    """One sales record, typed."""
+    """One sales record, as far as it could be read.
+
+    **A record the parser could not read whole travels too**, with the reason it
+    could not, and that is what RF-16 to RF-19 of 009 ask for: a sale without a
+    date, with a date that does not exist, without a total or with a negative
+    quantity is *held*, not dropped. Leaving it in `staging` would keep it out
+    of every screen and out of every «this is what I left out» count, which is
+    the one thing the feature exists to prevent.
+
+    So `sold_on` and `total` are nullable here, exactly as they are in the table
+    this ends up in. `reason` is `None` for a record that reads whole.
+    """
 
     staging_row_id: int
     code: str
     # The code with its spelling differences removed, which is what says two
-    # records are the same sale (RF-10 of 009).
+    # records are the same sale (RF-10 of 009). Empty when the record arrived
+    # without a code: there is nothing to group it by, and it is held on its own.
     code_key: str
-    sold_on: date
+    sold_on: date | None
     product_code: str | None
     quantity: int | None
     total: Decimal | None
+    # Why the parser could not read it whole, in the words a person reads
+    # (RF-23). `None` means it read whole.
+    reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

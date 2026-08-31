@@ -1,9 +1,10 @@
 import Link from 'next/link'
 
 import { NoPermission } from '@/components/common/NoPermission'
+import { InvoiceFilters } from '@/components/purchases/InvoiceFilters'
 import { InvoiceTable } from '@/components/purchases/InvoiceTable'
-import { fetchFromApi } from '@/lib/api/server'
-import type { InvoiceList } from '@/lib/purchases/types'
+import { readFromApi } from '@/lib/api/server'
+import type { InvoiceList, SupplierList } from '@/lib/purchases/types'
 
 export const metadata = {
   title: 'Facturas — Plataforma Cordillera',
@@ -12,6 +13,10 @@ export const metadata = {
 interface PageProps {
   searchParams: Promise<{
     q?: string
+    supplier_id?: string
+    issued_from?: string
+    issued_to?: string
+    order?: string
     payment_state?: string
     with_receipt?: string
     review_state?: string
@@ -19,34 +24,70 @@ interface PageProps {
 }
 
 /**
- * Las facturas de compra, con los filtros de la H4 de 004 y la H1 de 005.
+ * Las facturas de compra, con los filtros de la H8 de 004 y la H1 de 005.
  *
  * Los filtros van en la URL y no en el estado del componente a propósito: una
  * pantalla filtrada se comparte por chat con quien tiene que mirarla, y así
  * llega filtrada.
+ *
+ * Lo que la búsqueda alcanza lo decide el backend y no esta pantalla: el número,
+ * el nombre tal como llegó escrito y —para una factura ya asignada— el CUIT y la
+ * razón social del padrón (RF-41, RF-42). Acá sólo se arma la URL.
  */
 export default async function InvoicesPage({ searchParams }: PageProps) {
   const filters = await searchParams
   const query = new URLSearchParams({ limit: '200' })
-  if (filters.q) query.set('q', filters.q)
-  if (filters.payment_state) query.set('payment_state', filters.payment_state)
-  if (filters.review_state) query.set('review_state', filters.review_state)
-  if (filters.with_receipt) query.set('with_receipt', filters.with_receipt)
-
-  const listing = await fetchFromApi<InvoiceList>(`/invoices?${query.toString()}`)
-  if (listing === null) {
-    return <NoPermission what="las facturas de compra" />
+  for (const name of [
+    'q',
+    'supplier_id',
+    'issued_from',
+    'issued_to',
+    'order',
+    'payment_state',
+    'review_state',
+    'with_receipt',
+  ] as const) {
+    const value = filters[name]
+    if (value) query.set(name, value)
   }
 
-  const withoutReceipt = listing.items.filter(invoice => !invoice.receipt_issued).length
+  // El tercer pedido existe sólo por su `total`: cuántas facturas están sin
+  // recibo es una pregunta sobre el sistema, no sobre la página que se está
+  // mirando (RF-32). Contando `items` decía «46 sin recibo» cuando el límite
+  // de 200 recortaba la lista, y encima cambiaba al filtrar por otra cosa.
+  const [read, suppliers, missing] = await Promise.all([
+    readFromApi<InvoiceList>(`/invoices?${query.toString()}`),
+    readFromApi<SupplierList>('/suppliers'),
+    readFromApi<InvoiceList>('/invoices?with_receipt=false&limit=1'),
+  ])
+
+  // Un 403 y una caída del backend son dos frases distintas. Decirle «no tenés
+  // permiso» al dueño porque la API no contestó lo manda a pedirse a sí mismo
+  // un permiso que ya tiene, y a no mirar el problema que sí hay.
+  if (!read.ok) {
+    if (read.failure === 'unauthorized') {
+      return <NoPermission what="las facturas de compra" />
+    }
+    return (
+      <main className="mx-auto max-w-6xl space-y-6 p-8">
+        <h1 className="text-2xl font-bold">Facturas</h1>
+        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
+          No pudimos traer las facturas. Probá de nuevo en unos minutos.
+        </p>
+      </main>
+    )
+  }
+
+  const listing = read.data
+  const withoutReceipt = missing.ok ? missing.data.total : null
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Facturas</h1>
         <p className="text-sm text-muted-foreground">
-          {listing.total} facturas registradas · {withoutReceipt} sin recibo de recepción en esta
-          vista.
+          {listing.total} facturas registradas
+          {withoutReceipt !== null && ` · ${withoutReceipt} sin recibo de recepción`}.
         </p>
       </header>
 
@@ -69,25 +110,18 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
         <Link className="underline" href="/facturas/revision">
           En revisión
         </Link>
+        <Link className="underline" href="/facturas/pagos">
+          Comprobantes por repartir
+        </Link>
+        <Link className="underline" href="/facturas/incidentes">
+          Incidentes de recibo
+        </Link>
         <Link className="underline" href="/proveedores">
           Proveedores
         </Link>
       </nav>
 
-      <form className="flex flex-wrap items-end gap-2" action="/facturas">
-        <label className="text-sm">
-          <span className="mb-1 block text-muted-foreground">Buscar por número o proveedor</span>
-          <input
-            className="rounded border px-3 py-1.5"
-            name="q"
-            defaultValue={filters.q ?? ''}
-            maxLength={255}
-          />
-        </label>
-        <button className="rounded border px-3 py-1.5 text-sm hover:bg-gray-50" type="submit">
-          Buscar
-        </button>
-      </form>
+      <InvoiceFilters suppliers={suppliers.ok ? suppliers.data.items : []} values={filters} />
 
       <InvoiceTable invoices={listing.items} />
     </main>

@@ -22,7 +22,20 @@ import enum
 
 
 class BusinessSection(enum.StrEnum):
-    """The part of the business a fact belongs to."""
+    """The part of the business a fact belongs to — and, once, who decides it.
+
+    The two readings coincide almost everywhere, and where they do not the
+    second wins. A rubro is a datum of the catalog, which is sales', and since
+    the 010 it is **maintained by purchasing**; RF-19 of 003 shows somebody the
+    manual changes of the sections they reach, so filing that change under
+    `SALES` would hide it from the only person who can make it.
+
+    So `catalog` files a rubro change under `PURCHASING` and everything else it
+    owns under `SALES` (`catalog/service.py`, `CATEGORY_SECTION`). It is the
+    only place the two readings diverge; if a second one ever appears, this
+    enum is being asked to answer two questions and should be split rather than
+    stretched.
+    """
 
     # suppliers, purchase invoices, payments, orders, receipts, the calendar
     PURCHASING = "PURCHASING"

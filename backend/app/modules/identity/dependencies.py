@@ -11,6 +11,7 @@ and they stay here.
 """
 
 from collections.abc import Collection
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, params, status
@@ -25,6 +26,7 @@ from app.shared.sections import BusinessSection
 __all__ = [
     "BusinessSection",
     "ActorDirectory",
+    "Assignee",
     "ActorDirectoryDep",
     "CurrentUser",
     "IdentityDep",
@@ -134,6 +136,15 @@ async def get_visible_sections(current_user: CurrentUser) -> frozenset[BusinessS
 VisibleSections = Annotated[frozenset[BusinessSection], Depends(get_visible_sections)]
 
 
+@dataclass(frozen=True, slots=True)
+class Assignee:
+    """Somebody a piece of work can be handed to, as another module sees them."""
+
+    user_id: int
+    name: str
+    role: str
+
+
 class ActorDirectory:
     """Turns the user ids a screen is about into the names it shows.
 
@@ -162,6 +173,27 @@ class ActorDirectory:
                 f"{user.name} {user.last_name}".strip() if user.last_name else user.name
             )
         return names
+
+    async def who_reaches(self, section: Section, level: Level = Level.WRITE) -> list[Assignee]:
+        """The active people who reach this section at this level.
+
+        It is here for the same reason `names_for` is: the question is about
+        roles, roles are identity's vocabulary, and a module that needs to hand
+        work to a person cannot ask who those people are without importing the
+        module that knows (Artículo IV). `dependencies.py` is the one file
+        allowed to answer.
+
+        `messaging` uses it for RF-30 of 007 — a message is assigned to the
+        owner or to somebody in purchasing, **and to nobody else**. The route
+        used to take any `user_id` at all, so the screen could hand a supplier's
+        claim to whoever does not work on suppliers.
+        """
+        users, _ = await self.service.list_users(limit=200)
+        return [
+            Assignee(user_id=user.id, name=user.name, role=user.role.value)
+            for user in users
+            if user.is_active and level_for(user.role.value, section) >= level
+        ]
 
 
 def get_actor_directory(service: IdentityDep) -> ActorDirectory:

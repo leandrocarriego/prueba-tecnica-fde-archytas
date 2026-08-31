@@ -31,7 +31,9 @@ EXPECTED: dict[str, dict[str, Level]] = {
     "SALES": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.WRITE},
     "DASHBOARD": {OWNER: Level.READ, PURCHASING: Level.NONE, SALES: Level.READ},
     "STOCK": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.WRITE},
-    "PRODUCT_CATEGORIES": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.WRITE},
+    # La 010 los movió a compras: el rubro es la categoría con la que se compra.
+    # Ventas conserva la consulta, como con los precios de lista.
+    "PRODUCT_CATEGORIES": {OWNER: Level.WRITE, PURCHASING: Level.WRITE, SALES: Level.READ},
     "PRODUCT_CATALOG": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.WRITE},
     "ACCESS_ADMIN": {OWNER: Level.WRITE, PURCHASING: Level.NONE, SALES: Level.NONE},
     "ACCESS_LOG": {OWNER: Level.READ, PURCHASING: Level.NONE, SALES: Level.NONE},

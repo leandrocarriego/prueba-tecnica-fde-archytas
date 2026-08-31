@@ -466,6 +466,7 @@ class IngestionService:
             issued_on=reading.issued_on,
             total=reading.total,
             supplier_text=reading.supplier_text,
+            supplier_tax_id=reading.supplier_tax_id,
             reason=reading.reason,
             excerpt=reading.excerpt,
         )
@@ -483,6 +484,9 @@ class IngestionService:
                 issued_on=reading.issued_on,
                 total=reading.total,
                 supplier_text=reading.supplier_text,
+                supplier_tax_id=reading.supplier_tax_id,
+                content=content,
+                content_type=content_type,
             ),
             self.session,
         )
@@ -730,6 +734,19 @@ class IngestionService:
         await self.staging.add_all(rows)
         quarantined = self._quarantined_of(rows)
 
+        # **Every row travels, quarantined ones included.** This used to publish
+        # only the rows that read whole, and the twelve records the survey
+        # measured as broken — no date, a date that does not exist, no total, a
+        # negative quantity — stayed in `staging` where no screen reaches them:
+        # they were not shown, not counted among what an indicator left out, and
+        # not correctable. That is RF-16 to RF-19 of 009, and holding them is
+        # what the signed spec asks for (Artículo II).
+        #
+        # `SaleRowsQuarantined` is still published below and still has no
+        # subscriber, and that is deliberate: the row already has a human
+        # surface in the sales review queue, and opening a `triage` case as well
+        # would show the same record on two screens belonging to two different
+        # people.
         await events.publish(
             SalesNormalized(
                 batch_id=batch_id,
@@ -743,12 +760,9 @@ class IngestionService:
                         product_code=row.product_code,
                         quantity=row.quantity,
                         total=row.total,
+                        reason=row.reason,
                     )
                     for row in rows
-                    if row.status is RowStatus.VALID
-                    and row.code
-                    and row.sold_on is not None
-                    and row.total is not None
                 ),
                 quarantined=len(quarantined),
                 job_run_id=job_run_id,

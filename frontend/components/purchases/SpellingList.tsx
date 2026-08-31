@@ -11,6 +11,11 @@ import type { Supplier, SupplierAlias } from '@/lib/purchases/types'
 /**
  * Las grafías guardadas, y el botón que deja una sin efecto.
  *
+ * Cada una dice **quién** la decidió y cuándo (RF-51). El nombre lo resuelve la
+ * ruta con `ActorDirectory`: `purchases` guarda el id y no puede nombrar a nadie
+ * sin importar `identity`. Una grafía que el sistema reconoció solo no tiene
+ * autor, y lo dice así en vez de inventar uno.
+ *
  * Dejarla sin efecto devuelve a revisión **exactamente lo que esa grafía había
  * resuelto** (RF-53). Una factura que alguien decidió una por una no dependía
  * de ella y no vuelve: por eso el botón dice lo que hace y no "borrar".
@@ -44,7 +49,9 @@ export function SpellingList({
   return (
     <div className="space-y-4">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       <table className="w-full text-sm">
@@ -52,7 +59,7 @@ export function SpellingList({
           <tr>
             <th className="py-2">Cómo llega escrito</th>
             <th className="py-2">Proveedor</th>
-            <th className="py-2">De dónde salió</th>
+            <th className="py-2">Quién y cuándo</th>
             {canEdit && <th className="py-2" />}
           </tr>
         </thead>
@@ -62,7 +69,9 @@ export function SpellingList({
               <td className="py-2 font-mono">{alias.text_original}</td>
               <td className="py-2">{names.get(alias.supplier_id) ?? '—'}</td>
               <td className="py-2 text-muted-foreground">
-                {alias.source === 'OBSERVED' ? 'Reconocida por el sistema' : 'Asignada por alguien'}
+                {alias.source === 'OBSERVED'
+                  ? 'Reconocida por el sistema'
+                  : `La asignó ${alias.created_by_name ?? 'alguien que ya no tiene cuenta'}`}
                 {' · '}
                 {formatMoment(alias.created_at)}
               </td>

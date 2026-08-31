@@ -12,15 +12,24 @@ module boundary: a request has to know whether it may continue before its
 handler runs, and an event cannot answer that in time.
 """
 
+from collections.abc import AsyncIterator
 from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.modules.identity.dependencies import CurrentUser, Level, Section, require_section
-from app.modules.purchases.models import InvoiceReviewState
+from app.modules.identity.dependencies import (
+    ActorDirectory,
+    ActorDirectoryDep,
+    CurrentUser,
+    Level,
+    Section,
+    require_section,
+)
+from app.modules.purchases.models import InvoiceOrder, InvoiceReviewState
 from app.modules.purchases.schemas import (
     AliasPreview,
     AliasWrite,
@@ -34,6 +43,7 @@ from app.modules.purchases.schemas import (
     InvoiceList,
     InvoiceRead,
     InvoiceReviewResolution,
+    OrderResolution,
     PaymentRead,
     PaymentSplitWrite,
     PaymentWrite,
@@ -47,6 +57,7 @@ from app.modules.purchases.schemas import (
     SupplierTotalsRead,
 )
 from app.modules.purchases.service import PurchasesService, today_here
+from app.shared.live import bus
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -86,32 +97,48 @@ orders_router = APIRouter(prefix="/purchase-orders", tags=["Purchase orders"])
 @invoices_router.get(
     "",
     dependencies=[require_section(Section.PURCHASE_INVOICES, Level.READ)],
-    summary="The invoices, with every filter of the screen",
+    summary="The invoices, with every filter and every order of the screen",
 )
 async def list_invoices(
     service: PurchasesDep,
+    directory: ActorDirectoryDep,
     skip: SkipParam = 0,
     limit: LimitParam = DEFAULT_PAGE_SIZE,
     q: SearchParam = None,
     supplier_id: Annotated[int | None, Query(description="Only this supplier's")] = None,
     review_state: Annotated[InvoiceReviewState | None, Query(description="By review")] = None,
     payment_state: Annotated[str | None, Query(description="SALDADA, PARCIAL, SIN_PAGOS")] = None,
+    issued_from: Annotated[date | None, Query(description="Issued from this date")] = None,
+    issued_to: Annotated[date | None, Query(description="Issued up to this date")] = None,
     due_from: Annotated[date | None, Query(description="Falling due from")] = None,
     due_to: Annotated[date | None, Query(description="Falling due up to")] = None,
     with_receipt: Annotated[bool | None, Query(description="With or without receipt")] = None,
+    order: Annotated[InvoiceOrder, Query(description="By date or by total")] = (
+        InvoiceOrder.ISSUED_DESC
+    ),
 ) -> InvoiceList:
-    """The owner and purchasing (RF-03, RF-05, RF-39 to RF-46 of 004)."""
-    return await service.list_invoices(
+    """The owner and purchasing (RF-03, RF-05, RF-39 to RF-46 of 004).
+
+    `q` searches the invoice number, the supplier name as it arrived written,
+    and —for an invoice already attributed— the tax id and the legal name of
+    the register (RF-41, RF-42).
+    """
+    listing = await service.list_invoices(
         skip=skip,
         limit=limit,
         query=q,
         supplier_id=supplier_id,
         review_state=review_state,
         payment_state=payment_state,
+        issued_from=issued_from,
+        issued_to=issued_to,
         due_from=due_from,
         due_to=due_to,
         with_receipt=with_receipt,
+        order=order,
     )
+    await _name_whoever_resolved(listing.items, directory)
+    return listing
 
 
 @invoices_router.get(
@@ -119,9 +146,30 @@ async def list_invoices(
     dependencies=[require_section(Section.PURCHASE_INVOICES, Level.READ)],
     summary="One invoice, with what its document said",
 )
-async def get_invoice(invoice_id: int, service: PurchasesDep) -> InvoiceRead:
-    """The owner and purchasing (RF-03, RF-27, RF-39 of 004)."""
-    return await service.get_invoice(invoice_id)
+async def get_invoice(
+    invoice_id: int, service: PurchasesDep, directory: ActorDirectoryDep
+) -> InvoiceRead:
+    """The owner and purchasing (RF-03, RF-27, RF-32, RF-39 of 004)."""
+    invoice = await service.get_invoice(invoice_id)
+    await _name_whoever_resolved([invoice], directory)
+    return invoice
+
+
+async def _name_whoever_resolved(invoices: list[InvoiceRead], directory: ActorDirectory) -> None:
+    """Put a name next to the id of whoever decided about a held invoice.
+
+    Here and not in the service, for the same reason the history of `operations`
+    resolves its authors at the edge: `purchases` stores an id and holds no
+    foreign key to `users`, because two modules' schemas do not get to depend on
+    each other (Artículo IV). The name is a rendering concern, so it is resolved
+    by the one file of `identity` another module may import (RF-32).
+    """
+    names = await directory.names_for(
+        {invoice.resolved_by_user_id for invoice in invoices if invoice.resolved_by_user_id}
+    )
+    for invoice in invoices:
+        if invoice.resolved_by_user_id is not None:
+            invoice.resolved_by_name = names.get(invoice.resolved_by_user_id)
 
 
 @invoices_router.get(
@@ -280,10 +328,15 @@ async def supplier_totals(
     summary="The invoices waiting for a person",
 )
 async def review_queue(
-    service: PurchasesDep, skip: SkipParam = 0, limit: LimitParam = DEFAULT_PAGE_SIZE
+    service: PurchasesDep,
+    directory: ActorDirectoryDep,
+    skip: SkipParam = 0,
+    limit: LimitParam = DEFAULT_PAGE_SIZE,
 ) -> InvoiceList:
     """The owner and purchasing (RF-30, RF-34, RF-46 of 004)."""
-    return await service.review_queue(skip=skip, limit=limit)
+    queue = await service.review_queue(skip=skip, limit=limit)
+    await _name_whoever_resolved(queue.items, directory)
+    return queue
 
 
 @review_router.post(
@@ -306,6 +359,9 @@ async def resolve_invoice(
         supplier_id=payload.supplier_id,
         remember=payload.remember,
         actor_user_id=current_user.id,
+        number=payload.number,
+        issued_on=payload.issued_on,
+        total=payload.total,
     )
 
 
@@ -317,9 +373,23 @@ async def resolve_invoice(
     dependencies=[require_section(Section.SUPPLIERS, Level.READ)],
     summary="The spellings assigned to a supplier",
 )
-async def list_aliases(service: PurchasesDep) -> list[SupplierAliasRead]:
-    """The owner and purchasing (RF-51 of 004)."""
-    return await service.list_aliases()
+async def list_aliases(
+    service: PurchasesDep, directory: ActorDirectoryDep
+) -> list[SupplierAliasRead]:
+    """The owner and purchasing (RF-51 of 004).
+
+    The name of whoever decided each spelling is resolved here, not in the
+    service: the criterion asks for «quién y cuándo», and `purchases` can say
+    the id but not the person (Artículo IV).
+    """
+    aliases = await service.list_aliases()
+    names = await directory.names_for(
+        {alias.created_by_user_id for alias in aliases if alias.created_by_user_id}
+    )
+    for alias in aliases:
+        if alias.created_by_user_id is not None:
+            alias.created_by_name = names.get(alias.created_by_user_id)
+    return aliases
 
 
 @aliases_router.post(
@@ -465,6 +535,7 @@ async def close_incident(
 )
 async def read_calendar(
     service: PurchasesDep,
+    directory: ActorDirectoryDep,
     since: Annotated[date | None, Query(description="First day shown")] = None,
     until: Annotated[date | None, Query(description="Last day shown")] = None,
     without_receipt: Annotated[bool, Query(description="Only what has no receipt")] = False,
@@ -475,9 +546,33 @@ async def read_calendar(
     With no window given it opens on the current month, which is RF-04.
     """
     start, end = _month_of(since, until)
-    return await service.calendar(
+    read = await service.calendar(
         since=start, until=end, without_receipt=without_receipt, hide_settled=hide_settled
     )
+    await _name_whoever_touched_the_calendar(read.items, directory)
+    return read
+
+
+async def _name_whoever_touched_the_calendar(
+    entries: list[DueDateRead], directory: ActorDirectory
+) -> None:
+    """Put names next to the ids the calendar carries (RF-13, RF-21).
+
+    Same reason as the invoices: `purchases` stores an id and holds no foreign
+    key to `users`, so the name is resolved at the edge by the one file of
+    `identity` another module may import.
+
+    Without this the two requirements cannot be met at all: «figura con el
+    nombre de Marcela» is not something a screen can render from a number.
+    """
+    ids = {entry.created_by_user_id for entry in entries if entry.created_by_user_id}
+    ids |= {change.actor_user_id for entry in entries for change in entry.changes}
+    names = await directory.names_for(ids)
+    for entry in entries:
+        if entry.created_by_user_id is not None:
+            entry.created_by_name = names.get(entry.created_by_user_id)
+        for change in entry.changes:
+            change.actor_name = names.get(change.actor_user_id)
 
 
 @calendar_router.post(
@@ -495,6 +590,7 @@ async def add_due_date(
         description=payload.description,
         amount=payload.amount,
         actor_user_id=current_user.id,
+        actor_name=current_user.name,
     )
 
 
@@ -512,6 +608,7 @@ async def edit_due_date(
         description=payload.description,
         amount=payload.amount,
         actor_user_id=current_user.id,
+        actor_name=current_user.name,
     )
 
 
@@ -548,7 +645,43 @@ async def remove_due_date(
     due_date_id: int, current_user: CurrentUser, service: PurchasesDep
 ) -> None:
     """The owner and purchasing (RF-17 of 006). One from an invoice is refused (RF-18)."""
-    await service.remove_due_date(due_date_id, actor_user_id=current_user.id)
+    await service.remove_due_date(
+        due_date_id, actor_user_id=current_user.id, actor_name=current_user.name
+    )
+
+
+@calendar_router.get(
+    "/stream",
+    dependencies=[require_section(Section.CALENDAR, Level.READ)],
+    summary="The live channel of the calendar",
+)
+async def calendar_stream() -> StreamingResponse:
+    """All three roles, `READ`: sales watches the calendar live too (RF-37).
+
+    Server-sent events, and not a WebSocket: everything the screen needs travels
+    in one direction — what somebody else did — and what this screen does
+    already has four routes of its own. A bidirectional protocol would bring its
+    own handshake, its own keepalive and its own class of bugs to solve a
+    problem that is not there.
+
+    The browser does not call this route: the token lives in a cookie only the
+    server reads, and `EventSource` cannot send headers. The Next route handler
+    reads the cookie and proxies the stream, which is also why no token ever
+    ends up in a query string.
+    """
+
+    async def events_of() -> AsyncIterator[str]:
+        # An immediate comment so the reader knows it is connected rather than
+        # waiting on a proxy that has not flushed anything yet.
+        yield ": conectado\n\n"
+        async for message in bus.read():
+            yield f"data: {message}\n\n"
+
+    return StreamingResponse(
+        events_of(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _month_of(since: date | None, until: date | None) -> tuple[date, date]:
@@ -576,14 +709,50 @@ async def list_orders(
     status_text: Annotated[str | None, Query(description="Only this state")] = None,
     supplier_id: Annotated[int | None, Query(description="Only this supplier's")] = None,
     only_stalled: Annotated[bool, Query(description="Only the stalled ones")] = False,
+    only_in_review: Annotated[bool, Query(description="Only the ones held for review")] = False,
 ) -> PurchaseOrderList:
-    """The owner and purchasing. Sales is refused (RF-09 of 007)."""
+    """The owner and purchasing. Sales is refused (RF-09 of 007).
+
+    `only_in_review` is RF-52, and it is a filter of this same listing rather
+    than a screen of its own: the spec decides it that way and gives the reason
+    — a queue that costs time is a queue that gets abandoned.
+    """
     return await service.list_orders(
         skip=skip,
         limit=limit,
         status_text=status_text,
         supplier_id=supplier_id,
         only_stalled=only_stalled,
+        only_in_review=only_in_review,
+    )
+
+
+@orders_router.post(
+    "/{order_id}/resolution",
+    dependencies=[require_section(Section.PURCHASE_ORDERS, Level.WRITE)],
+    summary="Say which supplier a held order is from",
+)
+async def resolve_order(
+    order_id: int,
+    payload: OrderResolution,
+    current_user: CurrentUser,
+    service: PurchasesDep,
+) -> PurchaseOrderRead:
+    """The owner and purchasing; sales is refused (RF-53 of 007).
+
+    Who resolved it comes from the token, never from the body. With `remember`
+    —the default— the spelling is saved as a criterion and **every other order
+    and invoice written the same way is resolved with it** (RF-61, RF-62).
+
+    There is no way to create a supplier from here, and that is the point of
+    RF-55: the register is the portal's eight, and adding one is a decision of
+    the business taken somewhere else.
+    """
+    return await service.resolve_order(
+        order_id,
+        supplier_id=payload.supplier_id,
+        remember=payload.remember,
+        actor_user_id=current_user.id,
     )
 
 
@@ -608,10 +777,18 @@ async def dismiss_repeat(
 async def invoice_file(invoice_id: int, service: PurchasesDep) -> Response:
     """The owner and purchasing (RF-04 of 004).
 
-    The **excerpt** of the document, as plain text, and not the bytes the portal
-    delivered: `raw` is evidence and is never served to a browser, and what a
-    person reviewing needs is what the file said next to what the table said.
+    The file **as the portal delivered it** — the PDF or the spreadsheet, with
+    its own content type — and not a transcription of it. What a person disputes
+    is a number, and the answer to «where does that number come from» is the
+    paper it was printed on.
+
+    It is served from this module's own copy (`core.invoice_document.content`),
+    never by reading `raw`: that belongs to `portal`. `raw` stays the evidence
+    and stays untouched (Artículo III).
     """
-    invoice = await service.get_invoice(invoice_id)
-    body = "" if invoice.document is None else (invoice.document.excerpt or "")
-    return Response(content=body, media_type="text/plain; charset=utf-8")
+    document = await service.invoice_file(invoice_id)
+    return Response(
+        content=document.content,
+        media_type=document.content_type,
+        headers={"Content-Disposition": f'inline; filename="{document.filename}"'},
+    )
