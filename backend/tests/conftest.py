@@ -28,6 +28,7 @@ not end in `_test`.
 import asyncio
 import importlib.util
 import json
+import os
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -74,6 +75,39 @@ if not settings.POSTGRES_DB.endswith("_test"):
         f"The suite would run against {settings.POSTGRES_DB!r}. "
         "Tests only run against a database whose name ends in '_test'."
     )
+
+# --- One database per run ------------------------------------------------
+#
+# The suite rebuilds its schema from the models on every run — `drop_all` then
+# `create_all` — and that takes an AccessExclusiveLock on every table. Sharing
+# one database between two runs therefore does not degrade, it **breaks**: the
+# run that starts drops the tables under the feet of the one already going, and
+# what comes out is a deadlock in whichever test happened to be reading, or a
+# whole file of errors at setup. It looks exactly like a flaky suite and is not
+# one: every test passes on its own.
+#
+# That used to be a rare accident. It stopped being rare the day more than one
+# agent worked on this repository at a time: three runs of this suite were seen
+# racing each other on one machine.
+#
+# So the database name carries the process id, and the database is dropped when
+# the run ends. Two runs on the same server no longer share anything, and the
+# name still ends in `_test`, which is what the guard above insists on.
+#
+# **It is opt-out, not opt-in**, and the asymmetry is deliberate: forgetting to
+# turn it on costs a corrupted run that looks like a flaky test, and forgetting
+# to turn it off costs a database that has to be created again. Set
+# `CORDILLERA_TEST_DB_PER_RUN=0` to keep one fixed database across runs — which
+# is what somebody wants when they intend to open it afterwards and look at what
+# the suite left, and it is then their business not to run two at once.
+_PER_RUN_DATABASE = os.getenv("CORDILLERA_TEST_DB_PER_RUN", "1").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+}
+_BASE_DATABASE = settings.POSTGRES_DB
+if _PER_RUN_DATABASE:
+    settings.POSTGRES_DB = f"{_BASE_DATABASE[: -len('_test')]}_{os.getpid()}_test"
 
 
 # --- Schema provisioning -------------------------------------------------
@@ -189,16 +223,44 @@ async def _provision() -> None:
     await _seed_reference_data()
 
 
+async def _drop_database() -> None:
+    """Remove this run's database, so the server does not collect them.
+
+    Only ever the one this run created: with `CORDILLERA_TEST_DB_PER_RUN=0`
+    there is a database somebody chose to keep, and dropping that would be
+    taking away exactly what they asked to look at.
+
+    Best effort on purpose: a run killed halfway leaves its database behind, and
+    failing the whole session over the cleanup of something that is already
+    disposable would be worse than the leftover. Stray ones are named after a
+    process id that no longer exists and are safe to drop by hand.
+    """
+    engine = create_async_engine(MAINTENANCE_URL, isolation_level="AUTOCOMMIT", poolclass=NullPool)
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(
+                text(f'DROP DATABASE IF EXISTS "{settings.POSTGRES_DB}" WITH (FORCE)')
+            )
+    except Exception:  # noqa: BLE001 - la limpieza no rompe la corrida
+        pass
+    finally:
+        await engine.dispose()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def database_schema() -> Iterator[None]:
-    """Prepare the test database once per run.
+    """Prepare the test database once per run, and take it away afterwards.
 
     Synchronous on purpose: it owns its event loop through `asyncio.run` instead
     of borrowing the per-test loop that pytest-asyncio creates, so nothing here
     can leak a connection into a test.
     """
     asyncio.run(_provision())
-    yield
+    try:
+        yield
+    finally:
+        if _PER_RUN_DATABASE:
+            asyncio.run(_drop_database())
 
 
 # --- Database fixtures ---------------------------------------------------

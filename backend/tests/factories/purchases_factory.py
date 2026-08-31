@@ -110,6 +110,7 @@ class InvoiceFactory:
         *,
         supplier: Supplier | None = None,
         number: str | None = None,
+        supplier_text: str | None = None,
         issued_on: date | None = None,
         total: Decimal | int = 100_000,
         due_on: date | None = None,
@@ -127,7 +128,13 @@ class InvoiceFactory:
             issued_on=issued,
             total=Decimal(str(total)),
             supplier_id=supplier.id if supplier else None,
-            supplier_text=supplier.legal_name if supplier else "Proveedor Sin Padron",
+            # How the name arrived written. Defaults to the register's spelling,
+            # and is worth overriding: an invoice attributed to a supplier
+            # despite arriving misspelled is a real state of this table, and the
+            # only one where searching by legal name differs from searching by
+            # text (RF-42 of 004).
+            supplier_text=supplier_text
+            or (supplier.legal_name if supplier else "Proveedor Sin Padron"),
             due_on=due,
             original_due_on=due,
             review_state=review_state

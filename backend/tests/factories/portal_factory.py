@@ -13,13 +13,21 @@ from typing import Self
 
 from openpyxl import load_workbook
 
-from app.modules.portal.client import HTML_CONTENT_TYPE, XLSX_CONTENT_TYPE, DownloadedDocument
+from app.modules.portal.client import (
+    HTML_CONTENT_TYPE,
+    PDF_CONTENT_TYPE,
+    XLSX_CONTENT_TYPE,
+    DownloadedDocument,
+)
 from app.shared.errors import ExtractionError
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "portal"
 PRICE_LIST = FIXTURES / "price-list-2026-08-28.xlsx"
 BROKEN_LIST = FIXTURES / "price-list-broken-2026-08-28.xlsx"
 HISTORY_PAGE = FIXTURES / "price-history-page-2026-08-28.html"
+INVOICES_PAGE = FIXTURES / "invoices-page-2026-08-29.html"
+INVOICE_FILE = FIXTURES / "invoice-F-8411-text.pdf"
+SUPPLIER_LEDGER = FIXTURES / "suppliers-ledger-page-2026-08-29.html"
 
 PRICE_COLUMN = 5
 CODE_COLUMN = 1
@@ -39,6 +47,21 @@ def broken_list_bytes() -> bytes:
 def history_page_bytes() -> bytes:
     """The history screen of `COR-0001`, as rendered."""
     return HISTORY_PAGE.read_bytes()
+
+
+def invoices_page_bytes() -> bytes:
+    """The invoices screen, captured from the portal with its hundred rows."""
+    return INVOICES_PAGE.read_bytes()
+
+
+def invoice_file_bytes() -> bytes:
+    """The document of one invoice, as the supplier sent it: a PDF with a text layer."""
+    return INVOICE_FILE.read_bytes()
+
+
+def supplier_ledger_bytes() -> bytes:
+    """The supplier register, with its eight rows already expanded."""
+    return SUPPLIER_LEDGER.read_bytes()
 
 
 def price_list_with(
@@ -80,13 +103,22 @@ class FakePortal:
         *,
         price_list: bytes | None = None,
         history: bytes | None = None,
+        invoices: bytes | None = None,
+        invoice_file: bytes | None = None,
+        ledger: bytes | None = None,
         fails_with: ExtractionError | None = None,
     ) -> None:
         self.price_list = price_list if price_list is not None else price_list_bytes()
         self.history = history if history is not None else history_page_bytes()
+        self.invoices = invoices if invoices is not None else invoices_page_bytes()
+        self.invoice_file = invoice_file if invoice_file is not None else invoice_file_bytes()
+        self.supplier_ledger = ledger if ledger is not None else supplier_ledger_bytes()
         self.fails_with = fails_with
         self.downloads = 0
         self.history_visits: list[str] = []
+        self.invoice_visits = 0
+        self.invoice_file_visits: list[str] = []
+        self.ledger_visits = 0
 
     def __call__(self) -> Self:
         """Usable as the `reader_factory` the service expects."""
@@ -123,4 +155,42 @@ class FakePortal:
             content=self.history,
             content_type=HTML_CONTENT_TYPE,
             filename=f"{product_code}.html",
+        )
+
+    async def fetch_invoices(self) -> DownloadedDocument:
+        """Hand back the invoices screen, rendered."""
+        if self.fails_with is not None:
+            raise self.fails_with
+        self.invoice_visits += 1
+        return DownloadedDocument(
+            content=self.invoices,
+            content_type=HTML_CONTENT_TYPE,
+            filename="facturas.html",
+        )
+
+    async def download_invoice_file(self, invoice_number: str) -> DownloadedDocument:
+        """Hand back the document of one invoice.
+
+        The visits are counted because the portal is somebody else's system with
+        a shared account: a task that asks twice for a file it already has is a
+        cost this side cannot see and the other side can.
+        """
+        if self.fails_with is not None:
+            raise self.fails_with
+        self.invoice_file_visits.append(invoice_number)
+        return DownloadedDocument(
+            content=self.invoice_file,
+            content_type=PDF_CONTENT_TYPE,
+            filename=f"{invoice_number}.pdf",
+        )
+
+    async def fetch_supplier_ledger(self) -> DownloadedDocument:
+        """Hand back the supplier register, every row expanded."""
+        if self.fails_with is not None:
+            raise self.fails_with
+        self.ledger_visits += 1
+        return DownloadedDocument(
+            content=self.supplier_ledger,
+            content_type=HTML_CONTENT_TYPE,
+            filename="estado-cuenta.html",
         )
