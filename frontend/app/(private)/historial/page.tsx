@@ -4,6 +4,9 @@ import { getSession } from '@/app/actions/auth'
 import { AuditTable } from '@/components/operations/AuditTable'
 import { readFromApi } from '@/lib/api/server'
 import type { components } from '@/lib/api/types'
+import { canEdit } from '@/lib/auth/permissions'
+import { standingCorrections } from '@/lib/catalog/corrections'
+import type { CorrectionInForce } from '@/lib/catalog/types'
 import { isKnownEntityType } from '@/lib/operations/audit'
 import type { AuditEntry, AuditEntryList } from '@/lib/operations/types'
 
@@ -125,6 +128,39 @@ function countLabel(page: AuditEntryList): string {
   return `Mostrando ${first}–${last} de ${page.total} cambios.`
 }
 
+// The data of this module whose corrections `catalog` keeps, and whose
+// `entity_id` is a product id. A kind outside this set is a datum of some other
+// module, whose corrections live in a table of its own: asking `catalog` about
+// it would be asking the wrong module, so the log simply makes no offer over
+// that row until the feature that owns it brings its own answer.
+const CORRECTABLE_KINDS = new Set(['catalog.product', 'catalog.product_price'])
+
+/**
+ * Which correction still stands on each row of this page, or `null` if the
+ * answer never came back.
+ *
+ * One question for the whole page: the rows name at most fifty products, and
+ * asking per row would be fifty requests to build one column. `null` and an
+ * empty map are deliberately different — an empty map is "nothing here is
+ * undoable", which is the truth for a log of loads and parameter changes, and
+ * `null` is "we could not find out", which the screen says out loud instead of
+ * quietly withdrawing an offer the person had every right to (the same rule
+ * that keeps a backend being down from reading as a permission being missing).
+ */
+async function undoableIn(items: AuditEntry[]): Promise<Map<string, number> | null> {
+  const products = new Set<number>()
+  for (const entry of items) {
+    if (!CORRECTABLE_KINDS.has(entry.entity_type)) continue
+    const id = Number.parseInt(entry.entity_id, 10)
+    if (Number.isSafeInteger(id)) products.add(id)
+  }
+  if (products.size === 0) return new Map()
+
+  const query = [...products].map(id => `product_id=${id}`).join('&')
+  const read = await readFromApi<CorrectionInForce[]>(`/catalog/corrections?${query}`)
+  return read.ok ? standingCorrections(read.data) : null
+}
+
 /** The heading, which every shape of this screen carries. */
 function Header() {
   return (
@@ -196,6 +232,14 @@ export default async function HistoryPage({
     ? await readFromApi<AuditEntry[]>(datumPath)
     : await readFromApi<AuditEntryList>(`/operations/audit?${queryFor(filters, skip)}`)
   const page = read.ok ? (Array.isArray(read.data) ? asPage(read.data) : read.data) : null
+
+  // Undoing a correction is the owner's alone (RF-30), and its acceptance
+  // criterion puts it on this screen. Asked for only when it is going to be
+  // offered: the route refuses anybody else, so for the other two roles this
+  // would be a round trip that can only answer 403.
+  const mayUndo = session !== null && canEdit(session.permissions, 'MANUAL_CORRECTIONS')
+  const undoable =
+    mayUndo && page !== null ? await undoableIn(page.items) : new Map<string, number>()
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-8">
@@ -282,7 +326,13 @@ export default async function HistoryPage({
           {page.items.length > 0 && (
             <p className="text-sm text-muted-foreground">{countLabel(page)}</p>
           )}
-          <AuditTable items={page.items} />
+          {undoable === null && (
+            <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              No pudimos traer las correcciones que se pueden deshacer. El historial es el de
+              siempre; para deshacer una corrección, entrá al dato o probá de nuevo en unos minutos.
+            </p>
+          )}
+          <AuditTable items={page.items} undoable={undoable ?? undefined} />
           {!ofOneDatum && (current > 1 || page.skip + page.items.length < page.total) && (
             <nav className="flex items-center gap-4 text-sm">
               {current > 1 && (

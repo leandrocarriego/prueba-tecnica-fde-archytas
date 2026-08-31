@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { saveParameter } from '@/app/actions/parameters'
@@ -37,6 +38,12 @@ function bound(value: unknown): string | number | undefined {
  *
  * The `min` and `max` on the input are a courtesy, never the rule. The refusal
  * is the API's, and the browser only spares the round trip.
+ *
+ * Each row links to its own history, because a parameter is a datum somebody
+ * changed by hand like any other and RF-15 asks for the way back from **any**
+ * of them. The kind and the identifier are the ones the log itself writes —
+ * `operations.parameter` and the key — so the link answers instead of landing
+ * on «esta pantalla no conoce ese dato».
  *
  * The verdict goes into a live region that is on the page from the start and
  * only changes its text. Whoever saves a parameter without seeing the screen
@@ -114,7 +121,13 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
           : `Entre ${String(parameter.minimum)} y ${String(parameter.maximum)}.`}{' '}
         {parameter.changed_at
           ? 'Este valor lo cambiaste vos.'
-          : `Es el valor con el que arranca el sistema (${String(parameter.initial)}).`}
+          : `Es el valor con el que arranca el sistema (${String(parameter.initial)}).`}{' '}
+        <Link
+          className="underline underline-offset-2"
+          href={`/historial?entidad=operations.parameter&id=${encodeURIComponent(parameter.key)}`}
+        >
+          Ver quién lo cambió y cuándo
+        </Link>
       </p>
     </form>
   )

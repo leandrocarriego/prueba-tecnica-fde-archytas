@@ -3,12 +3,28 @@
 **Feature:** 003-system-control · **Fecha:** 2026-08-30 · **Rol:** `Lead`
 **Spec:** `spec.md`, Aprobada el 2026-08-29 por Leandro Carriego — FDE
 **Changeset:** commits `38ab165`, `519a8db`, `8df1c19`, mergeados a `main` en el PR #20 (`a2d7201`)
+**Cierre de los hallazgos:** `e5eb56f`, `20eff0f`, `c7c7f68`, `9d413fe`, `1d79713`, `2708f11`,
+y lo que cierra RF-15 y RF-30, todavía sin commitear
 
 > `review_feature` pregunta *¿está bien escrito?*. Este informe contesta la otra:
 > **¿es lo que se acordó?** No juzga calidad de código, ni tipado, ni cobertura. Juzga
 > correspondencia entre lo firmado y lo que existe.
 
-## Veredicto: 🔴 DERIVA MAYOR
+## Veredicto: 🔴 DERIVA MAYOR — cerrado el 2026-08-31
+
+> **Estado al 2026-08-31.** **Todos los hallazgos están cerrados.** Los cuatro mayores y M5 —el
+> que apareció después de escrito este informe— se resolvieron entre el 30 y el 31, y los siete
+> requisitos que la tabla marcó `Parcial` están hoy en `Implementado`, verificados en el árbol de
+> trabajo y no en el mensaje del commit que dice haberlos cerrado. Los dos últimos, **RF-15 y
+> RF-30**, se construyeron el 2026-08-31 y se explican debajo de la tabla.
+>
+> La feature **sigue sin desplegar**, así que su spec todavía **no se archiva**: `archive/README.md`
+> pide las dos condiciones —mergeada *y* desplegada—, y `PROJECT_BRIEF.md` mantiene `P9 · Control
+> propio` en *En desarrollo* hasta ese mismo momento.
+>
+> Lo que sigue es el informe **tal como se escribió el 2026-08-30**, y no se reescribe: es el
+> registro de un gate, y un gate que se edita para que dé bien deja de ser un gate. Cada hallazgo
+> lleva anotado, en su lugar, qué lo cerró.
 
 Hay requisitos firmados cuya implementación está incompleta. Ninguno está ausente del todo —no
 hay agujeros vacíos— pero **siete de los treinta y tres cumplen sólo una parte de lo que
@@ -47,32 +63,63 @@ test verde que no ejercita la condición que el requisito pide deja al requisito
 | RF-06 | Un valor fuera del rango admitido se rechaza informando el rango. | backend/app/shared/parameters.py::ParameterSpec.coerce / _as_number / _as_time_of_day / range_text · spec_for() para la clave desconocida · frontend ParameterRow muestra el mensaje del backend | ✅ Implementado |
 | RF-07 | El valor nuevo se aplica sin ninguna intervención adicional. | backend/app/modules/operations/service.py::due_for_update / interval_hours / highlight_threshold (leen el parámetro en cada uso) · catalog/handlers.py::remember_parameter · identity/service.py::_setting + resolve_session | ✅ Implementado |
 | RF-08 | Cada cambio de parámetro registra valor anterior, valor nuevo, quién y cuándo. | backend/app/modules/operations/service.py::set_parameters → record_manual_change (ManualChangeRecorded con old_value/new_value/actor_user_id/section=SYSTEM) · repository.py::AuditEntryRepository.insert · migración… | ✅ Implementado |
-| RF-09 | Cuando una persona cargue o modifique un dato a mano, el sistema registra quién lo hizo y cuándo. | backend/app/modules/operations/handlers.py::write_the_log · backend/app/modules/operations/service.py::OperationsService.record_manual_change · backend/app/modules/operations/models.py::AuditEntry (actor_user_id,… | 🟡 Parcial |
+| RF-09 | Cuando una persona cargue o modifique un dato a mano, el sistema registra quién lo hizo y cuándo. | backend/app/modules/operations/handlers.py::write_the_log · backend/app/modules/operations/service.py::OperationsService.record_manual_change · backend/app/modules/operations/models.py::AuditEntry (actor_user_id,… | ✅ Implementado (2026-08-31) |
 | RF-10 | Al modificar a mano un dato existente, el sistema conserva el valor que tenía antes. | backend/app/modules/operations/models.py::AuditEntry.old_value · backend/app/shared/corrections.py::CorrectionColumns.portal_value · backend/app/modules/catalog/service.py::CatalogService.apply_correction | ✅ Implementado |
 | RF-11 | Toda modificación manual de un dato existente exige un motivo elegido de una lista, y admite un detalle escrito. | backend/app/shared/corrections.py::CorrectionReason y REASON_LABELS (cinco motivos) · backend/app/modules/catalog/schemas.py::CorrectionWrite · backend/app/modules/catalog/service.py::CatalogService._reason ·… | ✅ Implementado |
 | RF-12 | El historial muestra el motivo de cada cambio. | backend/app/modules/operations/service.py::OperationsService._audit_read (reason_label) · backend/app/shared/corrections.py::label_for · frontend/components/operations/AuditTable.tsx (columna «Por qué») | ✅ Implementado |
 | RF-13 | El historial de cambios manuales se muestra ordenado por fecha. | backend/app/modules/operations/repository.py::AuditEntryRepository.list y .list_for_entity (order_by(AuditEntry.occurred_at.desc(), AuditEntry.id.desc())) · frontend/app/(private)/historial/page.tsx | ✅ Implementado |
 | RF-14 | Se puede filtrar el historial por persona y por rango de fechas. | backend/app/modules/operations/repository.py::AuditEntryRepository._filtered · backend/app/modules/operations/routes.py::list_audit (params actor_user_id, since, until) · backend/app/shared/time.py::as_business_time ·… | ✅ Implementado |
-| RF-15 | Desde cualquier dato modificado a mano se llega a su historial de cambios. | backend/app/modules/operations/routes.py::audit_for_entity (GET /operations/audit/{entity_type}/{entity_id}) · frontend/app/(private)/precios/[productId]/page.tsx (dos Link a /historial?entidad=…&id=…) ·… | 🟡 Parcial |
+| RF-15 | Desde cualquier dato modificado a mano se llega a su historial de cambios. | backend/app/modules/operations/routes.py::audit_for_entity (GET /operations/audit/{entity_type}/{entity_id}) · frontend/app/(private)/precios/[productId]/page.tsx (dos Link a /historial?entidad=…&id=…) ·… | ✅ Implementado (2026-08-31) |
 | RF-16 | El sistema impide que un registro del historial se modifique. | backend/alembic/versions/0006_manual_change_log.py (APPEND_ONLY_FUNCTION + APPEND_ONLY_TRIGGER, op.execute en :118-119) · backend/app/modules/operations/models.py (mismos statements colgados del metadata) ·… | ✅ Implementado |
 | RF-17 | El sistema impide que un registro del historial se elimine. | backend/alembic/versions/0006_manual_change_log.py (APPEND_ONLY_TRIGGER + NO_TRUNCATE_TRIGGER, op.execute en :118-120) · backend/app/modules/operations/models.py::NO_TRUNCATE_TRIGGER ·… | ✅ Implementado |
 | RF-18 | El dueño ve el historial de cambios manuales de todas las personas. | backend/app/modules/identity/dependencies.py::ROLE_SECTIONS / visible_sections (OWNER → frozenset(BusinessSection)) · backend/app/modules/operations/routes.py::list_audit ·… | ✅ Implementado |
 | RF-19 | Los roles distintos de dueño ven únicamente los cambios manuales de las secciones a las que tienen acceso. | backend/app/modules/identity/dependencies.py::ROLE_SECTIONS, visible_sections, VisibleSections · backend/app/modules/operations/repository.py::AuditEntryRepository._filtered (section.in_(...)) ·… | ✅ Implementado |
 | RF-20 | Reunir en una sola pantalla las acciones de carga y corrección disponibles (CA: «hay una sola pantalla desde la que se llega a todas las cargas y correcciones»). | frontend/app/(private)/acciones/page.tsx::ActionsPage · frontend/lib/operations/actions.ts::MANUAL_ACTIONS (línea 40) · frontend/components/auth/Navigation.tsx (enlace «Acciones») ·… | ✅ Implementado |
 | RF-21 | Mostrar a cada persona únicamente las acciones habilitadas para su rol (CA: «esa pantalla le muestra a Marcela acciones distintas de las que le muestra a Julián»). | frontend/lib/operations/actions.ts::actionsFor (línea 148) · frontend/lib/auth/permissions.ts::canEdit/canSee · backend/app/modules/identity/permissions.py::MATRIX/level_for ·… | ✅ Implementado |
-| RF-22 | Cuando una acción manual termine, informar a quien la ejecutó si se aplicó o si falló (CA: «ejecutada una acción, quien la ejecutó ve si se aplicó o si falló»). | Mitad que falla: frontend/lib/api/write.ts::callApi + backend/app/main.py::_error_body/handle_domain_error + backend/tests/integration/api/test_action_outcomes.py. Mitad que se aplica:… | 🟡 Parcial |
+| RF-22 | Cuando una acción manual termine, informar a quien la ejecutó si se aplicó o si falló (CA: «ejecutada una acción, quien la ejecutó ve si se aplicó o si falló»). | Mitad que falla: frontend/lib/api/write.ts::callApi + backend/app/main.py::_error_body/handle_domain_error + backend/tests/integration/api/test_action_outcomes.py. Mitad que se aplica:… | ✅ Implementado (2026-08-31) |
 | RF-23 | Se puede corregir a mano cualquier dato traído del portal: importes, fechas, números de comprobante y nombres de proveedor. | backend/app/modules/catalog/service.py::CORRECTABLE_FIELDS y ::CatalogService.apply_correction (+ ::_as_text, ::_as_number, ::_length_of) · POST /api/v1/catalog/products/{product_id}/corrections | ✅ Implementado |
 | RF-24 | Sólo corrige un dato quien tiene acceso a la sección a la que ese dato pertenece. | backend/app/modules/catalog/routes.py::correct_product (dependencies=[require_section(Section.PRODUCT_CATALOG, Level.WRITE)]) · backend/app/modules/identity/permissions.py::MATRIX[Section.PRODUCT_CATALOG] | ✅ Implementado |
 | RF-25 | Al corregir un dato traído del portal, lo que el portal había informado se conserva sin cambios. | backend/app/modules/catalog/service.py::CatalogService._store_correction · backend/app/modules/catalog/models.py::Correction (mixin app/shared/corrections.py::CorrectionColumns) ·… | ✅ Implementado |
-| RF-26 | Todo dato que difiera de lo que informó el portal queda señalado como corregido a mano. | backend/app/modules/catalog/service.py::CatalogService._marks y ::_price_read · backend/app/modules/catalog/schemas.py::CorrectionMark · frontend/components/catalog/PriceTable.tsx ·… | 🟡 Parcial |
+| RF-26 | Todo dato que difiera de lo que informó el portal queda señalado como corregido a mano. | backend/app/modules/catalog/service.py::CatalogService._marks y ::_price_read · backend/app/modules/catalog/schemas.py::CorrectionMark · frontend/components/catalog/PriceTable.tsx ·… | ✅ Implementado (2026-08-31) |
 | RF-27 | Junto a un dato corregido a mano se muestra el valor que había informado el portal. | frontend/app/(private)/precios/[productId]/page.tsx (encabezado «Descripción corregida a mano · el portal decía …», bloque «Precio vigente · Corregido a mano · el portal decía …», lista de correcciones al pie) ·… | ✅ Implementado |
-| RF-28 | Si una actualización posterior del portal trae un valor distinto del original sobre un dato corregido, se señala para revisión en la pantalla de ese dato en lugar de pisar la… | backend/app/modules/catalog/service.py::CatalogService._check_conflict y ::_register_price · frontend/app/(private)/precios/[productId]/page.tsx (banner «El portal informa otro valor») ·… | 🟡 Parcial |
-| RF-29 | Ese mismo conflicto le llega al dueño como aviso, sin que tenga que mirar la pantalla. | backend/app/modules/notifications/handlers.py::warn_about_a_contradicted_correction · backend/app/modules/notifications/service.py::conflict_message y ::NotificationService.notify_owner ·… | 🟡 Parcial |
-| RF-30 | El dueño —y sólo el dueño— puede dejar sin efecto una corrección manual; su criterio de aceptación agrega que lo hace «desde el historial». | backend/app/modules/catalog/service.py::CatalogService.revert_correction (línea 877) · backend/app/modules/catalog/routes.py::revert_correction (DELETE /api/v1/catalog/corrections/{correction_id}, línea 126) ·… | 🟡 Parcial |
+| RF-28 | Si una actualización posterior del portal trae un valor distinto del original sobre un dato corregido, se señala para revisión en la pantalla de ese dato en lugar de pisar la… | backend/app/modules/catalog/service.py::CatalogService._check_conflict y ::_register_price · frontend/app/(private)/precios/[productId]/page.tsx (banner «El portal informa otro valor») ·… | ✅ Implementado (2026-08-31) |
+| RF-29 | Ese mismo conflicto le llega al dueño como aviso, sin que tenga que mirar la pantalla. | backend/app/modules/notifications/handlers.py::warn_about_a_contradicted_correction · backend/app/modules/notifications/service.py::conflict_message y ::NotificationService.notify_owner ·… | ✅ Implementado (2026-08-31) |
+| RF-30 | El dueño —y sólo el dueño— puede dejar sin efecto una corrección manual; su criterio de aceptación agrega que lo hace «desde el historial». | backend/app/modules/catalog/service.py::CatalogService.revert_correction (línea 877) · backend/app/modules/catalog/routes.py::revert_correction (DELETE /api/v1/catalog/corrections/{correction_id}, línea 126) ·… | ✅ Implementado (2026-08-31) |
 | RF-31 | Anulada la corrección, el dato vuelve a mostrar el valor que informó el portal —no el valor anterior. | backend/app/modules/catalog/service.py::CatalogService.revert_correction (líneas 903-914) y ::_store_correction (líneas 1004-1013) | ✅ Implementado |
 | RF-32 | La anulación queda registrada: quién la anuló y cuándo, y figura en el historial. | backend/app/modules/catalog/service.py::revert_correction (líneas 918-937) · backend/app/shared/corrections.py:122-123 (reverted_by_user_id, reverted_at) · backend/alembic/versions/0007_manual_corrections.py:67-68 | ✅ Implementado |
 | RF-33 | No se puede dejar sin efecto una corrección sobre un dato que no fue traído del portal. | backend/app/modules/catalog/service.py::_came_from_the_portal (línea 1180) · ::_store_correction (líneas 987-993) · ::revert_correction (líneas 884-891) · backend/app/modules/catalog/models.py::PriceSource +… | ✅ Implementado |
-**26 Implementado · 7 Parcial · 0 Ausente.**
+**26 Implementado · 7 Parcial · 0 Ausente** — el 2026-08-30.
+**33 Implementado · 0 Parcial · 0 Ausente** — al 2026-08-31.
+
+**RF-15 y RF-30 llegaron últimos, y sin motivo escrito.** Los cinco anteriores son los que este
+informe detalló: M1 (RF-09), M2 (RF-28 y RF-29), M3 (RF-22) y el badge de la lista de precios
+(RF-26). Estos dos venían de los **38 hallazgos menores, que el informe contó y no enumeró**, así
+que por qué se los marcó `Parcial` no se puede recuperar de este documento. Es el defecto del
+propio informe, y la lección para el próximo `/converge`: un hallazgo que sólo se cuenta muere con
+la sesión que lo encontró. Lo que se hizo, entonces, fue volver a mirar los dos requisitos contra
+el código y cerrar la brecha que quedaba en cada uno.
+
+- **RF-15 — el parámetro no tenía enlace a su historial.** Desde un producto corregido ya se
+  llegaba (`precios/[productId]/page.tsx`) y desde el historial se volvía al dato
+  (`lib/operations/audit.ts::entityHref`); `/configuracion` nombraba el historial en prosa y nada
+  más, aunque un parámetro es un dato modificado a mano como cualquier otro. Ahora cada fila lleva
+  a `/historial?entidad=operations.parameter&id=<clave>`, que es la misma clave con la que el log
+  escribe el cambio (`components/operations/ParameterRow.tsx`).
+- **RF-30 — la anulación no estaba en el historial**, que es donde su criterio de aceptación la
+  pone con todas las letras: *«El dueño deja sin efecto una corrección desde el historial»*.
+  Funcionaba, sólo la ofrecía el dueño y el historial enlazaba a la pantalla del botón. Ahora el
+  botón está en la tabla del log, y es **el mismo componente** que usa la ficha del producto, no
+  una copia: así lo sigue cubriendo la regla de RF-22 que ya lo gobierna. Para saber qué corrección
+  deshacer, el log pregunta una vez por página a `GET /api/v1/catalog/corrections`, una ruta nueva
+  de `catalog` que devuelve las correcciones en pie de un conjunto de productos y que exige
+  `MANUAL_CORRECTIONS` — la sección del dueño y de nadie más, la misma que ya exigía la anulación.
+
+**Con qué se sostienen.** `backend/tests/architecture/test_history_is_reachable.py`, ocho reglas
+estáticas sobre el frontend —el estilo que el proyecto ya usa en `test_manual_actions.py`— y siete
+tests de integración sobre la ruta nueva en `test_correction_reversal.py`. La primera regla no
+nombra archivos: recorre el vocabulario que el log declara y exige el camino de vuelta para **todo**
+dato que tenga pantalla propia, así que la próxima feature que le enseñe una clase de dato al log
+hereda la obligación. Las tres reglas se verificaron por mutación: rotas a mano, fallan.
 
 ## Hallazgos
 
@@ -107,6 +154,12 @@ escribe una sola línea de bitácora. Y no es un camino teórico: es una de las 
    cubre la bitácora. Vuelve al `Solution-Designer`, **y la spec se vuelve a firmar**: el gate
    de la firma se reabre.
 
+> **Resuelto el 2026-08-31** (`e5eb56f`) — el *human in the loop* eligió la salida 1, así que la
+> spec no se reabrió. `catalog/service.py::_record_manual_load` publica `ManualChangeRecorded` con
+> `AuditAction.CREATED` desde la resolución de casos, fechada por **la decisión** y no por el reloj
+> del handler. No pide motivo: RF-11 lo exige para modificar *«un dato que ya existía»*, y una carga
+> crea uno que no existía. `AuditAction.CREATED` ya no es un valor del catálogo que no publica nadie.
+
 ### M2 · El conflicto del portal sólo se detecta sobre el precio, no sobre la descripción
 
 **Qué dice lo firmado.** RF-28: *«Si una actualización posterior del portal trae para un dato
@@ -129,6 +182,13 @@ cambia la descripción de un producto cuya descripción alguien corrigió, nadie
 Antes de eso hay una pregunta que sólo vos podés contestar: **¿un valor que el portal informa y
 el pipeline nunca aplica cuenta como «una actualización posterior que trae un valor distinto»?**
 
+> **Resuelto el 2026-08-31** (`e5eb56f`) — contestaste que sí, y se implementó.
+> `catalog/service.py:271-289` compara la descripción entrante contra la corrección vigente y
+> publica el conflicto igual que con el precio y la moneda, de modo que RF-29 —el aviso al dueño—
+> viaja por el mismo camino sin tocar `notifications`. La comparación pasa por
+> `shared.text.normalize`: mayúsculas, tildes y espacios de más no son el portal cambiando de
+> opinión. Las correcciones vigentes de un lote se leen una vez, no una por fila.
+
 ### M3 · RF-22 quedó a medias en una de las dos acciones que la feature agregó
 
 Es exactamente el defecto 10 que el `Tester` encontró y el `Developer` arregló en
@@ -138,6 +198,13 @@ valor del portal», el botón desaparece, y nunca lee que se aplicó.
 
 No hay dos salidas acá: el estándar ya lo fijó el propio proyecto al arreglar el otro botón.
 Vuelve al `Developer`, y después al `Tester` para generalizar el test estático que ya existe.
+
+> **Resuelto el 2026-08-31** (`e5eb56f`, `20eff0f`, `9d413fe`) — `RevertCorrectionButton.tsx:62`
+> anuncia el éxito al *toaster* que ya estaba montado, y no en estado local: el componente se
+> desmonta en el camino feliz, así que un mensaje adentro sería el mismo defecto con otra ropa.
+> El test estático dejó de nombrar archivos: recorre `MANUAL_ACTIONS` entero y exige que cada fila
+> tenga su Server Action. Que nombrara un archivo es la razón por la que este defecto sobrevivió
+> dos veces.
 
 ### M4 · `data-model.md` no conoce la migración `0009`
 
@@ -149,6 +216,11 @@ la suite.
 El código está bien; el artefacto quedó viejo. Vuelve al `Backend-Architect`. Lo mismo con la
 regla de comparación de `conflict_value`, que el código aplica distinto según el campo por un
 motivo argumentado que el documento no registra.
+
+> **Resuelto el 2026-08-31** (`e5eb56f`) — `data-model.md` declara las cuatro migraciones, `0009`
+> incluida —la columna `source` sobre `core.product` y `core.product_price`, reusando
+> `core.price_source`—, y registra las dos reglas de comparación que `conflict_value` aplica de
+> verdad. `plan.md` quedó alineado en el mismo commit.
 
 ## Tres cosas que el converge miró y **no** son hallazgos de esta feature
 
@@ -194,6 +266,23 @@ motivo argumentado que el documento no registra.
 
 ## Qué hacer con esto
 
-Antes de desplegar y archivar la spec, resolver M1 y M2 —las dos preguntas que son tuyas— y M3,
+~~Antes de desplegar y archivar la spec, resolver M1 y M2 —las dos preguntas que son tuyas— y M3,
 que no tiene pregunta. M4 y los 38 menores son actualización de artefactos: no bloquean nada,
-pero el que los deje viejos le está mintiendo al próximo que los lea.
+pero el que los deje viejos le está mintiendo al próximo que los lea.~~
+
+**Hecho, entre el 2026-08-30 y el 2026-08-31.** M1, M2 y M3 se implementaron —en los tres casos
+elegiste construir, no acotar la spec, así que el gate de la firma nunca se reabrió—, M4 y los
+menores se corrigieron, y M5 apareció y se cerró después. `/review-feature` corrió sobre el
+resultado y sus hallazgos también están cerrados (`9d413fe`, `1d79713`).
+
+**Lo que queda, en orden:**
+
+1. **Desplegar.** Es la única condición pendiente para que la 003 esté *entregada*: mergeada ya
+   está desde el PR #20.
+2. **Archivar**, como último paso de `/ship` y no antes: mover `docs/specs/003-system-control/` a
+   `docs/specs/archive/`, y en el mismo paso pasar `P9 · Control propio` a **Resuelto** en
+   `docs/PROJECT_BRIEF.md`. Las dos cosas juntas, porque las dos dicen lo mismo.
+~~3. **RF-15 y RF-30**, si te importan antes de archivar.~~ **Hechos el 2026-08-31**, con la
+   opción de construir y no la de acotar la spec: el gate de la firma sigue sin reabrirse. Los
+   cambios están en el árbol de trabajo, **sin commitear**, sobre la rama
+   `feat/004-to-009-remaining-specs`.
