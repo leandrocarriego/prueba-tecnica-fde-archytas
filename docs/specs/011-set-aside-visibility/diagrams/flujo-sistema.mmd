@@ -1,0 +1,20 @@
+---
+title: Qué hace el sistema cuando no puede interpretar algo
+---
+flowchart TD
+    A["El sistema lee una pantalla del portal"] --> B{"¿Puede interpretar el dato?"}
+    B -->|Sí| C["Lo registra y sigue"]
+    B -->|No| D["Lo aparta sin descartarlo"]
+    D --> E["Anota el motivo, lo que alcanzó a leer,<br/>de qué pantalla salió y cuándo"]
+    E --> F{"¿Ya había apartado lo mismo<br/>por el mismo motivo?"}
+    F -->|Sí| G["Suma una aparición al pendiente que ya existe"]
+    F -->|No| H["Abre un pendiente nuevo"]
+    G --> I["Queda en la lista de pendientes"]
+    H --> I
+    I --> J{"¿Se resolvió lo que lo originó,<br/>en la pantalla que le corresponde?"}
+    J -->|Sí| K["Deja de contarlo entre los pendientes,<br/>sin que nadie lo cierre a mano"]
+    J -->|No| L["Sigue esperando, y el sistema cuenta desde cuándo"]
+    L --> M{"¿Lleva más días que los configurados?"}
+    M -->|Sí| N["Lo señala como demorado"]
+    M -->|No| L
+    K --> O["Queda consultable para siempre"]

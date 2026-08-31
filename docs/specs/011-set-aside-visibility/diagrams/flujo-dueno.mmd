@@ -1,0 +1,14 @@
+---
+title: El dueño — cuánto falta resolver y hace cuánto
+---
+flowchart TD
+    A["El dueño entra a la lista de pendientes"] --> B["Ve los de todas las áreas"]
+    B --> C["Puede pedir ver sólo los de un área"]
+    B --> D["Lee cuántos hay sin resolver"]
+    D --> E["Y desde cuándo espera cada uno"]
+    E --> F{"¿Alguno lleva más días<br/>que los configurados?"}
+    F -->|Sí| G["Lo ve señalado como demorado"]
+    F -->|No| H["La lista está al día"]
+    A --> I["Define a partir de cuántos días<br/>un pendiente se considera demorado"]
+    I --> J["Mientras no lo cambie, son siete días"]
+    B --> K["Consulta los ya resueltos, que no se borran nunca"]

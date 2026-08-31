@@ -1,0 +1,40 @@
+---
+title: Lo apartado se ve — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Portal as El portal
+    participant Sistema as El sistema
+    actor Marcela as Marcela, compras
+    actor Julian as Julián, ventas
+    actor Duenio as El dueño
+
+    Note over Portal,Duenio: La regla que el cliente pidió: si algo no se puede resolver solo,<br/>que avise en vez de adivinar mal
+
+    Sistema->>Portal: Lee las pantallas con la frecuencia configurada
+    Portal-->>Sistema: Devuelve lo publicado, con datos que a veces no se pueden interpretar
+
+    alt El sistema puede interpretar el dato
+        Sistema->>Sistema: Lo registra y sigue
+    else No lo puede interpretar
+        Sistema->>Sistema: Lo aparta sin descartarlo y anota por qué
+        Sistema->>Sistema: Si ya había apartado lo mismo, suma una aparición<br/>en vez de abrir otro pendiente
+        Sistema-->>Duenio: Lo pone en la lista de pendientes con el motivo,<br/>lo que alcanzó a leer y de dónde salió
+    end
+
+    Note over Marcela,Julian: Cada uno entra a la misma lista y ve lo de su área
+
+    Marcela->>Sistema: Revisa lo de proveedores, pagos, órdenes y mensajes
+    Julian->>Sistema: Revisa lo de precios y ventas
+
+    alt Se puede resolver desde su pantalla
+        Marcela->>Sistema: Lo resuelve donde corresponde
+        Sistema->>Sistema: Saca el pendiente de la lista sin que nadie lo cierre a mano
+    else Sólo se puede dar por revisado
+        Marcela->>Sistema: Deja constancia de que lo vio
+        Sistema->>Sistema: Guarda quién lo hizo y cuándo
+    end
+
+    Duenio->>Sistema: Mira cuántos pendientes hay y desde cuándo esperan
+    Sistema-->>Duenio: Le señala los que llevan más días de los configurados
+    Note over Sistema,Duenio: Nada se borra: lo resuelto sale de la lista<br/>y se sigue pudiendo consultar

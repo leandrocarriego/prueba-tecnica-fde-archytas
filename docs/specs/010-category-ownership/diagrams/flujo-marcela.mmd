@@ -1,0 +1,26 @@
+---
+title: Marcela, compras — pasa a mantener los rubros
+---
+flowchart TD
+    A["Entra con su acceso"] --> B["Encuentra los rubros entre las secciones a las que entra"]
+
+    B --> C["Agrega un rubro nuevo a la lista"]
+    B --> D["Le cambia el nombre a un rubro"]
+    B --> E{"¿Puede eliminar un rubro?"}
+    E -->|Si no tiene productos asignados| F["Se elimina"]
+    E -->|Si tiene productos| G["El sistema lo sigue impidiendo y dice por qué"]
+
+    B --> H["Abre los productos que quedaron sin rubro"]
+    H --> R["Cada uno llega con el rubro que el sistema propone, o sin ninguno"]
+    R --> I["Confirma la propuesta, la corrige, o asigna el rubro si no había ninguna"]
+    B --> J["Le cambia el rubro a un producto ya clasificado"]
+
+    B --> K["Abre la pantalla donde ya resuelve lo que la actualización aparta"]
+    K --> L["Ahí también aparecen las formas escritas de categoría<br/>que el sistema no conoce"]
+    L --> M["Le indica a qué rubro corresponde esa forma escrita"]
+
+    B --> N["Abre la lista de equivalencias guardadas"]
+    N --> O["Cambia una de rubro y se reasignan los productos que dependían de ella"]
+    N --> P["O la deja sin efecto, y esos productos vuelven a revisión"]
+
+    Q["Lo que hacen los rubros no cambia con esta feature:<br/>cambia que ahora las decisiones las toma ella"]

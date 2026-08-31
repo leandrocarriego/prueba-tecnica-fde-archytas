@@ -1,0 +1,19 @@
+---
+title: El sistema — a quién le deja cambiar un rubro
+---
+flowchart TD
+    A["Llega un pedido de cambiar un rubro, la clasificación<br/>de un producto o una equivalencia"] --> B{"¿Quién lo pide?"}
+
+    B -->|El dueño| C["Lo deja pasar"]
+    B -->|Compras| C
+    B -->|Ventas| D["Lo rechaza"]
+
+    C --> E["El cambio queda hecho"]
+    D --> F["El cambio no se hace, aunque el pedido haya llegado igual"]
+
+    G["Llega un pedido de sólo consultar los rubros"] --> H{"¿Quién lo pide?"}
+    H -->|Los tres| I["Se los muestra con su conteo y sus formas escritas"]
+
+    J["A ventas no le ofrece ninguna acción para cambiarlos"] --> K["Y si el pedido llega igual, lo rechaza:<br/>esconder el botón no alcanza"]
+
+    L["A compras le muestra los rubros entre las secciones a las que entra"]
