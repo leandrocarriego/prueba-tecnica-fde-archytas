@@ -269,9 +269,10 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
     ),
     ParameterSpec(
         key="invoice_sync.interval_hours",
-        label="Cada cuántas horas se traen facturas, pagos y proveedores",
+        label="Cada cuántas horas se traen facturas, pagos, proveedores y órdenes de compra",
         effect="Cambia cada cuánto el sistema le pide al portal las facturas, los comprobantes de "
-        "pago y el padrón de proveedores.",
+        "pago, el padrón de proveedores y las órdenes de compra. Las cuatro se traen juntas: "
+        "este número las mueve a las cuatro.",
         kind=ParameterKind.INTEGER,
         initial=12,
         minimum=1,
