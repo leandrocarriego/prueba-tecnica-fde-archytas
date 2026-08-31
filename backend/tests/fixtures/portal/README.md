@@ -81,7 +81,7 @@ La planilla trae el encabezado **corrido a `A2`**, filas vacías intercaladas y 
 pie: se lee buscando las etiquetas por nombre en toda la hoja, no por posición.
 
 El escaneado es un único JPEG de 800×600 a 72 DPI sin capa de texto. La medición de OCR sobre doce
-como éste está en `docs/specs/004-invoices-suppliers/research.md`.
+como éste está en `docs/specs/archive/004-invoices-suppliers/research.md`.
 
 ## Las órdenes de compra (007)
 
