@@ -522,14 +522,27 @@ class CatalogService:
         The second way a datum gets loaded by hand, and so the second one that
         leaves a line behind (RF-09): the portal's row could not be read, and
         the amount in force from here on is one a person typed.
+
+        There is one amount this does not register, and it does not register it
+        by **refusing**: one that contradicts a standing correction.
+        `_register_price` raises there, so nothing below this call runs and the
+        caller — the handler of `QuarantineCaseResolved` — takes the refusal up
+        to `triage`, which never reaches its commit. The person is told, and the
+        case stays in the queue where the amount they typed still belongs.
+
+        The amount that *equals* a standing correction is the other side of
+        that, and it is the case's way out: nothing is written, because the
+        value is already the one in force, and the line below still says who
+        confirmed it and when. Without it the queue would hold a row no decision
+        could ever close.
         """
         product = await self.catalog.get_by_code(product_code)
         if product is None:
             raise NotFoundError(NO_SUCH_PRODUCT, details={"product_code": product_code})
         current = await self.catalog.get_price(product.id)
         previous = None if current is None else current.price
-        # Read here and handed down, because the answer is needed twice: to
-        # write the row, and to know afterwards whether the write reached it.
+        # Read here and handed down rather than looked up again inside: the
+        # write is what decides whether this amount may land at all.
         standing = (await self._standing_corrections([product.id])).get(product.id, {})
         await self._register_price(
             product=product,
@@ -543,25 +556,27 @@ class CatalogService:
             source=PriceSource.SYSTEM,
             corrections=standing,
         )
-        if PRICE_FIELD not in standing:
-            # Recorded whether or not the number moved: somebody confirming the
-            # amount already in force took a manual decision like any other, and
-            # it is recorded like any other (RF-09) — the same answer
-            # `apply_correction` gives to a correction back to the value a datum
-            # already had. The one case that leaves no line is the one where
-            # nothing was loaded: a standing correction holds this amount back on
-            # purpose, and writing «cargó 1500» over a value the screen never
-            # showed would be a line of the log that contradicts the screen it
-            # explains.
-            await self._record_manual_load(
-                entity_type=PRICE_ENTITY,
-                entity_id=str(product.id),
-                field=PRICE_FIELD,
-                old_value=previous,
-                new_value=price,
-                actor_user_id=actor_user_id,
-                moment=decided_at,
-            )
+        # Recorded whether or not the number moved: somebody confirming the
+        # amount already in force took a manual decision like any other, and it
+        # is recorded like any other (RF-09) — the same answer `apply_correction`
+        # gives to a correction back to the value a datum already had.
+        #
+        # Unconditional, and that is the point. The case that used to leave no
+        # line — a standing correction holding the amount back — splits in two
+        # now, and neither half wants a guard here: the amount that contradicts
+        # the correction never reaches this line, because the write refused it,
+        # and the amount that equals it is somebody confirming the price the
+        # screen shows, which is the paragraph above. Guarding this call was how
+        # the write and the log agreed to stay quiet together.
+        await self._record_manual_load(
+            entity_type=PRICE_ENTITY,
+            entity_id=str(product.id),
+            field=PRICE_FIELD,
+            old_value=previous,
+            new_value=price,
+            actor_user_id=actor_user_id,
+            moment=decided_at,
+        )
 
     async def discontinue(self, product_id: int) -> None:
         """Give a product up for discontinued (RF-31)."""
@@ -1406,6 +1421,76 @@ class CatalogService:
         )
 
     @staticmethod
+    def _held_back_by_a_correction(
+        *, product: Product, correction: Correction, rejected: Decimal
+    ) -> ConflictError:
+        """Build the refusal for an amount a standing correction does not let through.
+
+        A `ConflictError` and not a `ValidationError`: the number is a number,
+        the product is there and the permission was granted. What stands in the
+        way is the state of the row — which is what a 409 says and what a 422
+        would deny.
+
+        Three sentences, and each one earns its place (`ERR-02`): what happened
+        and what the price says instead, that the case did **not** leave the
+        queue, and the two ways out — either of which actually empties it. This
+        refusal reaches somebody who, until it existed, was told «Caso
+        resuelto»; a message that only said «rechazado» would leave them
+        exactly as lost, one word later, and one that named a remedy leaving
+        the case stuck forever would be the same lie with more steps.
+
+        Both ways out are real, and that is checked, not assumed. Typing the
+        amount already in force gets through this very method — an equal number
+        contradicts nothing — and closes the case. Changing the correction
+        moves what «in force» means, so the amount that was refused becomes the
+        amount that goes through on the second try. What does **not** work is
+        undoing the correction and stopping there, and that is why the sentence
+        ends «y volver a cargarlo acá».
+
+        It says *what has to be done*, never *«podés hacerlo»*, with one
+        exception it is entitled to: «cargá ese mismo importe» is addressed to
+        somebody who by definition just loaded one, on the screen that let
+        them. Changing the correction stays impersonal — emptying the queue is
+        `PRICES` in writing and correcting is `PRODUCT_CATALOG` in writing, and
+        those are not the same set of people: purchasing resolves these cases
+        and may not touch a correction. The screen knows who is reading and
+        says whose door it is; this module cannot see the role.
+
+        The date is read on the shop's clock, not on UTC: a correction made at
+        nine at night in Buenos Aires belongs to that day and not to the next
+        one. The amount goes out raw, the way `_jsonable` stored it: no error
+        message of this backend formats money, and a `$1.200` written here
+        would be a second money format nobody ever compares with the browser's.
+        The exact values travel in `details` so a screen can rewrite the whole
+        sentence with its own formatter if it ever wants to.
+
+        `corrected_by_user_id` travels too, and unresolved: naming the person
+        would take reading `identity` from here, which is the import the
+        Artículo IV forbids. `triage/routes.py` resolves it at the HTTP edge,
+        where the one file of `identity` that may be crossed lives; this module
+        says the id and stops.
+        """
+        when = correction.corrected_at.astimezone(BUSINESS_TIME_ZONE).strftime("%d/%m/%Y")
+        return ConflictError(
+            f"El precio de este producto está corregido a mano desde el {when} y dice "
+            f"{correction.corrected_value}, así que no se guardó el importe que cargaste "
+            "y el caso sigue en la cola. Si ese es el precio correcto, cargá ese mismo "
+            "importe y el caso se cierra sin tocar la corrección. Si no lo es, hay que "
+            "cambiar la corrección, con un motivo, en la ficha del producto, y volver "
+            "a cargarlo acá.",
+            details={
+                "product_id": product.id,
+                "product_code": product.code,
+                "field": PRICE_FIELD,
+                "correction_id": correction.id,
+                "corrected_value": correction.corrected_value,
+                "corrected_at": correction.corrected_at,
+                "corrected_by_user_id": correction.corrected_by_user_id,
+                "rejected_value": CatalogService._jsonable(rejected),
+            },
+        )
+
+    @staticmethod
     def _as_text(value: Any, field: str, *, limit: int | None = None) -> str:
         """Read a value as the text its field holds, or refuse it.
 
@@ -1591,6 +1676,19 @@ class CatalogService:
     ) -> tuple[bool, bool]:
         """Write the price in force. Returns (it changed, it is highlighted).
 
+        Or **raises**, in the one case where it cannot write and nobody should
+        be told otherwise: an amount somebody typed that **disagrees** with a
+        price a correction already holds. An amount equal to the one in force
+        contradicts nothing, so it goes through and writes nothing — that is
+        what keeps a case whose price is corrected from being unclosable, since
+        `triage` has no other road to `RESOLVED` than a decision that gets past
+        here. The refusal lives here and not in the caller because this is where
+        the skip actually happens and where the compiler makes the choice
+        explicit — the branch that writes from the portal is right beside it. A
+        caller-side check would leave this method's `else` mute again, and the
+        next non-portal writer would inherit the silence without being told,
+        which is exactly how the defect was born.
+
         A price that did not change adds no point to the history (RF-22) and
         keeps the date on which it was registered: that date is what the screen
         shows next to a product that did not come in today's list (RF-08).
@@ -1652,16 +1750,37 @@ class CatalogService:
                     against=corrected_price.portal_value,
                     moment=moment,
                 )
-            else:
+            elif not self._same(PRICE_FIELD, price, corrected_price.corrected_value):
                 # A person's number arriving through the review queue instead
-                # of through the corrections door. It is not applied — the
-                # correction is what the screen shows, and moving it takes a
-                # reason (RF-11) — and it is said out loud instead of dropped
-                # in silence (Artículo II).
-                logger.info(
-                    "A manual price was held back by a standing correction",
+                # of through the corrections door, and **disagreeing** with what
+                # the correction says. It is not applied — the correction is
+                # what the screen shows, and moving it takes a reason (RF-11) —
+                # and the person is **refused**, not informed afterwards: this
+                # used to log the fact and carry on, so the screen said «Caso
+                # resuelto» over an amount that was never written and never
+                # logged. That is the silent loss the Artículo II forbids, and
+                # the refusal is what makes it impossible: a handler that raises
+                # aborts the transaction of whoever published (`GEN-09`), so the
+                # case `triage` was resolving stays pending along with it.
+                logger.warning(
+                    "A manual price was refused by a standing correction",
                     extra={"product_id": product.id, "correction_id": corrected_price.id},
                 )
+                raise self._held_back_by_a_correction(
+                    product=product, correction=corrected_price, rejected=price
+                )
+            # The same number is not a contradiction, and refusing it was
+            # leaving the queue with a case nobody could ever empty: the only
+            # road to `RESOLVED` is a decision that gets past this line, so a
+            # row whose price a correction holds would have stayed pending
+            # forever, counted every morning, whatever anybody did about it.
+            # Confirming the amount already in force is a decision like any
+            # other — `apply_correction` answers a correction back to the value
+            # a datum already had exactly this way — and nothing is overwritten
+            # by writing nothing. The line `set_price_by_code` leaves afterwards
+            # reads «cargó 1200» over a screen that says 1200, which is the
+            # agreement between the log and the screen the old silence was
+            # protecting by staying quiet about both.
             # A correction on the amount freezes the whole row, currency
             # included, and that is deliberate: the unit belongs to the number,
             # and pinning a new one onto an amount the portal never reported

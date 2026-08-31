@@ -155,9 +155,32 @@ motivo argumentado que el documento no registra.
 - **La regla del motivo obligatorio se cumple sin excepción en la 003.** Pero código posterior ya
   la viola: las operaciones de categorías publican su línea de bitácora **sin motivo**. Es de otra
   feature, y conviene saberlo antes de que se multiplique.
-- **Una escritura del sistema sobre un importe con corrección vigente queda frenada y sólo se
-  registra en el log.** Roza el Artículo II —«un sistema que descarta en silencio le miente a
-  quien lo mira»—. Ya estaba anotado en `tasks.md` como decisión de negocio pendiente.
+- ~~**Una escritura del sistema sobre un importe con corrección vigente queda frenada y sólo se
+  registra en el log.**~~ **Resuelto el 2026-08-31.** Era lo que decía este bullet: la carga se
+  salteaba, no dejaba línea de bitácora y la pantalla igual contestaba «Caso resuelto». Rozaba el
+  Artículo II —«un sistema que descarta en silencio le miente a quien lo mira»— y estaba anotado
+  también en `tasks.md` como decisión de negocio pendiente.
+
+  **Quién y qué decidió.** El *human in the loop*, el **2026-08-31**, entre tres salidas —aplicar
+  y pisar la corrección, **rechazar avisando**, o aceptar así y dejar de decir «resuelto»— eligió
+  la del medio.
+
+  **Qué hace el sistema ahora.** Un importe que **contradice** la corrección vigente se rechaza
+  con un `ConflictError` (409): `CatalogService._register_price` levanta, el handler de
+  `QuarantineCaseResolved` propaga, y como un handler que falla aborta a quien publicó (`GEN-09`),
+  `triage` nunca llega a su `commit()` — el caso **sigue pendiente** en vez de cerrarse en falso.
+  El mensaje dice desde cuándo está corregido el precio, cuánto dice, que el caso sigue en la cola
+  y las dos salidas que sí lo vacían: cargar ese mismo importe, o cambiar la corrección en la
+  ficha del producto y volver a cargarlo. El `details` lleva `product_id`, `correction_id`,
+  `corrected_value` y `corrected_by_user_id`; el nombre de quien corrigió lo resuelve
+  `triage/routes.py` con `ActorDirectory` —`catalog` no puede nombrar a nadie sin violar el
+  Artículo IV—, y la tarjeta de `/revision` imprime «La corrección la hizo Julián» con los enlaces
+  para verla o cambiarla, o dice quién puede cambiarla cuando quien lee no puede.
+
+  **Un importe igual al corregido no es una contradicción**: pasa sin escribir nada y cierra el
+  caso, con su línea de bitácora. Sin eso el rechazo dejaba en la cola una fila que nadie podía
+  vaciar nunca —`TriageService.resolve` es el único camino a `RESOLVED` y pasa por esa escritura—,
+  que es el defecto opuesto y del mismo tamaño.
 - **Ninguna credencial se guarda hoy**, y está verificado: el catálogo de parámetros es cerrado y
   los campos corregibles son tres. Pero la bitácora es un canal genérico con texto libre; el
   riesgo es de diseño futuro, no de este código.

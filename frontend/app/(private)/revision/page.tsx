@@ -1,8 +1,10 @@
 import Link from 'next/link'
 
+import { getSession } from '@/app/actions/auth'
 import { CaseCard } from '@/components/triage/CaseCard'
 import { RuleList } from '@/components/triage/RuleList'
 import { fetchFromApi } from '@/lib/api/server'
+import { canEdit } from '@/lib/auth/permissions'
 import type { CaseList, Rule } from '@/lib/triage/types'
 
 export const metadata = {
@@ -18,10 +20,18 @@ export const metadata = {
  * instead of growing.
  */
 export default async function ReviewPage() {
-  const [cases, rules] = await Promise.all([
+  const [session, cases, rules] = await Promise.all([
+    getSession(),
     fetchFromApi<CaseList>('/triage/cases?limit=100'),
     fetchFromApi<Rule[]>('/triage/rules'),
   ])
+  // Asked here so a card can offer the second door when a load is refused by a
+  // correction in force. It is not the permission that opens this screen:
+  // emptying the queue is `PRICES` in writing and purchasing has it, replacing
+  // a correction is `PRODUCT_CATALOG` in writing and purchasing does not. The
+  // backend refuses either way; this only keeps a link off the card that would
+  // answer 403.
+  const mayCorrect = session !== null && canEdit(session.permissions, 'PRODUCT_CATALOG')
 
   if (cases === null) {
     return (
@@ -57,7 +67,7 @@ export default async function ReviewPage() {
             motivo.
           </p>
         ) : (
-          cases.items.map(item => <CaseCard key={item.id} item={item} />)
+          cases.items.map(item => <CaseCard key={item.id} item={item} mayCorrect={mayCorrect} />)
         )}
       </section>
 

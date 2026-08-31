@@ -205,9 +205,13 @@ correspondía arreglar, anotadas acá para que no se pierdan.
 
 - **Reenviar el valor que un parámetro ya tenía** responde 200 y escribe una línea de bitácora con
   `old_value == new_value`. La spec no resuelve el caso. El test lo deja enunciado sin avalarlo.
-- **Una escritura del sistema sobre un importe con corrección vigente queda frenada** — hoy se
-  registra y no se aplica. Si el negocio quiere que una persona pueda pisar su propia corrección
-  desde la cola de revisión, eso exige un motivo (RF-11) y por lo tanto es una decisión de alcance.
+- ~~**Una escritura del sistema sobre un importe con corrección vigente queda frenada** — hoy se
+  registra y no se aplica.~~ **Contestada por el humano el 2026-08-31: se rechaza avisando.** Nadie
+  pisa una corrección desde la cola —eso seguiría exigiendo un motivo (RF-11)—: el importe que
+  contradice la corrección se rechaza con un 409 que explica desde cuándo está corregido el precio,
+  cuánto dice y qué hacer, el caso queda pendiente en vez de cerrarse en falso, y un importe igual
+  al corregido pasa sin escribir nada y cierra el caso. El detalle de lo construido está en
+  `converge.md`, en «Tres cosas que el converge miró y no son hallazgos de esta feature».
 
 **Un error de cuenta que se repite en tres lugares**
 

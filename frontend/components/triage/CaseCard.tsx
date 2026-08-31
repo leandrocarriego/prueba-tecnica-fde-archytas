@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { resolveCase } from '@/app/actions/triage'
@@ -12,11 +13,52 @@ import { caseKindLabel, type Case } from '@/lib/triage/types'
 
 interface CaseCardProps {
   item: Case
+  /**
+   * Whether this person may change a correction, which is a different question
+   * from whether they may empty this queue. Resolving a case is `PRICES` in
+   * writing — the owner and purchasing; correcting a value is `PRODUCT_CATALOG`
+   * in writing — the owner and sales. So purchasing reaches this screen and
+   * cannot take that door, and offering it anyway would be a link that answers
+   * 403. Whoever cannot take it is told who can, rather than left in front of
+   * an instruction with nobody attached to it.
+   */
+  mayCorrect: boolean
 }
 
 function payloadText(item: Case, key: string): string {
   const value = item.payload[key]
   return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+}
+
+/** The correction a refusal is about: where to look at it, and who made it. */
+interface RefusedByCorrection {
+  productId: number
+  correctedBy: string | null
+}
+
+/**
+ * That correction, when the refusal was about one.
+ *
+ * Hung on `correction_id`, which only this refusal carries, and not on
+ * `product_id`, which several carry. Deciding by the product would light the
+ * links up under refusals that have nothing to do with a correction — a
+ * `missing_product` case whose product a revoked rule removed answers 404 with
+ * a `product_id` in it, and the card would offer «Ver la corrección» for a
+ * correction that does not exist, on a page that answers 404 too.
+ *
+ * `details` is whatever the backend put in the envelope, so every key is asked
+ * rather than trusted. A refusal with nothing in it — the session expired, the
+ * API did not answer — leaves the message on its own, which is still the whole
+ * of what RF-22 asks for.
+ */
+function refusedByCorrection(
+  details: Record<string, unknown> | undefined
+): RefusedByCorrection | null {
+  if (typeof details?.correction_id !== 'number') return null
+  const productId = details.product_id
+  if (typeof productId !== 'number') return null
+  const correctedBy = details.corrected_by_name
+  return { productId, correctedBy: typeof correctedBy === 'string' ? correctedBy : null }
 }
 
 /**
@@ -38,16 +80,22 @@ function payloadText(item: Case, key: string): string {
  * its own state. That confirmation is announced to the toaster in the root
  * layout, which is the only thing still on screen once the card is gone.
  */
-export function CaseCard({ item }: CaseCardProps) {
+export function CaseCard({ item, mayCorrect }: CaseCardProps) {
   const router = useRouter()
   const { addToast } = useToast()
   const [price, setPrice] = useState(payloadText(item, 'price'))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Kept beside the message and not folded into it: a refusal about a
+  // correction turns into a link and a name, and rewriting the sentence here to
+  // slip either one inside it would be this component editing text the backend
+  // wrote.
+  const [refused, setRefused] = useState<RefusedByCorrection | null>(null)
 
   async function decide(decision: Record<string, unknown>) {
     setSaving(true)
     setError(null)
+    setRefused(null)
     const result = await resolveCase(item.id, decision)
     setSaving(false)
     if (result.ok) {
@@ -60,6 +108,7 @@ export function CaseCard({ item }: CaseCardProps) {
       return
     }
     setError(result.message)
+    setRefused(refusedByCorrection(result.details))
   }
 
   return (
@@ -157,7 +206,46 @@ export function CaseCard({ item }: CaseCardProps) {
         )}
       </div>
 
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {/*
+        The refusal, then who is behind it, then where to go about it. The card
+        stays exactly where it was — the case was not resolved, so `/revision`
+        still lists it — and the amount the person typed is still in the field
+        above, which is the difference between being told and being sent back to
+        the start.
+
+        Whoever may not change a correction is told who may, instead of being
+        left in front of an instruction with nobody attached to it: the message
+        says the correction has to be changed, and purchasing — who empties this
+        queue — cannot change one. Hiding the link and saying nothing else would
+        be half the decision.
+      */}
+      {error && (
+        <div className="space-y-2 text-sm">
+          <p className="text-red-700">{error}</p>
+          {refused !== null && (
+            <>
+              {refused.correctedBy !== null && (
+                <p className="text-red-700">La corrección la hizo {refused.correctedBy}.</p>
+              )}
+              <p className="flex flex-wrap gap-4">
+                <Link className="underline" href={`/precios/${refused.productId}`}>
+                  Ver la corrección
+                </Link>
+                {mayCorrect && (
+                  <Link className="underline" href={`/precios/${refused.productId}#correcciones`}>
+                    Cambiarla
+                  </Link>
+                )}
+              </p>
+              {!mayCorrect && (
+                <p className="text-muted-foreground">
+                  Cambiar una corrección es de quien maneja el catálogo: el dueño o ventas.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </article>
   )
 }

@@ -18,8 +18,25 @@ const API_PREFIX = '/api/v1'
 const UNREACHABLE = 'No se pudo contactar al servidor'
 const NO_SESSION = 'La sesión expiró. Iniciá sesión de nuevo'
 
-/** What every action answers: it worked, or why it did not. */
-export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: string }
+/**
+ * What every action answers: it worked, or why it did not.
+ *
+ * `details` is the second half of the refusal — the `details` of the envelope
+ * `app.main` builds, untouched. Optional because most refusals are a sentence
+ * and nothing else, and because the action files that still keep their own copy
+ * of this client build this same shape by hand: making it required would have
+ * been a compile error in each of them for a field they have nothing to put in.
+ * How many of them there are is left uncounted on purpose: every one is on its
+ * way here, so a number written down would be wrong by the next migration.
+ *
+ * It exists because a message is not always enough to act on. A load refused by
+ * a standing correction names a product the person then has to go and look at,
+ * and the id of that product is in `details` — turning a sentence the screen can
+ * only print into one it can also link.
+ */
+export type ActionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; message: string; details?: Record<string, unknown> }
 
 /** An object whose keys can be asked about, told apart from `null` and the rest. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -43,6 +60,22 @@ function refusalMessage(body: unknown): string | null {
   const error = body.error
   if (!isRecord(error)) return null
   return typeof error.message === 'string' ? error.message : null
+}
+
+/**
+ * The `details` beside that message, asked for the same way and for the same reason.
+ *
+ * It comes back as `Record<string, unknown>` and not as anything narrower: the
+ * keys differ per refusal — a product id here, a range of valid values there —
+ * and every reader has to look at what it wants anyway. Promising a shape none
+ * of them share would be the assertion this file already refuses to make about
+ * `message`.
+ */
+function refusalDetails(body: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(body)) return undefined
+  const error = body.error
+  if (!isRecord(error)) return undefined
+  return isRecord(error.details) ? error.details : undefined
 }
 
 /**
@@ -73,7 +106,13 @@ export async function callApi<T>(path: string, init: RequestInit): Promise<Actio
     if (response.status === 204) return { ok: true, data: undefined as T }
 
     const body: unknown = await response.json()
-    if (!response.ok) return { ok: false, message: refusalMessage(body) ?? UNREACHABLE }
+    if (!response.ok) {
+      return {
+        ok: false,
+        message: refusalMessage(body) ?? UNREACHABLE,
+        details: refusalDetails(body),
+      }
+    }
     return { ok: true, data: body as T }
   } catch {
     return { ok: false, message: UNREACHABLE }

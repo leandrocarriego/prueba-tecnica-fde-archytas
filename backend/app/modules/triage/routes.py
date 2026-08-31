@@ -12,7 +12,14 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.modules.identity.dependencies import CurrentUser, Level, Section, require_section
+from app.modules.identity.dependencies import (
+    ActorDirectory,
+    ActorDirectoryDep,
+    CurrentUser,
+    Level,
+    Section,
+    require_section,
+)
 from app.modules.triage.models import CaseStatus
 from app.modules.triage.schemas import (
     CaseList,
@@ -22,6 +29,7 @@ from app.modules.triage.schemas import (
     RuleRead,
 )
 from app.modules.triage.service import TriageService
+from app.shared.errors import DomainError
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -74,6 +82,7 @@ async def resolve_case(
     payload: ResolutionRequest,
     current_user: CurrentUser,
     service: TriageDep,
+    directory: ActorDirectoryDep,
 ) -> CaseRead:
     """The owner and purchasing.
 
@@ -81,14 +90,53 @@ async def resolve_case(
     person who took the decision, and a body could name somebody else. The name
     travels as a plain string — the first name, which is how the business names
     these people — and not as a user of another module (Artículo IV).
+
+    A refusal on the way out gets one more name put on it, and that is why this
+    route knows about `identity` at all: a decision this queue publishes can be
+    turned away by whoever handles the event, and the one refusal that happens
+    for a *human* reason — an amount somebody already corrected — names that
+    somebody by id, because the module that raised it may not read `identity`.
+    Here it may: `dependencies.py` is the one file of `identity` a module is
+    allowed to cross, and this is the same trip `operations` makes to put a name
+    beside each line of the history.
     """
-    return await service.resolve(
-        case_id,
-        decision=payload.decision,
-        user_id=current_user.id,
-        user_name=current_user.name,
-        remember=payload.remember,
-    )
+    try:
+        return await service.resolve(
+            case_id,
+            decision=payload.decision,
+            user_id=current_user.id,
+            user_name=current_user.name,
+            remember=payload.remember,
+        )
+    except DomainError as refusal:
+        await _name_whoever_corrected(refusal, directory)
+        raise
+
+
+async def _name_whoever_corrected(refusal: DomainError, directory: ActorDirectory) -> None:
+    """Put a name next to the id a refusal carries, when it carries one.
+
+    `catalog` refuses an amount a correction holds back and says «está corregido
+    a mano», with `corrected_by_user_id` in `details` and no name: naming the
+    person from there would be the import the Artículo IV forbids. What the
+    person reading the screen was promised is «hay una corrección de Julián», so
+    the id is turned into a name here, at the edge, exactly the way
+    `operations.routes._name_the_authors` does it for the history.
+
+    Silent about anything else on purpose. A refusal that carries no such id —
+    a case already resolved, a product that is not there — passes through
+    untouched, and an id whose account is gone leaves the sentence as it was
+    rather than inventing an empty name. It runs on a transaction that is
+    already going to be rolled back and only reads from it: the refusal is
+    re-raised untouched apart from the name, and `get_session` throws the rest
+    away.
+    """
+    user_id = refusal.details.get("corrected_by_user_id")
+    if not isinstance(user_id, int):
+        return
+    name = (await directory.names_for([user_id])).get(user_id)
+    if name is not None:
+        refusal.details["corrected_by_name"] = name
 
 
 @router.get(

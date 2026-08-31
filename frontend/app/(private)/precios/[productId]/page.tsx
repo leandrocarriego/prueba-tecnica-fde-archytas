@@ -131,8 +131,17 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
         </section>
       )}
 
+      {/*
+        `id` so a link can land here and not at the top of the page. The review
+        queue sends people to it by name: a load refused by a correction in
+        force says the correction has to be changed for the amount to move, and
+        this is where that is done — correcting it again, which is what leaves
+        another value in force. An anchor and not a route, because the block is
+        one section of the product's own screen and pulling it into a page of
+        its own would split the correction from the value it is about.
+      */}
       {mayCorrect && (
-        <section className="space-y-3 rounded border p-4">
+        <section className="space-y-3 rounded border p-4" id="correcciones">
           <h2 className="text-lg font-medium">Corregir a mano</h2>
           <p className="text-sm text-muted-foreground">
             Lo que el portal informó se conserva siempre. Cada corrección queda registrada con tu
