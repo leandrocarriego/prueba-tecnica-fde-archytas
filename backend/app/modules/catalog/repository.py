@@ -469,6 +469,26 @@ class CatalogRepository:
             found.setdefault(int(product_id), int(quantity))
         return found
 
+    async def products_without_a_price_in(self, since: date | None, until: date | None) -> int:
+        """Active products with no published price inside the window (RF-46 of 009).
+
+        They are what the price curve leaves out: the average of a month is the
+        average of the points there are, and a product the supplier did not
+        price in the whole window contributes nothing to any of them. Saying how
+        many is the difference between a curve and a curve you can trust.
+        """
+        priced = select(PricePoint.product_id)
+        if since is not None:
+            priced = priced.where(PricePoint.changed_at >= since)
+        if until is not None:
+            priced = priced.where(PricePoint.changed_at <= until)
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Product)
+            .where(Product.status == ProductStatus.ACTIVE, Product.id.not_in(priced))
+        )
+        return int(result.scalar_one())
+
     async def products_first_seen_between(
         self, since: date | None, until: date | None
     ) -> list[Product]:

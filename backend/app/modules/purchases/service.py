@@ -18,6 +18,7 @@ specs rather than from taste.
 """
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -27,11 +28,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.purchases.models import (
+    INCONSISTENT,
+    PARTIAL,
+    SETTLED,
+    UNPAID,
     DueDate,
     DueDateChange,
     DueDateOrigin,
     Invoice,
     InvoiceDocument,
+    InvoiceOrder,
     InvoiceReviewState,
     OrderReviewState,
     Payment,
@@ -59,13 +65,16 @@ from app.modules.purchases.schemas import (
     PurchaseOrderRead,
     ReceiptRead,
     SupplierAliasRead,
+    SupplierCorrectionMark,
     SupplierList,
     SupplierRead,
     SupplierTotalsRead,
 )
+from app.shared.corrections import CorrectionStatus
 from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
     AuditAction,
+    CorrectionConflicted,
     DueDateChanged,
     InvoiceDueDateRescheduled,
     InvoiceReviewCase,
@@ -83,8 +92,9 @@ from app.shared.events import (
     RegisteredInvoice,
     events,
 )
+from app.shared.parameters import initial_value
 from app.shared.sections import BusinessSection
-from app.shared.text import normalize_entity_name
+from app.shared.text import normalize_entity_name, only_digits
 from app.shared.time import BUSINESS_TIME_ZONE
 
 logger = get_logger(__name__)
@@ -98,9 +108,19 @@ PAYMENT_UNASSIGNED = "payment_unassigned"
 
 # How this module names its own rows in the one log of the platform, and which
 # part of the business they belong to.
+DUE_DATE_ENTITY = "purchases.due_date"
 SUPPLIER_ENTITY = "purchases.supplier"
 INVOICE_ENTITY = "purchases.invoice"
 PURCHASING_SECTION = BusinessSection.PURCHASING
+
+# The fields of a supplier's card a person may correct (RF-16 of 004). The legal
+# name and the tax id are deliberately not among them (RF-17), and neither is
+# the balance: it is the portal's arithmetic, not a contact detail.
+#
+# The tuple is here and not beside the endpoint because it governs two places
+# that have to agree — what a correction may be written over, and what a later
+# reading of the register is not allowed to overwrite (RF-19).
+CORRECTABLE_SUPPLIER_FIELDS: tuple[str, ...] = ("email", "phone", "payment_term_days")
 
 # What a person reads next to a held row. In Spanish, like every user-facing
 # string of the platform.
@@ -115,6 +135,14 @@ VOUCHER_SEVERAL_INVOICES = "El comprobante cubre más de una factura"
 VOUCHER_LOOKS_MANUAL = "Coincide con un pago cargado a mano"
 
 NO_SUCH_INVOICE = "No encontramos esa factura"
+NO_SUCH_ORDER = "No encontramos esa orden"
+ORDER_NOT_HELD = "Esa orden no está apartada para revisión"
+NO_INVOICE_FILE = "Todavía no tenemos el archivo de esa factura"
+INVOICE_NUMBER_TAKEN = "Ese número ya es de otra factura de este proveedor"
+# Why a header field of an invoice changed. Every correction of RF-31 comes
+# from the same place — somebody looking at the excerpt of the document in the
+# review queue — so the log says that once instead of asking for it every time.
+INVOICE_RESOLVED_BY_HAND = "Corregido al resolver la factura en revisión"
 NO_SUCH_SUPPLIER = "No encontramos ese proveedor"
 NO_SUCH_PAYMENT = "No encontramos ese pago"
 NO_SUCH_DUE_DATE = "No encontramos ese vencimiento"
@@ -126,14 +154,10 @@ RECEIPT_ALREADY_VOIDED = "El recibo ya está anulado"
 PORTAL_PAYMENT_IS_NOT_UNDONE = "Un pago traído del portal no se puede dejar sin efecto"
 PAYMENT_OVER_BALANCE = "El pago supera el saldo de la factura"
 SPLIT_DOES_NOT_ADD_UP = "Las partes no suman el monto del comprobante"
+SPLIT_CROSSES_SUPPLIERS = "Un comprobante no se reparte entre facturas de dos proveedores"
+SPLIT_IS_ANOTHER_SUPPLIER = "Esas facturas son de otro proveedor, no del que pagó"
 INVOICE_FROM_A_LIST_IS_NOT_REMOVED = "Un vencimiento que viene de una factura no se elimina"
 MOVING_INTO_THE_PAST = "La fecha nueva ya pasó"
-
-# The states a screen shows, computed from the payments imputed (RF-01 of 005).
-SETTLED = "SALDADA"
-PARTIAL = "PARCIAL"
-UNPAID = "SIN_PAGOS"
-INCONSISTENT = "INCONSISTENTE"
 
 # What the portal calls the same three, so the two can be compared (RF-46).
 PORTAL_STATES: dict[str, str] = {
@@ -147,6 +171,19 @@ MATCH_THRESHOLD_KEY = "supplier_match.threshold_pct"
 RECEIPT_NOTICE_KEY = "receipt.notice_days"
 STALLED_DAYS_KEY = "purchase_order.stalled_days"
 REPEAT_WINDOW_KEY = "purchase_order.repeat_window_days"
+
+# What an invoice document is served as when the portal did not say. A browser
+# handed an unknown type offers to save the file, which is the harmless end of
+# guessing wrong.
+DEFAULT_FILE_TYPE = "application/octet-stream"
+# The extension each content type gets when the file is handed over, so what
+# lands in Descargas opens by double-clicking it.
+FILE_EXTENSIONS: tuple[tuple[str, str], ...] = (
+    ("pdf", ".pdf"),
+    ("spreadsheet", ".xlsx"),
+    ("excel", ".xlsx"),
+    ("csv", ".csv"),
+)
 
 # How far ahead of the runner-up a match has to be before it counts as certain.
 # Two suppliers of this register read alike — `Ferretera del Norte SRL` and
@@ -182,6 +219,27 @@ def today_here() -> date:
     return datetime.now(UTC).astimezone(BUSINESS_TIME_ZONE).date()
 
 
+@dataclass(frozen=True, slots=True)
+class InvoiceFile:
+    """The document of an invoice, ready to be handed to a browser (RF-04)."""
+
+    content: bytes
+    content_type: str
+    filename: str
+
+
+def _filename_for(number: str, content_type: str | None) -> str:
+    """What the file is called once it leaves the platform.
+
+    `Factura F-8411.pdf` and not the opaque name the portal used: whoever opens
+    it is going to have it sitting in a folder afterwards, and the invoice
+    number is the only thing they will search that folder by.
+    """
+    kind = (content_type or "").lower()
+    extension = next((suffix for token, suffix in FILE_EXTENSIONS if token in kind), "")
+    return f"Factura {number}{extension}"
+
+
 class PurchasesService:
     """Registers invoices, resolves who they are from, and answers what is owed."""
 
@@ -197,14 +255,23 @@ class PurchasesService:
         Every legal name of the register also becomes a spelling of itself, so
         an invoice that arrives written exactly as the register writes it
         resolves without anybody being asked.
+
+        «Exactly as it publishes it» stops at a field somebody corrected by
+        hand: a correction in force holds, and a reading that contradicts it is
+        reported instead of applied (RF-19). It is the same mechanism 003 built
+        for a price, reused here rather than rebuilt — the correction lives in
+        this module's own table precisely so these lines can ask it without
+        asking another module anything.
         """
+        moment = datetime.now(UTC)
         for card in suppliers:
+            held = await self._corrections_holding(card, moment=moment)
             supplier = await self.purchases.put_supplier(
                 legal_name=card.legal_name,
                 tax_id=card.tax_id,
-                email=card.email,
-                phone=card.phone,
-                payment_term_days=card.payment_term_days,
+                email=None if "email" in held else card.email,
+                phone=None if "phone" in held else card.phone,
+                payment_term_days=(None if "payment_term_days" in held else card.payment_term_days),
                 balance=card.balance,
             )
             await self.purchases.put_alias(
@@ -213,7 +280,148 @@ class PurchasesService:
                 supplier_id=supplier.id,
                 source=SupplierAliasSource.OBSERVED,
             )
+            # El plazo puede haber aparecido recién ahora, y de él sale el
+            # vencimiento de todas sus facturas (RF-26).
+            await self._refresh_due_dates(supplier)
         logger.info("Supplier register updated", extra={"suppliers": len(suppliers)})
+
+    async def _refresh_due_dates(self, supplier: Supplier) -> None:
+        """Recompute the due dates of a supplier's invoices from its term (RF-26).
+
+        The due date of an invoice **is** `issued_on + payment_term_days`, and
+        the column the portal publishes only stands in while the term is not
+        known. So the day the term appears — the register finally expands that
+        row, or somebody corrects it by hand — every invoice of that supplier
+        that was carrying the stand-in is still carrying it, and nothing was
+        putting it right: the recomputation only ever happened when a held
+        invoice was resolved.
+
+        That is not a cosmetic gap. The due date is what the receipt deadline
+        (RF-34), the ageing buckets (RF-25) and the average delay (RF-27) are
+        all measured against, so one wrong date quietly wrongs three numbers
+        the owner reads to decide whether they are keeping their word.
+
+        **A date a person rescheduled is not touched**, the same rule the
+        calendar and the register already follow: a decision somebody took is
+        not undone by a later reading.
+        """
+        if supplier.payment_term_days is None:
+            return
+        moved = 0
+        for invoice in await self.purchases.invoices_of_supplier(supplier.id):
+            expected = invoice.issued_on + timedelta(days=supplier.payment_term_days)
+            if invoice.due_on == expected:
+                continue
+            entry = await self.purchases.due_date_of_invoice(invoice.id)
+            if entry is not None and entry.was_rescheduled:
+                continue
+            invoice.due_on = expected
+            if invoice.original_due_on is None:
+                invoice.original_due_on = expected
+            await self.session.flush()
+            await self._sync_due_date(invoice)
+            moved += 1
+        if moved:
+            logger.info(
+                "Due dates recomputed from the agreed term",
+                extra={"supplier_id": supplier.id, "invoices": moved},
+            )
+
+    async def _corrections_holding(
+        self, card: NormalizedSupplier, *, moment: datetime
+    ) -> frozenset[str]:
+        """The fields of this card the portal is not allowed to write (RF-19).
+
+        A supplier the register publishes for the first time has nothing
+        standing on it, and neither has one nobody ever corrected: the common
+        morning costs one lookup and writes exactly what it wrote before.
+
+        A field the register did **not** publish this time is not a
+        contradiction — it is silence, and silence disagrees with nobody
+        (`put_supplier` already leaves those alone).
+        """
+        supplier = await self.purchases.supplier_named(card.legal_name)
+        if supplier is None:
+            return frozenset()
+
+        held: set[str] = set()
+        for correction in await self.purchases.corrections_in_force([str(supplier.id)]):
+            if (
+                correction.entity_type != SUPPLIER_ENTITY
+                or correction.field not in CORRECTABLE_SUPPLIER_FIELDS
+            ):
+                continue
+            held.add(correction.field)
+            incoming = getattr(card, correction.field, None)
+            if incoming is not None:
+                await self._check_supplier_conflict(correction, incoming=incoming, moment=moment)
+        return frozenset(held)
+
+    async def _check_supplier_conflict(
+        self, correction: PurchaseCorrection, *, incoming: Any, moment: datetime
+    ) -> None:
+        """Compare what the register brings against what it used to say (RF-19).
+
+        Three outcomes, and none of them touches the corrected value:
+
+        * the register repeats what it had said — nothing happened;
+        * it says something else — the correction is flagged and the owner is
+          told, through `CorrectionConflicted` like every other module;
+        * it says the same something else again — already flagged, so no second
+          warning about the same difference.
+
+        The comparison is against `portal_value` and not against the corrected
+        value, and that is the whole point of the rule. Somebody corrects a
+        phone **because** the register has it wrong, and the register goes on
+        publishing the wrong one every morning: measured against the corrected
+        value the owner would be told about the same difference every single
+        day, and would stop reading it long before the day the register really
+        changed its mind.
+        """
+        if self._same_detail(incoming, correction.portal_value):
+            return
+        if (
+            correction.status is CorrectionStatus.CONFLICTED
+            and correction.conflict_value is not None
+            and self._same_detail(incoming, correction.conflict_value)
+        ):
+            return
+
+        correction.status = CorrectionStatus.CONFLICTED
+        correction.conflict_value = incoming
+        correction.conflict_detected_at = moment
+        await self.session.flush()
+        await events.publish(
+            CorrectionConflicted(
+                entity_type=correction.entity_type,
+                entity_id=correction.entity_id,
+                field=correction.field,
+                correction_id=correction.id,
+                original_value=correction.portal_value,
+                corrected_value=correction.corrected_value,
+                incoming_value=incoming,
+            ),
+            self.session,
+        )
+        logger.warning(
+            "The register contradicted a correction",
+            extra={
+                "correction_id": correction.id,
+                "entity_id": correction.entity_id,
+                "field": correction.field,
+            },
+        )
+
+    @staticmethod
+    def _same_detail(left: Any, right: Any) -> bool:
+        """Whether two readings of a contact detail are the same reading.
+
+        Compared as text on purpose: `payment_term_days` comes back from JSONB
+        as an `int` and arrives from the register as an `int`, but a card that
+        was stored when the column held a string would otherwise read as a
+        change that never happened.
+        """
+        return str(left) == str(right)
 
     async def list_suppliers(self) -> SupplierList:
         """The register, with what the portal did not publish marked as missing."""
@@ -221,6 +429,7 @@ class PurchasesService:
         aliases: dict[int, list[SupplierAliasRead]] = defaultdict(list)
         for alias in await self.purchases.aliases():
             aliases[alias.supplier_id].append(SupplierAliasRead.model_validate(alias))
+        marks = await self._supplier_marks([supplier.id for supplier in suppliers])
         items = [
             SupplierRead(
                 id=supplier.id,
@@ -233,6 +442,7 @@ class PurchasesService:
                 missing=self._missing_of(supplier),
                 aliases=aliases.get(supplier.id, []),
                 invoice_count=await self.purchases.count_invoices(supplier_id=supplier.id),
+                corrections=marks.get(supplier.id, []),
             )
             for supplier in suppliers
         ]
@@ -256,7 +466,34 @@ class PurchasesService:
                 if alias.supplier_id == supplier.id
             ],
             invoice_count=await self.purchases.count_invoices(supplier_id=supplier.id),
+            corrections=(await self._supplier_marks([supplier.id])).get(supplier.id, []),
         )
+
+    async def _supplier_marks(
+        self, supplier_ids: list[int]
+    ) -> dict[int, list[SupplierCorrectionMark]]:
+        """What each card's corrections look like on a screen (RF-18, RF-19).
+
+        One query for the whole register rather than one per supplier: the
+        padrón screen walks this once for every card it lists.
+        """
+        marks: dict[int, list[SupplierCorrectionMark]] = defaultdict(list)
+        for correction in await self.purchases.corrections_in_force(
+            [str(supplier_id) for supplier_id in supplier_ids]
+        ):
+            if correction.entity_type != SUPPLIER_ENTITY:
+                continue
+            marks[int(correction.entity_id)].append(
+                SupplierCorrectionMark(
+                    correction_id=correction.id,
+                    field=correction.field,
+                    portal_value=correction.portal_value,
+                    corrected_value=correction.corrected_value,
+                    status=correction.status,
+                    conflict_value=correction.conflict_value,
+                )
+            )
+        return marks
 
     @staticmethod
     def _missing_of(supplier: Supplier) -> list[str]:
@@ -289,11 +526,13 @@ class PurchasesService:
     async def resolve_supplier(self, supplier_text: str) -> tuple[Supplier | None, str | None]:
         """Say which supplier a written name is, or why it cannot be said.
 
-        Two paths, in this order and no other: an exact spelling already known,
-        and then a comparison against the register. There is deliberately **no
-        third path through the tax id** — the only tax id printed on these
-        documents is Cordillera's, the client's, and a reader that took it would
-        assign the same supplier to all hundred invoices.
+        Two paths **here**, in this order and no other: an exact spelling already
+        known, and then a comparison against the register. There is no tax id
+        path in this function on purpose, and the reason is not the trap — it is
+        the timing. The invoices table publishes no tax id column, so the only
+        place a tax id can come from is the file, and the file arrives after the
+        row. RF-11 is therefore answered where the tax id exists, in
+        `_identify_by_tax_id`, and not here where it never would.
 
         A comparison only identifies when it is both close enough and clearly
         ahead of the runner-up. Anything short of that is a case for a person:
@@ -341,10 +580,27 @@ class PurchasesService:
         )
         return supplier, None
 
+    async def _supplier_with_tax_id(self, tax_id: str | None) -> Supplier | None:
+        """The supplier that tax id belongs to, if it belongs to one of ours.
+
+        Compared without punctuation, because `30-70918273-4` and `30709182734`
+        are the same number and which one gets printed is the document's whim.
+        A number that matches nobody in the register identifies nobody: it is
+        not an error and it is not a case for a person, it is simply not an
+        answer, and the name path gets its turn (RF-11).
+        """
+        if not tax_id:
+            return None
+        wanted = only_digits(tax_id)
+        if not wanted:
+            return None
+        for supplier in await self.purchases.suppliers():
+            if supplier.tax_id and only_digits(supplier.tax_id) == wanted:
+                return supplier
+        return None
+
     async def _setting(self, key: str) -> Any:
         """A business parameter, from this module's projection or its initial value."""
-        from app.shared.parameters import initial_value
-
         stored = await self.purchases.setting(key)
         return initial_value(key) if stored is None else stored
 
@@ -376,12 +632,14 @@ class PurchasesService:
                 supplier_text=row.supplier_text,
             )
             if existing is not None:
-                held = await self._count_arrival(existing, row)
+                held = await self._count_arrival(existing, row, batch_id=batch_id)
                 if held is not None:
                     review.append(held)
                 continue
 
-            invoice = await self._create_invoice(row, supplier=supplier, reason=reason)
+            invoice = await self._create_invoice(
+                row, supplier=supplier, reason=reason, batch_id=batch_id
+            )
             if invoice.review_state is InvoiceReviewState.PENDING:
                 review.append(
                     InvoiceReviewCase(
@@ -390,6 +648,7 @@ class PurchasesService:
                         reason=invoice.review_reason or AMBIGUOUS_SUPPLIER,
                         supplier_text=invoice.supplier_text,
                         supplier_key=normalize_entity_name(invoice.supplier_text),
+                        needs_document=True,
                     )
                 )
             elif supplier is not None:
@@ -418,7 +677,12 @@ class PurchasesService:
         )
 
     async def _create_invoice(
-        self, row: NormalizedInvoice, *, supplier: Supplier | None, reason: str | None
+        self,
+        row: NormalizedInvoice,
+        *,
+        supplier: Supplier | None,
+        reason: str | None,
+        batch_id: int,
     ) -> Invoice:
         """Store one invoice, with its due date derived from the agreed term."""
         due_on = self._due_date_for(row, supplier)
@@ -436,6 +700,7 @@ class PurchasesService:
                 portal_receipt_issued=row.receipt_issued,
                 file_kind=row.file_kind,
                 product_code=row.product_code,
+                last_batch_id=batch_id,
                 review_state=(
                     InvoiceReviewState.OK if supplier is not None else InvoiceReviewState.PENDING
                 ),
@@ -461,16 +726,30 @@ class PurchasesService:
         return row.due_on
 
     async def _count_arrival(
-        self, existing: Invoice, row: NormalizedInvoice
+        self, existing: Invoice, row: NormalizedInvoice, *, batch_id: int
     ) -> InvoiceReviewCase | None:
-        """An invoice that arrived again: counted, or held if it disagrees.
+        """An invoice met again: counted only if it really arrived again.
 
-        The same number and the same total is the same invoice arriving twice,
-        and one is kept with a count of how often it came (RF-38, RF-39). The
-        same number with **another total** is not the same invoice and is not a
-        decision this platform gets to take (RF-37).
+        **What counts as an arrival, and why it is not «we saw it again».** The
+        invoices screen is re-read on a schedule and re-normalised *whole*
+        whenever its hash changes — one supplier paying one invoice rewrites
+        one cell and brings the other ninety-nine rows back with it. Counting
+        every meeting made `arrival_count` report how often the page had been
+        read, so with the sync at twelve hours every invoice «arrived» twice a
+        day for ever, and RF-39 said something true about the pipeline and false
+        about the invoice.
+
+        So an arrival is the portal publishing this invoice **twice in the same
+        reading**: two rows, one page, one batch. Meeting it in a later batch is
+        the same row read again and adds nothing.
+
+        The total is compared either way. Two readings that disagree about what
+        an invoice is worth is a contradiction whichever reading it came in, and
+        it is not a decision this platform gets to take alone (RF-37, RF-38).
         """
-        existing.arrival_count += 1
+        if existing.last_batch_id == batch_id:
+            existing.arrival_count += 1
+        existing.last_batch_id = batch_id
         existing.portal_paid = row.paid
         existing.portal_payment_status = row.portal_payment_status
         existing.portal_receipt_issued = row.receipt_issued
@@ -504,6 +783,9 @@ class PurchasesService:
         issued_on: date | None,
         total: Decimal | None,
         supplier_text: str | None,
+        supplier_tax_id: str | None = None,
+        content: bytes | None = None,
+        content_type: str | None = None,
     ) -> None:
         """Keep what the document said, and hold the invoice when it disagrees.
 
@@ -511,6 +793,13 @@ class PurchasesService:
         the same as the table makes the invoice certainty and nobody is
         bothered; one that says something else, or that could not be read at
         all, holds the invoice with the excerpt in view (RF-27, RF-29, RF-30).
+
+        It is also the **only** moment a tax id can identify a supplier
+        (RF-11). The invoices table publishes no tax id column — it was looked
+        for and it is not there — so the number, when it exists at all, exists
+        inside the file, and the file arrives after the row it belongs to. An
+        invoice waiting because its name resolved to nobody is therefore
+        resolved here, by its tax id, without a person having to look at it.
 
         An invoice already held for another reason is left as it is: it is
         already waiting for the same person, and rewriting its reason would lose
@@ -536,8 +825,13 @@ class PurchasesService:
                 read_issued_on=issued_on,
                 read_total=total,
                 read_supplier_text=supplier_text,
+                read_supplier_tax_id=supplier_tax_id,
+                content=content,
+                content_type=content_type,
             )
         )
+        if await self._identify_by_tax_id(invoice, supplier_tax_id):
+            return
         if not agrees and invoice.review_state is InvoiceReviewState.OK:
             invoice.review_state = InvoiceReviewState.PENDING
             invoice.review_reason = FILE_DISAGREES if readable else FILE_UNREADABLE
@@ -546,6 +840,42 @@ class PurchasesService:
             "Invoice document recorded",
             extra={"invoice_id": invoice.id, "agrees": agrees, "readable": readable},
         )
+
+    async def _identify_by_tax_id(self, invoice: Invoice, tax_id: str | None) -> bool:
+        """Give a waiting invoice its supplier when the document printed its tax id.
+
+        Only an invoice that is waiting **because of its supplier** — nobody
+        could tell whose it was, or it looked like somebody outside the register
+        — is touched. An invoice held because the document disagrees about a
+        number is a different question and the tax id does not answer it.
+
+        Nothing is attributed to a person here: this is the platform reading a
+        number that identifies without interpretation, which is what RF-11 asks
+        for, so `resolved_by_user_id` stays empty and the invoice never reaches
+        the queue.
+        """
+        if invoice.review_state is not InvoiceReviewState.PENDING:
+            return False
+        if invoice.review_reason not in (AMBIGUOUS_SUPPLIER, OUTSIDE_REGISTER):
+            return False
+        supplier = await self._supplier_with_tax_id(tax_id)
+        if supplier is None:
+            return False
+
+        invoice.supplier_id = supplier.id
+        invoice.review_state = InvoiceReviewState.OK
+        invoice.review_reason = None
+        if supplier.payment_term_days is not None:
+            invoice.due_on = invoice.issued_on + timedelta(days=supplier.payment_term_days)
+            if invoice.original_due_on is None:
+                invoice.original_due_on = invoice.due_on
+        await self.session.flush()
+        await self._sync_due_date(invoice)
+        logger.info(
+            "Invoice identified by the tax id its document printed",
+            extra={"invoice_id": invoice.id, "supplier_id": supplier.id},
+        )
+        return True
 
     # --- Reading the invoices --------------------------------------------
 
@@ -558,16 +888,28 @@ class PurchasesService:
         query: str | None = None,
         review_state: InvoiceReviewState | None = None,
         payment_state: str | None = None,
+        issued_from: date | None = None,
+        issued_to: date | None = None,
         due_from: date | None = None,
         due_to: date | None = None,
         with_receipt: bool | None = None,
+        order: InvoiceOrder = InvoiceOrder.ISSUED_DESC,
     ) -> InvoiceList:
         """The invoices screen, with the filters of RF-41 to RF-46 and RF-04 of 005.
 
-        The payment state is filtered **after** the page is read, because it is
-        computed from the payments imputed and not stored: storing it would be a
-        second answer to a question the payments already answer, and the two
-        would drift the first time one was undone.
+        **Two date ranges, and they answer different questions.** `issued_from`
+        and `issued_to` are the date the supplier put on the invoice — the one
+        the screen shows and the one RF-43 filters by. `due_from` and `due_to`
+        are the day it has to be paid, which is derived from the agreed term and
+        belongs to the calendar of 005. Collapsing them into one range would
+        make «las facturas de mayo» mean two different sets of invoices
+        depending on who asked.
+
+        The payment state is **not** stored — storing it would be a second
+        answer to a question the payments already answer — but it is filtered
+        in the query all the same, over the sum of what is imputed. Filtering it
+        after reading the page filtered the page and not the listing: it came
+        back short, and `total` counted rows the filter had just removed.
         """
         invoices = await self.purchases.list_invoices(
             skip=skip,
@@ -575,22 +917,28 @@ class PurchasesService:
             supplier_id=supplier_id,
             query=query,
             review_state=review_state,
+            issued_from=issued_from,
+            issued_to=issued_to,
             due_from=due_from,
             due_to=due_to,
             with_receipt=with_receipt,
+            payment_state=payment_state,
+            order=order,
         )
         total = await self.purchases.count_invoices(
             supplier_id=supplier_id,
             query=query,
             review_state=review_state,
+            issued_from=issued_from,
+            issued_to=issued_to,
             due_from=due_from,
             due_to=due_to,
             with_receipt=with_receipt,
+            payment_state=payment_state,
         )
-        items = await self._read_invoices(invoices)
-        if payment_state is not None:
-            items = [item for item in items if item.payment_state == payment_state]
-        return InvoiceList(items=items, total=total, skip=skip, limit=limit)
+        return InvoiceList(
+            items=await self._read_invoices(invoices), total=total, skip=skip, limit=limit
+        )
 
     async def get_invoice(self, invoice_id: int) -> InvoiceRead:
         """One invoice, with its payments, its receipt and what its document said."""
@@ -614,7 +962,8 @@ class PurchasesService:
         if not invoices:
             return []
         paid = await self.purchases.imputed_totals()
-        receipts = await self.purchases.receipts_in_force()
+        receipts = await self.purchases.invoices_with_receipt()
+        numbers = await self.purchases.receipt_numbers()
         names = {supplier.id: supplier.legal_name for supplier in await self.purchases.suppliers()}
         today = today_here()
 
@@ -625,6 +974,11 @@ class PurchasesService:
             read.paid = paid.get(invoice.id, Decimal(0))
             read.balance = invoice.total - read.paid
             read.receipt_issued = invoice.id in receipts
+            # Declarado desde el primer día y nunca asignado: viajaba `null`
+            # hasta acá y hasta el tipo generado del frontend. Una factura cuyo
+            # recibo lo emitió el portal se queda sin número, y eso es exacto:
+            # ese número no es nuestro y no lo conocemos.
+            read.receipt_number = numbers.get(invoice.id)
             read.portal_payment_status = invoice.portal_payment_status
             read.payment_state = self._payment_state(invoice.total, read.paid)
             read.is_inconsistent = read.payment_state == INCONSISTENT
@@ -669,6 +1023,24 @@ class PurchasesService:
         expected = PORTAL_STATES.get(portal_status)
         return expected is not None and expected != computed
 
+    async def invoice_file(self, invoice_id: int) -> InvoiceFile:
+        """The document of an invoice, as it came (RF-04 of 004).
+
+        A missing file is a `404` and not an empty body: an invoice whose
+        document never arrived — the portal link expired, or the download is
+        still queued — is a fact somebody has to be told, and a browser handed
+        zero bytes with a `200` reads it as a broken file instead.
+        """
+        invoice = await self._require_invoice(invoice_id)
+        document = await self.purchases.document_of(invoice.id)
+        if document is None or not document.content:
+            raise NotFoundError(NO_INVOICE_FILE, details={"invoice_id": invoice_id})
+        return InvoiceFile(
+            content=document.content,
+            content_type=document.content_type or DEFAULT_FILE_TYPE,
+            filename=_filename_for(invoice.number, document.content_type),
+        )
+
     async def _require_invoice(self, invoice_id: int) -> Invoice:
         """Return the invoice, or say plainly that it is not there."""
         invoice = await self.purchases.invoice(invoice_id)
@@ -691,15 +1063,34 @@ class PurchasesService:
         supplier_id: int | None,
         remember: bool,
         actor_user_id: int,
+        number: str | None = None,
+        issued_on: date | None = None,
+        total: Decimal | None = None,
     ) -> InvoiceRead:
         """Record what a person decided about a held invoice (RF-31, RF-32, RF-33).
 
-        Saying who the supplier is resolves this invoice; asking to remember it
-        turns the spelling into a rule, and every other invoice written the same
-        way is resolved with it — which is the retroactivity of RF-49, and what
-        the preview counted before the decision was taken.
+        A held invoice can be waiting on two different questions, and this
+        answers both. **What it says**: the header fields the document put in
+        doubt are corrected here, and each correction is recorded with who made
+        it, when, and what the value was before (RF-31, RF-18). **Who it is
+        from**: saying which supplier resolves this invoice, and asking to
+        remember it turns the spelling into a rule that resolves every other
+        invoice written the same way — the retroactivity of RF-49, and what the
+        preview counted before the decision was taken.
+
+        The corrections are applied **first**, on purpose: the due date and the
+        calendar entry follow from the date and the total, so attaching the
+        supplier afterwards computes them once, from the values a person just
+        confirmed, instead of from the ones they were about to replace.
         """
         invoice = await self._require_invoice(invoice_id)
+        await self._correct_invoice_fields(
+            invoice,
+            number=number,
+            issued_on=issued_on,
+            total=total,
+            actor_user_id=actor_user_id,
+        )
         if supplier_id is None:
             # A decision that names no supplier is a decision that this invoice
             # is fine as it stands — a duplicate somebody looked at, a document
@@ -737,6 +1128,99 @@ class PurchasesService:
             "Invoice resolved", extra={"invoice_id": invoice_id, "supplier_id": supplier.id}
         )
         return await self.get_invoice(invoice_id)
+
+    async def _correct_invoice_fields(
+        self,
+        invoice: Invoice,
+        *,
+        number: str | None,
+        issued_on: date | None,
+        total: Decimal | None,
+        actor_user_id: int,
+    ) -> list[str]:
+        """Write the header fields a person confirmed or corrected (RF-31 of 004).
+
+        A field that arrives equal to what is stored is a **confirmation**, and
+        a confirmation is not a change: it writes nothing and it records
+        nothing. What gets recorded is a person disagreeing with the portal, and
+        that goes out as `ManualChangeRecorded` with the previous value, so the
+        log answers «who decided this number was that number» (RF-18, RF-32).
+
+        Changing the number is the one that can collide: two invoices of the
+        same supplier cannot share it, and the database index says so. It is
+        checked here so the person gets a sentence instead of an integrity
+        error.
+        """
+        changed: list[str] = []
+        if number is not None and number.strip() and number.strip() != invoice.number:
+            await self._require_free_number(invoice, number.strip())
+            changed.append(
+                await self._record_invoice_change(invoice, "number", number.strip(), actor_user_id)
+            )
+        if issued_on is not None and issued_on != invoice.issued_on:
+            changed.append(
+                await self._record_invoice_change(invoice, "issued_on", issued_on, actor_user_id)
+            )
+        if total is not None and total != invoice.total:
+            changed.append(
+                await self._record_invoice_change(invoice, "total", total, actor_user_id)
+            )
+
+        if not changed:
+            return changed
+
+        await self.session.flush()
+        # The due date is derived from the date of the invoice and the agreed
+        # term, and the calendar entry carries the amount. Both follow a
+        # correction rather than being left describing the old numbers.
+        supplier = (
+            await self.purchases.supplier(invoice.supplier_id) if invoice.supplier_id else None
+        )
+        if supplier is not None and supplier.payment_term_days is not None:
+            invoice.due_on = invoice.issued_on + timedelta(days=supplier.payment_term_days)
+            await self.session.flush()
+        await self._sync_due_date(invoice)
+        logger.info(
+            "Invoice header corrected by hand",
+            extra={"invoice_id": invoice.id, "fields": changed},
+        )
+        return changed
+
+    async def _require_free_number(self, invoice: Invoice, number: str) -> None:
+        """Refuse a number that belongs to another invoice of the same supplier."""
+        if invoice.supplier_id is None:
+            return
+        taken = await self.purchases.invoice_of(
+            supplier_id=invoice.supplier_id,
+            number=number,
+            supplier_text=invoice.supplier_text,
+        )
+        if taken is not None and taken.id != invoice.id:
+            raise ConflictError(
+                INVOICE_NUMBER_TAKEN, details={"number": number, "invoice_id": taken.id}
+            )
+
+    async def _record_invoice_change(
+        self, invoice: Invoice, field: str, value: Any, actor_user_id: int
+    ) -> str:
+        """Write one field and publish the fact that a person wrote it."""
+        previous = getattr(invoice, field)
+        setattr(invoice, field, value)
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=INVOICE_ENTITY,
+                entity_id=str(invoice.id),
+                action=AuditAction.CORRECTED,
+                actor_user_id=actor_user_id,
+                section=PURCHASING_SECTION,
+                field=field,
+                old_value=str(previous),
+                new_value=str(value),
+                reason_detail=INVOICE_RESOLVED_BY_HAND,
+            ),
+            self.session,
+        )
+        return field
 
     async def preview_alias(self, *, text: str, supplier_id: int) -> AliasPreview:
         """How many held invoices this assignment would resolve (RF-48 of 004).
@@ -816,13 +1300,31 @@ class PurchasesService:
     async def _apply_alias(
         self, key: str, *, supplier: Supplier, alias_id: int | None, actor_user_id: int
     ) -> list[str]:
-        """Attach every held invoice written this way to the supplier."""
+        """Attach everything held under this spelling to the supplier.
+
+        **Invoices and purchase orders, in the same pass**, and that is signed
+        scope rather than tidiness: the 007 says the criterion is one and the
+        same for both — *«una decisión sobre una forma de escribir un nombre se
+        toma una sola vez y sirve para todo»* — and spells out the consequence,
+        that resolving an order also identifies the invoices that were waiting
+        on that spelling, and the other way round.
+
+        There is one table of spellings (`core.supplier_alias`) and therefore
+        one decision. Walking only invoices here would have meant the same name
+        being decided twice — and the survey measured **twenty** different ways
+        of writing a supplier's name in the purchase orders alone.
+        """
         resolved: list[str] = []
         for invoice in await self.purchases.pending_invoices():
             if normalize_entity_name(invoice.supplier_text) != key:
                 continue
             await self._attach(invoice, supplier, actor_user_id=actor_user_id, alias_id=alias_id)
             resolved.append(invoice.number)
+        for order in await self.purchases.pending_orders():
+            if normalize_entity_name(order.supplier_text) != key:
+                continue
+            await self._attach_order(order, supplier, actor_user_id=actor_user_id)
+            resolved.append(order.number)
         return resolved
 
     async def _attach(
@@ -865,13 +1367,34 @@ class PurchasesService:
         read = await self._read_invoices(invoices)
         today = today_here()
 
+        def in_period(item: InvoiceRead) -> bool:
+            return (since is None or item.issued_on >= since) and (
+                until is None or item.issued_on <= until
+            )
+
         counted = [
             item
             for item in read
             if item.review_state is not InvoiceReviewState.PENDING
             and not item.is_inconsistent
-            and (since is None or item.issued_on >= since)
-            and (until is None or item.issued_on <= until)
+            and in_period(item)
+        ]
+        # Counted apart, and in this order, because one invoice can be left out
+        # for more than one reason and it has to be reported once. Being held is
+        # what RF-23 asks about, so it wins; falling outside the period is the
+        # weakest reason — it says nothing is wrong with the invoice.
+        in_review = [item for item in read if item.review_state is InvoiceReviewState.PENDING]
+        inconsistent = [
+            item
+            for item in read
+            if item.review_state is not InvoiceReviewState.PENDING and item.is_inconsistent
+        ]
+        out_of_period = [
+            item
+            for item in read
+            if item.review_state is not InvoiceReviewState.PENDING
+            and not item.is_inconsistent
+            and not in_period(item)
         ]
         excluded = len(read) - len(counted)
 
@@ -884,6 +1407,9 @@ class PurchasesService:
             owed=invoiced - paid,
             invoices=len(counted),
             excluded=excluded,
+            excluded_in_review=len(in_review),
+            excluded_inconsistent=len(inconsistent),
+            excluded_out_of_period=len(out_of_period),
             aging=self._aging_of(counted, today),
             average_delay_days=await self._average_delay(counted, today),
             since=since,
@@ -1150,9 +1676,11 @@ class PurchasesService:
                 details={"payment_id": payment_id, "amount": str(payment.amount)},
             )
 
+        invoices = [await self._require_invoice(invoice_id) for invoice_id, _ in parts]
+        await self._one_supplier_only(payment, invoices)
+
         created: list[Payment] = []
-        for invoice_id, amount in parts:
-            invoice = await self._require_invoice(invoice_id)
+        for invoice, (_, amount) in zip(invoices, parts, strict=True):
             created.append(
                 await self.purchases.add_payment(
                     Payment(
@@ -1179,6 +1707,33 @@ class PurchasesService:
         logger.info("Voucher split", extra={"payment_id": payment_id, "parts": len(created)})
         return [PaymentRead.model_validate(item) for item in created]
 
+    async def _one_supplier_only(self, payment: Payment, invoices: list[Invoice]) -> None:
+        """A voucher covers invoices of **one** supplier, and it is a signed assumption.
+
+        The spec says it in as many words — *«se asume que un comprobante que
+        cubre varias facturas cubre facturas de un mismo proveedor… si aparece
+        uno que cruza dos proveedores, el sistema lo mantiene apartado y
+        pregunta»* — and the split was letting anybody spread one voucher over
+        two of them.
+
+        That is not a tidiness rule. Money attributed to the wrong supplier
+        wrongs both of them at once: one is owed less than the platform says and
+        the other more, and the ageing and the average delay of the two are
+        computed off those numbers. The voucher stays held, which is what "asks"
+        means here.
+        """
+        suppliers = {invoice.supplier_id for invoice in invoices if invoice.supplier_id is not None}
+        if len(suppliers) > 1:
+            raise ValidationError(
+                SPLIT_CROSSES_SUPPLIERS,
+                details={"payment_id": payment.id, "suppliers": len(suppliers)},
+            )
+        if payment.supplier_id is not None and suppliers and payment.supplier_id not in suppliers:
+            raise ValidationError(
+                SPLIT_IS_ANOTHER_SUPPLIER,
+                details={"payment_id": payment.id, "supplier_id": payment.supplier_id},
+            )
+
     # --- The reception receipts and their incidents (005) ----------------
 
     async def issue_receipt(self, invoice_id: int, *, actor_user_id: int) -> ReceiptRead:
@@ -1190,7 +1745,10 @@ class PurchasesService:
         own, correlative and unique — the portal does not number ours.
         """
         invoice = await self._require_invoice(invoice_id)
-        if await self.purchases.receipt_of(invoice_id) is not None:
+        # Uno del portal cuenta igual que uno nuestro: emitir un segundo sobre
+        # una factura que ya tiene el suyo es duplicarlo, lo diga el registro
+        # que lo diga (RF-30, RF-35).
+        if await self.purchases.has_receipt(invoice_id):
             raise ConflictError(RECEIPT_ALREADY_ISSUED, details={"invoice_id": invoice_id})
         if invoice.due_on is not None and invoice.due_on < today_here():
             raise ConflictError(
@@ -1346,7 +1904,7 @@ class PurchasesService:
         """
         days = int(await self._setting(RECEIPT_NOTICE_KEY))
         today = today_here()
-        receipts = await self.purchases.receipts_in_force()
+        receipts = await self.purchases.invoices_with_receipt()
         due = await self.purchases.due_between(today, today + timedelta(days=days))
         return [
             (invoice, (invoice.due_on - today).days)
@@ -1396,8 +1954,16 @@ class PurchasesService:
         the computed state, never over a stored one.
         """
         entries = await self.purchases.due_dates_between(since, until)
+        # Las facturas **de estas entradas**, y no las que vencen en la ventana:
+        # una factura vencida que alguien reprogramó a otro mes tiene la tarjeta
+        # acá y su `due_on` allá, y buscarla por fecha la devolvía sin proveedor,
+        # sin estado de pago y sin la marca de vencida sin recibo — que es justo
+        # lo contrario de lo que RF-30 promete que se sigue viendo.
         invoices = {
-            invoice.id: invoice for invoice in await self.purchases.due_between(since, until)
+            invoice.id: invoice
+            for invoice in await self.purchases.invoices_by_ids(
+                [entry.invoice_id for entry in entries if entry.invoice_id is not None]
+            )
         }
         read = {
             item.id: item
@@ -1432,7 +1998,13 @@ class PurchasesService:
         return CalendarRead(since=since, until=until, items=items)
 
     async def add_due_date(
-        self, *, on_date: date, description: str, amount: Decimal | None, actor_user_id: int
+        self,
+        *,
+        on_date: date,
+        description: str,
+        amount: Decimal | None,
+        actor_user_id: int,
+        actor_name: str = "",
     ) -> DueDateRead:
         """Add an entry to the calendar by hand (RF-12, RF-13, RF-14 of 006)."""
         entry = await self.purchases.add_due_date(
@@ -1445,6 +2017,9 @@ class PurchasesService:
                 created_by_user_id=actor_user_id,
             )
         )
+        await self._announce(
+            entry, action="added", actor_user_id=actor_user_id, actor_name=actor_name
+        )
         await self.session.commit()
         logger.info("Due date added", extra={"due_date_id": entry.id})
         return DueDateRead.model_validate(entry)
@@ -1456,17 +2031,41 @@ class PurchasesService:
         description: str | None,
         amount: Decimal | None,
         actor_user_id: int,
+        actor_name: str = "",
     ) -> DueDateRead:
         """Correct a hand-made entry, keeping what it said before (RF-15, RF-16)."""
         entry = await self._require_due_date(due_date_id)
         self._only_manual(entry)
-        if description is not None:
+        # RF-16 pide quién, cuándo y **el valor anterior**, y lo tercero es lo
+        # que obliga a mirar antes de escribir. Va a la bitácora de la
+        # plataforma por el mismo evento que usa la corrección de un proveedor:
+        # este módulo no sabe que existe una bitácora, sólo dice qué cambió.
+        changes: list[tuple[str, object, object]] = []
+        if description is not None and description != entry.description:
+            changes.append(("description", entry.description, description))
             entry.description = description
-        if amount is not None:
+        if amount is not None and amount != entry.amount:
+            changes.append(("amount", entry.amount, amount))
             entry.amount = amount
+        for field, previous, value in changes:
+            await events.publish(
+                ManualChangeRecorded(
+                    entity_type=DUE_DATE_ENTITY,
+                    entity_id=str(entry.id),
+                    action=AuditAction.CORRECTED,
+                    actor_user_id=actor_user_id,
+                    section=PURCHASING_SECTION,
+                    field=field,
+                    old_value=str(previous) if previous is not None else None,
+                    new_value=str(value),
+                ),
+                self.session,
+            )
         await self.session.flush()
+        await self._announce(
+            entry, action="edited", actor_user_id=actor_user_id, actor_name=actor_name
+        )
         await self.session.commit()
-        del actor_user_id
         return DueDateRead.model_validate(entry)
 
     async def move_due_date(
@@ -1549,21 +2148,51 @@ class PurchasesService:
         )
         return DueDateRead.model_validate(entry)
 
-    async def remove_due_date(self, due_date_id: int, *, actor_user_id: int) -> None:
+    async def remove_due_date(
+        self, due_date_id: int, *, actor_user_id: int, actor_name: str = ""
+    ) -> None:
         """Remove a hand-made entry (RF-17). One from an invoice is refused (RF-18)."""
         entry = await self._require_due_date(due_date_id)
         self._only_manual(entry)
+        on_date, invoice_id = entry.on_date, entry.invoice_id
         await self.purchases.drop_due_date(entry)
         await events.publish(
             DueDateChanged(
                 due_date_id=due_date_id,
                 action="removed",
                 actor_user_id=actor_user_id,
-                actor_name="",
+                # Iba vacío aunque la ruta tenía el nombre a mano, y con el
+                # nombre vacío RF-33 no se puede cumplir para este verbo: la
+                # otra pantalla diría «alguien borró esto».
+                actor_name=actor_name,
+                on_date=on_date,
+                invoice_id=invoice_id,
             ),
             self.session,
         )
         await self.session.commit()
+
+    async def _announce(
+        self, entry: DueDate, *, action: str, actor_user_id: int, actor_name: str
+    ) -> None:
+        """Tell the other screens that the calendar moved under them (RF-31).
+
+        One publisher for the four verbs. Two of them — adding and correcting —
+        did not announce anything at all, so a live channel built on top of this
+        event would have carried half the changes and looked like a bug in the
+        channel.
+        """
+        await events.publish(
+            DueDateChanged(
+                due_date_id=entry.id,
+                action=action,
+                actor_user_id=actor_user_id,
+                actor_name=actor_name,
+                on_date=entry.on_date,
+                invoice_id=entry.invoice_id,
+            ),
+            self.session,
+        )
 
     @staticmethod
     def _only_manual(entry: DueDate) -> None:
@@ -1600,7 +2229,12 @@ class PurchasesService:
         held = 0
 
         for row in orders:
-            supplier, _ = await self.resolve_supplier(row.supplier_text)
+            # The reason is **kept**. It used to be thrown away here, and RF-55
+            # asks for exactly the half that was being lost: «this supplier is
+            # not in the register» is a different answer from «this name does
+            # not disambiguate», and only the first one means nobody may resolve
+            # the order by picking from the eight.
+            supplier, reason = await self.resolve_supplier(row.supplier_text)
             existing = await self.purchases.order_numbered(row.number)
             if existing is not None:
                 if existing.status_text != row.status_text:
@@ -1637,6 +2271,7 @@ class PurchasesService:
                     review_state=(
                         OrderReviewState.OK if supplier is not None else OrderReviewState.PENDING
                     ),
+                    review_reason=None if supplier is not None else reason,
                     repeat_of_order_id=earlier.id if earlier else None,
                 )
             )
@@ -1655,11 +2290,24 @@ class PurchasesService:
         status_text: str | None = None,
         supplier_id: int | None = None,
         only_stalled: bool = False,
+        only_in_review: bool = False,
+        order_id: int | None = None,
     ) -> PurchaseOrderList:
-        """The orders screen, with its counts and its stalled ones (RF-02 to RF-13)."""
+        """The orders screen, with its counts, its stalled and its held ones.
+
+        RF-02 to RF-13, plus RF-51 and RF-52: how many are set aside for review,
+        and being able to ask for only those. `held` is counted over **all** the
+        orders and not over the page, like `per_status`: they are the links the
+        screen navigates by, and a count that changes when you filter is a count
+        you cannot navigate by.
+        """
         orders = await self.purchases.orders(
             skip=skip, limit=limit, status_text=status_text, supplier_id=supplier_id
         )
+        if order_id is not None:
+            orders = [order for order in orders if order.id == order_id] or (
+                [found] if (found := await self.purchases.order(order_id)) else []
+            )
         per_status = await self.purchases.orders_per_status()
         limit_days = int(await self._setting(STALLED_DAYS_KEY))
         names = {supplier.id: supplier.legal_name for supplier in await self.purchases.suppliers()}
@@ -1680,11 +2328,14 @@ class PurchasesService:
         stalled = [item for item in items if item.is_stalled]
         if only_stalled:
             items = stalled
+        if only_in_review:
+            items = [item for item in items if item.review_state is OrderReviewState.PENDING]
         return PurchaseOrderList(
             items=items,
             total=len(items),
             per_status=per_status,
             stalled=len(stalled),
+            held=await self.purchases.count_orders_in_review(),
         )
 
     @staticmethod
@@ -1707,13 +2358,98 @@ class PurchasesService:
         """Drop the repeated-order flag, recording who did it (RF-18, RF-19)."""
         order = await self.purchases.order(order_id)
         if order is None:
-            raise NotFoundError("No encontramos esa orden", details={"order_id": order_id})
+            raise NotFoundError(NO_SUCH_ORDER, details={"order_id": order_id})
         order.repeat_of_order_id = None
         order.repeat_dismissed_by_user_id = actor_user_id
         order.repeat_dismissed_at = datetime.now(UTC)
         await self.session.flush()
         await self.session.commit()
         return PurchaseOrderRead.model_validate(order)
+
+    # --- Deciding about an order held for review (007, H8) ---------------
+    #
+    # Calcado del molde que ya resuelve una factura apartada, doscientas líneas
+    # más arriba, porque la spec dice que es el mismo criterio y porque lo es.
+    # La única diferencia sin análogo es RF-60: al asignarle el proveedor hay
+    # que **volver a evaluar** si repite un pedido anterior, que es lo que
+    # RF-59 dejó sin hacer mientras no se supiera de quién era la orden.
+
+    async def orders_in_review(self) -> list[PurchaseOrderRead]:
+        """The orders waiting for a person to say whose they are (RF-52)."""
+        listing = await self.list_orders(limit=100_000, only_in_review=True)
+        return listing.items
+
+    async def resolve_order(
+        self, order_id: int, *, supplier_id: int, remember: bool, actor_user_id: int
+    ) -> PurchaseOrderRead:
+        """Say which supplier an order is from, and everything that follows.
+
+        Asking to remember it turns the spelling into a rule, and **every other
+        order and invoice written the same way is resolved with it** (RF-61,
+        RF-62). That is not an extra: the survey measured twenty different
+        spellings in the purchase orders alone, and deciding each of them once
+        per document is the queue a team of three abandons.
+        """
+        order = await self.purchases.order(order_id)
+        if order is None:
+            raise NotFoundError(NO_SUCH_ORDER, details={"order_id": order_id})
+        if order.review_state is not OrderReviewState.PENDING:
+            raise ConflictError(ORDER_NOT_HELD, details={"order_id": order_id})
+
+        supplier = await self._require_supplier(supplier_id)
+        alias_id: int | None = None
+        if remember:
+            alias = await self.purchases.put_alias(
+                text_normalized=normalize_entity_name(order.supplier_text),
+                text_original=order.supplier_text,
+                supplier_id=supplier.id,
+                source=SupplierAliasSource.LEARNED,
+                created_by_user_id=actor_user_id,
+            )
+            alias_id = alias.id
+
+        await self._attach_order(order, supplier, actor_user_id=actor_user_id)
+        if remember:
+            await self._apply_alias(
+                normalize_entity_name(order.supplier_text),
+                supplier=supplier,
+                alias_id=alias_id,
+                actor_user_id=actor_user_id,
+            )
+        await self.session.commit()
+        logger.info(
+            "Purchase order resolved", extra={"order_id": order_id, "supplier_id": supplier.id}
+        )
+        return (await self.list_orders(limit=1, order_id=order_id)).items[0]
+
+    async def _attach_order(
+        self, order: PurchaseOrder, supplier: Supplier, *, actor_user_id: int
+    ) -> None:
+        """Give a held order its supplier, and re-check whether it repeats one.
+
+        **RF-60 lives in the last two lines**, and it is the only thing this
+        method does that resolving an invoice does not. While nobody knew whose
+        the order was there was nothing to compare it against (RF-59); now there
+        is, and the comparison happens once rather than never.
+        """
+        order.supplier_id = supplier.id
+        order.review_state = OrderReviewState.RESOLVED
+        order.review_reason = None
+        order.resolved_by_user_id = actor_user_id
+        order.resolved_at = datetime.now(UTC)
+
+        window = int(await self._setting(REPEAT_WINDOW_KEY))
+        earlier = await self.purchases.earlier_order_for(
+            supplier_id=supplier.id,
+            product_code=order.product_code,
+            since=order.ordered_on - timedelta(days=window),
+            before=order.ordered_on,
+        )
+        # Never itself: `earlier_order_for` looks at the same table, and an
+        # order resolved on its own ordering day would otherwise repeat itself.
+        if earlier is not None and earlier.id != order.id:
+            order.repeat_of_order_id = earlier.id
+        await self.session.flush()
 
     # --- Correcting a value by hand (004) --------------------------------
 
@@ -1735,24 +2471,49 @@ class PurchasesService:
         and this module never learns that a log exists.
         """
         supplier = await self._require_supplier(supplier_id)
+        now = datetime.now(UTC)
         changed: list[str] = []
         for field, value in values.items():
-            if value is None or getattr(supplier, field) == value:
+            if value is None:
                 continue
-            previous = getattr(supplier, field)
-            await self.purchases.add_correction(
-                PurchaseCorrection(
-                    entity_type=SUPPLIER_ENTITY,
-                    entity_id=str(supplier.id),
-                    field=field,
-                    portal_value=previous,
-                    corrected_value=value,
-                    reason_code=reason_code,
-                    reason_detail=reason_detail,
-                    corrected_by_user_id=actor_user_id,
-                    corrected_at=datetime.now(UTC),
-                )
+            standing = await self.purchases.correction_in_force(
+                entity_type=SUPPLIER_ENTITY, entity_id=str(supplier.id), field=field
             )
+            previous = getattr(supplier, field)
+            # Nothing to do only when there is nothing to change **and** nothing
+            # standing: re-affirming the value already in force is how somebody
+            # closes a conflict the register opened (RF-19), and it has to reach
+            # the correction row even though the card does not move.
+            if previous == value and standing is None:
+                continue
+            if standing is None:
+                await self.purchases.add_correction(
+                    PurchaseCorrection(
+                        entity_type=SUPPLIER_ENTITY,
+                        entity_id=str(supplier.id),
+                        field=field,
+                        portal_value=previous,
+                        corrected_value=value,
+                        reason_code=reason_code,
+                        reason_detail=reason_detail,
+                        corrected_by_user_id=actor_user_id,
+                        corrected_at=now,
+                    )
+                )
+            else:
+                # A second correction over the same field rewrites what a person
+                # left and clears the conflict — but never `portal_value`, which
+                # is what the register said and what a reversal restores. Two
+                # corrections in a row still give back the register's value and
+                # not the previous person's.
+                standing.corrected_value = value
+                standing.reason_code = reason_code
+                standing.reason_detail = reason_detail
+                standing.corrected_by_user_id = actor_user_id
+                standing.corrected_at = now
+                standing.status = CorrectionStatus.ACTIVE
+                standing.conflict_value = None
+                standing.conflict_detected_at = None
             setattr(supplier, field, value)
             changed.append(field)
             await events.publish(
@@ -1771,6 +2532,10 @@ class PurchasesService:
                 self.session,
             )
         await self.session.flush()
+        # Corregir el plazo a mano mueve el vencimiento de sus facturas por el
+        # mismo motivo que lo mueve leerlo del padrón: de ahí sale (RF-26).
+        if "payment_term_days" in changed:
+            await self._refresh_due_dates(supplier)
         await self.session.commit()
         logger.info("Supplier corrected", extra={"supplier_id": supplier_id, "fields": changed})
         return await self.get_supplier(supplier_id)

@@ -1,11 +1,15 @@
-"""Deriva los dos fixtures del portal que el relevamiento midió y no capturó.
+"""Deriva el fixture del portal que el relevamiento midió y no capturó.
 
-`/mensajes` y `/ventas` no tienen captura: el relevamiento contó lo que hay en
-cada una —64 mensajes y 588 ventas, con sus desgloses— pero no se guardó el DOM.
-Este script arma dos archivos que **reproducen exactamente esos números** y las
-anomalías que la spec de 009 enumera, con la misma estructura de tabla que sí se
-capturó en las otras cuatro pantallas (`table.datos`, encabezado en `thead`,
-fechas ISO, montos con `$` y separador de miles).
+`/ventas` no tiene captura: el relevamiento contó lo que hay —588 ventas con sus
+desgloses— pero no se guardó el DOM. Este script arma un archivo que **reproduce
+exactamente esos números** y las anomalías que la spec de 009 enumera, con la
+misma estructura de tabla que sí se capturó en las otras pantallas
+(`table.datos`, encabezado en `thead`, fechas ISO, montos con `$` y separador de
+miles).
+
+La bandeja estaba acá también, y **dejó de estarlo el 2026-08-31**: se capturó
+del portal real, y la deducción resultó equivocada en la ruta y en las columnas.
+Es el mejor argumento que hay para capturar ésta en cuanto se pueda.
 
 Es el mismo precedente que `price-list-broken-2026-08-28.xlsx`: un fixture
 derivado a mano, declarado como tal, para poder afirmar en un test por qué se
@@ -64,37 +68,6 @@ def _rows(rows: list[list[str]], headers: list[str]) -> str:
         "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>" for row in rows
     )
     return f"<table class='datos'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
-
-
-def messages_page() -> str:
-    """La bandeja: 64 mensajes, 27 de vencimiento, 21 reclamos, 16 de stock, 30 sin leer."""
-    random.seed(SEED)
-    start = date(2026, 6, 1)
-    rows: list[list[str]] = []
-    index = 0
-    for kind, count in MESSAGE_KINDS:
-        for _ in range(count):
-            index += 1
-            supplier = SUPPLIERS[index % len(SUPPLIERS)]
-            reference = f"F-{random.randint(1000, 9999)}"
-            when = (start + timedelta(days=index)).isoformat()
-            rows.append(
-                [
-                    f"MSG-{index:04d}",
-                    (start + timedelta(days=index % 80)).isoformat(),
-                    supplier,
-                    kind,
-                    SUBJECTS[kind].format(ref=reference, when=when),
-                    f"{supplier} informa: {SUBJECTS[kind].format(ref=reference, when=when)}.",
-                    "No leido" if index <= UNREAD else "Leido",
-                ]
-            )
-    headers = ["Id", "Fecha", "Remitente", "Tipo", "Asunto", "Mensaje", "Estado"]
-    return (
-        HEAD.format(title="Bandeja de mensajes")
-        + _rows(rows, headers)
-        + TAIL
-    )
 
 
 def sales_page() -> str:
@@ -182,7 +155,6 @@ def sales_page() -> str:
 def main() -> None:
     """Escribe los dos archivos, sobrescribiendo lo que hubiera."""
     for name, content in (
-        ("messages-page-2026-08-29.html", messages_page()),
         ("sales-page-2026-08-29.html", sales_page()),
     ):
         path = FIXTURES / name

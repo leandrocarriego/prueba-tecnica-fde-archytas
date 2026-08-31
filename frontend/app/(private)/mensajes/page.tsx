@@ -5,14 +5,14 @@ import { NoPermission } from '@/components/common/NoPermission'
 import { MessageList } from '@/components/messaging/MessageList'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
-import type { MessageList as MessageListRead } from '@/lib/messaging/types'
+import type { Assignee, MessageList as MessageListRead } from '@/lib/messaging/types'
 
 export const metadata = {
   title: 'Mensajes — Plataforma Cordillera',
 }
 
 interface PageProps {
-  searchParams: Promise<{ tipo?: string; estado?: string }>
+  searchParams: Promise<{ tipo?: string; estado?: string; proveedor?: string }>
 }
 
 /**
@@ -27,9 +27,21 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   const query = new URLSearchParams({ limit: '200' })
   if (filters.tipo) query.set('kind', filters.tipo)
   if (filters.estado) query.set('state', filters.estado)
+  // RF-26: por tipo, por estado **y por proveedor**. El criterio firmado pide
+  // «los reclamos pendientes de un proveedor», que son los tres a la vez.
+  if (filters.proveedor) query.set('supplier_name', filters.proveedor)
 
-  const [listing, session] = await Promise.all([
+  // Quiénes pueden hacerse cargo de un mensaje (RF-30). Sale de la matriz de
+  // permisos y no de una lista de roles escrita en el frontend: quien alcanza
+  // esta sección en escritura es exactamente quien puede ser responsable, y
+  // Julián no está entre ellos.
+  const [listing, assignees, senders, session] = await Promise.all([
     fetchFromApi<MessageListRead>(`/messages?${query.toString()}`),
+    fetchFromApi<Assignee[]>('/messages/assignees'),
+    // El padrón como lo guarda `messaging`: son exactamente los valores que
+    // `supplier_name` puede tomar, así que el filtro no ofrece nombres que no
+    // encuentran nada.
+    fetchFromApi<string[]>('/messages/senders'),
     getSession(),
   ])
 
@@ -67,8 +79,36 @@ export default async function MessagesPage({ searchParams }: PageProps) {
         </Link>
       </nav>
 
+      {/*
+        Un form con GET, como en las órdenes: el filtro por proveedor es otra
+        query sobre la misma pantalla, y el tipo y el estado que ya estaban
+        puestos viajan en campos ocultos en vez de perderse al elegir.
+      */}
+      <form action="/mensajes" className="flex flex-wrap items-center gap-2 text-sm" method="get">
+        {filters.tipo && <input name="tipo" type="hidden" value={filters.tipo} />}
+        {filters.estado && <input name="estado" type="hidden" value={filters.estado} />}
+        <label htmlFor="proveedor">Proveedor</label>
+        <select
+          className="rounded border p-2"
+          defaultValue={filters.proveedor ?? ''}
+          id="proveedor"
+          name="proveedor"
+        >
+          <option value="">Todos</option>
+          {(senders ?? []).map(name => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <button className="rounded border px-3 py-2" type="submit">
+          Filtrar
+        </button>
+      </form>
+
       <MessageList
         messages={listing.items}
+        assignees={assignees ?? []}
         canEdit={canEdit(session?.permissions ?? {}, 'SUPPLIER_MESSAGES')}
       />
     </main>

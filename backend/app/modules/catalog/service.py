@@ -186,8 +186,20 @@ CORRECTABLE_FIELDS: dict[str, CorrectableField] = {
 
 # Prices and the product catalog belong to sales in the map of roles, so that
 # is the section every correction here is filed under. It is what decides who
-# sees it in the history (RF-19).
+# sees it in the history (RF-19 of 003).
 CATALOG_SECTION = BusinessSection.SALES
+
+# **The rubros are the exception, and they are one on purpose.** The 010 moved
+# them to purchasing, and RF-19 of 003 shows somebody the manual changes of the
+# sections they reach — so filing a rubro change under `SALES` would mean the
+# person who made it cannot see it, while the person who may no longer make it
+# can. That is not a rule anybody would write down; it is what happens when
+# ownership moves and the section does not follow.
+#
+# Only `_record_category_change` uses this. Prices and products stay with
+# sales, and separating rubros from the catalog is the deliberate consequence
+# the 010 declares.
+CATEGORY_SECTION = BusinessSection.PURCHASING
 
 NO_PRICE_YET = "El producto todavía no tiene un precio para corregir"
 # What the person who ran the action reads when the product is not there
@@ -1000,7 +1012,7 @@ class CatalogService:
                 entity_id=str(category.id),
                 action=action,
                 actor_user_id=actor_user_id,
-                section=CATALOG_SECTION,
+                section=CATEGORY_SECTION,
                 field="name",
                 old_value=old_value,
                 new_value=new_value,
@@ -1995,7 +2007,12 @@ class CatalogService:
                 PriceCurvePoint(month=month, average_price=average, changes=changes)
                 for month, average, changes in curve
             ],
-            price_curve_excluded=0,
+            # Counted, not assumed: the products the supplier did not price at
+            # all inside this window contribute to no month of the curve, and
+            # RF-46 asks the cut to say how many it left out. A hard-coded zero
+            # says «none» without having looked, which is the one thing an
+            # indicator of this feature may not do.
+            price_curve_excluded=await self.catalog.products_without_a_price_in(since, until),
             stock=cuts,
             stock_excluded=excluded,
             new_products=[
@@ -2007,4 +2024,17 @@ class CatalogService:
                 )
                 for product in await self.catalog.products_first_seen_between(since, until)
             ],
+            # Zero, and computed rather than assumed: every product carries a
+            # `first_seen_at`, so the window either contains it or it does not
+            # and there is nothing this cut can fail to attribute. RF-46 asks it
+            # to say so, and RF-27 asks it to say so out loud when it left out
+            # none — which is exactly this.
+            #
+            # What this number does **not** say, and the spec knows it: the
+            # products the platform met already existing on its first reading
+            # come in as altas of that day. The spec declares it as a supuesto —
+            # «el corte de altas empieza a ser fiel recién desde ahí» — and
+            # separating them is a question for the client, not a rule to invent
+            # here.
+            new_products_excluded=0,
         )

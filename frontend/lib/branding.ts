@@ -84,15 +84,20 @@ export interface AuthBrandingConfig {
  */
 export const brandingConfig: AuthBrandingConfig = {
   colors: {
-    primary: '#2563eb', // blue-600
-    primaryHover: '#1d4ed8', // blue-700
-    background: '#f9fafb', // gray-50
-    cardBackground: '#ffffff', // white
-    text: '#111827', // gray-900
-    textSecondary: '#6b7280', // gray-500
-    border: '#e5e7eb', // gray-200
-    error: '#dc2626', // red-600
-    success: '#16a34a', // green-600
+    // La paleta de la guía visual (`docs/design/`): tinta grafito como acción
+    // neutra, naranja de obra como la única acción llena, papel cálido de
+    // fondo. Los valores están duplicados acá y en `app/globals.css` porque
+    // estas pantallas los necesitan como string para estilos en línea; si se
+    // cambia la paleta, se cambian los dos.
+    primary: '#C24B15', // acento obra
+    primaryHover: '#A63F11',
+    background: '#F4F2ED', // papel
+    cardBackground: '#FFFFFF',
+    text: '#16191C', // tinta
+    textSecondary: '#6E7278',
+    border: '#E2DED6',
+    error: '#A32B1E',
+    success: '#2E6B4F',
   },
   logo: {
     text: 'Cordillera',

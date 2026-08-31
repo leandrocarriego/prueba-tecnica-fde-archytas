@@ -315,3 +315,4 @@ flowchart TD
     X -->|Ya avisó| Z["No vuelve a avisar por la misma causa"]
     X -->|La fecha ya pasó| AA["Señala la factura como incidente y no permite emitirle el recibo"]
 ```
+

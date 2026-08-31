@@ -195,6 +195,13 @@ reprograma un vencimiento eligiendo la fecha nueva de un selector, sin arrastrar
 
 ## Criterios de aceptación
 
+> **Enmienda del 2026-08-31 — el criterio de RF-30.** El ejemplo firmado movía el vencimiento del
+> 10 al 20, dentro del mismo mes, y así **pasaba aunque el requisito fallara**: el defecto sólo
+> aparece cuando la fecha nueva cae en otro mes. El criterio ahora incluye ese caso. **No cambia el
+> alcance** —RF-30 dice lo mismo que el cliente firmó— cambia qué prueba el ejemplo: un criterio
+> verde que no verifica su requisito da por hecho lo que nadie comprobó. Queda registrada acá para
+> que el cliente la vea en la próxima revisión.
+
 - [ ] **RF-01** — El calendario muestra cada vencimiento en el día que le corresponde.
 - [ ] **RF-02** — Cada vencimiento se lee con su descripción, su monto y su proveedor.
 - [ ] **RF-03** — Cargada una factura con vencimiento, aparece en el calendario sin que nadie la agregue.
@@ -224,7 +231,7 @@ reprograma un vencimiento eligiendo la fecha nueva de un selector, sin arrastrar
 - [ ] **RF-27** — Esa misma factura, pagada el 18, no cuenta como atraso de su proveedor.
 - [ ] **RF-28** — Una factura que venció el 10 sin recibo, reprogramada el 12 para el 20, sigue sin permitir emitirlo.
 - [ ] **RF-29** — Esa factura, pagada el 18, cuenta ocho días de atraso: los que corren desde el 10.
-- [ ] **RF-30** — Esa factura sigue apareciendo señalada como vencida sin recibo, aunque su fecha ahora sea el 20.
+- [ ] **RF-30** — Esa factura sigue apareciendo señalada como vencida sin recibo, aunque su fecha ahora sea el 20. Y si se la reprograma **al mes siguiente**, sigue señalada igual: se la ve en el mes al que se la movió, con su proveedor y su estado de pago, y marcada como vencida sin recibo.
 - [ ] **RF-31** — Marcela mueve un vencimiento y el dueño, que está mirando, lo ve moverse.
 - [ ] **RF-32** — El dueño no tocó nada para verlo: no recargó la pantalla.
 - [ ] **RF-33** — El dueño ve que ese cambio lo hizo Marcela.

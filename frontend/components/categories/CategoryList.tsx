@@ -44,7 +44,9 @@ export function CategoryList({
   return (
     <div className="space-y-4">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       <table className="w-full text-sm">

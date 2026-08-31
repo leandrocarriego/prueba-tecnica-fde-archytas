@@ -18,10 +18,10 @@ const ROLES: ReadonlyArray<{ value: string; label: string }> = [
 
 /** The four states of an access, derived on the backend and only shown here. */
 function stateOf(user: UserRead): { label: string; tone: string } {
-  if (!user.is_active) return { label: 'Desactivado', tone: 'bg-gray-100 text-gray-700' }
-  if (!user.activated_at) return { label: 'Invitado', tone: 'bg-amber-100 text-amber-800' }
-  if (user.locked_until) return { label: 'Bloqueado', tone: 'bg-red-100 text-red-800' }
-  return { label: 'Activo', tone: 'bg-green-100 text-green-800' }
+  if (!user.is_active) return { label: 'Desactivado', tone: 'pill' }
+  if (!user.activated_at) return { label: 'Invitado', tone: 'pill pill-warn' }
+  if (user.locked_until) return { label: 'Bloqueado', tone: 'pill pill-danger' }
+  return { label: 'Activo', tone: 'pill pill-ok' }
 }
 
 export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; viewerId: number }) {
@@ -37,7 +37,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
       {result && (
         <p
           className={`rounded border px-4 py-2 text-sm ${
-            result.ok ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+            result.ok ? 'border-ok-border bg-ok-surface' : 'border-danger-border bg-danger-surface'
           }`}
         >
           {result.message}
@@ -82,7 +82,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
                   </select>
                 </td>
                 <td>
-                  <span className={`rounded px-2 py-1 text-xs ${tone}`}>{label}</span>
+                  <span className={tone}>{label}</span>
                 </td>
                 <td className="py-3 text-right">
                   {isViewer ? (
@@ -94,7 +94,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
                       type="button"
                       disabled={pending}
                       onClick={() => run(() => deactivateAccess(access.id))}
-                      className="cursor-pointer rounded border px-3 py-1 hover:bg-gray-50 disabled:opacity-50"
+                      className="cursor-pointer rounded border px-3 py-1 hover:bg-muted disabled:opacity-50"
                     >
                       Desactivar
                     </button>
@@ -103,7 +103,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
                       type="button"
                       disabled={pending}
                       onClick={() => run(() => reactivateAccess(access.id))}
-                      className="cursor-pointer rounded border px-3 py-1 hover:bg-gray-50 disabled:opacity-50"
+                      className="cursor-pointer rounded border px-3 py-1 hover:bg-muted disabled:opacity-50"
                     >
                       Reactivar
                     </button>

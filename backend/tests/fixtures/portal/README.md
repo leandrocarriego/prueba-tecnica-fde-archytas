@@ -16,7 +16,7 @@ apagado**. Por eso estos archivos se versionan.
 | `invoice-F-7797.xlsx` | Factura en planilla, con el encabezado corrido | El lector de planillas (004) |
 | `suppliers-ledger-page-2026-08-29.html` | `/estado-cuenta` con la primera fila **ya expandida** | El padrón: los ocho proveedores y su ficha (004) |
 | `purchase-orders-page-2026-08-29.html` | La sección `/ordenes-compra` renderizada, las 40 filas | La navegación y el parser de órdenes de compra (007) |
-| `messages-page-2026-08-29.html` | **Derivado**, no capturado: la bandeja con sus 64 mensajes | El parser de la bandeja (007) |
+| `messages-page-2026-08-31.html` | La sección `/mensajes-internos` renderizada, los 67 mensajes | El parser de la bandeja (007) |
 | `sales-page-2026-08-29.html` | **Derivado**, no capturado: las 588 ventas con sus anomalías | El parser de ventas (009) |
 
 ## El archivo del día
@@ -128,30 +128,35 @@ Dos cosas que el extractor tiene que saber:
 El detalle expandido trae además los movimientos de cuenta corriente —facturas y pagos con su
 saldo—. Eso es **P5**, y la 004 no lo carga.
 
-## Los dos derivados: la bandeja y las ventas
+## El derivado que queda: las ventas
 
-**No son capturas del portal.** El relevamiento contó qué hay en `/mensajes` y en
-`/ventas` —64 mensajes y 588 ventas, con sus desgloses— pero no guardó el DOM de
-ninguna de las dos. Estos dos archivos los genera
-`scripts/fixtures/derive_portal_fixtures.py`, con semilla fija, y reproducen
+**No es una captura del portal.** El relevamiento contó qué hay en `/ventas` —588
+ventas con sus desgloses— y no guardó el DOM. Este archivo lo genera
+`scripts/fixtures/derive_portal_fixtures.py`, con semilla fija, y reproduce
 exactamente esos números y las anomalías que la spec de 009 enumera:
 
 | Archivo | Lo que reproduce |
 |---|---|
-| `messages-page-2026-08-29.html` | 64 mensajes — 27 de vencimiento próximo, 21 reclamos de pago, 16 de stock bajo — y 30 sin leer |
 | `sales-page-2026-08-29.html` | 588 ventas — **17 grupos repetidos por código tal cual y 27 normalizando**, 6 con datos en conflicto, 3 sin fecha, 3 con fecha inexistente, 3 sin total, 3 con cantidad negativa, 2 con el total inflado diez veces y 1 apuntando a un producto que no existe |
 
 Es el mismo precedente que `price-list-broken`: derivado a mano, declarado como
 tal, para poder afirmar en un test por qué se apartó cada fila.
 
-> **Lo que hay que hacer cuando alguien pueda entrar al portal.** Las columnas de
-> estas dos pantallas se dedujeron del relevamiento y de la estructura que sí se
-> capturó en las otras cuatro (`table.datos`, encabezado en `thead`, fechas ISO,
-> montos con `$` y separador de miles). El día que se capturen las de verdad hay
-> que reemplazar los dos archivos y volver a correr los tests de los parsers: si
-> las columnas se llaman distinto, los parsers de `messages` y `sales` levantan
-> `ExtractionError` y el fallo queda visible en `operations`, que es exactamente
-> lo que tiene que pasar.
+> **Y conviene saber cómo le fue al otro derivado, porque es el precedente.** La
+> bandeja también era un fixture derivado hasta el **2026-08-31**, cuando se
+> capturó de verdad. La deducción falló en dos cosas y ninguna se habría notado
+> corriendo los tests:
+>
+> - la sección **no está en `/mensajes`** sino en `/mensajes-internos`, así que la
+>   lectura nocturna fallaba siempre;
+> - **no hay columna `Tipo`**. El tipo va en el asunto —«Reclamo de pago - F-1809»—,
+>   y leerlo de una columna inexistente dejaba los mensajes sin clasificar, con lo
+>   que ningún aviso inmediato podía dispararse.
+>
+> Los tests del parser de la bandeja **pasaban** todo ese tiempo. Es exactamente lo
+> que un fixture derivado no puede decirte, y vale para `sales-page` mientras siga
+> siéndolo: el día que se capture, hay que reemplazar el archivo y volver a correr
+> los tests del parser de ventas.
 
 ## Recapturar
 

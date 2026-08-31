@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { NoPermission } from '@/components/common/NoPermission'
-import { fetchFromApi } from '@/lib/api/server'
+import { readFromApi } from '@/lib/api/server'
 import { count, money } from '@/lib/format'
 import type { SupplierList } from '@/lib/purchases/types'
 
@@ -24,10 +24,22 @@ const MISSING_LABELS: Record<string, string> = {
  * lo mismo (RF-15, RF-20).
  */
 export default async function SuppliersPage() {
-  const listing = await fetchFromApi<SupplierList>('/suppliers')
-  if (listing === null) {
-    return <NoPermission what="el padrón de proveedores" />
+  const read = await readFromApi<SupplierList>('/suppliers')
+  if (!read.ok) {
+    if (read.failure === 'unauthorized') {
+      return <NoPermission what="el padrón de proveedores" />
+    }
+    return (
+      <main className="mx-auto max-w-5xl space-y-6 p-8">
+        <h1 className="text-2xl font-bold">Proveedores</h1>
+        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
+          No pudimos traer el padrón. Probá de nuevo en unos minutos.
+        </p>
+      </main>
+    )
   }
+
+  const listing = read.data
 
   return (
     <main className="mx-auto max-w-5xl space-y-8 p-8">
@@ -74,7 +86,7 @@ export default async function SuppliersPage() {
                 </td>
                 <td className="py-2 text-right">{money(supplier.balance)}</td>
                 <td className="py-2 text-right">{count(supplier.invoice_count)}</td>
-                <td className="py-2 text-amber-800">
+                <td className="py-2 text-warn">
                   {(supplier.missing ?? [])
                     .map(field => MISSING_LABELS[field] ?? field)
                     .join(', ') || '—'}

@@ -21,10 +21,15 @@ export default async function PrivateLayout({ children }: { children: React.Reac
     redirect('/login')
   }
 
+  /*
+   * La forma del shell es la de la guía visual: barra lateral fija en tinta
+   * grafito y el contenido sobre papel cálido. En pantallas angostas la barra
+   * se apila arriba en vez de comerse el ancho de la tabla que se vino a leer.
+   */
   return (
-    <>
+    <div className="flex min-h-dvh flex-col md:flex-row">
       <Navigation user={session.user} permissions={session.permissions} />
-      {children}
-    </>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   )
 }

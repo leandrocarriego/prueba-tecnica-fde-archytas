@@ -65,6 +65,19 @@ _SALES = "SALES"
 #
 # Nobody *edits* a dashboard, so it has no write level for anyone.
 #
+# `PRODUCT_CATEGORIES` is the one row of this table the 002 got wrong, and the
+# **010** corrects it: the rubros are maintained by whoever buys, not by whoever
+# sells. A rubro is the category something is bought under — the owner buys a
+# pair of pliers to resell, and it is Herramientas from the moment it is bought
+# — so the person who sees it arrive is the one in a position to say which rubro
+# it belongs to. Sales keeps `READ`, the same deal it already has with list
+# prices and with the calendar: it sells from that catalog and needs to know
+# where each product falls.
+#
+# **The catalog did not move with it**, and that is deliberate: `PRODUCT_CATALOG`
+# stays with sales. It is the first time the two are separated, and the 010 says
+# so out loud.
+#
 # `MANUAL_CORRECTIONS` is the odd one out, and worth a sentence. Making a
 # correction is authorised by the section the datum belongs to — the catalog
 # for a price, purchase invoices for an invoice — because that is what RF-24 of
@@ -83,7 +96,7 @@ MATRIX: dict[Section, dict[str, Level]] = {
     Section.SALES: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
     Section.DASHBOARD: {_OWNER: Level.READ, _PURCHASING: Level.NONE, _SALES: Level.READ},
     Section.STOCK: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
-    Section.PRODUCT_CATEGORIES: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
+    Section.PRODUCT_CATEGORIES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.READ},
     Section.PRODUCT_CATALOG: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
     Section.ACCESS_ADMIN: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.NONE},
     Section.ACCESS_LOG: {_OWNER: Level.READ, _PURCHASING: Level.NONE, _SALES: Level.NONE},

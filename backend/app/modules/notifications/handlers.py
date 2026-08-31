@@ -183,10 +183,13 @@ async def warn_about_a_message(event: SupplierMessageReceived, session: AsyncSes
         session,
         kind,
         build(supplier=event.supplier_name, subject=event.subject, body=event.body),
+        message_id=event.message_id,
     )
 
 
-async def _deliver(session: AsyncSession, kind: AlertKind, message: str) -> None:
+async def _deliver(
+    session: AsyncSession, kind: AlertKind, message: str, message_id: int | None = None
+) -> None:
     """Queue one alert per recipient, waiting for the window if it is closed.
 
     The delay is what RF-42 asks for and it is applied by the broker rather than
@@ -197,7 +200,12 @@ async def _deliver(session: AsyncSession, kind: AlertKind, message: str) -> None
     countdown = await router.delay_until_window()
     phones = await router.phones_for(kind)
     for phone in phones:
-        tasks.send_alert.apply_async(args=[phone, message], countdown=countdown)
+        # `message_id` travels so that a delivery that fails can be shown on the
+        # message it was about (RF-38). It is `None` for the due-date alerts of
+        # 005, which have no inbox message behind them.
+        tasks.send_alert.apply_async(
+            args=[phone, message, kind.value, message_id], countdown=countdown
+        )
     logger.info(
         "Alert queued",
         extra={"kind": kind.value, "recipients": len(phones), "countdown": countdown},

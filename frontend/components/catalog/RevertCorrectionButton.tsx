@@ -76,7 +76,7 @@ export function RevertCorrectionButton({ correctionId }: { correctionId: number 
       >
         {working ? 'Deshaciendo…' : 'Volver al valor del portal'}
       </button>
-      <span aria-live="polite" className="text-sm text-red-700" role="status">
+      <span aria-live="polite" className="text-sm text-danger" role="status">
         {error ?? ''}
       </span>
     </span>

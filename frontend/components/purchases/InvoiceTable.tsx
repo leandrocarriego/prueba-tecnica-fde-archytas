@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { day, money } from '@/lib/format'
-import { paymentStateLabel, warningFor } from '@/lib/purchases/labels'
+import { fileKindLabel, isScanned, paymentStateLabel, warningsFor } from '@/lib/purchases/labels'
 import type { Invoice } from '@/lib/purchases/types'
 
 /**
@@ -10,6 +10,11 @@ import type { Invoice } from '@/lib/purchases/types'
  * El estado de pago que muestra es el que sale de los pagos imputados, nunca el
  * que informa el portal (RF-45 de 005). Cuando los dos no coinciden, la fila lo
  * dice: no gana ninguno.
+ *
+ * La columna **Formato** es RF-05, y está acá y no en la ficha porque el
+ * criterio firmado pide distinguir a simple vista cuáles llegaron escaneadas —
+ * 46 de cada 100— y eso sólo se ve mirando la lista entera. Las escaneadas van
+ * marcadas: son las que el lector acierta menos.
  */
 export function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
   if (invoices.length === 0) {
@@ -28,6 +33,7 @@ export function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
             <th className="py-2">Factura</th>
             <th className="py-2">Proveedor</th>
             <th className="py-2">Fecha</th>
+            <th className="py-2">Formato</th>
             <th className="py-2">Vence</th>
             <th className="py-2 text-right">Monto</th>
             <th className="py-2 text-right">Pagado</th>
@@ -37,7 +43,7 @@ export function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
         </thead>
         <tbody>
           {invoices.map(invoice => {
-            const warning = warningFor(invoice)
+            const warnings = warningsFor(invoice)
             return (
               <tr key={invoice.id} className="border-b align-top">
                 <td className="py-2">
@@ -52,12 +58,21 @@ export function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
                 </td>
                 <td className="py-2">
                   {invoice.supplier_name ?? (
-                    <span className="text-amber-800">
-                      {invoice.supplier_text} · sin identificar
-                    </span>
+                    <span className="text-warn">{invoice.supplier_text} · sin identificar</span>
                   )}
                 </td>
                 <td className="py-2">{day(invoice.issued_on)}</td>
+                <td className="py-2">
+                  {isScanned(invoice.file_kind) ? (
+                    <span className="rounded bg-warn-surface px-1.5 py-0.5 text-xs text-warn">
+                      {fileKindLabel(invoice.file_kind)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {fileKindLabel(invoice.file_kind)}
+                    </span>
+                  )}
+                </td>
                 <td className="py-2">{day(invoice.due_on)}</td>
                 <td className="py-2 text-right">{money(invoice.total)}</td>
                 <td className="py-2 text-right">
@@ -68,7 +83,11 @@ export function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
                 </td>
                 <td className="py-2">
                   {paymentStateLabel(invoice.payment_state)}
-                  {warning && <p className="text-xs text-amber-800">{warning}</p>}
+                  {warnings.map(warning => (
+                    <p key={warning} className="text-xs text-warn">
+                      {warning}
+                    </p>
+                  ))}
                 </td>
                 <td className="py-2">{invoice.receipt_issued ? 'Emitido' : 'Falta'}</td>
               </tr>

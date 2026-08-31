@@ -42,7 +42,11 @@ LOGIN_PATH = "/login"
 INVOICES_PATH = "/facturas"
 SUPPLIER_LEDGER_PATH = "/estado-cuenta"
 PURCHASE_ORDERS_PATH = "/ordenes-compra"
-MESSAGES_PATH = "/mensajes"
+# The inbox is at `/mensajes-internos`, and it used to say `/mensajes` here.
+# That path answers 404: the nightly read failed every single time, and nothing
+# said so louder than a job that ended badly. Verified against the live portal
+# on 2026-08-31 — the menu links it as «Mensajes Internos».
+MESSAGES_PATH = "/mensajes-internos"
 SALES_PATH = "/ventas"
 
 DOWNLOAD_BUTTON = re.compile("Descargar planilla", re.IGNORECASE)

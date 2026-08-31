@@ -81,7 +81,9 @@ export function InvoicePanel({
   return (
     <div className="space-y-6">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       <section className="space-y-3">
@@ -160,7 +162,7 @@ export function InvoicePanel({
         )}
 
         {warning && (
-          <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <div className="space-y-2 rounded border border-warn-border bg-warn-surface p-3 text-sm text-warn">
             <p>{warning}</p>
             <Button type="button" variant="outline" disabled={busy} onClick={() => void pay(true)}>
               Registrarlo igual
@@ -176,7 +178,7 @@ export function InvoicePanel({
             <p>
               {receipt.number} · emitido el {formatMoment(receipt.issued_at)}
             </p>
-            <pre className="overflow-x-auto rounded bg-gray-50 p-3 text-xs">{receipt.document}</pre>
+            <pre className="overflow-x-auto rounded bg-muted p-3 text-xs">{receipt.document}</pre>
             {canIssue && (
               <Button
                 type="button"

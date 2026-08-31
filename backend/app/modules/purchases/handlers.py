@@ -20,6 +20,7 @@ from app.shared.events import (
     BusinessParameterChanged,
     DailyDigestContribution,
     DailyDigestRequested,
+    DueDateChanged,
     InvoiceFileRead,
     InvoicesNormalized,
     InvoicesRegistered,
@@ -28,6 +29,7 @@ from app.shared.events import (
     SuppliersNormalized,
     events,
 )
+from app.shared.live import announce
 
 logger = get_logger(__name__)
 
@@ -69,6 +71,9 @@ async def record_document(event: InvoiceFileRead, session: AsyncSession) -> None
         issued_on=event.issued_on,
         total=event.total,
         supplier_text=event.supplier_text,
+        supplier_tax_id=event.supplier_tax_id,
+        content=event.content,
+        content_type=event.content_type,
     )
 
 
@@ -129,3 +134,27 @@ async def contribute_to_the_digest(event: DailyDigestRequested, session: AsyncSe
         session,
     )
     del event
+
+
+@events.subscribe(DueDateChanged)
+async def push_the_calendar_change(event: DueDateChanged, session: AsyncSession) -> None:
+    """Tell the screens of the other people looking at the calendar (RF-31 to RF-33).
+
+    It runs in the transaction of whoever moved the entry, and that is fine here
+    precisely because of *how* it says it: `pg_notify` is transactional, so a
+    move that ends up rolled back announces nothing, and nothing is written to a
+    socket from inside the transaction. Sending an HTTP push from here instead
+    would make one person's dropped connection able to abort another person's
+    change, which is what `GEN-09` is about.
+    """
+    await announce(
+        session,
+        topic="calendar",
+        payload={
+            "due_date_id": event.due_date_id,
+            "action": event.action,
+            "actor_name": event.actor_name,
+            "on_date": event.on_date,
+            "invoice_id": event.invoice_id,
+        },
+    )

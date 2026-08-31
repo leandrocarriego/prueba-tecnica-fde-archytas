@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.logging import get_logger
 from app.modules.messaging.service import MessagingService
 from app.shared.events import (
+    AlertDeliveryFailed,
     DailyDigestContribution,
     DailyDigestRequested,
     SupplierMessagesNormalized,
@@ -60,3 +61,19 @@ async def contribute_to_the_digest(event: DailyDigestRequested, session: AsyncSe
         session,
     )
     del event
+
+
+@events.subscribe(AlertDeliveryFailed)
+async def record_a_failed_alert(event: AlertDeliveryFailed, session: AsyncSession) -> None:
+    """An alert about a message did not get through, so the message says so (RF-38).
+
+    The screen is where it belongs, and the reason is almost literal: the phone
+    is exactly where the news did **not** arrive, so the only place left to tell
+    somebody is the one they have to open anyway.
+
+    An alert with no message behind it — the due-date ones of 005 — is announced
+    all the same and recorded nowhere: there is nothing to write it on.
+    """
+    if event.message_id is None:
+        return
+    await MessagingService(session).record_alert_failure(event.message_id, event.reason)

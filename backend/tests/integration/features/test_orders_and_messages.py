@@ -14,16 +14,22 @@ Lo que la 007 pone en juego y por eso se fija acá:
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.models import User
 from app.modules.messaging.models import MessageKind, MessageState
 from app.modules.messaging.service import MessagingService
 from app.modules.purchases.service import PurchasesService, today_here
+from app.modules.triage.models import CaseStatus, ExceptionCase
+from app.modules.triage.service import UNREADABLE_ORDER_ROW
+from app.shared.errors import ConflictError
 from app.shared.events import (
     NormalizedMessage,
     NormalizedPurchaseOrder,
     NormalizedSupplier,
+    PurchaseOrderRowsQuarantined,
+    QuarantinedRow,
     SupplierMessageReceived,
     events,
 )
@@ -277,6 +283,39 @@ class TestTheInbox:
         assert read.supplier_name is None
         assert read.sender_unidentified is True
 
+    async def test_the_inbox_can_be_asked_for_one_supplier(self, session: AsyncSession) -> None:
+        """RF-26: los reclamos pendientes **de un proveedor**, y salen sólo esos.
+
+        El filtro existía en la API y no había control que lo pidiera. Lo que
+        fija este test es el par: por qué nombres se puede filtrar —el padrón
+        como lo guarda este módulo, que son exactamente los valores que
+        `supplier_name` puede tomar— y que filtrar por uno deje afuera al otro.
+        """
+        # Arrange
+        await register(session)
+        service = MessagingService(session)
+        await service.register_messages(
+            messages=(
+                message("MSG-7", sender="Aceros Belgrano SA", kind="Reclamo de pago"),
+                message("MSG-8", sender="Herramientas Cuyo SRL", kind="Reclamo de pago"),
+            ),
+            first_run=True,
+        )
+
+        # Act
+        senders = await service.senders()
+        theirs = await service.list_messages(
+            kind=MessageKind.PAYMENT_CLAIM,
+            state=MessageState.PENDING,
+            supplier_name="Aceros Belgrano SA",
+        )
+
+        # Assert
+        assert "Aceros Belgrano SA" in senders
+        assert senders == sorted(senders)
+        assert theirs.total == 1
+        assert theirs.items[0].supplier_name == "Aceros Belgrano SA"
+
     async def test_the_same_message_is_not_registered_twice(self, session: AsyncSession) -> None:
         """La bandeja se lee entera cada vez, y casi todo ya se había leído."""
         # Arrange
@@ -386,3 +425,212 @@ class TestWhoIsWokenUp:
 
         # Assert
         assert [event.kind for event in announced] == ["PAYMENT_CLAIM"]
+
+
+class TestAnOrderWithoutASupplierHasAWayOut:
+    """H8: la orden apartada se resuelve una sola vez y vuelve a la lista.
+
+    Estaba firmada y no estaba construida: la orden **se apartaba bien** —eso es
+    RF-08— y después no había salida. Ni ruta, ni conteo, ni filtro, ni dónde
+    guardar quién la resolvió.
+    """
+
+    async def test_an_unidentifiable_supplier_holds_the_order_with_its_reason(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-08, RF-50, RF-55: entra igual, apartada, y **con el motivo**.
+
+        El motivo se descartaba al registrar. RF-55 pide justamente el que se
+        perdía: «este proveedor no está en el padrón» es distinto de «el nombre
+        no alcanza», y de esa diferencia depende que nadie intente darlo de alta
+        desde la revisión.
+        """
+        # Arrange
+        await register(session)
+        service = PurchasesService(session)
+
+        # Act
+        await service.register_orders(
+            batch_id=1, orders=(order("OC-9001", "Metalurgica Quilmes SRL"),)
+        )
+
+        # Assert
+        listing = await service.list_orders(only_in_review=True)
+        assert listing.held == 1
+        assert listing.items[0].supplier_id is None
+        assert listing.items[0].supplier_text == "Metalurgica Quilmes SRL"
+        assert listing.items[0].review_reason is not None
+
+    async def test_resolving_it_records_who_and_takes_it_off_the_queue(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-54, RF-56, RF-57."""
+        # Arrange
+        await register(session)
+        service = PurchasesService(session)
+        await service.register_orders(
+            batch_id=1, orders=(order("OC-9002", "Metalurgica Quilmes SRL"),)
+        )
+        held = (await service.list_orders(only_in_review=True)).items[0]
+        supplier = (await service.list_suppliers()).items[0]
+
+        # Act
+        resolved = await service.resolve_order(
+            held.id, supplier_id=supplier.id, remember=True, actor_user_id=owner.id
+        )
+
+        # Assert
+        assert resolved.supplier_id == supplier.id
+        assert resolved.resolved_by_user_id == owner.id
+        assert resolved.resolved_at is not None
+        assert (await service.list_orders(only_in_review=True)).held == 0
+
+    async def test_one_decision_resolves_every_order_written_the_same_way(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-61, RF-62: el relevamiento midió **veinte** formas de escribir un nombre.
+
+        Decidir la misma una y otra vez es exactamente la cola que un equipo de
+        tres personas termina abandonando.
+        """
+        # Arrange — tres órdenes con el nombre escrito igual.
+        await register(session)
+        service = PurchasesService(session)
+        await service.register_orders(
+            batch_id=1,
+            orders=(
+                order("OC-9003", "Metalurgica Quilmes SRL"),
+                order("OC-9004", "Metalurgica Quilmes SRL", product_code="COR-0079"),
+                order("OC-9005", "Metalurgica Quilmes SRL", product_code="COR-0080"),
+            ),
+        )
+        assert (await service.list_orders(only_in_review=True)).held == 3
+        held = (await service.list_orders(only_in_review=True)).items[0]
+        supplier = (await service.list_suppliers()).items[0]
+
+        # Act — una sola decisión.
+        await service.resolve_order(
+            held.id, supplier_id=supplier.id, remember=True, actor_user_id=owner.id
+        )
+
+        # Assert
+        assert (await service.list_orders(only_in_review=True)).held == 0
+
+    async def test_the_next_order_written_that_way_arrives_identified(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-58: guardada la grafía, la que llegue después no pasa por revisión."""
+        # Arrange
+        await register(session)
+        service = PurchasesService(session)
+        await service.register_orders(
+            batch_id=1, orders=(order("OC-9006", "Metalurgica Quilmes SRL"),)
+        )
+        held = (await service.list_orders(only_in_review=True)).items[0]
+        supplier = (await service.list_suppliers()).items[0]
+        await service.resolve_order(
+            held.id, supplier_id=supplier.id, remember=True, actor_user_id=owner.id
+        )
+
+        # Act
+        await service.register_orders(
+            batch_id=2, orders=(order("OC-9007", "Metalurgica Quilmes SRL"),)
+        )
+
+        # Assert
+        assert (await service.list_orders(only_in_review=True)).held == 0
+        arrived = [item for item in (await service.list_orders()).items if item.number == "OC-9007"]
+        assert arrived[0].supplier_id == supplier.id
+
+    async def test_a_held_order_is_never_flagged_as_a_repeat_and_is_checked_on_resolution(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-59 y RF-60, que son las dos mitades de la misma regla.
+
+        Sin proveedor no hay con qué comparar y señalarla igual sería adivinar.
+        Resuelta, la comparación se hace **una vez** en vez de nunca.
+        """
+        # Arrange — un pedido ya identificado, y otro del mismo producto escrito
+        # de una forma que el sistema no reconoce.
+        await register(session)
+        service = PurchasesService(session)
+        supplier = (await service.list_suppliers()).items[0]
+        await service.register_orders(batch_id=1, orders=(order("OC-9008", supplier.legal_name),))
+        await service.register_orders(
+            batch_id=2, orders=(order("OC-9009", "Metalurgica Quilmes SRL"),)
+        )
+        held = (await service.list_orders(only_in_review=True)).items[0]
+        assert held.repeat_of_order_id is None  # RF-59
+
+        # Act
+        resolved = await service.resolve_order(
+            held.id, supplier_id=supplier.id, remember=False, actor_user_id=owner.id
+        )
+
+        # Assert — RF-60: ahora sí hay contra qué comparar.
+        assert resolved.repeat_of_order_id is not None
+        assert resolved.repeat_of_number == "OC-9008"
+
+    async def test_an_order_that_is_not_held_cannot_be_resolved(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Resolver dos veces no es idempotente: la segunda vez significa otra cosa."""
+        # Arrange
+        await register(session)
+        service = PurchasesService(session)
+        supplier = (await service.list_suppliers()).items[0]
+        await service.register_orders(batch_id=1, orders=(order("OC-9010", supplier.legal_name),))
+        identified = (await service.list_orders()).items[0]
+
+        # Act / Assert
+        with pytest.raises(ConflictError):
+            await service.resolve_order(
+                identified.id, supplier_id=supplier.id, remember=False, actor_user_id=owner.id
+            )
+
+
+class TestAnOrderRowNobodyCouldInterpret:
+    """RF-08 y el Artículo II sobre la fila de órdenes que no se pudo tipar."""
+
+    async def test_it_opens_a_case_instead_of_stopping_in_quarantine(
+        self, session: AsyncSession
+    ) -> None:
+        """El agujero que el converge encontró: se publicaba y nadie escuchaba.
+
+        `ingestion` publicaba `PurchaseOrderRowsQuarantined` desde el primer día
+        y no había un solo suscriptor: la fila quedaba en cuarentena en `staging`
+        y ahí terminaba. En esta pantalla es peor que en cualquier otra — la 007
+        existe porque los pedidos se pierden, y un pedido que la plataforma nunca
+        admite haber visto es el caso más literal de eso.
+        """
+        # Act
+        await events.publish(
+            PurchaseOrderRowsQuarantined(
+                batch_id=11,
+                cases=(
+                    QuarantinedRow(
+                        staging_row_id=41,
+                        reason="La fila no tiene numero de orden",
+                        excerpt="Herramientas Cuyo SRL;;COR-0078;10;Pendiente de envio",
+                    ),
+                ),
+            ),
+            session,
+        )
+
+        # Assert
+        opened = (
+            (
+                await session.execute(
+                    select(ExceptionCase).where(ExceptionCase.kind == UNREADABLE_ORDER_ROW)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(opened) == 1
+        assert opened[0].status is CaseStatus.PENDING
+        assert opened[0].reason == "La fila no tiene numero de orden"
+        assert opened[0].payload["excerpt"] == (
+            "Herramientas Cuyo SRL;;COR-0078;10;Pendiente de envio"
+        )

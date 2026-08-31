@@ -46,6 +46,11 @@ UNKNOWN_PRODUCT = "La venta apunta a un producto que no existe"
 OUTLIER_TOTAL = "El total se aleja de lo habitual para ese producto"
 DUPLICATE_WITH_DIFFERENCES = "Hay otra venta con el mismo código y datos distintos"
 DUPLICATE_IDENTICAL = "Repetida idéntica: se cuenta una sola vez"
+# Why a version was set aside when a **person** chose another one. It is not
+# `DUPLICATE_IDENTICAL`: these versions were not identical — that is precisely
+# why somebody had to decide — and telling the person who decided that the
+# system unified them is telling them something that did not happen.
+DISCARDED_BY_DECISION = "Se descartó al elegir otra versión de esta venta"
 
 NO_SUCH_SALE = "No encontramos esa venta"
 NOT_HELD = "Esa venta no está apartada"
@@ -68,12 +73,29 @@ class SalesService:
     # --- Registering what the sales screen brought -----------------------
 
     async def register_sales(self, *, batch_id: int, sales: tuple[NormalizedSale, ...]) -> None:
-        """Bring a batch of sales records in, counting only what may be counted."""
+        """Bring a batch of sales records in, counting only what may be counted.
+
+        Three outcomes, and none of them is «dropped». A record the parser could
+        not read whole is **held with its reason**; one that repeats another
+        identically is counted once and its copy kept; one that repeats another
+        with something different holds both until a person decides.
+        """
         known = await self.sales.known_products()
         threshold = Decimal(str(await self._setting(OUTLIER_KEY)))
         merged = held = counted = 0
 
         for row in sales:
+            if row.reason is not None:
+                # The parser could not read this record whole. It is held with
+                # the reason it arrived with (RF-16 to RF-19, RF-23) and it is
+                # **not compared against anything**: a record missing its code
+                # has no code to group by, and one missing its date or its total
+                # is not a repetition of anybody until a person completes it.
+                # Correcting it is `correct_sale`, and from there it counts.
+                await self.sales.add(self._sale_of(row, state=SaleState.HELD, reason=row.reason))
+                held += 1
+                continue
+
             reason = await self._why_not_countable(row, known=known, threshold=threshold)
             siblings = await self.sales.with_code_key(row.code_key)
             twin = self._identical_among(siblings, row)
@@ -138,10 +160,12 @@ class SalesService:
     ) -> str | None:
         """Why this record may not be added up, or nothing.
 
-        The parser already refused what is not readable — no date, a date that
-        does not exist, no total, a negative quantity. What is decided here is
-        what needs the rest of the platform to answer: whether the product
-        exists, and whether the amount is wildly out of line for it.
+        Only reached by a record that **read whole**: the parser already named
+        what it could not read — no date, a date that does not exist, no total,
+        a negative quantity — and `register_sales` holds those with that reason
+        without ever asking this. What is decided here is what needs the rest of
+        the platform to answer: whether the product exists, and whether the
+        amount is wildly out of line for it.
         """
         if row.product_code and row.product_code not in known:
             return UNKNOWN_PRODUCT
@@ -207,7 +231,13 @@ class SalesService:
         groups: list[SaleGroup] = []
         broken: list[SaleRead] = []
         for code_key, records in grouped.items():
-            if len(records) < 2:
+            # A record that arrived **without a code** is not part of any group,
+            # however many of them there are. They all share the empty
+            # `code_key`, so grouping them the way the rest is grouped would
+            # build one bogus «repeated sale» out of records that have nothing
+            # to do with each other — and the screen would ask a person to
+            # choose which of them «is the valid one».
+            if not code_key or len(records) < 2:
                 broken.extend(SaleRead.model_validate(sale) for sale in records)
                 continue
             groups.append(
@@ -251,6 +281,11 @@ class SalesService:
                 value=invoiced,
                 sales=counted,
                 excluded=held + discarded,
+                # Of everything left out, how much the platform unified on its
+                # own (RF-12). It is reported apart from the rest because they
+                # are different facts: nobody decided the merged ones, and a
+                # person decided every other discarded one.
+                merged=await self.sales.count_merged(since=since, until=until),
                 has_estimates=await self.sales.has_estimates(since=since, until=until),
             ),
             by_month=[
@@ -287,7 +322,7 @@ class SalesService:
                 chosen = sale.id == sale_id
                 sale.state = SaleState.COUNTED if chosen else SaleState.DISCARDED
                 sale.duplicate_of_sale_id = None if chosen else sale_id
-            sale.reason = None if sale.state is SaleState.COUNTED else DUPLICATE_IDENTICAL
+            sale.reason = None if sale.state is SaleState.COUNTED else DISCARDED_BY_DECISION
             sale.decision = decision
             sale.resolved_by_user_id = actor_user_id
             sale.resolved_at = now

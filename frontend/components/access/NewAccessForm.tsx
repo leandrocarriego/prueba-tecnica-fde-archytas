@@ -11,7 +11,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="cursor-pointer rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+      className="cursor-pointer rounded bg-primary px-4 py-2 text-white disabled:opacity-50"
     >
       {pending ? 'Dando de alta...' : 'Dar de alta e invitar'}
     </button>
@@ -63,9 +63,7 @@ export function NewAccessForm() {
       <SubmitButton />
 
       {result && (
-        <p className={`text-sm ${result.ok ? 'text-green-700' : 'text-red-700'}`}>
-          {result.message}
-        </p>
+        <p className={`text-sm ${result.ok ? 'text-ok' : 'text-danger'}`}>{result.message}</p>
       )}
     </form>
   )

@@ -11,7 +11,7 @@ function SubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="w-full cursor-pointer rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
+      className="w-full cursor-pointer rounded bg-primary px-4 py-2 text-white disabled:opacity-50"
     >
       {pending ? 'Guardando...' : label}
     </button>
@@ -46,7 +46,7 @@ export function PasswordForm({
   const [result, setResult] = useState<ActionResult | null>(null)
 
   if (singleUse && result?.ok) {
-    return <p className="text-sm text-green-700">{result.message}</p>
+    return <p className="text-sm text-ok">{result.message}</p>
   }
 
   return (
@@ -81,9 +81,7 @@ export function PasswordForm({
       <SubmitButton label={label} />
 
       {result && (
-        <p className={`text-sm ${result.ok ? 'text-green-700' : 'text-red-700'}`}>
-          {result.message}
-        </p>
+        <p className={`text-sm ${result.ok ? 'text-ok' : 'text-danger'}`}>{result.message}</p>
       )}
     </form>
   )

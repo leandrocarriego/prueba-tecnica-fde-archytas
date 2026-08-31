@@ -1,0 +1,14 @@
+---
+title: La vida de un pendiente
+---
+stateDiagram-v2
+    [*] --> Pendiente: El sistema aparta algo<br/>que no pudo interpretar
+    Pendiente --> Pendiente: Vuelve a aparecer lo mismo<br/>y suma una aparición
+    Pendiente --> Demorado: Pasan más días<br/>que los configurados
+    Demorado --> Pendiente: Deja de estar demorado sólo<br/>si cambia el plazo configurado
+    Pendiente --> Revisado: Una persona lo da por revisado
+    Demorado --> Revisado: Una persona lo da por revisado
+    Pendiente --> Resuelto: Se resuelve lo que lo originó,<br/>en la pantalla que le corresponde
+    Demorado --> Resuelto: Se resuelve lo que lo originó
+    Revisado --> [*]: Sale de la lista y queda consultable
+    Resuelto --> [*]: Sale de la lista y queda consultable

@@ -936,6 +936,8 @@ def parse_purchase_orders(content: bytes) -> list[ParsedPurchaseOrder]:
 
 MESSAGE_COLUMNS = ("Fecha", "Remitente", "Asunto")
 READ_STATES = frozenset({"leido", "leído"})
+# What separates the kind from the rest of a subject: «Reclamo de pago - F-1809».
+SUBJECT_KIND_SEPARATOR = " - "
 
 
 @dataclass(frozen=True, slots=True)
@@ -956,6 +958,29 @@ class ParsedMessage:
     @property
     def is_readable(self) -> bool:
         return self.reason is None
+
+
+def _kind_written_in(column: str, subject: str) -> str | None:
+    """How the portal names the kind of a message, wherever it writes it.
+
+    **There is no `Tipo` column**, and this used to read one: verified against
+    the live inbox on 2026-08-31, whose columns are `Fecha`, `Remitente`,
+    `Asunto` and `Estado`. Every message came back with no kind at all, so all
+    sixty-seven were shown unclassified and **no immediate alert could ever
+    fire** — RF-33 and RF-34 were dead without anything failing.
+
+    The kind is in the subject, before a dash: «Reclamo de pago - F-1809»,
+    «Vencimiento proximo - F-4032», «Stock bajo - COR-0143». The column is still
+    read first, because a portal that grows one should be believed over a
+    convention, and this stays a *reading* rather than a decision: what it means
+    is `messaging`'s to say, and a wording nobody mapped is still shown
+    unclassified (RF-25).
+    """
+    named = column.strip()
+    if named:
+        return named
+    head = subject.split(SUBJECT_KIND_SEPARATOR)[0].strip()
+    return head or None
 
 
 def parse_messages(content: bytes) -> list[ParsedMessage]:
@@ -999,7 +1024,7 @@ def parse_messages(content: bytes) -> list[ParsedMessage]:
                     else datetime.combine(received, datetime.min.time(), tzinfo=UTC)
                 ),
                 sender_text=sender or None,
-                kind_text=table.column(row, "Tipo").strip() or None,
+                kind_text=_kind_written_in(table.column(row, "Tipo"), subject),
                 subject=subject or None,
                 body=table.column(row, "Mensaje").strip() or subject or None,
                 already_read=state in READ_STATES,

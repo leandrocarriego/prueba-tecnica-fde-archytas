@@ -235,6 +235,7 @@ class InvoiceFileRead(Base):
     issued_on: Mapped[date | None] = mapped_column(Date, default=None)
     total: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), default=None)
     supplier_text: Mapped[str | None] = mapped_column(String(255), default=None)
+    supplier_tax_id: Mapped[str | None] = mapped_column(String(20), default=None)
     reason: Mapped[str | None] = mapped_column(String(200), default=None)
     excerpt: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

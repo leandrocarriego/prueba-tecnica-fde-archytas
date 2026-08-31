@@ -49,7 +49,7 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
         <Link className="text-sm text-muted-foreground underline" href="/precios">
           « Volver a la lista de precios
         </Link>
-        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
           No pudimos traer este producto. Probá de nuevo en unos minutos.
         </p>
       </main>
@@ -114,12 +114,12 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
       </section>
 
       {history.corrections.some(correction => correction.status === 'CONFLICTED') && (
-        <section className="space-y-2 rounded border border-red-300 bg-red-50 p-4">
-          <h2 className="font-medium text-red-900">El portal informa otro valor</h2>
+        <section className="space-y-2 rounded border border-danger-border bg-danger-surface p-4">
+          <h2 className="font-medium text-danger">El portal informa otro valor</h2>
           {history.corrections
             .filter(correction => correction.status === 'CONFLICTED')
             .map(correction => (
-              <p className="text-sm text-red-900" key={correction.correction_id}>
+              <p className="text-sm text-danger" key={correction.correction_id}>
                 Para {FIELD_LABELS[correction.field] ?? correction.field}, el portal había informado{' '}
                 <strong>{String(correction.portal_value)}</strong>, quedó corregido a mano en{' '}
                 <strong>{String(correction.corrected_value)}</strong>, y ahora informa{' '}
@@ -171,7 +171,7 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
               required and the API validates it against this very list. So the
               screen says the part that failed, and keeps everything below.
             */
-            <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+            <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
               No pudimos traer los motivos de corrección. Probá de nuevo en unos minutos.
             </p>
           )}

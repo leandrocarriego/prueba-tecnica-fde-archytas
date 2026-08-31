@@ -30,6 +30,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -67,6 +68,17 @@ class InvoiceReviewState(enum.StrEnum):
     RESOLVED = "RESOLVED"
 
 
+# The payment states a screen shows, computed from the payments imputed and
+# never stored (RF-01, RF-45 of 005). They live here, and not in the service
+# that computes them, because the repository has to name the same four to
+# filter a listing by them — and a repository importing from its own service
+# would invert the module's layers to share four strings.
+SETTLED = "SALDADA"
+PARTIAL = "PARCIAL"
+UNPAID = "SIN_PAGOS"
+INCONSISTENT = "INCONSISTENTE"
+
+
 class PaymentOrigin(enum.StrEnum):
     """Whether a payment came from the portal or somebody typed it (RF-20 of 005)."""
 
@@ -87,6 +99,24 @@ class DueDateOrigin(enum.StrEnum):
 
     INVOICE = "INVOICE"
     MANUAL = "MANUAL"
+
+
+class InvoiceOrder(enum.StrEnum):
+    """How the invoices screen is sorted (RF-45 of 004).
+
+    Vocabulary and not a column: nothing stores it, and it lives here —beside
+    the other words this module answers in— so the ordering travels
+    `routes` → `service` → `repository` in one direction. A plain pair of
+    strings would have let a screen ask for a column that does not exist.
+
+    Two fields and both directions, which is exactly what the requirement asks
+    for: the date the invoice was issued, and its total.
+    """
+
+    ISSUED_DESC = "issued_desc"
+    ISSUED_ASC = "issued_asc"
+    TOTAL_DESC = "total_desc"
+    TOTAL_ASC = "total_asc"
 
 
 class OrderReviewState(enum.StrEnum):
@@ -234,6 +264,13 @@ class Invoice(Base):
     # How many times the same invoice arrived. A second arrival with the same
     # total is counted, not stored twice (RF-38, RF-39).
     arrival_count: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # The batch that last brought this invoice, and the whole reason the count
+    # above means what RF-39 says. The invoices screen is re-read twice a day
+    # and re-normalised whole whenever one cell of it changes, so «seen again»
+    # is the normal case and says nothing. An **arrival** is the portal
+    # publishing the invoice as a second row of the *same* reading; meeting it
+    # again in a later reading is the same row, read again, and counts nothing.
+    last_batch_id: Mapped[int | None] = mapped_column(Integer, default=None)
     staging_row_id: Mapped[int | None] = mapped_column(Integer, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -247,6 +284,14 @@ class InvoiceDocument(Base):
     Kept in `core` and not only in `staging` because it is what the review
     screen shows a person: the excerpt of the file, next to what the table said,
     is the evidence the decision is taken on (RF-30 of 004).
+
+    It keeps the **bytes** too, and that is deliberate duplication. RF-04 asks
+    that the original of any invoice can be opened, and the original lives in
+    `raw`, which belongs to `portal`: reading it from here would be the import
+    the Artículo IV forbids. So this module keeps its own copy, fed by
+    `InvoiceFileRead`, which is the projection the constitution prescribes for
+    exactly this. `raw` stays the evidence and stays untouched; this is the copy
+    that gets served to a browser.
     """
 
     __tablename__ = "invoice_document"
@@ -265,6 +310,10 @@ class InvoiceDocument(Base):
     read_issued_on: Mapped[date | None] = mapped_column(Date, default=None)
     read_total: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), default=None)
     read_supplier_text: Mapped[str | None] = mapped_column(String(255), default=None)
+    read_supplier_tax_id: Mapped[str | None] = mapped_column(String(20), default=None)
+    # The file as the portal delivered it, so RF-04 can hand it back.
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, default=None)
+    content_type: Mapped[str | None] = mapped_column(String(120), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     def __repr__(self) -> str:
@@ -487,6 +536,7 @@ class PurchaseOrder(Base):
     __table_args__ = (
         UniqueConstraint("number", name="uq_purchase_order_number"),
         Index("ix_purchase_order_status", "status_text"),
+        Index("ix_purchase_order_review_state", "review_state"),
         Index("ix_purchase_order_supplier", "supplier_id"),
         {"schema": CORE_SCHEMA},
     )
@@ -513,6 +563,13 @@ class PurchaseOrder(Base):
         default=OrderReviewState.OK,
         server_default=OrderReviewState.OK.value,
     )
+    # Why it was held, in the words a person reads (RF-55). Two things get told
+    # apart here and they are not the same: a name that does not disambiguate,
+    # and a supplier that **is not in the register** — only the second one means
+    # nobody may resolve this order by picking from the eight.
+    review_reason: Mapped[str | None] = mapped_column(String(200), default=None)
+    resolved_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     # The earlier order this one repeats, when it looks like a repeat (RF-15).
     repeat_of_order_id: Mapped[int | None] = mapped_column(Integer, default=None)
     repeat_dismissed_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -582,6 +639,7 @@ __all__ = [
     "DueDateOrigin",
     "Invoice",
     "InvoiceDocument",
+    "InvoiceOrder",
     "InvoiceReviewState",
     "OrderReviewState",
     "Payment",

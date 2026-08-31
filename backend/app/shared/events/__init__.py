@@ -7,6 +7,7 @@ vocabulary.
 
 from app.shared.events.bus import EventBus, Handler, discover_handlers, events
 from app.shared.events.catalog import (
+    AlertDeliveryFailed,
     AuditAction,
     BusinessParameterChanged,
     CorrectionConflicted,
@@ -54,7 +55,6 @@ from app.shared.events.catalog import (
     PurchaseOrderRowsQuarantined,
     PurchaseOrdersExtracted,
     PurchaseOrdersNormalized,
-    PurchaseOrdersStalled,
     QuarantineCaseResolved,
     QuarantinedRow,
     QuarantineRuleRedecided,
@@ -129,10 +129,10 @@ __all__ = [
     "ProductHistoryExtracted",
     "ProductPricesUpdated",
     "ProductsRegistered",
+    "AlertDeliveryFailed",
     "PurchaseOrderRowsQuarantined",
     "PurchaseOrdersExtracted",
     "PurchaseOrdersNormalized",
-    "PurchaseOrdersStalled",
     "QuarantineCaseResolved",
     "QuarantineRuleRedecided",
     "QuarantineRuleRevoked",

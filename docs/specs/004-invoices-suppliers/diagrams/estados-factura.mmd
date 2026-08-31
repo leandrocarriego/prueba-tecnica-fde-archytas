@@ -2,39 +2,41 @@
 title: Qué le pasa a cada factura que llega del portal
 ---
 stateDiagram-v2
-    state "Obtenida del portal, con su archivo guardado" as Obtenida
-    state "Leída con certeza" as Leida
-    state "Con algún dato en duda" as Dudosa
+    state "Leída de la lista del portal" as Leida
+    state "Registrada, con sus cuatro datos" as Registrada
     state "Con el proveedor sin identificar" as SinProveedor
     state "De un proveedor que no está en el padrón" as FueraDelPadron
     state "Repetida, con un total distinto" as Discrepante
+    state "Con algún dato en duda" as Dudosa
     state "Apartada, esperando una decisión" as Apartada
     state "Resuelta por una persona" as Resuelta
-    state "Registrada, con sus cuatro datos" as Registrada
 
-    [*] --> Obtenida
-    Obtenida --> Leida: se leen número, fecha, proveedor y total
-    Obtenida --> Dudosa: un dato no se pudo leer con certeza
-    Obtenida --> Apartada: el archivo tiene una forma que el sistema no reconoce
-
-    Leida --> Registrada: el proveedor queda identificado
+    [*] --> Leida
+    Leida --> Registrada: el proveedor queda identificado por su nombre
     Leida --> SinProveedor: el nombre no alcanza para saber cuál es
     Leida --> FueraDelPadron: el proveedor no es ninguno de los ocho
-    Leida --> Discrepante: ya había una igual, con otro total
+    Leida --> Discrepante: ya había llegado una igual en esta lectura, con otro total
 
-    Dudosa --> Apartada
     SinProveedor --> Apartada
     FueraDelPadron --> Apartada
     Discrepante --> Apartada
 
-    Apartada --> Resuelta: una persona confirma el dato o asigna el proveedor
+    Registrada --> Dudosa: el archivo dice algo distinto de la lista, o no se pudo leer
+    Dudosa --> Apartada
+
+    Apartada --> Registrada: el archivo trae el CUIT de un proveedor del padrón
+    Apartada --> Resuelta: una persona confirma o corrige el dato, o asigna el proveedor
     Resuelta --> Registrada
+    Registrada --> Apartada: se deja sin efecto la grafía que la había resuelto
     Registrada --> [*]
 
-    note right of Obtenida
-        El archivo se conserva tal como llegó
-        y no se vuelve a tocar. Si mañana
-        mejora la forma de leerlo, se puede
+    note right of Leida
+        El archivo se busca después de leer la
+        lista, para toda factura: también para
+        la apartada, que es la que más lo
+        necesita. Se conserva tal como llegó y
+        no se vuelve a tocar, así que si mañana
+        mejora la forma de leerlo se puede
         volver a leer sin pedirle nada al portal
     end note
 
@@ -42,12 +44,17 @@ stateDiagram-v2
         Contada y visible con su motivo, sin
         frenar el procesamiento de las demás.
         Nada se descarta y nada se completa
-        por suposición
+        por suposición. Una fila que ni
+        siquiera se pudo interpretar también
+        llega a una persona, en la cola general
+        de revisión
     end note
 
     note right of Registrada
         Nunca queda registrada sin número, sin
         fecha, sin proveedor o sin total. La
         misma factura entra una sola vez, y si
-        llegó varias, lo indica
+        el portal la publicó varias en la misma
+        lectura, lo indica. Volver a leer la
+        pantalla no cuenta como una llegada
     end note

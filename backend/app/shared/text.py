@@ -29,6 +29,18 @@ def normalize(value: str) -> str:
     return _WHITESPACE.sub(" ", cleaned).strip()
 
 
+def only_digits(value: str) -> str:
+    """A tax id with its punctuation taken out.
+
+    `30-70918273-4` and `30709182734` are the same number written twice, and
+    which of the two gets printed depends on who typed it. Every comparison of
+    two tax ids goes through here so that the answer never depends on the
+    formatting — the SQL side of the same rule is `_only_digits` in the
+    purchases repository, which strips the same two characters in the database.
+    """
+    return "".join(character for character in value if character.isdigit())
+
+
 def _merge_initials(tokens: list[str]) -> list[str]:
     """Join runs of single letters back into the word they abbreviate.
 

@@ -87,12 +87,20 @@ async function handleRequest(request: NextRequest, pathArray: string[], method: 
       return new NextResponse(null, { status: 204 })
     }
 
+    // Not JSON either: a PDF or a spreadsheet, which is how the document of an
+    // invoice comes back (RF-04 of 004). It is passed through as **bytes** —
+    // reading it as text would decode it as UTF-8 and hand the browser a
+    // corrupted file — and its `Content-Disposition` travels with it so what
+    // opens in the tab is called `Factura F-8411.pdf` and not `file`.
     const contentType = response.headers.get('content-type') ?? ''
     if (!contentType.includes('application/json')) {
-      const text = await response.text()
-      return new NextResponse(text, {
+      const passed = new Headers()
+      if (contentType) passed.set('Content-Type', contentType)
+      const disposition = response.headers.get('content-disposition')
+      if (disposition) passed.set('Content-Disposition', disposition)
+      return new NextResponse(await response.arrayBuffer(), {
         status: response.status,
-        headers: contentType ? { 'Content-Type': contentType } : undefined,
+        headers: passed,
       })
     }
 

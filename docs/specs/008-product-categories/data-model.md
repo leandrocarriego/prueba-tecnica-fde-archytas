@@ -1,9 +1,12 @@
 # Rubros unificados — Modelo de datos
 
-**Feature:** 008-product-categories · **Fecha:** 2026-08-29 · Detalle de `plan.md` → *Datos*.
+**Feature:** 008-product-categories · **Fecha:** 2026-08-31 · Detalle de `plan.md` → *Datos*.
 
-Todo vive en el esquema `core`, salvo la regla de `triage`, que sigue en `operations` y no se
-toca. Migración: `0003_product_categories`, sobre la cabeza `0002`.
+Todo vive en el esquema `core`, salvo los tres cambios de `operations.resolution_rule`.
+Migración: **`0010_product_categories`**, sobre la cabeza `0009` — la versión anterior de este
+documento la llamaba `0003` sobre `0002`, que era la cabeza cuando se escribió y no cuando la
+feature se construyó. Verificado en
+`backend/alembic/versions/0010_product_categories.py:41-42`.
 
 ## `core.category` — el rubro
 
@@ -20,7 +23,8 @@ mensaje para una persona.
 
 ## `core.category_alias` — la equivalencia
 
-Proyección local de las reglas de `triage`, más las 18 formas sembradas.
+Proyección local de las reglas de `triage`, más las formas sembradas: **11 filas** que cubren las
+18 grafías de la tabla firmada (ver abajo).
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -28,7 +32,7 @@ Proyección local de las reglas de `triage`, más las 18 formas sembradas.
 | `category_id` | `int` FK → `core.category.id` | A qué rubro apunta |
 | `text_normalized` | `str(200)` único | La clave de matcheo |
 | `text_original` | `str(200)` | La forma tal como llegó. Es lo que muestran RF-03 y RF-23 |
-| `rule_id` | `int` | La regla de `triage` de la que salió. **Siempre presente**: las sembradas también tienen su regla, para que no existan dos clases de equivalencia |
+| `rule_id` | `int` **nulo** | La regla de `triage` de la que salió. La columna admite nulo (`catalog/models.py:253`), pero **en la práctica siempre está**: la siembra la escribe y aprender una equivalencia la trae del evento, para que no existan dos clases de equivalencia. La única forma de dejarla nula es resolver el caso con `remember: false`, y esa equivalencia queda fuera del alcance de RF-28 y RF-30 — ver `plan.md` → *Riesgos* |
 | `source` | `SEED` \| `LEARNED` | De dónde vino |
 | `created_at` | `timestamptz` | |
 
@@ -38,8 +42,23 @@ que difieren en mayúsculas —`ELECTRICIDAD` y `Electricidad` son la misma clav
 y `Ferreteria General` son **dos filas distintas apuntando al mismo rubro**, que es exactamente lo
 que la tabla de equivalencias es y por qué se siembra explícita.
 
-Las 18 formas de la spec producen 18 filas y 7 rubros. Que dos filas compartan `category_id` es lo
-normal, no una anomalía.
+**Las 18 formas de la spec producen 11 filas y 7 rubros**, no 18 filas. Es consecuencia directa
+del párrafo de arriba: si `ELECTRICIDAD` y `Electricidad` son la misma clave, no pueden ser dos
+filas bajo un índice único. Las siete grafías que sólo difieren en mayúsculas se colapsan; las
+cuatro que difieren en algo más —`Ferreteria Gral.`, `Herram.`, `Pinturas/Adhesivos`,
+`Seg. Industrial`— siguen siendo filas propias apuntando al mismo rubro.
+
+**Al resolver, el comportamiento es el que la spec pide**: las 18 formas se resuelven al rubro que
+les toca (RF-02), y cada equivalencia —cada una de las 11 filas— tiene su regla en `triage`, así que
+RF-28 a RF-31 alcanzan a todas. Lo que cambia es cuántas filas hacen falta. La siembra lo hace
+explícito saltando la clave repetida (`backend/alembic/versions/0010_product_categories.py:198-206`),
+que es también por qué hay 11 reglas y no 18: las 7 grafías colapsadas comparten la regla de su par.
+
+**Al mostrar, no.** `CategoryRead.aliases` enseña estas 11 filas, así que un rubro con par de
+mayúsculas muestra una forma escrita menos de las que la spec firmada cuenta. Es deriva, está en
+`plan.md` → *Deriva contra la spec firmada*, punto 13, y la decide el humano.
+
+Que dos filas compartan `category_id` es lo normal, no una anomalía.
 
 ## `core.product` — lo que se le suma
 
@@ -57,8 +76,14 @@ normal, no una anomalía.
 Un producto clasificado a mano tiene `classified_by_user_id` y `classified_by_rule_id` nulo, y una
 revocación no lo alcanza.
 
-Índice en `(category_id)` para el conteo por rubro de RF-04, y parcial sobre
-`category_id IS NULL` para la cola de sin clasificar de RF-11 y RF-12.
+Índices efectivamente creados: `(category_id)`, `(subcategory_raw)` y `(classified_by_rule_id)`
+(`0010_product_categories.py:144,151,163-165`). **No hay** índice parcial sobre
+`category_id IS NULL` para la cola de sin clasificar: con cien productos no hace falta, y la
+versión anterior de este documento afirmaba uno que la migración nunca creó.
+
+Los tres conteos —por rubro, sin rubro y total— cuentan sólo productos `ACTIVE`
+(`backend/app/modules/catalog/repository.py:300,364,376`): un producto discontinuado no entra en
+ninguno, así que la suma sigue cerrando contra el total que la pantalla muestra.
 
 ## Cómo se clasifica un lote
 

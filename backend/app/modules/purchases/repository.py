@@ -5,15 +5,22 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.modules.purchases.models import (
+    INCONSISTENT,
+    PARTIAL,
+    SETTLED,
+    UNPAID,
     DueDate,
     DueDateChange,
     Invoice,
     InvoiceDocument,
+    InvoiceOrder,
     InvoiceReviewState,
+    OrderReviewState,
     Payment,
     PaymentOrigin,
     PaymentState,
@@ -27,6 +34,7 @@ from app.modules.purchases.models import (
     SupplierAliasSource,
 )
 from app.shared.corrections import CorrectionStatus
+from app.shared.text import only_digits
 
 
 class PurchasesRepository:
@@ -203,6 +211,24 @@ class PurchasesRepository:
         )
         return list(result.scalars().all())
 
+    async def invoices_of_supplier(self, supplier_id: int) -> list[Invoice]:
+        """Every invoice attributed to a supplier, unpaginated.
+
+        For recomputing due dates when the agreed term appears or changes: the
+        listing is a page and this is all of them.
+        """
+        result = await self.session.execute(
+            select(Invoice).where(Invoice.supplier_id == supplier_id)
+        )
+        return list(result.scalars().all())
+
+    async def invoices_by_ids(self, invoice_ids: Sequence[int]) -> list[Invoice]:
+        """The invoices these ids name, in no particular order."""
+        if not invoice_ids:
+            return []
+        result = await self.session.execute(select(Invoice).where(Invoice.id.in_(invoice_ids)))
+        return list(result.scalars().all())
+
     async def invoices_resolved_by_alias(self, alias_id: int) -> list[Invoice]:
         """The invoices one saved assignment resolved, and nothing else (RF-53).
 
@@ -222,18 +248,29 @@ class PurchasesRepository:
         supplier_id: int | None = None,
         query: str | None = None,
         review_state: InvoiceReviewState | None = None,
+        issued_from: date | None = None,
+        issued_to: date | None = None,
         due_from: date | None = None,
         due_to: date | None = None,
         with_receipt: bool | None = None,
+        payment_state: str | None = None,
+        order: InvoiceOrder = InvoiceOrder.ISSUED_DESC,
     ) -> list[Invoice]:
-        """A page of invoices, newest first."""
+        """A page of invoices, newest first unless somebody asked otherwise."""
         statement = self._invoices_query(
-            select(Invoice), supplier_id, query, review_state, due_from, due_to, with_receipt
+            select(Invoice),
+            supplier_id,
+            query,
+            review_state,
+            issued_from,
+            issued_to,
+            due_from,
+            due_to,
+            with_receipt,
+            payment_state,
         )
         result = await self.session.execute(
-            statement.order_by(Invoice.issued_on.desc(), Invoice.id.desc())
-            .offset(skip)
-            .limit(limit)
+            statement.order_by(*self._ordering(order)).offset(skip).limit(limit)
         )
         return list(result.scalars().all())
 
@@ -243,9 +280,12 @@ class PurchasesRepository:
         supplier_id: int | None = None,
         query: str | None = None,
         review_state: InvoiceReviewState | None = None,
+        issued_from: date | None = None,
+        issued_to: date | None = None,
         due_from: date | None = None,
         due_to: date | None = None,
         with_receipt: bool | None = None,
+        payment_state: str | None = None,
     ) -> int:
         """How many invoices match the same filters as the listing."""
         statement = self._invoices_query(
@@ -253,12 +293,43 @@ class PurchasesRepository:
             supplier_id,
             query,
             review_state,
+            issued_from,
+            issued_to,
             due_from,
             due_to,
             with_receipt,
+            payment_state,
         )
         result = await self.session.execute(statement)
         return int(result.scalar_one())
+
+    @staticmethod
+    def _ordering(order: InvoiceOrder) -> tuple[Any, ...]:
+        """How a page of invoices is sorted (RF-45).
+
+        The id breaks every tie, and that is not decoration: two invoices of the
+        same day —or of the same amount, which happens with a supplier that
+        always bills the same service— would otherwise land in whatever order
+        the database felt like, and page two could repeat a row page one
+        already showed.
+        """
+        columns = {
+            InvoiceOrder.ISSUED_DESC: (Invoice.issued_on.desc(), Invoice.id.desc()),
+            InvoiceOrder.ISSUED_ASC: (Invoice.issued_on.asc(), Invoice.id.asc()),
+            InvoiceOrder.TOTAL_DESC: (Invoice.total.desc(), Invoice.id.desc()),
+            InvoiceOrder.TOTAL_ASC: (Invoice.total.asc(), Invoice.id.asc()),
+        }
+        return columns[order]
+
+    @staticmethod
+    def _only_digits(column: Any) -> Any:
+        """A tax id with its punctuation taken out, as SQL sees it.
+
+        `30-70918273-4` and `30709182734` are the same number written twice, and
+        which of the two somebody types depends on where they copied it from.
+        Comparing the stripped forms makes both find the same invoices (RF-41).
+        """
+        return func.replace(func.replace(column, "-", ""), ".", "")
 
     def _invoices_query(
         self,
@@ -266,37 +337,111 @@ class PurchasesRepository:
         supplier_id: int | None,
         query: str | None,
         review_state: InvoiceReviewState | None,
+        issued_from: date | None,
+        issued_to: date | None,
         due_from: date | None,
         due_to: date | None,
         with_receipt: bool | None,
+        payment_state: str | None = None,
     ) -> Select[Any]:
         """The filters the listing and its count share."""
         if supplier_id is not None:
             statement = statement.where(Invoice.supplier_id == supplier_id)
         if review_state is not None:
             statement = statement.where(Invoice.review_state == review_state)
+        if issued_from is not None:
+            statement = statement.where(Invoice.issued_on >= issued_from)
+        if issued_to is not None:
+            statement = statement.where(Invoice.issued_on <= issued_to)
         if due_from is not None:
             statement = statement.where(Invoice.due_on >= due_from)
         if due_to is not None:
             statement = statement.where(Invoice.due_on <= due_to)
         if query:
-            pattern = f"%{query.strip()}%"
-            statement = statement.where(
-                or_(Invoice.number.ilike(pattern), Invoice.supplier_text.ilike(pattern))
-            )
+            statement = self._matching(statement, query.strip())
         if with_receipt is not None:
-            issued = select(Receipt.invoice_id).where(Receipt.voided_at.is_(None))
-            statement = statement.where(
-                Invoice.id.in_(issued) if with_receipt else Invoice.id.not_in(issued)
-            )
+            has = self._has_receipt()
+            statement = statement.where(has if with_receipt else ~has)
+        if payment_state is not None:
+            statement = statement.where(self._in_payment_state(payment_state))
         return statement
 
+    @staticmethod
+    def _paid_expression() -> ColumnElement[Decimal]:
+        """What an invoice has imputed, as a scalar the query can compare.
+
+        The same sum `_read_invoices` computes in Python, written once more in
+        SQL because a filter that runs after the page is read filters the page
+        and not the listing. It is the only duplication of the rule in the
+        module, and it is deliberate: the alternative was storing the state,
+        which is the thing 005 refused for good reasons — two answers to one
+        question drift the first time a payment is undone.
+        """
+        return func.coalesce(
+            select(func.sum(Payment.amount))
+            .where(Payment.invoice_id == Invoice.id, Payment.state == PaymentState.IMPUTED)
+            .correlate(Invoice)
+            .scalar_subquery(),
+            Decimal(0),
+        )
+
+    def _in_payment_state(self, state: str) -> ColumnElement[bool]:
+        """The invoices whose computed payment state is this one.
+
+        Mirrors `PurchasesService._payment_state` branch for branch. If the two
+        ever disagree, the listing lies about its own count, so there is a test
+        that walks the four states over the same data through both paths.
+        """
+        paid = self._paid_expression()
+        if state == INCONSISTENT:
+            return paid > Invoice.total
+        if state == UNPAID:
+            return and_(paid <= 0, paid <= Invoice.total)
+        if state == SETTLED:
+            return and_(paid > 0, paid == Invoice.total)
+        if state == PARTIAL:
+            return and_(paid > 0, paid < Invoice.total)
+        # Un estado que esta plataforma no conoce no selecciona nada, en vez de
+        # devolver todo: un filtro mal escrito tiene que verse.
+        return false()
+
+    def _matching(self, statement: Select[Any], text: str) -> Select[Any]:
+        """Narrow a listing to what one search box means (RF-41, RF-42).
+
+        Four places are searched, and the join is what makes two of them
+        possible. The number and the **name as it arrived written** live on the
+        invoice; the **tax id** and the **legal name** live on the supplier the
+        invoice was attributed to, and without reaching them a person could only
+        find an invoice by the spelling that particular one happened to carry —
+        which is the opposite of what H2 spent a whole story unifying.
+
+        The join is left, and only added when there is something to search:
+        an invoice nobody could attribute yet still has to be findable by its
+        number, and a listing with no search box open should not pay for a join
+        it does not use.
+        """
+        pattern = f"%{text}%"
+        matches = [
+            Invoice.number.ilike(pattern),
+            Invoice.supplier_text.ilike(pattern),
+            Supplier.legal_name.ilike(pattern),
+        ]
+        digits = only_digits(text)
+        if digits:
+            matches.append(self._only_digits(Supplier.tax_id).like(f"%{digits}%"))
+        return statement.outerjoin(Supplier, Invoice.supplier_id == Supplier.id).where(
+            or_(*matches)
+        )
+
     async def overdue_without_receipt(self, today: date) -> list[Invoice]:
-        """Invoices past their due date with no receipt in force (RF-37 of 005)."""
-        issued = select(Receipt.invoice_id).where(Receipt.voided_at.is_(None))
+        """Invoices past their due date with no receipt at all (RF-37 of 005).
+
+        "At all" includes the portal's: opening an incident over an invoice
+        whose receipt already exists is inventing work for a person.
+        """
         result = await self.session.execute(
             select(Invoice).where(
-                Invoice.due_on.is_not(None), Invoice.due_on < today, Invoice.id.not_in(issued)
+                Invoice.due_on.is_not(None), Invoice.due_on < today, ~self._has_receipt()
             )
         )
         return list(result.scalars().all())
@@ -418,12 +563,55 @@ class PurchasesRepository:
         """Return a receipt by id, or None."""
         return await self.session.get(Receipt, receipt_id)
 
-    async def receipts_in_force(self) -> set[int]:
-        """The invoices that have a receipt right now."""
-        result = await self.session.execute(
-            select(Receipt.invoice_id).where(Receipt.voided_at.is_(None))
+    @staticmethod
+    def _has_receipt() -> ColumnElement[bool]:
+        """Whether an invoice has its reception receipt, from either place it lives.
+
+        Two places, because a receipt can exist without this platform having
+        issued it: the portal published receipts before we were here, and 005
+        stores that in `invoice.portal_receipt_issued` (RF-30). Reading only
+        `core.receipt` — which is what every query did — meant an invoice whose
+        receipt already existed showed as "Falta", could be issued a **second**
+        one (RF-35) and opened an incident that was not real (RF-37).
+
+        The one subtlety is the `not_in(voided)`: **a person annulling a receipt
+        wins over a reading of the portal**. Without it, annulling the receipt
+        of an invoice that has not fallen due would leave it unable to get a new
+        one whenever the portal also claimed it had one, and RF-50 says the
+        opposite. It is the same rule the padrón and the calendar already
+        follow: a decision somebody took is not undone by the next read.
+        """
+        in_force = select(Receipt.invoice_id).where(Receipt.voided_at.is_(None))
+        annulled = select(Receipt.invoice_id).where(Receipt.voided_at.is_not(None))
+        return or_(
+            Invoice.id.in_(in_force),
+            and_(Invoice.portal_receipt_issued.is_(True), Invoice.id.not_in(annulled)),
         )
+
+    async def invoices_with_receipt(self) -> set[int]:
+        """The invoices that have their reception receipt, ours or the portal's."""
+        result = await self.session.execute(select(Invoice.id).where(self._has_receipt()))
         return {int(value) for value in result.scalars().all()}
+
+    async def receipt_numbers(self) -> dict[int, str]:
+        """The number of the receipt in force of each invoice that has ours.
+
+        Only ours: a receipt the portal issued before this platform existed has
+        no number we can quote, and inventing one would be worse than the empty
+        field. Such an invoice still reads as having its receipt — that is
+        `_has_receipt` — it just cannot say under which number.
+        """
+        result = await self.session.execute(
+            select(Receipt.invoice_id, Receipt.number).where(Receipt.voided_at.is_(None))
+        )
+        return {int(invoice_id): number for invoice_id, number in result.all()}
+
+    async def has_receipt(self, invoice_id: int) -> bool:
+        """Whether this invoice already has one, from either place (RF-35)."""
+        result = await self.session.execute(
+            select(Invoice.id).where(Invoice.id == invoice_id, self._has_receipt())
+        )
+        return result.scalars().first() is not None
 
     async def add_receipt(self, receipt: Receipt) -> Receipt:
         """Store a receipt and give it its id."""
@@ -557,6 +745,30 @@ class PurchasesRepository:
             select(PurchaseOrder.status_text, func.count()).group_by(PurchaseOrder.status_text)
         )
         return {str(row[0]): int(row[1]) for row in result.all()}
+
+    async def pending_orders(self) -> list[PurchaseOrder]:
+        """Every order still waiting for a person to say whose it is (RF-52 of 007).
+
+        Filtered by the normalised spelling in Python for the same reason
+        `pending_invoices` is: the normalisation drops legal forms and
+        connecting words, and teaching that to SQL would be a second copy of a
+        rule that already exists once in `shared/text.py`.
+        """
+        result = await self.session.execute(
+            select(PurchaseOrder)
+            .where(PurchaseOrder.review_state == OrderReviewState.PENDING)
+            .order_by(PurchaseOrder.ordered_on.desc(), PurchaseOrder.id.desc())
+        )
+        return list(result.scalars().all())
+
+    async def count_orders_in_review(self) -> int:
+        """How many orders are set aside for review (RF-51 of 007)."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(PurchaseOrder)
+            .where(PurchaseOrder.review_state == OrderReviewState.PENDING)
+        )
+        return int(result.scalar_one())
 
     async def earlier_order_for(
         self, *, supplier_id: int | None, product_code: str | None, since: date, before: date

@@ -17,11 +17,21 @@ do the invoice is certainty, and when they do not it goes to a person with the
 excerpt in view. That comparison replaces the confidence threshold that would
 otherwise be the only thing separating a good number from a made-up one.
 
-**The trap.** The only tax id printed on these documents is **Cordillera's**,
-the client's, never the issuer's. A reader that keeps the first one it finds
-assigns the same supplier to all hundred invoices. So no tax id is read here at
-all: the supplier travels as the name the document prints, and resolving it is
-`purchases`' problem, against the register.
+**The trap, and how the tax id gets past it.** On the corpus that was measured,
+the only tax id printed is **Cordillera's**, the client's, never the issuer's —
+and it arrives labelled as such (`Cliente: … CUIT 30-71234567-8`). A reader that
+kept the first number it found would assign the same supplier to all hundred
+invoices, so a tax id on a line that names the client is discarded here and
+never travels.
+
+What does travel is a tax id that is *not* the client's, because RF-11 says an
+invoice that carries the supplier's tax id is identified by it. Two things keep
+that honest: this reader throws away the client's line, and `purchases` only
+accepts a tax id that matches one of the eight suppliers in the register —
+Cordillera is not in the register, so its number cannot resolve to anybody even
+if a document ever prints it unlabelled. On today's four pinned documents no
+supplier tax id appears at all, and the path simply does not fire: the
+requirement is a conditional, and its antecedent is false on this corpus.
 """
 
 import io
@@ -30,9 +40,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
 
+import pytesseract
 from openpyxl import load_workbook
+from PIL import Image
 from pypdf import PdfReader
 
 from app.logging import get_logger
@@ -53,6 +64,11 @@ LABELLED_TOTAL = re.compile(
     r"(?:monto\s+total|total)\s*[:\-]?\s*\$?\s*([\d.]+)(?:,(\d{1,2}))?", re.IGNORECASE
 )
 SUPPLIER_LABEL = re.compile(r"proveedor\s*[:\-]\s*(.+)", re.IGNORECASE)
+# A tax id, with or without its dashes. What tells the issuer's from the
+# client's is not the number: it is the line it sits on.
+TAX_ID = re.compile(r"\b(\d{2}-?\d{8}-?\d)\b")
+# The line that names who is being invoiced. Every tax id on it is Cordillera's.
+CLIENT_LINE = re.compile(r"cliente|raz[oó]n\s+social\s+del\s+cliente", re.IGNORECASE)
 
 # The languages the OCR is asked for, in order. Spanish is what the documents
 # are written in and what the worker image installs; the fallback is there so a
@@ -80,6 +96,11 @@ class DocumentReading:
     issued_on: date | None = None
     total: Decimal | None = None
     supplier_text: str | None = None
+    # The issuer's tax id, when the document prints one that is not the
+    # client's. It is **not** part of `agrees_with`: the table publishes no tax
+    # id to compare it against, and who the supplier is gets decided against the
+    # register, not against this reading.
+    supplier_tax_id: str | None = None
     reason: str | None = None
 
     def agrees_with(
@@ -153,19 +174,16 @@ def _from_scan(content: bytes) -> str:
     for what the portal publishes: a scan here is one JPEG per page, and the
     embedded image *is* the page.
     """
-    import pytesseract
-    from PIL import Image
-
     reader = PdfReader(io.BytesIO(content))
     pieces: list[str] = []
     for page in reader.pages:
         for embedded in page.images:
             image = Image.open(io.BytesIO(embedded.data))
-            pieces.append(_ocr(image, pytesseract))
+            pieces.append(_ocr(image))
     return "\n".join(pieces)
 
 
-def _ocr(image: Any, pytesseract: Any) -> str:
+def _ocr(image: Image.Image) -> str:
     """Run the OCR, falling back to another language rather than to nothing."""
     last: Exception | None = None
     for language in OCR_LANGUAGES:
@@ -213,6 +231,7 @@ def _fields_in(text: str) -> DocumentReading:
         issued_on=issued_on,
         total=total,
         supplier_text=supplier.group(1).strip() if supplier else None,
+        supplier_tax_id=_issuer_tax_id_in(text),
     )
     if reading.number is None and reading.issued_on is None and reading.total is None:
         # The bytes were read and say nothing this platform recognises. That is
@@ -220,6 +239,24 @@ def _fields_in(text: str) -> DocumentReading:
         # confirms nothing, and it goes to a person.
         return DocumentReading(readable=True, excerpt=excerpt, reason=NOTHING_IN_THE_DOCUMENT)
     return reading
+
+
+def _issuer_tax_id_in(text: str) -> str | None:
+    """The tax id of whoever issued the invoice, or nothing.
+
+    Read line by line, because the line is what distinguishes the two numbers a
+    document can carry: the one that sits next to the word «cliente» belongs to
+    Cordillera and is dropped here, and never leaves this function. What comes
+    back is the first tax id printed anywhere else — and `purchases` still has
+    to find it in the register before it identifies anybody (RF-11).
+    """
+    for line in text.splitlines():
+        if CLIENT_LINE.search(line):
+            continue
+        match = TAX_ID.search(line)
+        if match is not None:
+            return match.group(1)
+    return None
 
 
 def _date_in(text: str) -> date | None:

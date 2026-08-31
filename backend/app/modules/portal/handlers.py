@@ -1,11 +1,12 @@
 """What `portal` does when something happens elsewhere.
 
-Two subscriptions, and the same shape: something was registered for the first
+Three subscriptions, and the same shape: something was registered for the first
 time, so the document the portal already publishes about it has to be brought
 in — the price history of a product (RF-38 of 001), the file of an invoice
-(RF-02 of 004).
+(RF-02 of 004), whether that invoice resolved on its own or is waiting for
+somebody.
 
-Both handlers **queue and return**. They run inside the transaction of whoever
+Every handler **queues and returns**. They run inside the transaction of whoever
 published, and a hundred visits to a third party's system cannot be held open
 inside a transaction that is registering rows (`GEN-09`).
 """
@@ -15,7 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.logging import get_logger
 from app.modules.portal.tasks import extract_invoice_file, extract_product_history
-from app.shared.events import InvoicesRegistered, ProductsRegistered, events
+from app.shared.events import (
+    InvoicesNeedingReview,
+    InvoicesRegistered,
+    ProductsRegistered,
+    events,
+)
 
 logger = get_logger(__name__)
 
@@ -52,3 +58,28 @@ async def bring_invoice_files(event: InvoicesRegistered, _session: AsyncSession)
         )
 
     logger.info("Invoice files queued", extra={"invoices": len(event.invoices)})
+
+
+@events.subscribe(InvoicesNeedingReview)
+async def bring_held_invoice_files(event: InvoicesNeedingReview, _session: AsyncSession) -> None:
+    """Bring the file of an invoice that was **held**, which needs it most.
+
+    A held invoice used to be the one invoice whose document never arrived:
+    `InvoicesRegistered` carries only the ones whose supplier resolved by
+    itself, so everything waiting for a person waited without the evidence that
+    person was supposed to look at (RF-30) — and without the only place a
+    supplier tax id can come from (RF-11).
+
+    Only the ones that have just been registered are fetched. An invoice that is
+    held because it arrived a second time with another total already has its
+    document, and asking the portal for it again would be a visit to somebody
+    else's system that buys nothing.
+    """
+    waiting = [case for case in event.cases if case.needs_document]
+    for position, case in enumerate(waiting):
+        extract_invoice_file.apply_async(
+            kwargs={"invoice_number": case.number},
+            countdown=position * settings.PORTAL_HISTORY_SPACING_SECONDS,
+        )
+
+    logger.info("Held invoice files queued", extra={"invoices": len(waiting)})

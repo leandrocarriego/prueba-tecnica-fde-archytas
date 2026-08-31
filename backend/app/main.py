@@ -61,6 +61,7 @@ from app.shared.errors import (
     ValidationError,
 )
 from app.shared.events import discover_handlers
+from app.shared.live import bus
 
 setup_logging()
 logger = get_logger(__name__)
@@ -211,7 +212,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     apart, and the first environment to notice would be production.
     """
     logger.info("Starting %s (%s) on %s", settings.PROJECT_NAME, settings.ENVIRONMENT, API_PREFIX)
+    # One listening connection per worker, opened here because it belongs to the
+    # process and not to a module — the same reason the routers are mounted
+    # here (`GEN-04`). If it cannot be opened the app still serves: the calendar
+    # stops updating on its own and nothing else changes.
+    await bus.start()
     yield
+    await bus.stop()
     await engine.dispose()
     logger.info("Shutdown complete")
 

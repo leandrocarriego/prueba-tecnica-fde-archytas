@@ -53,7 +53,9 @@ export function UnclassifiedQueue({
   return (
     <div className="space-y-3">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       {queue.items.map(item => {

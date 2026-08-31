@@ -18,19 +18,19 @@ type Tone = 'ok' | 'degraded' | 'unreachable'
  */
 const TONE_STYLES: Record<Tone, { dot: string; halo: string; label: string }> = {
   ok: {
-    dot: 'bg-emerald-500',
-    halo: 'bg-emerald-500/20',
-    label: 'text-emerald-600',
+    dot: 'bg-ok',
+    halo: 'bg-ok/20',
+    label: 'text-ok',
   },
   degraded: {
-    dot: 'bg-amber-500',
-    halo: 'bg-amber-500/20',
-    label: 'text-amber-600',
+    dot: 'bg-warn',
+    halo: 'bg-warn/20',
+    label: 'text-warn',
   },
   unreachable: {
-    dot: 'bg-red-500',
-    halo: 'bg-red-500/20',
-    label: 'text-red-600',
+    dot: 'bg-destructive',
+    halo: 'bg-destructive/20',
+    label: 'text-danger',
   },
 }
 

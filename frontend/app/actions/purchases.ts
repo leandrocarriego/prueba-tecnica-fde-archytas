@@ -59,19 +59,38 @@ async function call<T>(path: string, init: RequestInit): Promise<ActionResult<T>
 
 // --- Facturas y proveedores (004) ----------------------------------------
 
-/** Decide about an invoice held for review (RF-31, RF-32, RF-33 of 004). */
+/** What a person corrected about a held invoice, when they corrected anything. */
+export interface InvoiceCorrections {
+  number?: string
+  issued_on?: string
+  total?: string
+}
+
+/**
+ * Decide about an invoice held for review (RF-31, RF-32, RF-33 of 004).
+ *
+ * A field that goes empty is **not sent**: leaving it alone is how somebody
+ * confirms what the table published, and sending it back unchanged would write
+ * a correction into the log that nobody made.
+ */
 export async function resolveInvoice(
   invoiceId: number,
   supplierId: number | null,
-  remember = true
+  remember = true,
+  corrections: InvoiceCorrections = {}
 ): Promise<ActionResult<Invoice>> {
+  const body: Record<string, unknown> = { supplier_id: supplierId, remember }
+  for (const [field, value] of Object.entries(corrections)) {
+    if (value) body[field] = value
+  }
   const result = await call<Invoice>(`/invoice-review/${invoiceId}/resolve`, {
     method: 'POST',
-    body: JSON.stringify({ supplier_id: supplierId, remember }),
+    body: JSON.stringify(body),
   })
   if (result.ok) {
     revalidatePath('/facturas/revision')
     revalidatePath('/facturas')
+    revalidatePath(`/facturas/${invoiceId}`)
   }
   return result
 }
@@ -287,6 +306,29 @@ export async function removeDueDate(dueDateId: number): Promise<ActionResult<voi
 // --- Las órdenes de compra (007) -----------------------------------------
 
 /** Drop the repeated-order flag, recording who did it (RF-18, RF-19 of 007). */
+/**
+ * Decir de qué proveedor del padrón es una orden apartada (RF-54, RF-61 de 007).
+ *
+ * `remember` va en `true` y es lo que convierte la decisión en criterio: la
+ * misma forma de escribir el nombre no se vuelve a preguntar, y **las otras
+ * órdenes y facturas que estaban esperando esa grafía quedan resueltas con
+ * ésta** (RF-62). El relevamiento midió veinte formas distintas de escribir un
+ * nombre sólo en las órdenes.
+ */
+export async function resolveOrder(
+  orderId: number,
+  supplierId: number
+): Promise<ActionResult<PurchaseOrder>> {
+  const result = await call<PurchaseOrder>(`/purchase-orders/${orderId}/resolution`, {
+    method: 'POST',
+    body: JSON.stringify({ supplier_id: supplierId, remember: true }),
+  })
+  if (result.ok) {
+    revalidatePath('/ordenes')
+  }
+  return result
+}
+
 export async function dismissRepeat(orderId: number): Promise<ActionResult<PurchaseOrder>> {
   const result = await call<PurchaseOrder>(`/purchase-orders/${orderId}/repeat-flag`, {
     method: 'DELETE',

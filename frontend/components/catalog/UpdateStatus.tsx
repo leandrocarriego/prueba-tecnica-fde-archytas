@@ -29,7 +29,7 @@ export function UpdateStatus({ status }: UpdateStatusProps) {
 
   if (status.is_stalled) {
     return (
-      <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+      <div className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
         <p className="font-medium">La actualización de precios dejó de funcionar.</p>
         <p>
           Van {status.consecutive_failures} consultas seguidas sin éxito. Última actualización

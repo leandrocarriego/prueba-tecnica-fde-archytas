@@ -22,7 +22,7 @@ from app.modules.identity.models import User
 from app.modules.purchases.models import PaymentOrigin, PaymentState
 from app.modules.purchases.service import PurchasesService, today_here
 from app.shared.errors import ConflictError, ValidationError
-from app.shared.events import NormalizedPayment
+from app.shared.events import NormalizedInvoice, NormalizedPayment, NormalizedSupplier
 from tests.factories.purchases_factory import InvoiceFactory, PaymentFactory, SupplierFactory
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
@@ -284,6 +284,46 @@ class TestAVoucherThatDoesNotSayWhichInvoice:
         assert len(parts) == 2
         assert (await service.get_invoice(first.id)).payment_state == "SALDADA"
 
+    async def test_a_split_moves_each_balance_by_its_own_part(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-53, RF-56: cada factura baja por su parte, y queda quién repartió.
+
+        Tres partes distintas y no tres iguales a propósito: un reparto en
+        partes iguales pasaría igual si el servicio dividiera el monto entre la
+        cantidad de facturas, que es exactamente lo que la spec prohíbe — el
+        reparto lo decide una persona, no el sistema.
+        """
+        # Arrange
+        supplier = await SupplierFactory.create(session, legal_name="Distribuidora Sur SA")
+        first = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        second = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        third = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        voucher = await PaymentFactory.create(
+            session, amount=30_000, state=PaymentState.PENDING, origin=PaymentOrigin.PORTAL
+        )
+        service = PurchasesService(session)
+
+        # Act
+        parts = await service.split_payment(
+            voucher.id,
+            parts=[
+                (first.id, Decimal(10_000)),
+                (second.id, Decimal(5_000)),
+                (third.id, Decimal(15_000)),
+            ],
+            actor_user_id=owner.id,
+        )
+
+        # Assert — cada una por su parte, y ninguna por el promedio.
+        assert (await service.get_invoice(first.id)).balance == 0
+        assert (await service.get_invoice(second.id)).balance == Decimal(5_000)
+        assert (await service.get_invoice(third.id)).balance == Decimal(-5_000)
+        assert (await service.get_invoice(second.id)).payment_state == "PARCIAL"
+        # RF-56: quién lo repartió, en el comprobante que se dejó sin efecto.
+        assert all(part.created_by_user_id == owner.id for part in parts)
+        assert await service.pending_payments() == []
+
     async def test_a_voucher_naming_an_unknown_invoice_is_imputed_when_it_lands(
         self, session: AsyncSession
     ) -> None:
@@ -408,3 +448,382 @@ class TestTheReceptionReceipt:
         assert closed.closed_by_user_id == owner.id
         assert await service.list_incidents() == []
         assert len(await service.list_incidents(only_open=False)) == 1
+
+    async def test_closing_an_incident_does_not_reopen_the_receipt(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-57, RF-58 y el borde duro del negocio que los rodea.
+
+        Cerrar el incidente registra **qué se hizo**, no deshace la fecha: el
+        recibo se emite hasta el vencimiento y no después, y nada lo reabre —
+        ni cerrar el incidente, ni reprogramar más tarde. Sin este test, la
+        forma más natural de "resolver" un incidente sería emitir el recibo que
+        faltaba, y RF-34 dejaría de valer por la puerta de atrás.
+        """
+        # Arrange
+        supplier = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        stored = await InvoiceFactory.create(
+            session, supplier=supplier, due_on=today_here() - timedelta(days=3)
+        )
+        service = PurchasesService(session)
+        await service.open_incidents_for_overdue()
+        incident = (await service.list_incidents())[0]
+
+        # Act
+        closed = await service.close_incident(
+            incident.id, resolution="Se acordó pagarla con la próxima", actor_user_id=owner.id
+        )
+
+        # Assert — el motivo queda, y la emisión sigue negada.
+        assert closed.resolution == "Se acordó pagarla con la próxima"
+        assert closed.closed_at is not None
+        with pytest.raises(ConflictError):
+            await service.issue_receipt(stored.id, actor_user_id=owner.id)
+
+
+class TestTheListingAnswersAboutTheListing:
+    """H1 y H6: un filtro filtra el listado, no la página que se leyó."""
+
+    async def test_filtering_by_payment_state_does_not_filter_only_the_page(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-04: la página vuelve completa y el total cuenta lo mismo que la página.
+
+        Con el filtro aplicado después de paginar, pedir las parciales sobre un
+        conjunto más grande que la página devolvía **lo parcial que hubiera
+        entrado en esa página** y un total que contaba todo: dos números que se
+        contradicen en la misma pantalla.
+        """
+        # Arrange — nueve facturas, tres de cada estado, entremezcladas.
+        supplier = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        for index in range(9):
+            invoice = await InvoiceFactory.create(
+                session, supplier=supplier, total=10_000, number=f"F-{9000 + index}"
+            )
+            if index % 3 == 1:
+                await PaymentFactory.create(session, invoice=invoice, amount=4_000)
+            elif index % 3 == 2:
+                await PaymentFactory.create(session, invoice=invoice, amount=10_000)
+        service = PurchasesService(session)
+
+        # Act — una página de dos sobre las tres parciales.
+        page = await service.list_invoices(payment_state="PARCIAL", limit=2)
+        everything = await service.list_invoices(payment_state="PARCIAL", limit=100)
+
+        # Assert
+        assert page.total == 3
+        assert len(page.items) == 2
+        assert len(everything.items) == 3
+        assert {item.payment_state for item in everything.items} == {"PARCIAL"}
+
+    async def test_the_four_states_agree_between_the_query_and_the_reader(
+        self, session: AsyncSession
+    ) -> None:
+        """El filtro en SQL y el estado calculado en Python dicen lo mismo.
+
+        La regla vive en dos lados a propósito —una vez en `_payment_state` y
+        otra en el `WHERE`— y este test es lo que impide que se separen: si
+        alguien cambia una y no la otra, el listado miente sobre su propia
+        cuenta.
+        """
+        # Arrange — una factura de cada estado, incluida la inconsistente.
+        supplier = await SupplierFactory.create(session, legal_name="Cañerias del Litoral SA")
+        unpaid = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        partial = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        settled = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        over = await InvoiceFactory.create(session, supplier=supplier, total=10_000)
+        await PaymentFactory.create(session, invoice=partial, amount=3_000)
+        await PaymentFactory.create(session, invoice=settled, amount=10_000)
+        await PaymentFactory.create(session, invoice=over, amount=13_000)
+        service = PurchasesService(session)
+
+        # Act / Assert
+        expected = {
+            "SIN_PAGOS": unpaid.id,
+            "PARCIAL": partial.id,
+            "SALDADA": settled.id,
+            "INCONSISTENTE": over.id,
+        }
+        for state, invoice_id in expected.items():
+            listing = await service.list_invoices(
+                supplier_id=supplier.id, payment_state=state, limit=100
+            )
+            assert [item.id for item in listing.items] == [invoice_id], state
+            assert listing.total == 1, state
+
+    async def test_an_invoice_can_be_wrong_in_two_ways_at_once(self, session: AsyncSession) -> None:
+        """RF-15, RF-46: los dos señalamientos viajan juntos, no por precedencia."""
+        # Arrange — más pagos que total, y el portal diciendo que está paga.
+        supplier = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        stored = await InvoiceFactory.create(
+            session, supplier=supplier, total=10_000, portal_payment_status="Impaga"
+        )
+        await PaymentFactory.create(session, invoice=stored, amount=13_000)
+
+        # Act
+        read = await PurchasesService(session).get_invoice(stored.id)
+
+        # Assert — la inconsistencia no tapa la contradicción.
+        assert read.is_inconsistent is True
+        assert read.payment_state_disagrees is True
+        assert read.total == Decimal(10_000)
+        assert read.paid == Decimal(13_000)
+
+
+class TestTheReceiptThePortalAlreadyIssued:
+    """RF-29 a RF-31, RF-35, RF-37: uno del portal cuenta como uno emitido."""
+
+    async def test_it_counts_everywhere_a_receipt_counts(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Se guardaba y no se leía: figuraba «Falta», admitía otro y abría incidente."""
+        # Arrange — vencida hace tres días, con su recibo ya emitido en el portal.
+        supplier = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        stored = await InvoiceFactory.create(
+            session,
+            supplier=supplier,
+            due_on=today_here() - timedelta(days=3),
+            portal_receipt_issued=True,
+        )
+        service = PurchasesService(session)
+
+        # Act
+        read = await service.get_invoice(stored.id)
+        with_receipt = await service.list_invoices(with_receipt=True, limit=100)
+        without = await service.list_invoices(with_receipt=False, limit=100)
+        opened = await service.open_incidents_for_overdue()
+
+        # Assert
+        assert read.receipt_issued is True
+        assert read.receipt_number is None  # el número es del portal y no lo conocemos
+        assert read.is_overdue_without_receipt is False
+        assert stored.id in {item.id for item in with_receipt.items}
+        assert stored.id not in {item.id for item in without.items}
+        assert opened == 0
+        with pytest.raises(ConflictError):
+            await service.issue_receipt(stored.id, actor_user_id=owner.id)
+
+    async def test_annulling_ours_wins_over_what_the_portal_says(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-50: una decisión de una persona no la deshace una lectura del portal."""
+        # Arrange — el orden es el que pasa de verdad: emitimos el nuestro, y
+        # **después** una lectura del portal informa que también tiene el suyo.
+        supplier = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        stored = await InvoiceFactory.create(
+            session, supplier=supplier, due_on=today_here() + timedelta(days=10)
+        )
+        service = PurchasesService(session)
+        receipt = await service.issue_receipt(stored.id, actor_user_id=owner.id)
+        stored.portal_receipt_issued = True
+        await session.flush()
+
+        # Act
+        await service.void_receipt(receipt.id, actor_user_id=owner.id)
+
+        # Assert — anulado el nuestro, se puede emitir otro aunque el portal insista.
+        again = await service.issue_receipt(stored.id, actor_user_id=owner.id)
+        assert again.number != receipt.number
+
+
+class TestTheDueDateComesFromTheAgreedTerm:
+    """H5: de `issued_on + plazo`, y de ninguna otra fecha (RF-26)."""
+
+    async def test_the_term_of_the_supplier_decides_and_not_the_document(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-26: 1 de marzo + 45 días vence el 15 de abril, diga lo que diga el papel."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name="Distribuidora Sur SA", payment_term_days=45
+        )
+        service = PurchasesService(session)
+
+        # Act — el portal publica otra fecha de vencimiento en su columna.
+        await service.register_invoices(
+            batch_id=1,
+            invoices=(
+                NormalizedInvoice(
+                    staging_row_id=1,
+                    number="F-7001",
+                    issued_on=date(2026, 3, 1),
+                    due_on=date(2026, 3, 31),
+                    total=Decimal(10_000),
+                    supplier_text="Distribuidora Sur SA",
+                ),
+            ),
+        )
+
+        # Assert
+        listing = await service.list_invoices(supplier_id=supplier.id, limit=10)
+        assert listing.items[0].due_on == date(2026, 4, 15)
+
+    async def test_the_due_date_is_recomputed_when_the_term_finally_appears(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-26: la fecha del portal era un suplente, y se corrige el día que se sabe el plazo.
+
+        El plazo aparece cuando el padrón por fin expande esa fila. Hasta ahora
+        nada rehacía la cuenta, así que la factura se quedaba con la fecha del
+        portal para siempre — y de esa fecha cuelgan el plazo del recibo, los
+        tramos de antigüedad y el atraso promedio.
+        """
+        # Arrange — un proveedor sin plazo conocido, y una factura suya.
+        supplier = await SupplierFactory.create(
+            session, legal_name="Aceros Belgrano SA", payment_term_days=None
+        )
+        service = PurchasesService(session)
+        await service.register_invoices(
+            batch_id=1,
+            invoices=(
+                NormalizedInvoice(
+                    staging_row_id=2,
+                    number="F-7002",
+                    issued_on=date(2026, 3, 1),
+                    due_on=date(2026, 3, 31),
+                    total=Decimal(10_000),
+                    supplier_text="Aceros Belgrano SA",
+                ),
+            ),
+        )
+        before = (await service.list_invoices(supplier_id=supplier.id, limit=10)).items[0]
+        assert before.due_on == date(2026, 3, 31)
+
+        # Act — el padrón trae el plazo pactado.
+        await service.remember_suppliers(
+            (
+                NormalizedSupplier(
+                    legal_name="Aceros Belgrano SA",
+                    tax_id=None,
+                    email=None,
+                    phone=None,
+                    payment_term_days=30,
+                    balance=None,
+                ),
+            )
+        )
+
+        # Assert
+        after = (await service.list_invoices(supplier_id=supplier.id, limit=10)).items[0]
+        assert after.due_on == date(2026, 3, 31)  # 1 de marzo + 30 días
+        assert after.due_on == before.issued_on + timedelta(days=30)
+
+
+class TestAVoucherBelongsToOneSupplier:
+    """El supuesto firmado: un comprobante cubre facturas de un solo proveedor."""
+
+    async def test_it_is_not_split_across_two_suppliers(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-53 y el supuesto de la spec.
+
+        Repartir plata de un proveedor sobre la factura de otro equivoca a los
+        dos a la vez: a uno se le debe menos de lo que el sistema dice y al otro
+        más, y de esos números salen la antigüedad y el atraso promedio de
+        ambos. El comprobante se queda apartado, que es lo que «pregunta»
+        significa acá.
+        """
+        # Arrange
+        first = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        second = await SupplierFactory.create(session, legal_name="Distribuidora Sur SA")
+        mine = await InvoiceFactory.create(session, supplier=first, total=10_000)
+        theirs = await InvoiceFactory.create(session, supplier=second, total=10_000)
+        voucher = await PaymentFactory.create(
+            session, amount=20_000, state=PaymentState.PENDING, origin=PaymentOrigin.PORTAL
+        )
+        voucher.supplier_id = first.id
+        await session.flush()
+        service = PurchasesService(session)
+
+        # Act / Assert
+        with pytest.raises(ValidationError):
+            await service.split_payment(
+                voucher.id,
+                parts=[(mine.id, Decimal(10_000)), (theirs.id, Decimal(10_000))],
+                actor_user_id=owner.id,
+            )
+        # Y sigue apartado, esperando: nada se movió.
+        assert [item.id for item in await service.pending_payments()] == [voucher.id]
+
+    async def test_it_is_not_imputed_to_the_invoices_of_another_supplier(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """El caso más silencioso: un solo proveedor, pero el que no pagó."""
+        # Arrange
+        payer = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        other = await SupplierFactory.create(session, legal_name="Distribuidora Sur SA")
+        theirs = await InvoiceFactory.create(session, supplier=other, total=10_000)
+        voucher = await PaymentFactory.create(
+            session, amount=10_000, state=PaymentState.PENDING, origin=PaymentOrigin.PORTAL
+        )
+        voucher.supplier_id = payer.id
+        await session.flush()
+        service = PurchasesService(session)
+
+        # Act / Assert
+        with pytest.raises(ValidationError):
+            await service.split_payment(
+                voucher.id, parts=[(theirs.id, Decimal(10_000))], actor_user_id=owner.id
+            )
+
+
+class TestWhatIsOwedAndHowLate:
+    """H5: la deuda por antigüedad y el atraso promedio, contra la cuenta a mano."""
+
+    async def test_the_debt_is_split_by_how_long_it_has_been_overdue(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-25: los tramos se cuentan desde el vencimiento, no desde la fecha."""
+        # Arrange — cuatro impagas, una en cada tramo.
+        supplier = await SupplierFactory.create(
+            session, legal_name="Aceros Belgrano SA", payment_term_days=30
+        )
+        for days, amount in ((10, 1_000), (45, 2_000), (75, 4_000), (200, 8_000)):
+            await InvoiceFactory.create(
+                session,
+                supplier=supplier,
+                total=amount,
+                due_on=today_here() - timedelta(days=days),
+            )
+
+        # Act
+        totals = await PurchasesService(session).supplier_totals(supplier.id)
+
+        # Assert — cada peso en un solo tramo, y la suma es la deuda entera.
+        by_label = {bucket.label: bucket for bucket in totals.aging}
+        assert sum(bucket.amount for bucket in totals.aging) == Decimal(15_000)
+        assert sum(bucket.invoices for bucket in totals.aging) == 4
+        assert all(bucket.invoices == 1 for bucket in by_label.values() if bucket.amount > 0)
+
+    async def test_the_average_delay_counts_the_unpaid_ones_too(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-27: y esa es la parte que se olvida.
+
+        Dejar afuera lo que se debe y ya se pasó de fecha bajaría el número
+        justo cuando peor se está cumpliendo. Una pagada diez días tarde y una
+        impaga vencida hace veinte dan quince de promedio; sólo la pagada daría
+        diez.
+        """
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name="Cañerias del Litoral SA", payment_term_days=30
+        )
+        paid_late = await InvoiceFactory.create(
+            session, supplier=supplier, total=10_000, due_on=today_here() - timedelta(days=40)
+        )
+        await PaymentFactory.create(
+            session,
+            invoice=paid_late,
+            amount=10_000,
+            paid_on=today_here() - timedelta(days=30),  # diez días tarde
+        )
+        await InvoiceFactory.create(
+            session, supplier=supplier, total=5_000, due_on=today_here() - timedelta(days=20)
+        )
+
+        # Act
+        totals = await PurchasesService(session).supplier_totals(supplier.id)
+
+        # Assert — (10 + 20) / 2, y no 10.
+        assert totals.average_delay_days == Decimal("15.0")

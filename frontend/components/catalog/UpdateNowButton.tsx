@@ -14,8 +14,8 @@ const MAX_POLLS = 60
 type Outcome = { tone: 'ok' | 'error' | 'info'; message: string }
 
 const TONES: Record<Outcome['tone'], string> = {
-  ok: 'text-emerald-700',
-  error: 'text-red-700',
+  ok: 'text-ok',
+  error: 'text-danger',
   info: 'text-muted-foreground',
 }
 

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from app.modules.ingestion.documents import read_invoice_document
+from app.modules.ingestion.documents import _issuer_tax_id_in, read_invoice_document
 
 pytestmark = [pytest.mark.unit, pytest.mark.portal]
 
@@ -60,20 +60,40 @@ def test_the_date_inside_the_document_is_day_first() -> None:
     assert reading.issued_on == date(2026, 5, 3)
 
 
-def test_no_tax_id_is_read_from_the_document() -> None:
-    """El único CUIT impreso es el de Cordillera, el cliente, no el del emisor.
+def test_the_tax_id_of_the_client_is_read_and_thrown_away() -> None:
+    """El único CUIT que imprimen estas facturas es el de Cordillera, el cliente.
 
     Un lector que se quedara con el primero que encuentra le asignaría el mismo
-    proveedor a las cien facturas. Por eso acá no se lee ninguno: el proveedor
-    viaja como el nombre que el documento imprime, y resolverlo es de
-    `purchases`, contra el padrón.
+    proveedor a las cien. Por eso el que está en la línea del cliente se
+    descarta acá y nunca sale de la función: lo que viaja para identificar
+    (RF-11) es el CUIT **del emisor**, y en este documento no hay ninguno.
     """
-    reading = read_invoice_document(
-        (FIXTURES / "invoice-F-8411-text.pdf").read_bytes(), file_kind="PDF"
-    )
+    content = (FIXTURES / "invoice-F-8411-text.pdf").read_bytes()
+
+    reading = read_invoice_document(content, file_kind="PDF")
 
     assert reading.supplier_text == "Ferretera del Norte S.R.L."
-    assert not hasattr(reading, "tax_id")
+    # El número está impreso —el recorte lo muestra— y aun así no identifica.
+    assert "30-71234567-8" in reading.excerpt
+    assert reading.supplier_tax_id is None
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("Proveedor: Aceros Belgrano SA - CUIT 30-70918273-4", "30-70918273-4"),
+        ("CUIT del emisor 30709182734", "30709182734"),
+        ("Cliente: Ferreteria Industrial Cordillera - CUIT 30-71234567-8", None),
+        ("Razon social del cliente: Cordillera CUIT 30-71234567-8", None),
+    ],
+)
+def test_the_issuer_tax_id_is_the_one_off_the_client_line(line: str, expected: str | None) -> None:
+    """RF-11: lo que distingue a los dos números no es el número, es la línea.
+
+    Con y sin guiones, porque cuál de las dos formas se imprime depende de quién
+    la tipeó y las dos son el mismo CUIT.
+    """
+    assert _issuer_tax_id_in(f"FACTURA\nNumero: F-8411\n{line}\nMonto total: $1.000") == expected
 
 
 def test_the_spreadsheet_is_read_by_label_and_not_by_position() -> None:

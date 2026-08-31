@@ -161,6 +161,16 @@ class MessagingService:
             limit=limit,
         )
 
+    async def senders(self) -> list[str]:
+        """The suppliers a message can be filtered by (RF-26 of 007).
+
+        This module's **own** projection of the register, not `purchases`'
+        table: the screen filters by exact name and these are exactly the names
+        `supplier_name` can hold, so offering any other list would offer filters
+        that match nothing.
+        """
+        return sorted(supplier.legal_name for supplier in await self.messaging.suppliers())
+
     async def count_pending(self) -> int:
         """How many messages are still waiting for somebody (RF-31)."""
         return await self.messaging.count_messages(state=MessageState.PENDING)

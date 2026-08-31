@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f0eee9;font-family:'IBM Plex Mono',ui-monospace,monospace}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:400 15px/1.2 'Architects Daughter',cursive;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.35 'IBM Plex Mono',monospace;color:rgba(0,0,0,.55);max-width:600px}
+.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.6 'IBM Plex Mono',monospace;color:rgba(0,0,0,.5)}
+a{color:#2a78d6}a:hover{color:#1a56a0}
+
+.f{width:600px;background:#fff;border:1.5px solid #222;border-radius:5px;overflow:hidden}
+.f.mob{width:230px}
+.fbar{display:flex;align-items:center;gap:5px;padding:5px 8px;border-bottom:1.5px solid #222;background:#f6f5f2}
+.dot{width:7px;height:7px;border-radius:50%;border:1.2px solid #222}
+.fttl{font:400 11px 'Architects Daughter',cursive;color:#555;margin-left:6px}
+.row{display:flex}
+.sb{width:120px;border-right:1.5px solid #222;padding:8px 7px;display:flex;flex-direction:column;gap:4px;background:#faf9f6}
+.sb.mini{width:46px;align-items:center}
+.logo{font:400 12px 'Architects Daughter',cursive;border:1.2px dashed #999;border-radius:4px;padding:4px 6px;text-align:center;margin-bottom:4px}
+.ni{font:400 10.5px 'IBM Plex Mono',monospace;color:#444;padding:3px 5px;border-radius:3px;border:1px solid transparent;display:flex;justify-content:space-between;gap:4px}
+.ni.on{background:#e8eef7;border-color:#2a78d6;color:#14406e;font-weight:600}
+.ni.dim{color:#aaa}
+.sq{width:16px;height:16px;border:1.2px solid #666;border-radius:3px}
+.grp{font:600 8.5px 'IBM Plex Mono',monospace;color:#999;letter-spacing:.08em;margin:6px 0 1px;text-transform:uppercase}
+.main{flex:1;padding:10px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.h{font:400 14px 'Architects Daughter',cursive;color:#111}
+.h2{font:400 11.5px 'Architects Daughter',cursive;color:#111}
+.sub{font:400 9.5px 'IBM Plex Mono',monospace;color:#888}
+.g{display:grid;gap:8px}
+.card{border:1.5px solid #222;border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:6px;background:#fff;min-width:0}
+.soft{border:1.2px dashed #aaa;border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.kpi{font:400 17px 'Architects Daughter',cursive;color:#111}
+.ln{height:6px;border-radius:3px;background:#e2e0da}
+.ln.d{background:#cbc9c2}
+.tbl{display:flex;flex-direction:column;border:1.5px solid #222;border-radius:4px;overflow:hidden}
+.tr{display:grid;grid-template-columns:1.6fr 1fr 1fr .8fr;gap:8px;padding:6px 8px;border-bottom:1px solid #ddd;align-items:center}
+.tr:last-child{border-bottom:0}
+.tr.hd{background:#f2f1ed;border-bottom:1.5px solid #222}
+.tr.warn{background:#fdf6e8}
+.th{font:600 8.5px 'IBM Plex Mono',monospace;color:#666;text-transform:uppercase;letter-spacing:.06em}
+.pill{font:600 8.5px 'IBM Plex Mono',monospace;border:1.2px solid #444;border-radius:20px;padding:2px 6px;display:inline-block;white-space:nowrap}
+.pill.a{border-color:#2a78d6;color:#2a78d6}
+.pill.w{border-color:#c07d18;color:#a86a10;background:#fdf3e2}
+.pill.g{border-color:#3d7a4a;color:#2f6039}
+.btn{font:600 9px 'IBM Plex Mono',monospace;border:1.5px solid #222;border-radius:4px;padding:4px 8px;display:inline-block;background:#fff}
+.btn.p{background:#222;color:#fff}
+.ph{border:1.2px solid #bbb;border-radius:4px;background:repeating-linear-gradient(135deg,#f4f3ef 0 6px,#e8e6e0 6px 12px);display:flex;align-items:center;justify-content:center;font:400 9px 'IBM Plex Mono',monospace;color:#8a8a8a;text-align:center;padding:6px}
+.bars{display:flex;align-items:flex-end;gap:5px;height:62px}
+.bars i{flex:1;background:#d9d7d0;border:1px solid #b9b7b0;border-radius:2px 2px 0 0}
+.spark{height:46px;border:1.2px solid #bbb;border-radius:4px;background:repeating-linear-gradient(90deg,transparent 0 22px,#f0efeb 22px 23px);position:relative;overflow:hidden}
+.spark:after{content:"";position:absolute;left:4px;right:4px;top:60%;height:1.5px;background:#2a78d6;transform:rotate(-9deg)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);border:1.5px solid #222;border-radius:4px;overflow:hidden}
+.cal>div{border-right:1px solid #e0ded8;border-bottom:1px solid #e0ded8;min-height:44px;padding:3px 4px;display:flex;flex-direction:column;gap:2px}
+.cal>div.hd{min-height:0;background:#f2f1ed;font:600 8px 'IBM Plex Mono',monospace;color:#666;text-align:center;border-bottom:1.5px solid #222}
+.dnum{font:600 8px 'IBM Plex Mono',monospace;color:#999}
+.ev{font:600 7.5px 'IBM Plex Mono',monospace;border:1.2px solid #444;border-radius:2px;padding:1px 3px;white-space:nowrap;overflow:hidden}
+.ev.w{border-color:#c07d18;background:#fdf3e2;color:#8a5a0c}
+.ev.g{border-color:#3d7a4a;background:#eef5ef;color:#2f6039}
+.ev.a{border-color:#2a78d6;background:#e8eef7;color:#14406e}
+.note{font:400 9px/1.4 'IBM Plex Mono',monospace;color:#9a8f7a;border-left:2px solid #cfc6b0;padding-left:6px}
+.tabs{display:flex;gap:0;border-bottom:1.5px solid #222}
+.tab{font:600 9.5px 'IBM Plex Mono',monospace;padding:5px 9px;border:1.2px solid #ccc;border-bottom:0;border-radius:4px 4px 0 0;margin-bottom:-1.5px;color:#777;background:#f6f5f2}
+.tab.on{border-color:#222;border-bottom:1.5px solid #fff;color:#111;background:#fff}
+.chip{font:600 8.5px 'IBM Plex Mono',monospace;border:1.2px solid #bbb;border-radius:20px;padding:2px 7px;color:#666}
+.mbar{display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1.5px solid #222;font:600 9px 'IBM Plex Mono',monospace;color:#444}
+.mtabs{display:flex;justify-content:space-around;border-top:1.5px solid #222;padding:6px 0;background:#faf9f6}
+.mt{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 7.5px 'IBM Plex Mono',monospace;color:#888}
+.mt.on{color:#14406e}
+.stepper{display:flex;align-items:center;gap:5px}
+.st{width:16px;height:16px;border-radius:50%;border:1.5px solid #222;font:600 8px 'IBM Plex Mono',monospace;display:flex;align-items:center;justify-content:center}
+.st.on{background:#222;color:#fff}
+.st.off{border-color:#bbb;color:#bbb}
+.dash{flex:1;height:1.2px;background:#ccc}
+.split{display:flex;border:1.5px solid #222;border-radius:4px;overflow:hidden}
+.split>.l{width:180px;border-right:1.5px solid #222;display:flex;flex-direction:column}
+.li{padding:6px 7px;border-bottom:1px solid #e6e4de;display:flex;flex-direction:column;gap:3px}
+.li.on{background:#e8eef7}
+.li b{font:600 9.5px 'IBM Plex Mono',monospace;color:#222}
+.split>.r{flex:1;padding:8px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.cmd{border:1.5px solid #222;border-radius:4px;padding:5px 8px;font:400 10px 'IBM Plex Mono',monospace;color:#999;display:flex;justify-content:space-between}
+</style></helmet>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Set completo de pantallas sobre la estructura de <a class="dv-oid" href="#1a">1a</a> — sidebar fijo por dominio, filtrado por rol</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Compras · el día a día de Marcela: entrada de facturas de cualquier formato, pagos parciales y recibos, seguimiento de órdenes.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Facturas · entrada y cola de revisión</span></div>
+<div class="row">
+<div class="sb"><div class="logo">FIC</div><div class="ni">Tablero</div><div class="grp">Compras</div><div class="ni">Proveedores</div><div class="ni on">Facturas <span>4</span></div><div class="ni">Pagos y recibos</div><div class="ni">Órdenes compra</div><div class="grp">Datos</div><div class="ni">Catálogo/precios</div><div class="ni">Rubros</div><div class="ni">Revisar esto <span>12</span></div><div class="grp">Sistema</div><div class="ni">Avisos <span>7</span></div><div class="ni">Calendario</div><div class="ni dim">Configuración</div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h">Facturas</div><div class="sub">128 este año · 4 esperando decisión</div></div><div style="display:flex;gap:5px"><span class="btn">Casilla de mail</span><span class="btn p">+ Subir archivos</span></div></div>
+<div class="soft" style="flex-direction:row;align-items:center;gap:10px"><div class="ph" style="flex:1;height:46px">arrastrá PDF, foto o Excel acá</div><div style="display:flex;flex-direction:column;gap:3px"><div class="sub">facturas@cordillera.com.ar</div><div class="sub">portal proveedor · baja 06:00 · ok hoy</div></div></div>
+<div class="tabs"><span class="tab on">Por revisar (4)</span><span class="tab">Todas</span><span class="tab">Sin recibo</span><span class="tab">Parciales</span><span class="tab">Vencidas</span></div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1.3fr 1fr 1.1fr .9fr .9fr"><span class="th">Archivo / N°</span><span class="th">Formato</span><span class="th">Proveedor</span><span class="th">Total</span><span class="th">Qué falta</span></div>
+<div class="tr warn" style="grid-template-columns:1.3fr 1fr 1.1fr .9fr .9fr"><span class="ln" style="width:80%"></span><span class="pill w">foto escaneada</span><span class="sub">¿Prov. X o Y?</span><span class="ln d" style="width:60%"></span><span class="btn">Elegir</span></div>
+<div class="tr warn" style="grid-template-columns:1.3fr 1fr 1.1fr .9fr .9fr"><span class="ln" style="width:70%"></span><span class="pill w">Excel torcido</span><span class="ln d" style="width:70%"></span><span class="sub">—</span><span class="btn">Mapear</span></div>
+<div class="tr warn" style="grid-template-columns:1.3fr 1fr 1.1fr .9fr .9fr"><span class="ln" style="width:62%"></span><span class="pill">Excel</span><span class="ln d" style="width:65%"></span><span class="ln d" style="width:55%"></span><span class="pill a">¿duplicada?</span></div>
+<div class="tr" style="grid-template-columns:1.3fr 1fr 1.1fr .9fr .9fr"><span class="ln" style="width:75%"></span><span class="pill">PDF texto</span><span class="ln d" style="width:60%"></span><span class="ln d" style="width:55%"></span><span class="pill g">listo</span></div>
+<div class="tr" style="grid-template-columns:1.3fr 1fr 1.1fr .9fr .9fr"><span class="ln" style="width:68%"></span><span class="pill">PDF texto</span><span class="ln d" style="width:70%"></span><span class="ln d" style="width:55%"></span><span class="pill g">listo</span></div>
+</div>
+<div class="note">Nada se importa a medias: si falta un dato o el proveedor es ambiguo, la fila queda acá y no entra a los totales.</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Factura › detalle · pagos parciales y recibo</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="h">FC-1051 · Proveedor X</div><div class="sub">emitida 29/06 · vence 13/08 · plazo 45 días · rubro pinturas</div></div><div style="display:flex;gap:5px"><span class="btn">Ver original</span><span class="btn">Registrar pago</span><span class="btn p">Generar recibo</span></div></div>
+<div class="g" style="grid-template-columns:1.1fr 1fr">
+<div class="card"><div class="sub">Estado de pago</div><div style="display:flex;align-items:baseline;gap:6px"><span class="kpi">$ 00.000</span><span class="sub">pagado de $ 000.000</span></div><div style="height:9px;border:1.2px solid #222;border-radius:5px;display:flex;overflow:hidden"><i style="width:40%;background:#2a78d6"></i><i style="width:60%;background:repeating-linear-gradient(135deg,#f4f3ef 0 5px,#e3e1db 5px 10px)"></i></div><div style="display:flex;gap:5px"><span class="pill a">parcial 40 %</span><span class="pill w">resto vence en 2 días</span></div></div>
+<div class="card"><div class="sub">Recibo</div><div class="h2">Todavía no generado</div><div class="sub">se puede generar hasta el 13/08 · después queda en falta y avisa</div><span class="btn p" style="align-self:flex-start">Generar ahora</span></div>
+</div>
+<div class="tabs"><span class="tab on">Pagos (2)</span><span class="tab">Documento</span><span class="tab">Historial de cambios</span><span class="tab">Orden de compra</span></div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1fr 1fr 1fr .8fr"><span class="th">Fecha</span><span class="th">Monto</span><span class="th">Medio</span><span class="th">Cargó</span></div>
+<div class="tr" style="grid-template-columns:1fr 1fr 1fr .8fr"><span class="sub">02/07</span><span class="ln d" style="width:60%"></span><span class="sub">transferencia</span><span class="sub">Marcela</span></div>
+<div class="tr" style="grid-template-columns:1fr 1fr 1fr .8fr"><span class="sub">21/07</span><span class="ln d" style="width:45%"></span><span class="sub">cheque</span><span class="sub">Marcela</span></div>
+</div>
+<div class="note">Todo lo que se toca a mano (pago, ajuste de monto, recibo) queda firmado con usuario y fecha.</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Órdenes de compra · qué se pidió y nadie siguió</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div><div class="sq"></div><div class="sq"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center"><div class="h">Órdenes de compra</div><div style="display:flex;gap:5px"><span class="chip">todas</span><span class="chip">esperando</span><span class="chip">atrasadas</span><span class="btn p">+ Nueva orden</span></div></div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="sub">Pendientes</div><div class="kpi">00</div></div>
+<div class="card" style="border-color:#a86a10"><div class="sub">Atrasadas</div><div class="kpi">00</div><div class="sub">más de 15 días sin recibir</div></div>
+<div class="card"><div class="sub">Recibidas parcial</div><div class="kpi">00</div></div>
+<div class="card"><div class="sub">Posible pedido repetido</div><div class="kpi">02</div><div class="pill a">mismo producto, 8 días</div></div>
+</div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:.9fr 1.2fr 1fr 1.1fr .9fr"><span class="th">OC</span><span class="th">Proveedor</span><span class="th">Pedida</span><span class="th">Estado</span><span class="th">Factura</span></div>
+<div class="tr warn" style="grid-template-columns:.9fr 1.2fr 1fr 1.1fr .9fr"><span class="ln" style="width:70%"></span><span class="ln" style="width:80%"></span><span class="sub">hace 22 días</span><span class="pill w">esperando</span><span class="sub">—</span></div>
+<div class="tr" style="grid-template-columns:.9fr 1.2fr 1fr 1.1fr .9fr"><span class="ln" style="width:70%"></span><span class="ln" style="width:65%"></span><span class="sub">hace 9 días</span><span class="pill a">parcial 3 de 5</span><span class="ln d" style="width:50%"></span></div>
+<div class="tr" style="grid-template-columns:.9fr 1.2fr 1fr 1.1fr .9fr"><span class="ln" style="width:70%"></span><span class="ln" style="width:75%"></span><span class="sub">hace 4 días</span><span class="pill g">recibida</span><span class="ln d" style="width:50%"></span></div>
+</div>
+<div class="note">Al abrir una OC: línea de tiempo pedido → recibido → facturado → pagado, y aviso si ya hay otra orden parecida abierta.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Datos y calidad · la bandeja "Revisar esto" con sus tres tipos de excepción, el normalizador de rubros y el catálogo de precios sincronizado del portal.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Revisar esto · 12 pendientes</span></div>
+<div class="row">
+<div class="sb"><div class="logo">FIC</div><div class="ni">Tablero</div><div class="grp">Compras</div><div class="ni">Proveedores</div><div class="ni">Facturas</div><div class="ni">Pagos y recibos</div><div class="ni">Órdenes compra</div><div class="grp">Datos</div><div class="ni">Catálogo/precios</div><div class="ni">Rubros</div><div class="ni on">Revisar esto <span>12</span></div><div class="grp">Sistema</div><div class="ni">Avisos <span>7</span></div><div class="ni">Calendario</div><div class="ni dim">Configuración</div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h">Cosas que el sistema no quiso adivinar</div><div class="sub">12 sin resolver · 2 resueltas hoy · el número también se ve en el tablero</div></div><div style="display:flex;gap:5px"><span class="chip">todas</span><span class="chip">ventas</span><span class="chip">proveedores</span><span class="chip">rubros</span></div></div>
+<div class="g" style="grid-template-columns:repeat(3,1fr)">
+<div class="card"><div class="sub">Ventas con código repetido</div><div class="kpi">08</div><div class="sub">excluidas de los totales</div><span class="btn" style="align-self:flex-start">Resolver en lote</span></div>
+<div class="card"><div class="sub">Proveedores posiblemente repetidos</div><div class="kpi">03</div><div class="sub">mismo CUIT o nombre parecido</div><span class="btn" style="align-self:flex-start">Unificar</span></div>
+<div class="card"><div class="sub">Registros rotos</div><div class="kpi">01</div><div class="sub">monto o fecha ilegible</div><span class="btn" style="align-self:flex-start">Corregir</span></div>
+</div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1fr 1.6fr 1fr .8fr"><span class="th">Tipo</span><span class="th">Qué pasó</span><span class="th">Dónde</span><span class="th"></span></div>
+<div class="tr warn" style="grid-template-columns:1fr 1.6fr 1fr .8fr"><span class="pill w">duplicado</span><span class="sub">código VT-8891 aparece 2 veces con montos distintos</span><span class="sub">Ventas 2024</span><span class="btn">Abrir</span></div>
+<div class="tr warn" style="grid-template-columns:1fr 1.6fr 1fr .8fr"><span class="pill w">proveedor</span><span class="sub">"Proveedro SA" se parece a "Proveedor S.A."</span><span class="sub">Facturas</span><span class="btn">Abrir</span></div>
+<div class="tr warn" style="grid-template-columns:1fr 1.6fr 1fr .8fr"><span class="pill w">rubro</span><span class="sub">14 productos sin rubro cargado</span><span class="sub">Catálogo</span><span class="btn">Abrir</span></div>
+<div class="tr" style="grid-template-columns:1fr 1.6fr 1fr .8fr"><span class="pill g">resuelta</span><span class="sub">2 rubros unificados en "Sanitarios"</span><span class="sub">hoy · Marcela</span><span class="btn">Deshacer</span></div>
+</div>
+<div class="note">Regla del sistema: ante la duda no suma, avisa. Nada se descarta en silencio y todo se puede deshacer.</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Rubros · unificar categorías escritas de cinco formas</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div><div class="sq"></div></div>
+<div class="main">
+<div class="stepper"><span class="st on">1</span><span class="dash"></span><span class="st on">2</span><span class="dash"></span><span class="st off">3</span><span class="sub" style="margin-left:6px">agrupar → nombrar → aplicar</span></div>
+<div class="h">Estos 5 nombres parecen el mismo rubro</div>
+<div class="split">
+<div class="l" style="width:210px">
+<div class="li on"><b>Pinturas</b><span class="sub">5 variantes · 212 productos</span></div>
+<div class="li"><b>Herramientas</b><span class="sub">4 variantes · 340 productos</span></div>
+<div class="li"><b>Sanitarios</b><span class="sub">3 variantes · 98 productos</span></div>
+<div class="li"><b>Sin rubro</b><span class="sub">14 productos</span><span class="pill w">asignar</span></div>
+</div>
+<div class="r">
+<div class="h2">Se unifican como: <span class="pill a">Pinturas</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:5px"><span class="pill">pintura</span><span class="pill">PINTURAS</span><span class="pill">Pinturas y afines</span><span class="pill">pintureria</span><span class="pill">pint.</span></div>
+<div class="soft"><div class="sub">Impacto: 212 productos, 46 facturas y el gráfico "gasto por rubro" se recalculan.</div></div>
+<div class="ph" style="height:52px">antes / después del gráfico por rubro</div>
+<div style="display:flex;gap:5px;justify-content:flex-end;margin-top:auto"><span class="btn">Separar alguno</span><span class="btn p">Unificar</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Catálogo y precios · sincronizado del portal del proveedor</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div><div class="sq"></div><div class="sq"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div><div class="h">Lista de precios</div><div class="sub">última actualización automática: hoy 06:04 · 1.284 productos</div></div>
+<div style="display:flex;gap:5px;align-items:center"><span class="pill g">al día</span><span class="btn">Actualizar ahora</span><span class="btn">Historial de sync</span></div>
+</div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="sub">Subieron de precio</div><div class="kpi">142</div><div class="sub">promedio +0,0 %</div></div>
+<div class="card"><div class="sub">Bajaron</div><div class="kpi">09</div></div>
+<div class="card"><div class="sub">Productos nuevos</div><div class="kpi">18</div><div class="pill w">sin rubro</div></div>
+<div class="card"><div class="sub">Dejaron de figurar</div><div class="kpi">06</div></div>
+</div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1.6fr 1fr .8fr .8fr .9fr"><span class="th">Producto</span><span class="th">Rubro</span><span class="th">Precio hoy</span><span class="th">Anterior</span><span class="th">Var.</span></div>
+<div class="tr" style="grid-template-columns:1.6fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:85%"></span><span class="pill">Pinturas</span><span class="ln d" style="width:70%"></span><span class="ln d" style="width:70%"></span><span class="pill w">+12 %</span></div>
+<div class="tr" style="grid-template-columns:1.6fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:75%"></span><span class="pill">Herramientas</span><span class="ln d" style="width:70%"></span><span class="ln d" style="width:70%"></span><span class="sub">=</span></div>
+<div class="tr warn" style="grid-template-columns:1.6fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:80%"></span><span class="pill w">sin rubro</span><span class="ln d" style="width:70%"></span><span class="sub">nuevo</span><span class="pill a">nuevo</span></div>
+</div>
+<div class="note">La descarga del portal corre sola con la frecuencia que se define en Configuración; si el portal falla, avisa y deja el precio anterior marcado como viejo.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Fechas y avisos · calendario colaborativo de vencimientos con estado de recibo, y la bandeja de avisos y reclamos que hoy nadie mira.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Calendario · dos personas mirando a la vez</span></div>
+<div class="row">
+<div class="sb"><div class="logo">FIC</div><div class="ni">Tablero</div><div class="grp">Compras</div><div class="ni">Proveedores</div><div class="ni">Facturas</div><div class="ni">Pagos y recibos</div><div class="ni">Órdenes compra</div><div class="grp">Datos</div><div class="ni">Catálogo/precios</div><div class="ni">Rubros</div><div class="ni">Revisar esto</div><div class="grp">Sistema</div><div class="ni">Avisos <span>7</span></div><div class="ni on">Calendario</div><div class="ni dim">Configuración</div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center"><div><div class="h">Agosto 2026</div><div class="sub">en vivo · Marcela y Julián viendo</div></div><div style="display:flex;gap:5px;align-items:center"><span class="sq" style="border-radius:50%"></span><span class="sq" style="border-radius:50%"></span><span class="chip">mes</span><span class="chip">semana</span><span class="chip">lista</span><span class="btn p">+ Vencimiento</span></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill g">con recibo</span><span class="pill w">sin recibo</span><span class="pill a">reprogramado</span><span class="pill">pagado</span></div>
+<div class="cal">
+<div class="hd">L</div><div class="hd">M</div><div class="hd">M</div><div class="hd">J</div><div class="hd">V</div><div class="hd">S</div><div class="hd">D</div>
+<div><span class="dnum">3</span></div><div><span class="dnum">4</span><span class="ev g">FC-1042</span></div><div><span class="dnum">5</span></div><div><span class="dnum">6</span><span class="ev">FC-1044</span></div><div><span class="dnum">7</span><span class="ev a">FC-1046</span></div><div style="background:#faf9f6"><span class="dnum">8</span></div><div style="background:#faf9f6"><span class="dnum">9</span></div>
+<div><span class="dnum">10</span><span class="ev w">FC-1060</span></div><div style="outline:1.5px solid #2a78d6;outline-offset:-1.5px"><span class="dnum">11 · hoy</span><span class="ev g">FC-1061</span></div><div><span class="dnum">12</span></div><div><span class="dnum">13</span><span class="ev w">FC-1051</span><span class="ev g">FC-1065</span></div><div><span class="dnum">14</span></div><div style="background:#faf9f6"><span class="dnum">15</span></div><div style="background:#faf9f6"><span class="dnum">16</span></div>
+<div><span class="dnum">17</span><span class="ev g">FC-1070</span></div><div><span class="dnum">18</span><span class="ev a">FC-1053</span></div><div><span class="dnum">19</span></div><div><span class="dnum">20</span><span class="ev w">FC-1064</span></div><div><span class="dnum">21</span><span class="ev">FC-1072</span></div><div style="background:#faf9f6"><span class="dnum">22</span></div><div style="background:#faf9f6"><span class="dnum">23</span></div>
+</div>
+<div class="g" style="grid-template-columns:1.2fr 1fr">
+<div class="soft" style="border-color:#c07d18"><div class="h2">Se acerca sin recibo generado</div><div class="sub">FC-1051 vence en 2 días · FC-1060 mañana</div><div style="display:flex;gap:5px"><span class="btn p">Generar recibo</span><span class="btn">Reprogramar</span></div></div>
+<div class="soft"><div class="h2">Al arrastrar una tarjeta</div><div class="note" style="border:0;padding:0">se reprograma, queda registrado quién lo movió y el otro usuario lo ve al instante, sin refrescar la página.</div></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Avisos y reclamos · con salida fuera del sistema</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h">Bandeja de avisos</div><div class="sub">7 sin resolver · el más viejo hace 11 días</div></div><div style="display:flex;gap:5px"><span class="chip">sin resolver</span><span class="chip">reclamos</span><span class="chip">vencimientos</span><span class="chip">archivados</span></div></div>
+<div class="split">
+<div class="l" style="width:200px">
+<div class="li on"><b>Reclamo · Proveedor Y</b><span class="sub">"nos deben 2 facturas"</span><span class="pill w">hace 11 días</span></div>
+<div class="li"><b>Vence en 2 días</b><span class="sub">FC-1051 sin recibo</span></div>
+<div class="li"><b>Precio subió 12 %</b><span class="sub">supera el umbral fijado</span></div>
+<div class="li"><b>OC sin recibir</b><span class="sub">hace 22 días</span></div>
+<div class="li"><b>Reclamo · Proveedor X</b><span class="sub">pago parcial vencido</span></div>
+</div>
+<div class="r">
+<div style="display:flex;justify-content:space-between"><div class="h2">Reclamo de Proveedor Y</div><span class="pill w">sin resolver · 11 días</span></div>
+<div class="soft"><div class="sub">Texto del reclamo tal como entró en el sistema del proveedor</div><div class="ln" style="width:95%"></div><div class="ln" style="width:88%"></div><div class="ln" style="width:60%"></div></div>
+<div class="card"><div class="sub">Contexto que el sistema ya sabe</div><div class="sub">Le debemos $ 000.000 en 2 facturas · pago promedio 52 días (plazo 45)</div><div style="display:flex;gap:5px"><span class="btn">Abrir proveedor</span><span class="btn">Ver las 2 facturas</span></div></div>
+<div style="display:flex;gap:5px;margin-top:auto"><span class="btn p">Marcar resuelto</span><span class="btn">Asignar a Marcela</span><span class="btn">Responder por mail</span></div>
+</div>
+</div>
+<div class="note">Los avisos no viven sólo acá: salen por mail y push según lo configurado, así el equipo se entera antes de que llame el proveedor.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="2d">
+<div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Acceso y control · login por persona, permisos por rol y los parámetros que el cliente quiere poder cambiar sin llamar a nadie.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f" style="width:600px">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Ingreso · un usuario por persona</span></div>
+<div style="display:flex">
+<div class="ph" style="width:250px;height:230px;border:0;border-right:1.5px solid #222;border-radius:0">imagen o color de marca<br>(logo Cordillera)</div>
+<div class="main" style="padding:22px;justify-content:center;gap:11px">
+<div class="h">Entrar</div>
+<div class="sub">Cada persona con su cuenta. La clave compartida se da de baja.</div>
+<div style="display:flex;flex-direction:column;gap:4px"><span class="sub">Mail</span><div class="soft" style="padding:6px"><div class="ln" style="width:60%"></div></div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><span class="sub">Contraseña</span><div class="soft" style="padding:6px"><div class="ln" style="width:40%"></div></div></div>
+<span class="btn p" style="text-align:center;padding:7px">Ingresar</span>
+<div class="sub">¿Olvidaste la clave? · Segundo factor opcional</div>
+<div class="note">Después del login cada uno cae en su propio inicio: Marcela en Compras, Julián en Ventas, el dueño en el tablero completo.</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Usuarios y permisos · sólo el dueño</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center"><div class="h">Quién ve qué</div><span class="btn p">+ Invitar persona</span></div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1.2fr 1fr 1fr 1fr 1fr"><span class="th">Persona</span><span class="th">Rol</span><span class="th">Compras</span><span class="th">Ventas</span><span class="th">Config.</span></div>
+<div class="tr" style="grid-template-columns:1.2fr 1fr 1fr 1fr 1fr"><span class="sub">Dueño</span><span class="pill a">dirección</span><span class="pill g">todo</span><span class="pill g">todo</span><span class="pill g">todo</span></div>
+<div class="tr" style="grid-template-columns:1.2fr 1fr 1fr 1fr 1fr"><span class="sub">Marcela</span><span class="pill">compras</span><span class="pill g">editar</span><span class="pill" style="color:#aaa;border-color:#ccc">sin acceso</span><span class="pill" style="color:#aaa;border-color:#ccc">no</span></div>
+<div class="tr" style="grid-template-columns:1.2fr 1fr 1fr 1fr 1fr"><span class="sub">Julián</span><span class="pill">ventas</span><span class="pill" style="color:#aaa;border-color:#ccc">sin acceso</span><span class="pill g">ver</span><span class="pill" style="color:#aaa;border-color:#ccc">no</span></div>
+</div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="card"><div class="h2">Rol: compras</div><div class="sub">Proveedores, facturas, pagos, recibos, órdenes, calendario, avisos propios. No ve facturación total ni ventas.</div></div>
+<div class="card"><div class="h2">Rol: ventas</div><div class="sub">Ventas, precios, stock, productos nuevos y sus excepciones. No ve cuentas de proveedores.</div></div>
+</div>
+<div class="note">Lo que un rol no puede ver, no aparece en el menú (no es un botón que da error).</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Configuración · sin depender de nadie</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div></div>
+<div class="main">
+<div class="h">Parámetros del sistema</div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="card"><div class="h2">Actualización de precios</div><div class="sub">cada cuánto se baja la lista del portal</div><div style="display:flex;gap:5px"><span class="chip">6 h</span><span class="pill a">1 vez por día</span><span class="chip">manual</span></div><div class="sub">hora: 06:00 · último intento ok</div></div>
+<div class="card"><div class="h2">Avisos por monto</div><div class="sub">avisar cuando una factura supere</div><div class="soft" style="padding:5px"><div class="ln" style="width:35%"></div></div><div class="sub">y cuando un precio suba más de 10 %</div></div>
+<div class="card"><div class="h2">Anticipo de vencimientos</div><div class="sub">avisar X días antes si falta el recibo</div><div style="display:flex;gap:5px"><span class="chip">2</span><span class="pill a">5 días</span><span class="chip">10</span></div></div>
+<div class="card"><div class="h2">Por dónde llegan los avisos</div><div style="display:flex;gap:5px;flex-wrap:wrap"><span class="pill g">mail</span><span class="pill g">en la app</span><span class="pill">push celular</span><span class="pill">resumen diario</span></div></div>
+<div class="card"><div class="h2">Plazos de pago por defecto</div><div class="sub">30 / 45 / 60 días · se puede pisar por proveedor</div></div>
+<div class="card"><div class="h2">Numeración de recibos</div><div class="sub">prefijo y próximo número · datos fiscales de la empresa</div></div>
+</div>
+<div class="note">Todo esto lo cambia el dueño desde acá; queda registrado quién lo cambió y cuándo.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="2e">
+<div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Móvil · la misma estructura de <a class="dv-oid" href="#1a">1a</a> reducida a lo que se usa lejos del escritorio: avisos, decisiones rápidas y fechas.</div>
+<div class="dv-card" style="display:flex;gap:12px;padding:14px;align-items:flex-start">
+
+<div class="f mob">
+<div class="mbar"><span>9:41</span><span>Hoy</span><span>▲ 3</span></div>
+<div class="main" style="padding:8px;gap:7px">
+<div class="soft" style="border-color:#c07d18;padding:6px"><div class="h2">3 decisiones para hoy</div></div>
+<div class="card" style="padding:6px"><div class="sub">Facturado mes</div><div class="kpi">$ 000.000</div><div class="spark"></div></div>
+<div class="card" style="padding:6px"><div class="sub">Le debo</div><div class="kpi">$ 000.000</div></div>
+<div class="card" style="padding:6px"><div class="sub">Vence en 7 días</div><div class="kpi">00</div><div class="pill w">3 sin recibo</div></div>
+</div>
+<div class="mtabs"><span class="mt on"><span class="sq"></span>Hoy</span><span class="mt"><span class="sq"></span>Avisos</span><span class="mt"><span class="sq"></span>Fechas</span><span class="mt"><span class="sq"></span>Más</span></div>
+</div>
+
+<div class="f mob">
+<div class="mbar"><span>9:41</span><span>Avisos</span><span>filtrar</span></div>
+<div class="main" style="padding:8px;gap:7px">
+<div class="card" style="padding:6px;border-color:#a86a10"><div class="pill w">vence en 2 días</div><div class="sub">FC-1051 · Proveedor X sin recibo</div><div style="display:flex;gap:4px"><span class="btn p">Generar</span><span class="btn">Después</span></div></div>
+<div class="card" style="padding:6px"><div class="pill">reclamo</div><div class="sub">Proveedor Y: "faltan 2 pagos"</div><span class="btn">Abrir</span></div>
+<div class="card" style="padding:6px"><div class="pill a">revisar</div><div class="sub">¿"Proveedro SA" es el mismo?</div><div style="display:flex;gap:4px"><span class="btn">Sí</span><span class="btn">No</span><span class="btn">Luego</span></div></div>
+</div>
+<div class="mtabs"><span class="mt"><span class="sq"></span>Hoy</span><span class="mt on"><span class="sq"></span>Avisos</span><span class="mt"><span class="sq"></span>Fechas</span><span class="mt"><span class="sq"></span>Más</span></div>
+</div>
+
+<div class="f mob">
+<div class="mbar"><span>9:41</span><span>Proveedor X</span><span>⋯</span></div>
+<div class="main" style="padding:8px;gap:7px">
+<div class="h2">Proveedor X</div>
+<div class="sub">CUIT 00-00000000-0 · plazo 45 días</div>
+<div style="display:flex;gap:4px"><span class="btn">Mail</span><span class="btn">Copiar CUIT</span></div>
+<div class="card" style="padding:6px;border-color:#a86a10"><div class="sub">Le debo</div><div class="kpi">$ 00.000</div><div class="pill w">7 días tarde en promedio</div></div>
+<div class="card" style="padding:6px"><div class="sub">Últimas facturas</div><div class="ln" style="width:80%"></div><div class="ln" style="width:65%"></div><div class="ln" style="width:72%"></div></div>
+<span class="btn p" style="text-align:center">Registrar pago</span>
+</div>
+<div class="mtabs"><span class="mt"><span class="sq"></span>Hoy</span><span class="mt"><span class="sq"></span>Avisos</span><span class="mt"><span class="sq"></span>Fechas</span><span class="mt on"><span class="sq"></span>Más</span></div>
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="dv-opt" id="2f">
+<div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Ventas · el espacio de Julián sobre la estructura de <a class="dv-oid" href="#1a">1a</a>: evolución 2023 → hoy, variación de precios, qué se mueve y qué no, productos nuevos.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Ventas · sesión: Julián (no ve Compras)</span></div>
+<div class="row">
+<div class="sb"><div class="logo">FIC</div><div class="ni on">Tablero ventas</div><div class="grp">Ventas</div><div class="ni">Evolución</div><div class="ni">Por rubro</div><div class="ni">Productos</div><div class="grp">Datos</div><div class="ni">Precios</div><div class="ni">Stock</div><div class="ni">Revisar esto <span>8</span></div><div class="grp">Sistema</div><div class="ni">Avisos <span>3</span></div><div class="ni">Calendario</div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h">Cómo vienen las ventas</div><div class="sub">2023 → hoy · 3 años de historia importada</div></div><div style="display:flex;gap:5px"><span class="chip">mes</span><span class="pill a">año</span><span class="chip">vs. año anterior</span><span class="btn">Exportar</span></div></div>
+<div class="soft" style="border-color:#c07d18;flex-direction:row;justify-content:space-between;align-items:center"><div class="sub" style="color:#8a5a0c">8 ventas con código repetido quedaron fuera de estos totales · 2 con fecha ilegible</div><span class="btn">Ver las 10</span></div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="sub">Facturado mes</div><div class="kpi">$ 000.000</div><div class="spark"></div></div>
+<div class="card"><div class="sub">vs. mismo mes 2025</div><div class="kpi">+0,0 %</div><div class="ln" style="width:60%;background:#2a78d6"></div></div>
+<div class="card"><div class="sub">Ticket promedio</div><div class="kpi">$ 00.000</div><div class="spark"></div></div>
+<div class="card"><div class="sub">Productos nuevos del mes</div><div class="kpi">18</div><div class="pill w">14 sin rubro</div></div>
+</div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="h2">Facturación mensual · 2023 · 2024 · 2025 · 2026</div><div style="display:flex;gap:5px"><span class="chip">todos los rubros</span><span class="chip">acumulado</span></div></div><div class="ph" style="height:104px">gráfico de líneas · 4 series por año + banda gris "datos excluidos"</div><div class="sub">al pasar el mouse: total del mes, cuántas ventas y cuántas quedaron excluidas</div></div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="card"><div class="h2">Ventas por rubro</div><div class="bars"><i style="height:85%"></i><i style="height:62%"></i><i style="height:48%"></i><i style="height:33%"></i><i style="height:20%"></i><i style="height:12%;background:repeating-linear-gradient(135deg,#f4f3ef 0 5px,#e3e1db 5px 10px)"></i></div><div class="sub">la última barra rayada es "sin rubro" · se puede normalizar desde Rubros</div></div>
+<div class="card"><div class="h2">Variación de precios del proveedor</div><div class="spark"></div><div class="tbl" style="border:0"><div class="tr" style="grid-template-columns:1.5fr .8fr;padding:4px 0;border-color:#eee"><span class="ln" style="width:80%"></span><span class="pill w">+12 %</span></div><div class="tr" style="grid-template-columns:1.5fr .8fr;padding:4px 0;border-color:#eee"><span class="ln" style="width:70%"></span><span class="pill w">+8 %</span></div><div class="tr" style="grid-template-columns:1.5fr .8fr;padding:4px 0;border:0"><span class="ln" style="width:62%"></span><span class="pill g">-3 %</span></div></div></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Stock y productos · qué se mueve y qué no</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div><div class="sq"></div><div class="sq"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center"><div class="h">Productos</div><div style="display:flex;gap:5px"><span class="cmd" style="width:150px">buscar producto…<span>⌘K</span></span><span class="chip">se mueve</span><span class="chip">dormido</span><span class="chip">nuevo</span></div></div>
+<div class="g" style="grid-template-columns:repeat(3,1fr)">
+<div class="card"><div class="sub">Sin vender hace +90 días</div><div class="kpi">64</div><div class="sub">capital quieto: $ 000.000</div></div>
+<div class="card"><div class="sub">Se quedan sin stock pronto</div><div class="kpi">12</div><span class="btn" style="align-self:flex-start">Sugerir orden</span></div>
+<div class="card"><div class="sub">Nuevos del proveedor sin cargar precio de venta</div><div class="kpi">18</div></div>
+</div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1.7fr 1fr .8fr .8fr .9fr"><span class="th">Producto</span><span class="th">Rubro</span><span class="th">Stock</span><span class="th">Últ. venta</span><span class="th">Rotación</span></div>
+<div class="tr" style="grid-template-columns:1.7fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:85%"></span><span class="pill">Pinturas</span><span class="sub">00</span><span class="sub">ayer</span><span class="pill g">alta</span></div>
+<div class="tr warn" style="grid-template-columns:1.7fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:75%"></span><span class="pill">Herramientas</span><span class="sub">00</span><span class="sub">hace 4 m</span><span class="pill w">dormido</span></div>
+<div class="tr warn" style="grid-template-columns:1.7fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:80%"></span><span class="pill w">sin rubro</span><span class="sub">00</span><span class="sub">nunca</span><span class="pill a">nuevo</span></div>
+<div class="tr" style="grid-template-columns:1.7fr 1fr .8fr .8fr .9fr"><span class="ln" style="width:68%"></span><span class="pill">Sanitarios</span><span class="sub">02</span><span class="sub">hoy</span><span class="pill w">poco stock</span></div>
+</div>
+<div class="note">Julián ve precios y movimiento; no ve cuentas de proveedores ni deuda. Si necesita comprar, sugiere la orden y Marcela la confirma.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="2g">
+<div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Pagos y recibos · módulo propio: qué se pagó, qué falta, y el flujo de generar un recibo en tres pasos (incluye pago que cubre varias facturas).</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Pagos y recibos</span></div>
+<div class="row">
+<div class="sb"><div class="logo">FIC</div><div class="ni">Tablero</div><div class="grp">Compras</div><div class="ni">Proveedores</div><div class="ni">Facturas</div><div class="ni on">Pagos y recibos <span>3</span></div><div class="ni">Órdenes compra</div><div class="grp">Datos</div><div class="ni">Catálogo/precios</div><div class="ni">Rubros</div><div class="ni">Revisar esto</div><div class="grp">Sistema</div><div class="ni">Avisos</div><div class="ni">Calendario</div><div class="ni dim">Configuración</div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h">Pagos y recibos</div><div class="sub">3 pagos registrados sin recibo emitido</div></div><div style="display:flex;gap:5px"><span class="btn">Exportar</span><span class="btn p">+ Registrar pago</span></div></div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="sub">Pagado este mes</div><div class="kpi">$ 000.000</div></div>
+<div class="card" style="border-color:#a86a10"><div class="sub">Pagos sin recibo</div><div class="kpi">03</div><span class="btn" style="align-self:flex-start">Emitir los 3</span></div>
+<div class="card"><div class="sub">Facturas parciales</div><div class="kpi">07</div><div class="sub">$ 00.000 restantes</div></div>
+<div class="card"><div class="sub">Próximo N° de recibo</div><div class="kpi">A-0142</div></div>
+</div>
+<div class="tabs"><span class="tab on">Pagos</span><span class="tab">Recibos emitidos</span><span class="tab">Sin recibo (3)</span></div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:.8fr 1.2fr .9fr 1fr 1.1fr"><span class="th">Fecha</span><span class="th">Proveedor</span><span class="th">Monto</span><span class="th">Aplica a</span><span class="th">Recibo</span></div>
+<div class="tr warn" style="grid-template-columns:.8fr 1.2fr .9fr 1fr 1.1fr"><span class="sub">28/08</span><span class="ln" style="width:80%"></span><span class="ln d" style="width:65%"></span><span class="pill a">3 facturas</span><span class="btn">Generar</span></div>
+<div class="tr warn" style="grid-template-columns:.8fr 1.2fr .9fr 1fr 1.1fr"><span class="sub">26/08</span><span class="ln" style="width:70%"></span><span class="ln d" style="width:55%"></span><span class="sub">FC-1051 · parcial</span><span class="btn">Generar</span></div>
+<div class="tr" style="grid-template-columns:.8fr 1.2fr .9fr 1fr 1.1fr"><span class="sub">21/07</span><span class="ln" style="width:75%"></span><span class="ln d" style="width:60%"></span><span class="sub">FC-1044</span><span class="pill g">A-0139</span></div>
+<div class="tr" style="grid-template-columns:.8fr 1.2fr .9fr 1fr 1.1fr"><span class="sub">02/07</span><span class="ln" style="width:66%"></span><span class="ln d" style="width:58%"></span><span class="sub">FC-1051 · parcial</span><span class="pill g">A-0138</span></div>
+</div>
+<div class="note">Un pago puede cubrir varias facturas y una factura puede tener varios pagos. El recibo se emite sobre el pago, no sobre la factura.</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Generar recibo · paso 1 de 3</span></div>
+<div class="main">
+<div class="stepper"><span class="st on">1</span><span class="dash"></span><span class="st off">2</span><span class="dash"></span><span class="st off">3</span><span class="sub" style="margin-left:6px">a qué facturas se aplica → revisar → emitir</span></div>
+<div class="h">Pago del 28/08 · Proveedor X · $ 000.000</div>
+<div class="sub">transferencia · comprobante adjunto · cargado por Marcela</div>
+<div class="g" style="grid-template-columns:1.3fr 1fr">
+<div class="card"><div class="h2">Elegí a qué facturas se aplica</div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:.4fr 1.2fr 1fr 1fr"><span class="th"></span><span class="th">Factura</span><span class="th">Saldo</span><span class="th">Aplicar</span></div>
+<div class="tr" style="grid-template-columns:.4fr 1.2fr 1fr 1fr"><span class="sq" style="width:12px;height:12px;background:#2a78d6;border-color:#2a78d6"></span><span class="sub">FC-1051</span><span class="ln d" style="width:60%"></span><div class="soft" style="padding:3px"><div class="ln" style="width:55%"></div></div></div>
+<div class="tr" style="grid-template-columns:.4fr 1.2fr 1fr 1fr"><span class="sq" style="width:12px;height:12px;background:#2a78d6;border-color:#2a78d6"></span><span class="sub">FC-1053</span><span class="ln d" style="width:50%"></span><div class="soft" style="padding:3px"><div class="ln" style="width:70%"></div></div></div>
+<div class="tr" style="grid-template-columns:.4fr 1.2fr 1fr 1fr"><span class="sq" style="width:12px;height:12px"></span><span class="sub">FC-1060</span><span class="ln d" style="width:55%"></span><span class="sub">—</span></div>
+</div>
+<div style="display:flex;gap:5px"><span class="btn">Aplicar más antiguas primero</span><span class="btn">Distribuir proporcional</span></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div class="card"><div class="sub">Monto del pago</div><div class="kpi">$ 000.000</div></div>
+<div class="card"><div class="sub">Asignado</div><div class="kpi">$ 000.000</div><div class="ln" style="width:100%;background:#2a78d6"></div><div class="pill g">cierra exacto</div></div>
+<div class="card" style="border-color:#a86a10"><div class="sub">Si sobra o falta</div><div class="sub">queda como saldo a favor del proveedor y avisa; no se fuerza el cierre.</div></div>
+</div>
+</div>
+<div style="display:flex;gap:5px;justify-content:flex-end"><span class="btn">Cancelar</span><span class="btn p">Siguiente: revisar</span></div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Generar recibo · paso 3 de 3 · emitir</span></div>
+<div class="main">
+<div class="stepper"><span class="st on">1</span><span class="dash"></span><span class="st on">2</span><span class="dash"></span><span class="st on">3</span><span class="sub" style="margin-left:6px">listo para emitir</span></div>
+<div class="g" style="grid-template-columns:1fr 1.1fr">
+<div class="ph" style="height:190px">vista previa del recibo A-0142<br><br>datos de la empresa · proveedor · detalle de facturas aplicadas · monto en letras · firma</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<div class="card"><div class="sub">Número</div><div class="h2">A-0142</div><div class="sub">sigue la numeración de Configuración</div></div>
+<div class="card"><div class="sub">Se aplica a</div><div class="sub">FC-1051 (queda saldada) · FC-1053 (parcial 60 %)</div></div>
+<div class="card"><div class="h2">Al emitir</div><div class="sub">las facturas cambian de estado, se cierra el aviso de vencimiento y el recibo queda descargable e inmutable.</div></div>
+<div style="display:flex;gap:5px;flex-wrap:wrap"><span class="btn p">Emitir y descargar PDF</span><span class="btn">Emitir y enviar por mail</span><span class="btn">Volver</span></div>
+<div class="note">Un recibo emitido no se edita: si estuvo mal, se anula con motivo y queda el rastro.</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="2h">
+<div class="dv-olabel"><a class="dv-oid" href="#2h">2h</a>Mapa de navegación y permisos · la estructura completa en un cuadro, para la entrega.</div>
+<div class="dv-card" style="padding:14px">
+<div class="f" style="width:640px">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Estructura del sistema · qué ve cada rol</span></div>
+<div class="main">
+<div class="soft" style="flex-direction:row;align-items:center;gap:8px"><span class="pill">Login</span><span class="sub">→ cada rol cae en su inicio →</span><span class="pill a">Dueño: Tablero</span><span class="pill a">Marcela: Compras</span><span class="pill a">Julián: Ventas</span></div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="h2">Compras</div><div style="display:flex;flex-direction:column;gap:3px"><span class="sub">Proveedores → ficha → cuenta corriente</span><span class="sub">Facturas → entrada → detalle</span><span class="sub">Pagos y recibos → generar recibo</span><span class="sub">Órdenes de compra → seguimiento</span></div><div style="display:flex;gap:4px;flex-wrap:wrap"><span class="pill g">dueño</span><span class="pill g">Marcela</span><span class="pill" style="color:#aaa;border-color:#ccc">Julián</span></div></div>
+<div class="card"><div class="h2">Ventas</div><div style="display:flex;flex-direction:column;gap:3px"><span class="sub">Tablero de ventas</span><span class="sub">Evolución · por rubro</span><span class="sub">Productos · stock</span><span class="sub">Precios sincronizados</span></div><div style="display:flex;gap:4px;flex-wrap:wrap"><span class="pill g">dueño</span><span class="pill" style="color:#aaa;border-color:#ccc">Marcela</span><span class="pill g">Julián</span></div></div>
+<div class="card"><div class="h2">Datos</div><div style="display:flex;flex-direction:column;gap:3px"><span class="sub">Revisar esto (excepciones)</span><span class="sub">Rubros → unificar</span><span class="sub">Catálogo / lista de precios</span></div><div style="display:flex;gap:4px;flex-wrap:wrap"><span class="pill g">dueño</span><span class="pill g">Marcela</span><span class="pill g">Julián*</span></div><div class="sub">* sólo excepciones de ventas</div></div>
+<div class="card"><div class="h2">Sistema</div><div style="display:flex;flex-direction:column;gap:3px"><span class="sub">Calendario de vencimientos</span><span class="sub">Avisos y reclamos</span><span class="sub">Configuración</span><span class="sub">Usuarios y permisos</span></div><div style="display:flex;gap:4px;flex-wrap:wrap"><span class="pill g">dueño</span><span class="pill g">Marcela*</span><span class="pill g">Julián*</span></div><div class="sub">* sin Configuración ni Usuarios</div></div>
+</div>
+<div class="grp">Recorridos que tienen que funcionar sin explicación</div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="soft"><div class="sub">Llega una factura en foto → entra → se identifica el proveedor → se aprueba → aparece en el calendario</div></div>
+<div class="soft"><div class="sub">Vence en 2 días sin recibo → aviso por mail/push → registrar pago → generar recibo → aviso cerrado</div></div>
+<div class="soft"><div class="sub">Reclamo del proveedor → contexto de deuda y puntualidad → responder → marcar resuelto</div></div>
+<div class="soft"><div class="sub">Dato dudoso → queda fuera de los totales y visible en "Revisar esto" → wizard → recalcula</div></div>
+</div>
+<div class="note">Principio transversal: lo que un rol no puede ver no aparece en el menú, y ningún número del tablero se calcula con datos que el sistema no pudo confirmar.</div>
+</div>
+</div>
+</div>
+</div>
+
+<p class="dv-next">Probá pedirme: "pasá <a class="dv-oid" href="#2a">2a</a> y <a class="dv-oid" href="#2c">2c</a> a alta fidelidad" · "sumá el flujo de generar recibo paso a paso" · "armá el mapa de navegación y permisos por rol" · "documentá las decisiones técnicas de cada problema"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">5 estructuras para el sistema de Ferretería Industrial Cordillera — dueño / Marcela (compras) / Julián (ventas)</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Sidebar fijo por dominio. Todos los módulos siempre visibles, filtrados por rol (lo que no te toca no aparece). Home = tablero del dueño con salud de datos arriba. Segunda pantalla: ficha de proveedor con cuenta corriente.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Inicio · sesión: Dueño</span></div>
+<div class="row">
+<div class="sb">
+<div class="logo">FIC<br>Cordillera</div>
+<div class="ni on">Tablero</div>
+<div class="grp">Compras</div>
+<div class="ni">Proveedores</div>
+<div class="ni">Facturas <span>4</span></div>
+<div class="ni">Pagos y recibos</div>
+<div class="ni">Órdenes compra</div>
+<div class="grp">Datos</div>
+<div class="ni">Catálogo/precios</div>
+<div class="ni">Rubros</div>
+<div class="ni">Revisar esto <span>12</span></div>
+<div class="grp">Sistema</div>
+<div class="ni">Avisos <span>7</span></div>
+<div class="ni">Calendario</div>
+<div class="ni">Configuración</div>
+<div class="ni dim">Usuarios y roles</div>
+</div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end">
+<div><div class="h">Cómo venimos</div><div class="sub">agosto 2026 · datos al día · últ. sync precios 06:00</div></div>
+<div style="display:flex;gap:5px"><span class="chip">Mes</span><span class="chip">Trimestre</span><span class="chip">Año</span></div>
+</div>
+<div class="soft" style="border-color:#c07d18;background:#fdf9f0;flex-direction:row;align-items:center;justify-content:space-between">
+<div style="display:flex;flex-direction:column;gap:3px"><div class="h2">Hay 12 cosas para revisar antes de confiar en estos números</div><div class="sub">8 ventas duplicadas · 3 proveedores posiblemente repetidos · 1 factura ilegible</div></div>
+<span class="btn p">Revisar</span>
+</div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="sub">Facturado mes</div><div class="kpi">$ 000.000</div><div class="ln" style="width:60%"></div></div>
+<div class="card"><div class="sub">Deuda a proveedores</div><div class="kpi">$ 000.000</div><div class="ln" style="width:45%"></div></div>
+<div class="card"><div class="sub">Vence en 7 días</div><div class="kpi">00</div><div class="pill w">3 sin recibo</div></div>
+<div class="card"><div class="sub">OC sin recibir</div><div class="kpi">00</div><div class="pill w">2 atrasadas</div></div>
+</div>
+<div class="g" style="grid-template-columns:1.5fr 1fr">
+<div class="card"><div class="h2">Facturación por mes · 2023 → hoy</div><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:35%"></i><i style="height:70%"></i><i style="height:60%"></i><i style="height:85%"></i><i style="height:50%"></i><i style="height:75%"></i><i style="height:65%"></i><i style="height:90%"></i><i style="height:72%"></i><i style="height:58%"></i></div><div class="sub">las barras rayadas marcan meses con datos dudosos</div></div>
+<div class="card"><div class="h2">Gasto por rubro</div><div class="ph" style="height:62px">gráfico de torta · 5 rubros normalizados + "sin rubro"</div><div class="pill w">14 productos sin rubro</div></div>
+</div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div class="h2">Próximos vencimientos</div><span class="btn">Ver calendario</span></div>
+<div class="tbl">
+<div class="tr hd"><span class="th">Proveedor</span><span class="th">Factura</span><span class="th">Vence</span><span class="th">Recibo</span></div>
+<div class="tr warn"><span class="ln" style="width:80%"></span><span class="ln d" style="width:60%"></span><span class="pill w">en 2 días</span><span class="pill w">falta</span></div>
+<div class="tr"><span class="ln" style="width:65%"></span><span class="ln d" style="width:60%"></span><span class="sub">en 6 días</span><span class="pill g">ok</span></div>
+<div class="tr"><span class="ln" style="width:74%"></span><span class="ln d" style="width:60%"></span><span class="sub">en 11 días</span><span class="pill g">ok</span></div>
+</div></div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Proveedores › ficha · sesión: Marcela</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:4px">
+<div class="h">Proveedor · nombre canónico</div>
+<div class="sub">CUIT 00-00000000-0 · compras@proveedor.com · plazo 45 días</div>
+<div style="display:flex;gap:5px;flex-wrap:wrap"><span class="pill a">3 nombres unificados</span><span class="pill">"Prov. S.A."</span><span class="pill">"PROVEEDOR SA"</span><span class="pill">"Proveedro SA"</span></div>
+</div>
+<div style="display:flex;gap:5px"><span class="btn">Editar datos</span><span class="btn p">Registrar pago</span></div>
+</div>
+<div class="g" style="grid-template-columns:repeat(4,1fr)">
+<div class="card"><div class="sub">Le compré (año)</div><div class="kpi">$ 000.000</div></div>
+<div class="card"><div class="sub">Le pagué</div><div class="kpi">$ 000.000</div></div>
+<div class="card" style="border-color:#a86a10"><div class="sub">Le debo</div><div class="kpi">$ 00.000</div></div>
+<div class="card"><div class="sub">Pago promedio</div><div class="kpi">52 días</div><div class="pill w">7 días tarde</div></div>
+</div>
+<div class="tabs"><span class="tab on">Cuenta corriente</span><span class="tab">Facturas</span><span class="tab">Pagos</span><span class="tab">Órdenes</span><span class="tab">Reclamos (2)</span></div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1.2fr 1fr 1fr 1fr"><span class="th">Factura</span><span class="th">Total</span><span class="th">Pagado</span><span class="th">Estado</span></div>
+<div class="tr" style="grid-template-columns:1.2fr 1fr 1fr 1fr"><span class="ln" style="width:70%"></span><span class="ln d" style="width:55%"></span><span class="ln d" style="width:55%"></span><span class="pill g">saldada</span></div>
+<div class="tr" style="grid-template-columns:1.2fr 1fr 1fr 1fr"><span class="ln" style="width:70%"></span><span class="ln d" style="width:55%"></span><span class="ln d" style="width:35%"></span><span class="pill a">parcial 40%</span></div>
+<div class="tr warn" style="grid-template-columns:1.2fr 1fr 1fr 1fr"><span class="ln" style="width:70%"></span><span class="ln d" style="width:55%"></span><span class="sub">—</span><span class="pill w">vencida sin tocar</span></div>
+</div>
+<div class="note">Barra de saldo arriba de la tabla: cuánto está saldado / parcial / sin tocar, en una sola línea visual.</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Topbar con espacios de trabajo por rol. Cada persona entra a su propio espacio (Compras / Ventas / Dirección) y dentro navega con tabs. Menos menú, más "esto es lo tuyo". Segunda pantalla: calendario de vencimientos con presencia en vivo.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Espacio Ventas · sesión: Julián</span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1.5px solid #222;background:#faf9f6">
+<div style="display:flex;align-items:center;gap:8px"><span class="logo" style="margin:0">FIC</span><span class="pill a">Espacio: Ventas</span><span class="pill" style="border-style:dashed;color:#aaa">Compras 🔒</span><span class="pill" style="border-style:dashed;color:#aaa">Dirección 🔒</span></div>
+<div style="display:flex;gap:6px;align-items:center"><span class="cmd" style="width:150px">buscar…<span>⌘K</span></span><span class="pill w">7 avisos</span><span class="sq" style="border-radius:50%"></span></div>
+</div>
+<div class="tabs" style="padding:0 10px;background:#f6f5f2"><span class="tab on">Resumen</span><span class="tab">Ventas</span><span class="tab">Precios</span><span class="tab">Stock</span><span class="tab">Productos nuevos</span><span class="tab">Revisar (8)</span></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center"><div class="h">Ventas 2023 → hoy</div><div style="display:flex;gap:5px"><span class="chip">mensual</span><span class="chip">por rubro</span><span class="btn">Exportar</span></div></div>
+<div class="g" style="grid-template-columns:repeat(3,1fr)">
+<div class="card"><div class="sub">Facturado mes</div><div class="kpi">$ 000.000</div><div class="spark"></div></div>
+<div class="card"><div class="sub">Variación de precios</div><div class="kpi">+0,0 %</div><div class="spark"></div></div>
+<div class="card"><div class="sub">Productos nuevos</div><div class="kpi">00</div><div class="ln" style="width:50%"></div></div>
+</div>
+<div class="soft" style="flex-direction:row;justify-content:space-between;align-items:center;border-color:#c07d18"><div class="sub" style="color:#8a5a0c">8 ventas con código repetido y 2 con datos rotos quedaron fuera de estos totales</div><span class="btn">Ver las 10</span></div>
+<div class="card"><div class="h2">Evolución mensual · comparado con año anterior</div><div class="ph" style="height:96px">gráfico de líneas · 2 series + banda de datos excluidos</div></div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="card"><div class="h2">Top rubros</div><div style="display:flex;flex-direction:column;gap:5px"><div class="ln" style="width:90%"></div><div class="ln" style="width:70%"></div><div class="ln" style="width:52%"></div><div class="ln" style="width:31%"></div></div></div>
+<div class="card"><div class="h2">Stock: qué se mueve y qué no</div><div class="ph" style="height:56px">tabla compacta · 6 filas</div></div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Espacio Compras › Calendario · sesión: Marcela</span></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div><div class="h">Vencimientos · agosto 2026</div><div class="sub">se actualiza solo · Julián está viendo esto también</div></div>
+<div style="display:flex;gap:5px;align-items:center"><span class="sq" style="border-radius:50%"></span><span class="sq" style="border-radius:50%"></span><span class="chip">mes</span><span class="chip">semana</span><span class="btn p">+ Vencimiento</span></div>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill g">con recibo</span><span class="pill w">sin recibo</span><span class="pill a">reprogramado</span><span class="pill">pagado</span></div>
+<div class="cal">
+<div class="hd">L</div><div class="hd">M</div><div class="hd">M</div><div class="hd">J</div><div class="hd">V</div><div class="hd">S</div><div class="hd">D</div>
+<div><span class="dnum">3</span></div>
+<div><span class="dnum">4</span><span class="ev g">FC-1042</span></div>
+<div><span class="dnum">5</span></div>
+<div><span class="dnum">6</span><span class="ev w">FC-1051</span><span class="ev a">FC-1053</span></div>
+<div><span class="dnum">7</span></div>
+<div style="background:#faf9f6"><span class="dnum">8</span></div>
+<div style="background:#faf9f6"><span class="dnum">9</span></div>
+<div><span class="dnum">10</span><span class="ev w">FC-1060</span></div>
+<div style="outline:1.5px solid #2a78d6;outline-offset:-1.5px"><span class="dnum">11 · hoy</span><span class="ev g">FC-1061</span></div>
+<div><span class="dnum">12</span></div>
+<div><span class="dnum">13</span><span class="ev w">FC-1064</span><span class="ev g">FC-1065</span></div>
+<div><span class="dnum">14</span></div>
+<div style="background:#faf9f6"><span class="dnum">15</span></div>
+<div style="background:#faf9f6"><span class="dnum">16</span></div>
+</div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="soft" style="border-color:#c07d18"><div class="h2">Se acerca y no tiene recibo</div><div class="sub">FC-1051 vence en 2 días · FC-1060 en 6</div><div style="display:flex;gap:5px"><span class="btn p">Generar recibo</span><span class="btn">Avisarme antes</span></div></div>
+<div class="soft"><div class="h2">Arrastrar para reprogramar</div><div class="note">al mover una tarjeta se registra quién y cuándo; el otro usuario lo ve al instante, sin refrescar.</div></div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Bandeja primero. La app abre en una única bandeja de trabajo: avisos, reclamos de proveedores y excepciones de datos mezclados y priorizados; los módulos quedan detrás de un menú colapsable. Segunda pantalla: wizard para resolver un proveedor duplicado.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Bandeja de trabajo · sesión: Marcela</span></div>
+<div class="row">
+<div class="sb mini"><div class="sq" style="border-color:#2a78d6;background:#e8eef7"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="h">Para hoy · 9 cosas</div><div class="sub">3 urgentes · 4 de datos · 2 reclamos</div></div><div style="display:flex;gap:5px"><span class="chip">todo</span><span class="chip">urgente</span><span class="chip">datos</span><span class="chip">resueltas</span></div></div>
+<div class="split">
+<div class="l">
+<div class="li on"><b>Vence en 2 días</b><span class="sub">FC-1051 sin recibo</span><span class="pill w">urgente</span></div>
+<div class="li"><b>Reclamo de proveedor</b><span class="sub">"nos deben 2 facturas"</span></div>
+<div class="li"><b>Proveedor duplicado</b><span class="sub">3 nombres parecidos</span></div>
+<div class="li"><b>Factura ilegible</b><span class="sub">PDF escaneado, 2 campos</span></div>
+<div class="li"><b>8 ventas duplicadas</b><span class="sub">mismo código</span></div>
+<div class="li"><b>14 productos sin rubro</b><span class="sub">asignar en lote</span></div>
+</div>
+<div class="r">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="h2">FC-1051 · vence 13/08 · sin recibo</div><div class="sub">Proveedor X · $ 000.000 · plazo 45 días</div></div><span class="pill w">urgente</span></div>
+<div class="ph" style="height:70px">vista previa del comprobante</div>
+<div class="tbl"><div class="tr hd" style="grid-template-columns:1fr 1fr"><span class="th">Campo</span><span class="th">Valor detectado</span></div><div class="tr" style="grid-template-columns:1fr 1fr"><span class="sub">Total</span><span class="ln" style="width:50%"></span></div><div class="tr" style="grid-template-columns:1fr 1fr"><span class="sub">Vencimiento</span><span class="ln" style="width:50%"></span></div></div>
+<div style="display:flex;gap:5px;margin-top:auto"><span class="btn p">Generar recibo</span><span class="btn">Reprogramar</span><span class="btn">Posponer aviso</span><span class="btn">Marcar resuelto</span></div>
+<div class="note">Cada ítem se cierra desde acá. Lo que no se resuelve queda contado en "sin resolver", nunca se autoadivina.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Resolver · ¿es el mismo proveedor?</span></div>
+<div class="main">
+<div class="stepper"><span class="st on">1</span><span class="dash"></span><span class="st on">2</span><span class="dash"></span><span class="st off">3</span><span class="sub" style="margin-left:6px">paso 2 de 3 · unificar proveedores</span></div>
+<div class="h">Encontramos 3 nombres que podrían ser el mismo</div>
+<div class="g" style="grid-template-columns:repeat(3,1fr)">
+<div class="card" style="border-color:#2a78d6"><div class="pill a">quedarse con este</div><div class="h2">"Proveedor S.A."</div><div class="sub">CUIT 00-00000000-0</div><div class="sub">18 facturas · $ 000.000</div></div>
+<div class="card"><div class="h2">"PROVEEDOR SA"</div><div class="sub">CUIT igual</div><div class="sub">6 facturas · $ 00.000</div></div>
+<div class="card"><div class="h2">"Proveedro SA"</div><div class="sub">sin CUIT</div><div class="sub">2 facturas · $ 00.000</div></div>
+</div>
+<div class="soft"><div class="h2">Qué pasa si unifico</div><div class="sub">26 facturas, 11 pagos y 4 órdenes pasan al proveedor unificado. La cuenta corriente se recalcula. Se puede deshacer.</div></div>
+<div class="soft" style="border-color:#c07d18"><div class="sub" style="color:#8a5a0c">¿No estás segura? Dejalo pendiente y queda en la bandeja. Preferimos que avise antes que adivinar mal.</div></div>
+<div style="display:flex;gap:5px;justify-content:flex-end"><span class="btn">No son el mismo</span><span class="btn">Dejar pendiente</span><span class="btn p">Unificar los 3</span></div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Lista + detalle en todo el sistema, con buscador de comandos (⌘K) como navegación principal. Pensado para uso intensivo: Marcela vive en la lista de facturas. Segunda pantalla: ingesta de facturas (PDF, foto escaneada, Excel torcido) con cola de revisión.</div>
+<div class="dv-card" style="display:flex;flex-direction:column;gap:14px;padding:14px">
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Facturas · lista + detalle</span></div>
+<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1.5px solid #222"><span class="logo" style="margin:0">FIC</span><span class="cmd" style="flex:1">ir a… factura, proveedor, orden, rubro<span>⌘K</span></span><span class="pill w">12 por revisar</span></div>
+<div class="row">
+<div class="sb" style="width:150px;background:#fff">
+<div class="grp">Bandejas</div>
+<div class="ni on">Por revisar <span>12</span></div>
+<div class="ni">Ingresadas hoy <span>5</span></div>
+<div class="ni">Vencen esta semana</div>
+<div class="ni">Parciales</div>
+<div class="ni">Sin recibo</div>
+<div class="grp">Filtros guardados</div>
+<div class="ni">Proveedor X</div>
+<div class="ni">Rubro: pinturas</div>
+<div class="ni">+ nuevo filtro</div>
+</div>
+<div class="main" style="padding:0">
+<div class="split" style="border:0;border-radius:0">
+<div class="l" style="width:200px">
+<div style="padding:6px 7px;border-bottom:1.5px solid #222;display:flex;justify-content:space-between"><span class="th">12 resultados</span><span class="th">ordenar ▾</span></div>
+<div class="li on"><b>FC-1051 · Proveedor X</b><span class="sub">$ 000.000 · vence 13/08</span><div style="display:flex;gap:4px"><span class="pill w">sin recibo</span><span class="pill a">parcial</span></div></div>
+<div class="li"><b>FC-1052 · sin identificar</b><span class="sub">foto escaneada · 3 campos dudosos</span><span class="pill w">revisar</span></div>
+<div class="li"><b>FC-1053 · Proveedor Y</b><span class="sub">$ 00.000 · vence 20/08</span></div>
+<div class="li"><b>FC-1054 · Proveedor Y</b><span class="sub">Excel · fila de títulos movida</span><span class="pill w">revisar</span></div>
+<div class="li"><b>FC-1055 · Proveedor Z</b><span class="sub">$ 000.000 · saldada</span></div>
+</div>
+<div class="r">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="h">FC-1051</div><div class="sub">Proveedor X · CUIT 00-00000000-0 · plazo 45 días</div></div><div style="display:flex;gap:5px"><span class="btn">Recibo</span><span class="btn">Pago</span><span class="btn p">Aprobar</span></div></div>
+<div class="g" style="grid-template-columns:1fr 1fr">
+<div class="ph" style="height:130px">documento original<br>(PDF / foto / Excel)</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div class="card"><div class="sub">Total</div><div class="kpi">$ 000.000</div></div>
+<div class="card"><div class="sub">Pagado · 2 pagos</div><div class="kpi">$ 00.000</div><div class="ln" style="width:40%;background:#2a78d6"></div><div class="sub">queda 60 % · parcial</div></div>
+<div class="card" style="border-color:#a86a10"><div class="sub">Campo dudoso</div><div class="h2">Vencimiento: 13/08 ?</div><div style="display:flex;gap:4px"><span class="btn">Confirmar</span><span class="btn">Corregir</span></div></div>
+</div>
+</div>
+<div class="tabs"><span class="tab on">Detalle</span><span class="tab">Pagos (2)</span><span class="tab">Historial</span><span class="tab">Orden de compra</span></div>
+<div class="note">j / k para moverse en la lista, ⌘K para saltar a cualquier cosa. La misma plantilla sirve para proveedores, órdenes y avisos.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="f">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Entrada de facturas · un solo lugar</span></div>
+<div class="main">
+<div class="h">Todo entra por acá</div>
+<div class="g" style="grid-template-columns:repeat(3,1fr)">
+<div class="soft" style="align-items:center;text-align:center"><div class="h2">Arrastrar archivos</div><div class="sub">PDF · foto · Excel · ZIP</div></div>
+<div class="soft" style="align-items:center;text-align:center"><div class="h2">Casilla de mail</div><div class="sub">facturas@cordillera…</div></div>
+<div class="soft" style="align-items:center;text-align:center"><div class="h2">Portal del proveedor</div><div class="sub">baja automática 06:00 · últ. ok hoy</div></div>
+</div>
+<div class="tbl">
+<div class="tr hd" style="grid-template-columns:1.4fr 1fr 1fr 1fr"><span class="th">Archivo</span><span class="th">Tipo</span><span class="th">Proveedor detectado</span><span class="th">Estado</span></div>
+<div class="tr" style="grid-template-columns:1.4fr 1fr 1fr 1fr"><span class="ln" style="width:80%"></span><span class="pill">PDF texto</span><span class="ln d" style="width:70%"></span><span class="pill g">listo</span></div>
+<div class="tr warn" style="grid-template-columns:1.4fr 1fr 1fr 1fr"><span class="ln" style="width:70%"></span><span class="pill w">foto escaneada</span><span class="sub">¿Prov. X o Prov. Y?</span><span class="pill w">elegí vos</span></div>
+<div class="tr warn" style="grid-template-columns:1.4fr 1fr 1fr 1fr"><span class="ln" style="width:60%"></span><span class="pill w">Excel raro</span><span class="ln d" style="width:70%"></span><span class="pill w">títulos movidos</span></div>
+<div class="tr" style="grid-template-columns:1.4fr 1fr 1fr 1fr"><span class="ln" style="width:75%"></span><span class="pill">Excel</span><span class="ln d" style="width:60%"></span><span class="pill a">duplicada de FC-1049</span></div>
+</div>
+<div class="note">Nada entra dos veces: si el número + proveedor + monto ya existen, queda como posible duplicado y espera decisión.</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="dv-opt" id="1e">
+<div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Desktop mínimo + compañero móvil. El escritorio es un solo tablero con secciones apiladas (nada de menú profundo); el celular es donde llegan los avisos y se aprueban cosas en el momento. Pensado para el dueño que "no es de sistemas".</div>
+<div class="dv-card" style="display:flex;gap:14px;padding:14px;align-items:flex-start">
+
+<div class="f" style="width:430px">
+<div class="fbar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="fttl">Una sola página, de arriba a abajo</span></div>
+<div class="main">
+<div style="display:flex;justify-content:space-between;align-items:center"><div class="h">Cordillera · hoy</div><div style="display:flex;gap:5px"><span class="pill w">3 urgentes</span><span class="sq" style="border-radius:50%"></span></div></div>
+<div class="soft" style="border-color:#c07d18;flex-direction:row;justify-content:space-between;align-items:center"><div class="h2">3 cosas que necesitan tu decisión</div><span class="btn p">Ver</span></div>
+<div class="grp">Cómo venimos</div>
+<div class="g" style="grid-template-columns:1fr 1fr"><div class="card"><div class="sub">Facturado mes</div><div class="kpi">$ 000.000</div><div class="spark"></div></div><div class="card"><div class="sub">Le debo a proveedores</div><div class="kpi">$ 000.000</div><div class="spark"></div></div></div>
+<div class="grp">Esta semana vence</div>
+<div class="tbl"><div class="tr" style="grid-template-columns:1.4fr .8fr .8fr"><span class="ln" style="width:75%"></span><span class="pill w">sin recibo</span><span class="btn">Generar</span></div><div class="tr" style="grid-template-columns:1.4fr .8fr .8fr"><span class="ln" style="width:65%"></span><span class="pill g">ok</span><span class="sub">13/08</span></div></div>
+<div class="grp">Proveedores</div>
+<div class="tbl"><div class="tr hd" style="grid-template-columns:1.4fr 1fr 1fr"><span class="th">Proveedor</span><span class="th">Le debo</span><span class="th">Puntualidad</span></div><div class="tr" style="grid-template-columns:1.4fr 1fr 1fr"><span class="ln" style="width:70%"></span><span class="ln d" style="width:55%"></span><span class="pill w">tarde</span></div><div class="tr" style="grid-template-columns:1.4fr 1fr 1fr"><span class="ln" style="width:60%"></span><span class="ln d" style="width:55%"></span><span class="pill g">al día</span></div></div>
+<div class="grp">Compras pedidas y no recibidas</div>
+<div class="tbl"><div class="tr" style="grid-template-columns:1.4fr 1fr 1fr"><span class="ln" style="width:70%"></span><span class="pill w">hace 22 días</span><span class="btn">Seguir</span></div></div>
+<div class="note">Cada sección tiene un "ver todo" que abre el módulo completo. El tablero es la casa; los módulos son visitas.</div>
+</div>
+</div>
+
+<div style="display:flex;gap:12px">
+<div class="f mob">
+<div class="mbar"><span>9:41</span><span>Cordillera</span><span>▲ 3</span></div>
+<div class="main" style="padding:8px;gap:7px">
+<div class="h2">Avisos</div>
+<div class="card" style="border-color:#a86a10"><div class="pill w">vence en 2 días</div><div class="sub">FC-1051 · Proveedor X sin recibo</div><div style="display:flex;gap:4px"><span class="btn p">Generar</span><span class="btn">Después</span></div></div>
+<div class="card"><div class="pill">reclamo</div><div class="sub">Proveedor Y: "faltan 2 pagos"</div><span class="btn">Abrir</span></div>
+<div class="card"><div class="pill a">para revisar</div><div class="sub">¿Prov. X y PROVEEDOR SA son el mismo?</div><div style="display:flex;gap:4px"><span class="btn">Sí</span><span class="btn">No</span></div></div>
+<div class="ph" style="height:40px">notificación push / mail</div>
+</div>
+<div class="mtabs"><span class="mt on"><span class="sq"></span>Avisos</span><span class="mt"><span class="sq"></span>Hoy</span><span class="mt"><span class="sq"></span>Fechas</span><span class="mt"><span class="sq"></span>Más</span></div>
+</div>
+
+<div class="f mob">
+<div class="mbar"><span>9:41</span><span>Fechas</span><span>+</span></div>
+<div class="main" style="padding:8px;gap:6px">
+<div class="h2">Agosto</div>
+<div class="card" style="padding:6px"><div class="sub">mié 13</div><div class="ev w">FC-1051 · sin recibo</div><div class="ev g">FC-1061 · con recibo</div></div>
+<div class="card" style="padding:6px"><div class="sub">lun 18</div><div class="ev a">FC-1053 · reprogramado</div></div>
+<div class="card" style="padding:6px"><div class="sub">jue 21</div><div class="ev w">FC-1064 · sin recibo</div></div>
+<div class="soft" style="padding:6px"><div class="note" style="border:0;padding:0">Lista por día en vez de grilla; se sincroniza en vivo con el calendario del escritorio.</div></div>
+</div>
+<div class="mtabs"><span class="mt"><span class="sq"></span>Avisos</span><span class="mt"><span class="sq"></span>Hoy</span><span class="mt on"><span class="sq"></span>Fechas</span><span class="mt"><span class="sq"></span>Más</span></div>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+<p class="dv-next">Probá pedirme: "quedémonos con <a class="dv-oid" href="#1a">1a</a> pero con la bandeja de <a class="dv-oid" href="#1c">1c</a> como home" · "desarrollá todas las pantallas de <a class="dv-oid" href="#1d">1d</a>" · "mostrame login y permisos por rol" · "sumá catálogo de precios, rubros y configuración"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}"></script>
+</body>
+</html>

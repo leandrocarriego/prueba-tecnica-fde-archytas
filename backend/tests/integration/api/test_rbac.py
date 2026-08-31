@@ -269,3 +269,178 @@ class TestRolesInTheDatabase:
         # Assert
         assert response.status_code == 200
         assert response.json()["user"]["role"] == role.value
+
+
+@pytest.mark.integration
+@pytest.mark.database
+class TestTheCommercialDashboardIsNotForPurchasing:
+    """RF-08 y RF-29 de 009, **por comportamiento y no por construcción**.
+
+    La matriz ya decía que compras no llega ni a las ventas ni al tablero, y el
+    test que la recorre lo verificaba en la tabla. Lo que faltaba era una request
+    de verdad: RF-08 dice que Marcela no llega «ni pegando su dirección», y eso
+    sólo lo prueba pegando la dirección.
+    """
+
+    async def test_purchasing_cannot_read_the_dashboard(
+        self, purchasing_client: AsyncClient
+    ) -> None:
+        """RF-08."""
+        # Act
+        response = await purchasing_client.get(f"{API_PREFIX}/dashboard/sales")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_purchasing_cannot_read_the_catalog_cuts(
+        self, purchasing_client: AsyncClient
+    ) -> None:
+        """RF-08: los tres cortes del catálogo son del mismo tablero."""
+        # Act
+        response = await purchasing_client.get(f"{API_PREFIX}/dashboard/catalog")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_purchasing_cannot_list_the_sales(self, purchasing_client: AsyncClient) -> None:
+        """RF-08."""
+        # Act
+        response = await purchasing_client.get(f"{API_PREFIX}/sales")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_purchasing_cannot_reach_the_review_queue(
+        self, purchasing_client: AsyncClient
+    ) -> None:
+        """RF-29: resolver una venta apartada es de ventas y del dueño, y de nadie más."""
+        # Act
+        response = await purchasing_client.get(f"{API_PREFIX}/sales/review")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_purchasing_cannot_correct_a_sale(self, purchasing_client: AsyncClient) -> None:
+        """RF-29: y la escritura también, no sólo la lectura de la cola."""
+        # Act
+        response = await purchasing_client.patch(f"{API_PREFIX}/sales/1", json={"quantity": 3})
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_sales_reaches_the_dashboard_and_the_queue(
+        self, sales_client: AsyncClient
+    ) -> None:
+        """La otra mitad: cerrarle la puerta a compras no puede cerrársela a ventas."""
+        # Act
+        board = await sales_client.get(f"{API_PREFIX}/dashboard/sales")
+        queue = await sales_client.get(f"{API_PREFIX}/sales/review")
+
+        # Assert
+        assert board.status_code == 200
+        assert queue.status_code == 200
+
+    async def test_the_owner_reaches_them_too(self, owner_client: AsyncClient) -> None:
+        """El dueño ve todo, y esta sección no es la excepción."""
+        # Act
+        board = await owner_client.get(f"{API_PREFIX}/dashboard/sales")
+        queue = await owner_client.get(f"{API_PREFIX}/sales/review")
+
+        # Assert
+        assert board.status_code == 200
+        assert queue.status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.database
+class TestTheOrdersAndTheInboxAreNotForSales:
+    """RF-09 y RF-46 de 007, **por comportamiento**.
+
+    Los dos requisitos dicen que Julián no llega «ni pegando su dirección», y eso
+    sólo se prueba pegando la dirección. Hasta acá estaban probados por
+    construcción: la matriz decía que no, y nadie lo había intentado.
+    """
+
+    async def test_sales_cannot_see_the_purchase_orders(self, sales_client: AsyncClient) -> None:
+        """RF-09."""
+        # Act
+        response = await sales_client.get(f"{API_PREFIX}/purchase-orders")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_sales_cannot_resolve_a_held_order(self, sales_client: AsyncClient) -> None:
+        """RF-53: resolver una orden apartada es del dueño y de compras."""
+        # Act
+        response = await sales_client.post(
+            f"{API_PREFIX}/purchase-orders/1/resolution", json={"supplier_id": 1}
+        )
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_sales_cannot_open_the_inbox(self, sales_client: AsyncClient) -> None:
+        """RF-46, que incluye los mensajes de stock bajo."""
+        # Act
+        response = await sales_client.get(f"{API_PREFIX}/messages")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_purchasing_reaches_both(self, purchasing_client: AsyncClient) -> None:
+        """La otra mitad: cerrarle la puerta a ventas no puede cerrársela a compras."""
+        # Act
+        orders = await purchasing_client.get(f"{API_PREFIX}/purchase-orders")
+        inbox = await purchasing_client.get(f"{API_PREFIX}/messages")
+
+        # Assert
+        assert orders.status_code == 200
+        assert inbox.status_code == 200
+
+    async def test_only_the_owner_decides_who_gets_told_what(
+        self, purchasing_client: AsyncClient, owner_client: AsyncClient
+    ) -> None:
+        """RF-37: repartir los avisos es una decisión sobre el equipo."""
+        # Act
+        refused = await purchasing_client.get(f"{API_PREFIX}/alerts/routes")
+        allowed = await owner_client.get(f"{API_PREFIX}/alerts/routes")
+
+        # Assert
+        assert refused.status_code == 403
+        assert allowed.status_code == 200
+
+    async def test_the_owner_changes_a_route_and_sales_is_not_offerable(
+        self, owner_client: AsyncClient
+    ) -> None:
+        """RF-37, ahora que hay pantalla, y RF-46, que la limita.
+
+        La ruta aceptaba cualquier string mientras nadie pudiera llamarla. Con
+        un control en `/configuracion`, un rol que no existe apuntaría un tipo
+        de aviso a nadie, y ventas sería elegible para los reclamos de la
+        bandeja a la que ventas no entra.
+        """
+        # Act
+        changed = await owner_client.put(
+            f"{API_PREFIX}/alerts/routes/PAYMENT_CLAIM", json={"role": "OWNER"}
+        )
+        to_sales = await owner_client.put(
+            f"{API_PREFIX}/alerts/routes/PAYMENT_CLAIM", json={"role": "SALES"}
+        )
+
+        # Assert
+        assert changed.status_code == 200
+        assert changed.json()["role"] == "OWNER"
+        assert to_sales.status_code == 422
+
+    async def test_purchasing_can_read_the_senders_it_filters_by(
+        self, purchasing_client: AsyncClient, sales_client: AsyncClient
+    ) -> None:
+        """RF-26: el filtro por proveedor necesita saber por cuáles se filtra."""
+        # Act
+        allowed = await purchasing_client.get(f"{API_PREFIX}/messages/senders")
+        refused = await sales_client.get(f"{API_PREFIX}/messages/senders")
+
+        # Assert
+        assert allowed.status_code == 200
+        assert isinstance(allowed.json(), list)
+        assert refused.status_code == 403

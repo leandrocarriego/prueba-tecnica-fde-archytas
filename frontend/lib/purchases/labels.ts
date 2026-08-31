@@ -31,18 +31,55 @@ export function reviewStateLabel(state: string): string {
 }
 
 /**
- * The one line that says everything that is wrong with an invoice, or nothing.
+ * En qué formato llegó la factura, en una palabra (RF-05 de 004).
  *
- * Ordered by what a person has to do first: a held invoice is a decision, an
- * inconsistent one is a number that does not close, and one overdue without a
- * receipt is a deadline that already passed.
+ * El criterio firmado pide que la lista distinga **a simple vista** cuáles
+ * llegaron como imagen escaneada, y son 46 de cada 100: son las que el lector
+ * acierta menos y las que más caen en revisión, así que quien mira la lista
+ * necesita saber cuál es cuál sin abrir ninguna.
+ *
+ * Lo que llega es lo que escribió el portal en su columna *Tipo* —`PDF`,
+ * `PDF (escaneado)`, `Excel`—, y se traduce acá en vez de guardarse traducido:
+ * el día que el portal escriba otra cosa, esto la muestra tal cual en lugar de
+ * perderla.
  */
-export function warningFor(invoice: Invoice): string | null {
-  if (invoice.review_state === 'PENDING') return invoice.review_reason ?? 'Esperando una decisión'
-  if (invoice.is_inconsistent) return 'Los pagos superan el total de la factura'
-  if (invoice.is_overdue_without_receipt) return 'Venció sin recibo de recepción'
-  if (invoice.payment_state_disagrees) {
-    return `El portal la informa como «${invoice.portal_payment_status}»`
+export function fileKindLabel(kind: string | null | undefined): string {
+  if (!kind) return '—'
+  const normalized = kind.toLowerCase()
+  if (normalized.includes('escane') || normalized.includes('scan')) return 'Escaneada'
+  if (normalized.includes('excel') || normalized.includes('planilla')) return 'Planilla'
+  if (normalized.includes('pdf')) return 'PDF'
+  return kind
+}
+
+/** Si el formato es el difícil, el que conviene que salte a la vista. */
+export function isScanned(kind: string | null | undefined): boolean {
+  const normalized = (kind ?? '').toLowerCase()
+  return normalized.includes('escane') || normalized.includes('scan')
+}
+
+/**
+ * Todo lo que anda mal con una factura, y no sólo lo primero.
+ *
+ * Antes esto devolvía **un** señalamiento por precedencia, y ahí se perdía uno
+ * real: una factura inconsistente que además contradice al portal mostraba la
+ * inconsistencia y callaba la contradicción, aunque RF-46 pida ver las dos
+ * cosas. Los cuatro son independientes entre sí —una decisión pendiente, un
+ * número que no cierra, un plazo que pasó y un origen que dice otra cosa— y no
+ * hay motivo para que uno tape a otro.
+ *
+ * Sigue el orden de lo que hay que hacer primero, porque el orden en que se
+ * leen sí importa.
+ */
+export function warningsFor(invoice: Invoice): string[] {
+  const warnings: string[] = []
+  if (invoice.review_state === 'PENDING') {
+    warnings.push(invoice.review_reason ?? 'Esperando una decisión')
   }
-  return null
+  if (invoice.is_inconsistent) warnings.push('Los pagos superan el total de la factura')
+  if (invoice.is_overdue_without_receipt) warnings.push('Venció sin recibo de recepción')
+  if (invoice.payment_state_disagrees) {
+    warnings.push(`El portal la informa como «${invoice.portal_payment_status}»`)
+  }
+  return warnings
 }

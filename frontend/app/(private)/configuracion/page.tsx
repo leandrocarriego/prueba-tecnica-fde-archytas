@@ -1,6 +1,8 @@
 import { NoPermission } from '@/components/common/NoPermission'
+import { AlertRoutes } from '@/components/notifications/AlertRoutes'
 import { ParameterRow } from '@/components/operations/ParameterRow'
 import { readFromApi } from '@/lib/api/server'
+import type { AlertRoute } from '@/lib/notifications/types'
 import type { Parameter } from '@/lib/operations/types'
 
 export const metadata = {
@@ -33,7 +35,12 @@ export const metadata = {
  * because "pedíselo al dueño" is advice nobody can act on when the API is down.
  */
 export default async function ParametersPage() {
-  const read = await readFromApi<Parameter[]>('/operations/parameters')
+  const [read, routes] = await Promise.all([
+    readFromApi<Parameter[]>('/operations/parameters'),
+    // Quién recibe cada tipo de aviso (RF-37 de 007). Misma sección de
+    // permisos que los parámetros, así que quien llega a una llega a la otra.
+    readFromApi<AlertRoute[]>('/alerts/routes'),
+  ])
 
   if (!read.ok) {
     if (read.failure === 'unauthorized') {
@@ -42,7 +49,7 @@ export default async function ParametersPage() {
     return (
       <main className="mx-auto max-w-3xl space-y-6 p-8">
         <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
-        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
           No pudimos traer los parámetros. Probá de nuevo en unos minutos.
         </p>
       </main>
@@ -63,7 +70,7 @@ export default async function ParametersPage() {
       </header>
 
       {waiting > 0 && (
-        <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
           {waiting === 1
             ? 'Hay un parámetro que todavía no tiene efecto: '
             : `Hay ${waiting} parámetros que todavía no tienen efecto: `}
@@ -77,6 +84,8 @@ export default async function ParametersPage() {
           <ParameterRow key={parameter.key} parameter={parameter} />
         ))}
       </section>
+
+      {routes.ok && <AlertRoutes routes={routes.data} />}
     </main>
   )
 }

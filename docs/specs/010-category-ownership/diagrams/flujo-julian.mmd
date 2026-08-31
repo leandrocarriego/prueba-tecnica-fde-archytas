@@ -1,0 +1,21 @@
+---
+title: Julián, ventas — los sigue viendo, sin poder cambiarlos
+---
+flowchart TD
+    A["Entra con su acceso"] --> B["Abre los rubros del catálogo del que vende"]
+    B --> C["Los ve con cuántos productos tiene cada uno"]
+    B --> D["Y con todas las formas en que llega escrito cada rubro"]
+    C --> E["Vende sabiendo en qué rubro cae cada producto"]
+    D --> E
+
+    B --> F["No encuentra ninguna acción para agregar, renombrar<br/>ni eliminar un rubro"]
+    B --> G["Tampoco para clasificar un producto ni para corregir una equivalencia"]
+
+    F --> H{"¿Y si manda el pedido igual?"}
+    G --> H
+    H --> I["El sistema lo rechaza"]
+    I --> J["Esconder el botón no alcanza, y ya estaba acordado así<br/>cuando se definieron los accesos"]
+
+    K["Es el mismo trato que ya tiene con los precios de lista<br/>y con el calendario: los ve y no los toca"]
+
+    L["El catálogo sigue siendo suyo: sigue corrigiendo<br/>la descripción de un producto, y ya no su rubro"]
