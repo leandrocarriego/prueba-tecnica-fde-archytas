@@ -54,9 +54,10 @@ registros quedaron afuera de cada número y por qué.
 
 - **Se asume que el histórico relevante arranca en 2023**, como indicó el cliente.
 
-- **Se asume que este tablero se construye sobre las ventas.** El gasto por rubro y todo lo que
-  venga de compras tiene su propio problema (**P7**) y su propia pregunta abierta sobre de dónde
-  sale el dato.
+- **Se asume que este tablero se construye sobre las ventas.** Lo que viene de compras se trata
+  aparte, cada cosa en el problema que le corresponde: las facturas son **P2**, los proveedores y
+  su deuda **P4**, el estado de los pagos **P5**, las órdenes de compra **P6** y el gasto por rubro
+  **P7**. Nada de eso entra en el alcance de esta feature.
 
 - **Se asume que el stock de cada producto se puede reconstruir a partir de lo que el origen publica
   cada día.** El corte de stock compara la foto del inicio del período con la del final. Si el
@@ -91,8 +92,8 @@ que se sale de lo habitual quede afuera del número y señalada, para no decidir
 arrastra basura.
 
 **Cómo se prueba que anda:** las ventas sin total, las que tienen fecha 31/02/2025 y las que tienen
-un monto muy por encima de lo habitual para su producto no entran en ningún indicador, y aparecen en
-la pantalla de revisión con el motivo por el que se apartaron.
+un total que se aparta del promedio de su producto más que la diferencia tolerada no entran en
+ningún indicador, y aparecen en la pantalla de revisión con el motivo por el que se apartaron.
 
 ### H4 — Cada número dice qué dejó afuera
 Como **dueño**, quiero que junto a cada número me diga cuántos registros excluyó y pueda ir a
@@ -141,8 +142,8 @@ productos dados de alta, cada corte con su propio período elegible.
 | RF-18 | Si una venta no tiene total, entonces el sistema debe apartarla. | H3 |
 | RF-19 | Si una venta tiene una cantidad negativa, entonces el sistema debe apartarla. | H3 |
 | RF-20 | Si una venta referencia un producto que no existe, entonces el sistema debe apartarla. | H3 |
-| RF-21 | Si el total de una venta se aleja de lo habitual para ese producto más de lo tolerado, entonces el sistema debe apartarla como monto atípico. | H3 |
-| RF-22 | El sistema debe permitir configurar a partir de qué diferencia el total de una venta se considera atípico. | H3 |
+| RF-21 | Si el total de una venta se aparta del promedio de los totales de las ventas de ese mismo producto que ya se cuentan, en un porcentaje mayor que la diferencia tolerada, entonces el sistema debe apartarla como monto atípico. | H3 |
+| RF-22 | El sistema debe tomar la diferencia a partir de la cual el total de una venta es atípico del panel de configuración del sistema, cuyo valor inicial es de 300 %. | H3 |
 | RF-23 | El sistema debe mostrar, para cada venta apartada, el motivo por el que se apartó. | H3 |
 | RF-24 | El sistema debe impedir completar por suposición un dato faltante de una venta. | H3 |
 | RF-25 | El sistema debe mostrar, junto a cada indicador, cuántos registros quedaron excluidos de su cálculo. | H4 |
@@ -176,6 +177,11 @@ productos dados de alta, cada corte con su propio período elegible.
 - **Lo dudoso no suma.** Una venta repetida con diferencias, o con un dato roto, queda afuera del
   número hasta que una persona decida qué hacer con ella. Es preferible un total que dice "faltan
   doce" a uno que está inflado y no lo dice.
+- **Lo habitual de un producto se aprende de lo que ya suma.** El total de una venta se compara
+  contra el promedio de las ventas de ese mismo producto que hoy se cuentan —no contra un valor
+  aparte que alguien tenga que mantener— y sin recortar por período: todo lo que se sabe del
+  producto entra en la comparación. Mientras un producto no tenga ninguna venta contada, no hay
+  contra qué compararlo y ninguna venta suya se aparta por su monto.
 - **Lo idéntico no necesita a una persona.** Cuando dos ventas comparten el código y no difieren en
   ningún dato, no hay nada que decidir: el sistema cuenta una sola y dice cuántas unificó. La
   decisión humana se reserva para donde hay una decisión de verdad.
@@ -196,6 +202,10 @@ productos dados de alta, cada corte con su propio período elegible.
   tablero que no se ve nunca.
 - **El tablero no es la fuente de nada.** Muestra lo que hay: si un número no cierra, se corrige el
   dato en su lugar, no el tablero.
+- **Los valores ajustables de esta feature viven en el panel de configuración del sistema**, junto
+  a los del resto: cada cuánto se traen las ventas del portal y la diferencia a partir de la cual
+  el total de una venta es atípico. No hay valores escondidos en el tablero ni en la pantalla de
+  revisión.
 - **El tablero comercial y las ventas no los ve compras.**
 - **El tablero se construye al final por una razón.** Muestra datos que primero tienen que estar
   limpios: hacerlo antes sería mostrar prolijamente números que todavía no cierran.
@@ -222,8 +232,8 @@ productos dados de alta, cada corte con su propio período elegible.
 - [ ] **RF-18** — Las 3 ventas sin total quedan apartadas.
 - [ ] **RF-19** — Las 3 ventas con cantidad negativa quedan apartadas.
 - [ ] **RF-20** — La venta que apunta a un producto inexistente queda apartada.
-- [ ] **RF-21** — Con la tolerancia acordada, las 2 ventas con el total inflado diez veces quedan apartadas por monto atípico.
-- [ ] **RF-22** — Cambiada la tolerancia, la cantidad de ventas apartadas por monto cambia en consecuencia.
+- [ ] **RF-21** — Con la diferencia tolerada en 300 %, las 2 ventas con el total inflado diez veces quedan apartadas por monto atípico —un total diez veces el habitual se aparta un 900 % del promedio—, y una venta que se aparta un 200 % de ese promedio sigue contando.
+- [ ] **RF-22** — Recién instalado y sin que nadie toque nada, una venta se aparta por su monto recién cuando su total se aparta más de un 300 % del promedio de su producto; cambiado ese valor en el panel de configuración del sistema, las ventas que entren a partir de ahí se comparan contra el valor nuevo.
 - [ ] **RF-23** — Cada venta apartada muestra por qué se apartó.
 - [ ] **RF-24** — Ninguna venta apartada aparece con un dato que el sistema haya completado.
 - [ ] **RF-25** — Al lado del total de un mes se lee cuántas ventas quedaron excluidas.
@@ -268,12 +278,79 @@ productos dados de alta, cada corte con su propio período elegible.
   su canal todavía se está confirmando con el cliente: prometerlos acá sería comprometer dos veces
   lo mismo. Si más adelante el cliente quiere un resumen periódico de lo que quedó pendiente, se
   agrega ahí.
-- **El gasto por rubro.** Es **P7 — El problema de los rubros**, y depende de una pregunta que sigue
-  abierta.
+- **El gasto por rubro.** Es la otra mitad de **P7 — El problema de los rubros**, y ya quedó fuera
+  de esa feature por la misma razón por la que queda fuera de ésta: hoy no hay de dónde sacarlo,
+  porque ni las facturas de compra ni las órdenes de compra dicen qué productos se compraron, y
+  repartir un total entre rubros sin ese dato sería inventarlo. Se especifica aparte cuando exista
+  una fuente que ligue lo gastado con el producto.
 - **La deuda con proveedores y el estado de los pagos.** Son **P4 y P5**, y no entran al tablero
   comercial: compras y ventas están separadas a propósito.
+- **La pantalla donde el dueño ajusta los valores del sistema.** Los dos valores ajustables de esta
+  feature —cada cuánto se traen las ventas y la diferencia a partir de la cual un total es
+  atípico— se publican en el panel de configuración del sistema, que se define en **P9 — El
+  problema de no tener control**.
 - **Márgenes, rentabilidad y costo de la mercadería vendida.** El origen no publica el costo de
   venta.
 - **Exportar el tablero a una planilla o a un informe.** No se pidió.
 - **Corregir una venta en el portal del proveedor.** El origen es de sólo lectura; la corrección vive
   del lado nuevo.
+
+## Preguntas abiertas
+
+<!--
+  Todo lo que falte definir, marcado como [NECESITA ACLARACIÓN: pregunta concreta].
+  Una spec con preguntas abiertas NO se firma: primero se resuelven con /clarify.
+  Cuando no queda ninguna, esta sección se borra — salvo que haya decisiones que cerró
+  el equipo con lo ya acordado: ésas se conservan bajo "Para confirmar al firmar".
+-->
+
+No queda ninguna: la que trababa RF-21 y RF-22 se cerró con lo que ya estaba definido en otro lado.
+La sección se conserva por lo que sigue.
+
+### Para confirmar al firmar
+
+Lo que sigue no son preguntas: son las decisiones que se cerraron sin volver a molestar al cliente,
+porque ya estaban acordadas o resueltas en otro lado. Se listan para que quien firma las vea antes
+de firmar, y no las descubra después.
+
+- **El total de una venta se compara contra el promedio de ese mismo producto, sin ventana de
+  tiempo** (RF-21). Sale de lo que el propio pedido implica —"lo habitual" de un producto es lo que
+  ese producto viene facturando— y es como quedó resuelto al construir esta funcionalidad. *Si el
+  cliente prefiere otra referencia* —por ejemplo la mediana, o sólo los últimos doce meses—, cambia
+  la regla de comparación de RF-21; el resto de la feature no se toca.
+
+- **La diferencia tolerada arranca en 300 % y se ajusta desde el panel de configuración del
+  sistema** (RF-22). El valor inicial y la pantalla donde vive son los que ya tiene cargados el
+  sistema, y la forma de decirlo es la misma que usan los demás valores ajustables (los días de una
+  orden estancada, la hora del resumen diario). *Si el cliente prefiere arrancar más ajustado o más
+  holgado*, es un número que él mismo cambia desde esa pantalla el primer día: no cambia nada de lo
+  que se firma acá.
+
+- **Cambiar la diferencia tolerada vale para las ventas que entren a partir de ahí** (RF-22). La
+  comparación se hace cuando cada venta entra al sistema, y el motivo por el que quedó apartada
+  queda guardado con ella: mover el número no vuelve a revisar lo que ya está cargado —hoy, las 588
+  ventas del histórico—. *Si el cliente esperaba que al ajustar la tolerancia se reevalúen también
+  las ventas ya cargadas*, eso no está prometido en ninguna spec firmada ni construido: es una
+  decisión suya, y queda dicha acá para que la tome antes de firmar y no después.
+
+- **Mientras un producto no tenga ninguna venta contada, ninguna venta suya se aparta por su monto.**
+  Es consecuencia de lo anterior —sin promedio no hay contra qué comparar— y está dicho en las
+  reglas de negocio para que no sorprenda: el control de montos atípicos empieza a valer para un
+  producto recién cuando el sistema ya le contó alguna venta.
+
+- **El "deshacer" que promete esta feature es el de la resolución de una venta repetida**
+  (RF-35). Lo que el sistema unificó solo, por ser idéntico, no tiene una resolución que deshacer, y
+  los diagramas de esta feature ahora lo muestran así. Deshacer una **corrección manual** —una fecha,
+  un total— es otra cosa, y **no es alcance nuevo**: ya está acordada y firmada en **P9 — El problema
+  de no tener control**, que promete corregir a mano cualquier dato traído del portal, dejar sin
+  efecto esa corrección y restituir el valor que había informado el portal. *Lo que sí hay que decir
+  antes de firmar*: sobre las ventas eso hoy no está construido así —la corrección de una venta se
+  aplica sin pasar por el mecanismo común de P9 y no se puede dejar sin efecto, a diferencia de lo
+  que ya funciona sobre los productos y sobre las compras—. Es una divergencia entre lo firmado y lo
+  construido, no un alcance que haya que volver a pedir: qué se corrige —el sistema o el acuerdo— lo
+  decide el humano, y esta spec no lo cierra.
+
+- **Lo que viene de compras queda afuera de este tablero, y son cinco problemas, no uno.** El
+  supuesto decía que era **P7**; en realidad las facturas (**P2**), los proveedores (**P4**), los
+  pagos (**P5**) y las órdenes de compra (**P6**) también son de compras y también quedan afuera.
+  No cambia el alcance —ninguno de los cinco estaba adentro—, cambia qué tan claro está dicho.

@@ -1,0 +1,49 @@
+---
+title: El camino de un aviso que sale del sistema
+---
+stateDiagram-v2
+    state "Hay un aviso inmediato para enviar" as Inmediato
+    state "En espera de la franja" as EnEspera
+    state "Hay un resumen diario para enviar" as Resumen
+    state "Entregado por WhatsApp" as Entregado
+    state "No entregado" as NoEntregado
+    state "Sin aviso hacia afuera" as SinAviso
+
+    [*] --> Inmediato: entra un reclamo de pago o un aviso de vencimiento próximo
+    Inmediato --> EnEspera: el aviso inmediato entró fuera de la franja de avisos
+    EnEspera --> Entregado: comienza la franja siguiente
+    Inmediato --> Entregado: sale al número registrado de quien recibe ese tipo de aviso
+    Inmediato --> NoEntregado: el envío falla, y queda registrado y señalado en la pantalla de mensajes
+
+    [*] --> Resumen: llega la hora configurada del resumen diario
+    Resumen --> Entregado: sale al número registrado de quien recibe el resumen
+    Resumen --> NoEntregado: el envío falla, y queda registrado y señalado en la pantalla de mensajes
+
+    [*] --> SinAviso: es un aviso de stock bajo o un mensaje sin clasificar
+    [*] --> SinAviso: ya se mandó el aviso inmediato por ese mismo mensaje
+    [*] --> SinAviso: el mensaje ya estaba en la bandeja al ponerse en marcha el sistema
+    [*] --> SinAviso: la persona perdió el acceso al sistema
+
+    Entregado --> [*]
+    NoEntregado --> [*]
+    SinAviso --> [*]
+
+    note right of EnEspera
+        Fuera de la franja acordada el aviso inmediato espera
+        al comienzo de la siguiente. Un canal que despierta a
+        alguien de madrugada por algo que se resuelve a las 9
+        se silencia, y silenciado deja de existir
+    end note
+
+    note right of Resumen
+        Lleva los mensajes pendientes y las órdenes
+        estancadas, cada orden una vez por día. La franja
+        es de los avisos inmediatos: el resumen sale a su
+        hora configurada
+    end note
+
+    note right of SinAviso
+        El mensaje se ve igual en la pantalla: lo que no
+        sale es el aviso. La pantalla es donde se
+        resuelve, no donde uno se entera
+    end note

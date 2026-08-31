@@ -49,8 +49,8 @@ bandeja y hace llegar lo importante fuera del sistema, a un canal que el equipo 
 | Actor | Qué hace con esta feature |
 |---|---|
 | El sistema | Trae del portal las órdenes de compra y los mensajes, detecta lo que quedó estancado y manda los avisos |
-| Marcela — compras | Sigue las órdenes, resuelve los mensajes que le tocan y recibe los avisos de reclamos y vencimientos |
-| El dueño | Ve todo. Recibe el resumen diario, ve qué quedó sin resolver y de quién es, y ajusta los valores con que trabaja la feature |
+| Marcela — compras | Sigue las órdenes, resuelve las que quedaron sin proveedor identificado y los mensajes que le tocan, y recibe los avisos de reclamos y vencimientos |
+| El dueño | Ve todo. Resuelve también las órdenes apartadas, recibe el resumen diario, ve qué quedó sin resolver y de quién es, y ajusta los valores con que trabaja la feature |
 | Julián — ventas | No accede a las órdenes de compra ni a la bandeja de mensajes |
 
 ## Supuestos
@@ -59,8 +59,23 @@ bandeja y hace llegar lo importante fuera del sistema, a un canal que el equipo 
 
 - **Se asume que las tres personas aceptan recibir los avisos en su teléfono personal.** El cliente
   eligió números personales por sobre un número del negocio, porque el aviso llega al teléfono que
-  la persona ya mira. Si alguien no quiere, el aviso no le llega y para esa persona el problema de
-  P8 sigue abierto.
+  la persona ya mira.
+
+- **Se acepta, como límite de esta feature, que a quien no quiera dar su teléfono personal no le
+  llegue ningún aviso.** No hay un segundo canal ni un número del negocio que lo reemplace: esa
+  persona se entera sólo si entra a la pantalla de mensajes, que es exactamente lo que hoy no pasa
+  con la bandeja del portal. Dicho sin vueltas: **para esa persona, P8 — El problema de los avisos
+  que nadie mira sigue abierto**, y cerrarlo exige acordar otro canal, que no forma parte de lo que
+  se firma acá.
+
+- **Se asume que los valores con que arranca esta funcionalidad son un punto de partida, no una
+  decisión del cliente.** El cliente pidió que las órdenes paradas queden señaladas, que el aviso
+  salga a un canal que el equipo sí mira y que los números se puedan ajustar. **No eligió estos
+  números**: los 15 días para considerar estancada una orden, los 15 días de la ventana de pedido
+  repetido, las 8:00 del resumen diario y la franja de lunes a viernes de 8:00 a 18:00. Tampoco
+  eligió el reparto inicial de destinatarios —los reclamos y los vencimientos a compras, el resumen
+  al dueño—. Los cinco los propone el relevamiento, y el dueño los cambia desde el panel de
+  configuración del sistema el día que quiera.
 
 ## Historias de usuario
 
@@ -114,8 +129,21 @@ configurada le llega al dueño un resumen con lo que quedó pendiente.
 Como **Marcela**, quiero que un mensaje del que ya me enteré no me vuelva a avisar, para que el
 canal siga sirviendo en lugar de convertirse en ruido que se ignora.
 
-**Cómo se prueba que anda:** el mismo reclamo se procesa tres veces y llega un solo aviso; una vez
-marcado como resuelto, deja de aparecer en el resumen diario.
+**Cómo se prueba que anda:** el mismo reclamo se procesa tres veces y llega un solo aviso inmediato;
+una vez marcado como resuelto, deja de aparecer en el resumen diario.
+
+### H8 — La orden que quedó sin proveedor se resuelve una sola vez y vuelve a la lista
+Como **Marcela**, quiero decir a qué proveedor del padrón corresponde una orden que el sistema no
+pudo identificar, para que vuelva a contarse con las demás en lugar de quedar en un limbo **y para
+no tener que decidir dos veces lo mismo**.
+
+**Cómo se prueba que anda:** llega una orden con el nombre del proveedor escrito de una forma que el
+sistema no reconoce; queda en la lista señalada como sin identificar y contada aparte. Marcela pide
+ver sólo esas, le asigna uno de los ocho proveedores del padrón, y la orden queda con ese proveedor,
+con el nombre de quien lo decidió y la fecha, y deja de figurar entre las apartadas. Las otras
+órdenes que estaban apartadas con el nombre escrito de esa misma forma quedan resueltas con esa
+misma decisión, y la orden que llegue después escrita así entra ya identificada, sin pasar por
+revisión.
 
 ## Requisitos funcionales
 
@@ -159,7 +187,7 @@ marcado como resuelto, deja de aparecer en el resumen diario.
 | RF-36 | El sistema debe tomar la hora del resumen diario del panel de configuración del sistema, cuyo valor inicial es las 8:00. | H6 |
 | RF-37 | El sistema debe permitir al dueño definir quién recibe cada tipo de aviso, con los reclamos y los vencimientos hacia el rol compras y el resumen diario hacia el dueño como valores iniciales. | H6 |
 | RF-38 | Si un aviso no se puede entregar, entonces el sistema debe registrar el fallo y señalarlo en la pantalla de mensajes. | H6 |
-| RF-39 | Mientras un mensaje siga siendo el mismo, el sistema debe avisar por él una sola vez. | H7 |
+| RF-39 | Mientras un mensaje siga siendo el mismo, el sistema debe enviar un solo aviso inmediato por él. | H7 |
 | RF-40 | Si un mensaje está marcado como resuelto, entonces el sistema no debe incluirlo en el resumen diario. | H7 |
 | RF-41 | Mientras una orden siga estancada, el sistema debe incluirla en el resumen diario una vez por día como máximo. | H7 |
 | RF-42 | Si la causa de un aviso inmediato entra fuera de la franja de avisos, entonces el sistema debe enviar ese aviso al comenzar la franja siguiente. | H6 |
@@ -170,6 +198,19 @@ marcado como resuelto, deja de aparecer en el resumen diario.
 | RF-47 | El sistema debe registrar como pendientes los mensajes que ya estaban en la bandeja del portal al ponerse en marcha, sin enviar ningún aviso por ellos. | H7 |
 | RF-48 | Cuando el sistema observe una orden en un estado distinto del que tenía registrado, debe registrar la fecha de esa observación. | H2 |
 | RF-49 | El sistema debe mostrar, para cada orden anterior a su puesta en marcha, cuántos días pasaron desde la fecha del pedido. | H1 |
+| RF-50 | Mientras el proveedor de una orden no esté identificado, el sistema debe mostrarla en la lista con el nombre del proveedor tal como llegó escrito y señalada como sin identificar. | H1 |
+| RF-51 | El sistema debe mostrar cuántas órdenes de compra están apartadas para revisión. | H8 |
+| RF-52 | El sistema debe permitir mostrar únicamente las órdenes apartadas para revisión. | H8 |
+| RF-53 | El sistema debe habilitar únicamente al dueño y al rol compras a resolver una orden apartada. | H8 |
+| RF-54 | Cuando el dueño o el rol compras asigne a una orden apartada un proveedor del padrón, el sistema debe asociarla a ese proveedor. | H8 |
+| RF-55 | Si una orden corresponde a un proveedor que no está en el padrón, entonces el sistema debe apartarla indicando ese motivo, sin dar de alta un proveedor ni permitir darlo de alta desde la revisión. | H8 |
+| RF-56 | Cuando alguien resuelva una orden apartada, el sistema debe registrar quién la resolvió y cuándo. | H8 |
+| RF-57 | Cuando una orden apartada quede resuelta, el sistema debe dejar de mostrarla entre las apartadas para revisión. | H8 |
+| RF-58 | Si una orden trae una forma de escribir el nombre del proveedor ya asignada a un proveedor del padrón, entonces el sistema debe asociarla a ese proveedor sin apartarla. | H8 |
+| RF-59 | Mientras el proveedor de una orden no esté identificado, el sistema no debe señalarla como posible pedido repetido. | H3 |
+| RF-60 | Cuando una orden apartada quede resuelta, el sistema debe evaluar si repite un pedido anterior al proveedor que se le asignó. | H3 |
+| RF-61 | Cuando el dueño o el rol compras asigne a una orden apartada un proveedor del padrón, el sistema debe guardar esa forma de escribir el nombre como criterio. | H8 |
+| RF-62 | Cuando esa asignación quede guardada, el sistema debe aplicarla también a las órdenes ya apartadas que traían esa misma forma de escribir el nombre. | H8 |
 
 ## Reglas de negocio
 
@@ -188,9 +229,14 @@ marcado como resuelto, deja de aparecer en el resumen diario.
 - **El aviso urgente no suena de madrugada.** Fuera de la franja acordada el aviso espera al
   comienzo de la siguiente. Un canal que despierta a alguien por algo que se resuelve a las 9 se
   silencia, y silenciado deja de existir.
-- **Un aviso no se repite mientras la causa siga siendo la misma.** El mismo reclamo genera un aviso,
-  no uno por cada vez que el sistema lo procesa. Un canal que repite se silencia, y silenciado deja
-  de existir.
+- **La franja es de los avisos inmediatos.** El resumen diario sale a su hora configurada, todos los
+  días, y no la espera: son dos avisos distintos, con dos valores distintos, y el dueño ajusta cada
+  uno por su lado. Consecuencia a tener presente: un reclamo que entra fuera de la franja no suena
+  en el momento, pero figura entre los pendientes del resumen siguiente.
+- **Un aviso inmediato no se repite mientras la causa siga siendo la misma.** El mismo reclamo genera
+  un aviso inmediato, no uno por cada vez que el sistema lo procesa. Un canal que repite se silencia,
+  y silenciado deja de existir. Lo que sí se repite, por diseño, es el resumen: mientras algo siga
+  pendiente se cuenta ahí, una vez por día.
 - **El reloj del estancamiento es del sistema, no del portal.** El sistema viejo dice en qué estado
   está una orden, pero no desde cuándo. Así que el tiempo se cuenta desde que el sistema lo ve por
   sí mismo: el día uno no hay nada señalado, y a los quince días aparece lo que de verdad no se
@@ -207,6 +253,29 @@ marcado como resuelto, deja de aparecer en el resumen diario.
   decisión de pedirlo igual es del negocio.
 - **Nada se descarta.** Un mensaje cuyo tipo no se puede determinar, o cuyo remitente no se puede
   identificar, se muestra como tal: no se esconde en un cajón de "otros" ni se tira.
+- **Una orden sin proveedor tampoco se descarta ni se adivina.** Si el nombre no alcanza para decir
+  con certeza de quién es, la orden entra igual y queda apartada: se ve en la lista con el nombre tal
+  como llegó, se cuenta aparte y espera a que una persona diga a cuál de los ocho proveedores
+  corresponde. Es el mismo criterio con el que ya se tratan las facturas.
+- **La orden apartada se resuelve donde se la mira.** No hay una bandeja aparte: se la pide desde la
+  misma lista de órdenes, se le asigna el proveedor y vuelve a contarse con las demás, quedando
+  registrado quién lo decidió y cuándo. La resuelven el dueño y compras, que son quienes trabajan
+  las órdenes.
+- **Resolver una orden no da de alta un proveedor.** El padrón son los ocho del portal; si la orden
+  es de alguien que no está, queda apartada con ese motivo hasta que sumar un proveedor se decida
+  como lo que es: una decisión del negocio.
+- **Una decisión sobre una forma de escribir un nombre se toma una sola vez y sirve para todo.**
+  Resolver una orden apartada no arregla sólo esa orden: la decisión queda guardada como criterio,
+  alcanza a las otras órdenes que estaban apartadas escritas de esa misma forma, y la que llegue
+  después escrita así entra identificada sin que nadie vuelva a preguntar. Es el mismo criterio con
+  el que ya se resuelven las facturas. Sin esto la cuenta no cierra: el relevamiento midió veinte
+  formas distintas de escribir el nombre del proveedor sólo en las órdenes de compra, y decidir la
+  misma una y otra vez es exactamente la cola de revisión que un equipo de tres personas termina
+  abandonando.
+- **Mientras no se sepa de quién es una orden, no se la compara con ninguna otra.** Un pedido
+  repetido se mide contra el mismo proveedor: sin proveedor no hay con qué comparar, y señalarla
+  igual sería adivinar. Resuelta la orden, la comparación se hace y el señalamiento aparece si
+  corresponde.
 - **Cada pendiente tiene un dueño.** Un mensaje sin responsable es un mensaje que nadie va a
   resolver: por eso el estado y el responsable son parte del mensaje, no una anotación aparte.
 - **Resolver un caso tiene que costar segundos.** Si revisar cada mensaje cuesta trabajo, el equipo
@@ -260,7 +329,7 @@ marcado como resuelto, deja de aparecer en el resumen diario.
 - [ ] **RF-36** — Recién instalado, el resumen sale a las 8:00; el dueño cambia la hora en el panel del sistema y el resumen siguiente llega a la hora nueva.
 - [ ] **RF-37** — Sin que nadie configure nada, los reclamos y los vencimientos llegan a compras y el resumen al dueño; el dueño cambia los destinatarios y los avisos siguientes llegan a quien indicó.
 - [ ] **RF-38** — Fallado el envío de un aviso, queda registrado y se ve en la pantalla de mensajes.
-- [ ] **RF-39** — El mismo reclamo procesado tres veces genera un solo aviso.
+- [ ] **RF-39** — El mismo reclamo procesado tres veces genera un solo aviso inmediato.
 - [ ] **RF-40** — Un mensaje resuelto no aparece en el resumen del día siguiente.
 - [ ] **RF-41** — Una orden estancada cinco días aparece en cinco resúmenes, uno por día, y no cinco veces en el mismo.
 - [ ] **RF-42** — Un reclamo que entra el sábado a las 22 no suena el sábado: el aviso llega el lunes a las 8.
@@ -271,6 +340,19 @@ marcado como resuelto, deja de aparecer en el resumen diario.
 - [ ] **RF-47** — El primer día los treinta mensajes sin leer figuran como pendientes y no se envió ningún aviso por ellos.
 - [ ] **RF-48** — Una orden que pasa de enviada a confirmada queda con la fecha en que el sistema vio el cambio, y su antigüedad en el estado vuelve a cero.
 - [ ] **RF-49** — Las veintinueve órdenes en curso que vienen del sistema viejo se listan mostrando su antigüedad, sin quedar señaladas el primer día.
+- [ ] **RF-50** — Una orden apartada sigue en la lista, con el nombre del proveedor tal como vino y la marca de que quedó sin identificar.
+- [ ] **RF-51** — La pantalla dice cuántas órdenes están apartadas para revisión.
+- [ ] **RF-52** — Se pueden pedir sólo las órdenes apartadas.
+- [ ] **RF-53** — Julián no puede resolver una orden apartada; el dueño y Marcela sí.
+- [ ] **RF-54** — Marcela le asigna a una orden apartada uno de los ocho proveedores del padrón y la orden queda con ese proveedor.
+- [ ] **RF-55** — Una orden a nombre de alguien que no está en el padrón no crea un proveedor nuevo ni deja darlo de alta desde la revisión: queda apartada, y el motivo dice que el proveedor no está en el padrón.
+- [ ] **RF-56** — Esa orden resuelta figura con el nombre de quien la resolvió y la fecha.
+- [ ] **RF-57** — Resuelta una orden, la lista de apartadas tiene una menos.
+- [ ] **RF-58** — Asignada ya una forma de escribir el nombre a un proveedor, la orden siguiente que llegue escrita así entra con ese proveedor y sin pasar por revisión.
+- [ ] **RF-59** — Una orden apartada no aparece señalada como posible pedido repetido de ninguna otra.
+- [ ] **RF-60** — Resuelta una orden apartada, si ese mismo producto ya se le había pedido a ese proveedor dentro de la ventana, queda señalada como posible pedido repetido mostrando el pedido anterior.
+- [ ] **RF-61** — Asignado un proveedor a una orden apartada, esa forma de escribir el nombre queda guardada como criterio.
+- [ ] **RF-62** — Con tres órdenes apartadas que traían el nombre escrito igual, resuelta una las tres quedan con ese proveedor y la lista de apartadas tiene tres menos.
 
 ## Fuera de alcance
 
@@ -285,6 +367,87 @@ marcado como resuelto, deja de aparecer en el resumen diario.
 - **Los avisos de stock bajo hacia afuera.** Los mensajes de stock entran a la bandeja y se ven, pero
   no generan aviso por WhatsApp: el cliente pidió que salieran del sistema los reclamos y los
   vencimientos.
+- **Un canal de aviso que no sea WhatsApp al teléfono de cada persona.** Ni un número del negocio,
+  ni correo, ni un mensaje a un grupo. Quien no dé su teléfono no recibe avisos y sigue enterándose
+  sólo si entra a mirar: es un límite acordado de esta feature, no algo que quede para después.
 - **La pantalla donde el dueño ajusta los valores de esta feature.** Los cuatro parámetros se
-  publican en el panel de configuración del sistema, que define **003-system-control**.
+  publican en el panel de configuración del sistema, que se define en **P9 — El problema de no
+  tener control**.
 - **Un tablero de compras por proveedor o por rubro.** Eso es **P7** y **P3**.
+- **Dar de alta un proveedor nuevo desde la revisión de una orden.** El padrón es el del portal
+  —ocho proveedores, confirmados por el cliente—; una orden a nombre de alguien que no está queda
+  apartada con ese motivo, y sumar un proveedor se decide aparte, igual que en **P2 y P4 — Las
+  facturas y los proveedores**.
+- **Asignarle un responsable a una orden apartada.** El responsable existe para los mensajes, que
+  entran de a uno todos los días; las órdenes apartadas las trabajan el dueño y compras desde la
+  misma lista, sin repartirlas de a una.
+
+## Preguntas abiertas
+
+<!--
+  Ninguna de estas frena la firma: no hay marcadores de aclaración pendientes en el documento.
+  Es la lista de lo que se decidió con lo ya acordado para poder cerrarlo, puesta a la vista.
+-->
+
+### Para confirmar al firmar
+
+Estas cosas se decidieron con lo que ya está acordado en otro lado o con lo que el sistema ya hace,
+para que la spec quede completa. **Ninguna la eligió el cliente**, y por eso están acá y no
+escondidas en el cuerpo del documento: si alguna no es lo que quiere, se cambia antes de firmar.
+
+- **Una orden cuyo proveedor no se puede identificar se resuelve asignándole uno de los ocho
+  proveedores del padrón, y la resuelven el dueño y compras** (RF-53, RF-54). *De dónde sale:* es
+  exactamente lo que se firmó para las facturas en **P2 y P4**, que es el mismo problema del mismo
+  lado del negocio. *Si el cliente quiere otra cosa:* cambia quién puede resolverlas, no el
+  mecanismo.
+
+- **Resolver una orden apartada guarda esa forma de escribir el nombre como criterio, y con eso
+  quedan resueltas de una vez las otras órdenes apartadas que venían escritas igual** (RF-61,
+  RF-62). *De dónde sale:* del brief, que promete para la cola de revisión que *"cada decisión que
+  toma una persona queda como criterio para que el mismo caso no se pregunte dos veces"*, y de lo ya
+  firmado para las facturas en **P2 y P4**, donde son dos requisitos con esas mismas palabras. Es
+  además lo único que produce las asignaciones que RF-58 ya da por existentes. *Consecuencia
+  práctica que conviene mirar:* el criterio es uno solo para las facturas y las órdenes, así que una
+  decisión tomada resolviendo una orden también identifica las facturas que estaban esperando esa
+  misma forma de escribir el nombre, y al revés. *Lo que no se trajo de facturas:* ahí el sistema
+  avisa, antes de guardar, a cuántas alcanza la decisión; acá la decisión se toma sobre una orden
+  concreta y el efecto se ve al resolverla. Si se quiere también ese aviso previo en las órdenes,
+  hay que pedirlo antes de firmar. *Si el cliente prefiere otra cosa:* que resolver una orden
+  arregle sólo esa orden es sacar RF-61 y RF-62, y entonces la misma forma de escribir un nombre se
+  decide orden por orden, veinte veces según lo que midió el relevamiento.
+
+- **La orden apartada se resuelve desde la misma lista de órdenes, filtrando por las apartadas, y no
+  en una pantalla de revisión aparte** (RF-50, RF-51, RF-52). *De dónde sale:* es como el sistema ya
+  las muestra —la orden sigue en la lista, con el nombre tal como llegó— y responde a la advertencia
+  del propio relevamiento: una cola que cuesta tiempo se abandona. *Si el cliente quiere otra cosa:*
+  una pantalla propia es una pantalla más, no un alcance distinto.
+
+- **Una orden apartada no lleva responsable asignado.** *De dónde sale:* en esta funcionalidad el
+  responsable existe para los mensajes, que entran de a uno todos los días (RF-30), y las facturas
+  apartadas tampoco lo llevan. *Si el cliente quiere otra cosa:* repartir también las órdenes de a
+  una se agrega, y hay que decirlo antes de firmar.
+
+- **Resolver una orden no da de alta un proveedor nuevo** (RF-55). *De dónde sale:* es la misma regla
+  ya firmada para las facturas. *Si el cliente quiere otra cosa:* implica mover el padrón de ocho,
+  que es una decisión del negocio y se conversa aparte.
+
+- **Una orden apartada no se señala como posible pedido repetido, y sí se la evalúa cuando se
+  resuelve** (RF-59, RF-60). *De dónde sale:* lo primero es lo que el sistema hace hoy —sin proveedor
+  no hay contra qué comparar—; lo segundo es lo único que evita que esa orden pierda para siempre el
+  aviso de H3, y sigue el criterio ya firmado en facturas de que una decisión alcanza también a lo
+  que estaba esperando. *Si el cliente prefiere otra cosa:* que una orden resuelta tarde no vuelva a
+  compararse es sacar RF-60.
+
+- **El resumen diario sale todos los días a su hora, también sábado y domingo; la franja horaria rige
+  sólo los avisos inmediatos** (RF-35, RF-42, RF-43). *De dónde sale:* es lo que dicen los tres
+  requisitos leídos juntos, y lo que el sistema hace. *Consecuencia práctica que conviene mirar:* un
+  reclamo que entra un sábado a la noche no suena en el momento —el aviso inmediato espera al
+  lunes— pero aparece en el resumen del domingo a las 8:00. *Si el cliente prefiere otra cosa:* que
+  el resumen respete la franja, o que no salga los fines de semana, hay que decidirlo antes de
+  firmar.
+
+- **Un mismo mensaje genera un solo aviso inmediato, pero se cuenta en el resumen todos los días
+  hasta que alguien lo resuelve** (RF-39, RF-40). *De dónde sale:* es lo que ya decían RF-40 y RF-41
+  y lo que el sistema hace; RF-39 decía "una sola vez" sin aclarar de qué aviso hablaba, y quedaba
+  contradiciendo al resumen. *Si el cliente prefiere otra cosa:* que el resumen no repita lo que ya
+  se avisó una vez es un cambio de alcance del resumen.

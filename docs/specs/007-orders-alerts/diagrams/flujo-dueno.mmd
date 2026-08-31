@@ -1,0 +1,27 @@
+---
+title: El dueño — qué mira, qué recibe y qué ajusta
+---
+flowchart TD
+    A["El dueño quiere saber qué quedó sin resolver y de quién es"] --> B["Ve lo mismo que compras: las órdenes de compra y la pantalla de mensajes"]
+    B --> C["Cuántas órdenes hay en cada estado y cuántas están estancadas"]
+    C --> D["Mira sólo esas, en lugar de recorrer las cuarenta"]
+    B --> E["Cuántos mensajes siguen pendientes, quién es responsable de cada uno y quién resolvió cada uno"]
+    B --> E2["Cuántas órdenes quedaron apartadas por no poder identificar a su proveedor, y las resuelve igual que compras"]
+
+    A --> F["Recibe por WhatsApp el resumen diario, a la hora configurada"]
+    F --> G["Lleva los mensajes pendientes y las órdenes estancadas"]
+    G --> H["Lo ya resuelto no aparece, y cada orden estancada figura una vez por día"]
+
+    A --> I["Define quién recibe cada tipo de aviso"]
+    I --> J["Arranca con los reclamos y los vencimientos hacia compras, y el resumen hacia él"]
+    J --> K["Cambiado el destinatario, el aviso siguiente llega a quien indicó"]
+
+    A --> L["Ajusta en el panel de configuración del sistema los cuatro valores de esta funcionalidad"]
+    L --> M["Los días para considerar estancada una orden, que arrancan en 15"]
+    L --> N["La ventana de pedido repetido, que arranca en 15 días"]
+    L --> O["La hora del resumen diario, que arranca a las 8:00"]
+    L --> P["La franja en la que puede sonar un aviso, que arranca de lunes a viernes de 8:00 a 18:00"]
+    M --> Q["No hay valores escondidos en las pantallas de órdenes ni de mensajes"]
+    N --> Q
+    O --> Q
+    P --> Q

@@ -1,0 +1,83 @@
+---
+title: Órdenes de compra y avisos — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Portal as El portal del proveedor
+    participant Sistema as El sistema
+    actor Marcela as Marcela, compras
+    actor Duenio as El dueño
+    actor Julian as Julián, ventas
+
+    loop Con la frecuencia configurada
+        Sistema->>Portal: Entra por su cuenta y pide las órdenes de compra
+        Portal-->>Sistema: Cada orden con su proveedor, su fecha, su monto y su estado
+        Sistema->>Sistema: Registra en qué estado la ve y desde cuándo la viene viendo así
+
+        alt El proveedor de la orden se identifica con certeza
+            Sistema->>Sistema: La registra y la muestra en su punto del recorrido, del pedido a la recepción
+        else No se puede identificar con certeza
+            Sistema->>Sistema: La aparta para revisión, sin asignarla al proveedor que más se le parece
+            Note over Sistema,Marcela: Sigue en la lista con el nombre tal como llegó y se cuenta aparte.<br/>Mientras no se sepa de quién es, no se la compara con ninguna otra
+        end
+
+        opt Lleva, antes de la recepción, más días que el límite configurado sin moverse
+            Sistema->>Sistema: La señala como estancada
+            Note over Sistema: Una orden ya recibida no se estanca
+        end
+
+        opt Ese producto ya se le pidió al mismo proveedor dentro de la ventana configurada
+            Sistema->>Sistema: La señala como posible pedido repetido y muestra el pedido anterior
+            Note over Sistema,Marcela: Señala, no bloquea: la orden queda igual en la lista, con su estado
+        end
+    end
+
+    Marcela->>Sistema: Abre las órdenes y filtra por estado o por proveedor
+    Sistema-->>Marcela: Cuántas hay en cada estado, cuántas están estancadas y desde cuándo espera cada una
+    Marcela->>Sistema: Descarta un señalamiento de pedido repetido
+    Sistema->>Sistema: Registra quién lo descartó y cuándo
+
+    Marcela->>Sistema: Pide ver sólo las órdenes apartadas y le asigna a una un proveedor del padrón
+    Sistema->>Sistema: La asocia a ese proveedor, registra quién lo decidió y cuándo, y la saca de las apartadas
+    Sistema->>Sistema: Guarda esa forma de escribir el nombre como criterio y resuelve con ella las otras apartadas escritas igual
+    Note over Sistema,Marcela: La decisión se toma una sola vez: la orden que llegue después escrita así entra<br/>identificada, sin pasar por revisión
+    Note over Sistema,Marcela: Resolverla no da de alta un proveedor: si es de alguien fuera del padrón,<br/>el motivo lo dice y sumar un proveedor se decide aparte
+
+    loop De modo que no pase más de una hora desde que un mensaje aparece
+        Sistema->>Portal: Pide los mensajes de la bandeja
+        Portal-->>Sistema: Reclamos de pago, avisos de vencimiento próximo y avisos de stock bajo
+        Sistema->>Sistema: Clasifica cada mensaje por tipo y busca su remitente en el padrón de proveedores
+        Note over Sistema: Nada se descarta: sin tipo se muestra como sin clasificar,<br/>y sin remitente reconocido se muestra señalando que quedó sin identificar
+        Sistema->>Sistema: Lo registra como pendiente
+
+        alt Es un reclamo de pago o un vencimiento próximo, dentro de la franja de avisos
+            Sistema-->>Marcela: Le avisa por WhatsApp en el momento, al número registrado de quien recibe ese tipo de aviso
+        else Es un reclamo o un vencimiento fuera de la franja
+            Sistema->>Sistema: Retiene el aviso y lo envía al comenzar la franja siguiente
+        else Es un aviso de stock bajo o quedó sin clasificar
+            Sistema->>Sistema: Queda a la vista en la pantalla de mensajes, sin salir del sistema
+        end
+
+        opt El aviso no se pudo entregar
+            Sistema->>Sistema: Registra el fallo y lo señala en la pantalla de mensajes
+        end
+    end
+    Note over Sistema,Marcela: Por el mismo mensaje manda un solo aviso inmediato, y mientras siga pendiente se cuenta en el resumen.<br/>Los que ya estaban en la bandeja al ponerse en marcha quedan pendientes, sin ningún aviso
+
+    Marcela->>Sistema: Abre los mensajes y filtra por tipo, por proveedor o por estado
+    Marcela->>Sistema: Toma un reclamo como responsable, deja una nota y lo marca resuelto
+    Sistema->>Sistema: Registra quién lo resolvió y cuándo, y cuenta un pendiente menos
+
+    Sistema-->>Duenio: A la hora configurada, el resumen diario por WhatsApp
+    Note over Sistema,Duenio: Lleva los mensajes pendientes y las órdenes estancadas.<br/>Lo resuelto no entra, y una orden estancada figura una vez por día.<br/>La franja es de los avisos inmediatos: el resumen sale a su hora configurada
+
+    Duenio->>Sistema: Ajusta los días de estancamiento, la ventana de pedido repetido, la hora del resumen y la franja de avisos
+    Duenio->>Sistema: Define quién recibe cada tipo de aviso
+    Sistema-->>Duenio: Los avisos siguientes salen con los valores nuevos
+
+    opt Una persona pierde el acceso al sistema
+        Sistema->>Sistema: Deja de enviarle avisos
+    end
+
+    Julian->>Sistema: Intenta abrir las órdenes de compra o la bandeja de mensajes
+    Sistema-->>Julian: No tiene permiso, ni siquiera conociendo la dirección de la pantalla

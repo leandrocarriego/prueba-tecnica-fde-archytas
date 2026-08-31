@@ -1,0 +1,32 @@
+---
+title: El sistema — qué hace con cada mensaje de la bandeja
+---
+flowchart TD
+    A["De modo que no pase más de una hora desde que aparece, trae los mensajes de la bandeja"] --> B{"¿Se puede determinar el tipo del mensaje?"}
+    B -->|Sí| C["Lo clasifica como reclamo de pago, vencimiento próximo o stock bajo"]
+    B -->|No| D["Lo muestra como sin clasificar, en lugar de descartarlo"]
+    C --> E{"¿El remitente coincide con un proveedor del padrón?"}
+    D --> E
+    E -->|Sí| F["Lo muestra con su proveedor identificado"]
+    E -->|No| G["Lo muestra señalando que el remitente quedó sin identificar"]
+    F --> H["Lo registra como pendiente"]
+    G --> H
+
+    H --> I{"¿Es un reclamo de pago o un vencimiento próximo?"}
+    I -->|No| J["Queda a la vista en la pantalla de mensajes, sin salir del sistema"]
+    I -->|Sí| K{"¿Ya avisó por este mismo mensaje?"}
+    K -->|Sí| J
+    K -->|No| L{"¿Está dentro de la franja de avisos?"}
+    L -->|No| M["Retiene el aviso hasta que comienza la franja siguiente"]
+    L -->|Sí| N["Avisa por WhatsApp al número registrado de quien recibe ese tipo de aviso"]
+    M --> N
+    N --> O{"¿Se pudo entregar?"}
+    O -->|Sí| P["Queda avisado una sola vez, aunque el mensaje se procese de nuevo"]
+    O -->|No| Q["Registra el fallo y lo señala en la pantalla de mensajes"]
+
+    R["A la hora configurada arma el resumen diario"] --> S["Reúne los mensajes que siguen pendientes y las órdenes señaladas como estancadas"]
+    S --> T["Deja afuera lo que ya está resuelto"]
+    T --> U["Lo envía por WhatsApp a quien tenga configurado el resumen"]
+
+    V["Al ponerse en marcha, los mensajes que ya estaban en la bandeja quedan registrados como pendientes"] --> W["Por ellos no envía ningún aviso"]
+    X["Una persona pierde el acceso al sistema"] --> Y["Deja de enviarle avisos"]

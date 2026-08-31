@@ -1,0 +1,36 @@
+---
+title: Julián, ventas — mira el tablero y resuelve lo apartado
+---
+flowchart TD
+    A["Julián quiere saber cómo viene el negocio sin armar la planilla a mano"] --> B["Abre el tablero"]
+    B --> C["Lo primero que lee es el total facturado del período y cuántas ventas quedaron excluidas"]
+    C --> D["Ve la facturación mes a mes desde 2023 y cuántas ventas hubo en el período"]
+    D --> E["Ve cómo se movieron los precios del proveedor, cuánto stock había al inicio y al final, y qué productos se dieron de alta"]
+    E --> F["Elige el período de cada corte por separado, sin mover el de los demás"]
+
+    C --> G{"¿El total del mes cierra con la suma hecha a mano?"}
+    G -->|Sí| H["Puede confiar en el número"]
+    G -->|"No, y el tablero dice cuántas dejó afuera"| I["Hace un clic y ve cuáles son las ventas excluidas"]
+
+    I --> J["Abre la pantalla de revisión"]
+    J --> K{"¿Qué tipo de caso es?"}
+
+    K -->|Una venta repetida con datos en conflicto| L["Ve las dos versiones enfrentadas, con las diferencias señaladas"]
+    L --> M{"¿Son la misma venta cargada dos veces?"}
+    M -->|Sí| N["Elige cuál de las versiones vale"]
+    M -->|"No, son dos ventas distintas"| O["Declara que son ventas distintas y entran las dos"]
+    N --> P["El total del mes se recalcula y la versión descartada se sigue viendo"]
+    O --> P
+    P --> Q{"¿Se equivocó al decidir?"}
+    Q -->|Sí| R["Deshace la resolución: el caso vuelve a pendiente y los números vuelven atrás"]
+    Q -->|No| S["El caso sale de pendientes, con qué decidió, quién y cuándo"]
+
+    K -->|"Una venta con un dato roto o un monto atípico"| T["Lee el motivo por el que se apartó"]
+    T --> U{"¿Se puede conocer el dato correcto?"}
+    U -->|Sí| V["Corrige la fecha, el total, la cantidad o el producto"]
+    V --> W["La venta entra a los indicadores"]
+    U -->|No hay forma de saberlo| X["Carga el valor que estima"]
+    X --> Y["El valor queda señalado como estimado y el indicador que lo usa lo avisa"]
+    W --> S
+    Y --> S
+    S --> Z["Lo que informó el portal se sigue viendo debajo de la corrección"]
