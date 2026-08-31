@@ -1,23 +1,31 @@
 """What a person may correct on a product, and what they have to say to do it.
 
 Pure rules, so they are checked without a database: which fields exist, where
-each one lives, and that a correction without a legal reason is refused before
-anything is written.
+each one lives, what a value has to be to land in a column, and that a
+correction without a legal reason is refused before anything is written.
 """
 
+import re
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
+import app.modules.catalog.service as catalog_service
+from app.modules.catalog.handlers import _price_of
 from app.modules.catalog.models import PriceSource, Product, ProductPrice
 from app.modules.catalog.service import (
     CORRECTABLE_FIELDS,
+    DEFAULT_HIGHLIGHT_THRESHOLD,
+    HIGHLIGHT_THRESHOLD_KEY,
+    NEGATIVE_AMOUNT,
     PRICE_ENTITY,
     PRODUCT_ENTITY,
     CatalogService,
 )
 from app.shared.corrections import CorrectionReason
 from app.shared.errors import ValidationError
+from app.shared.parameters import initial_value
 
 
 @pytest.mark.unit
@@ -130,3 +138,146 @@ class TestWhereTheDatumCameFrom:
         # Assert
         assert CatalogService._came_from_the_portal(typed) is False
         assert CatalogService._came_from_the_portal(repriced) is True
+
+
+@pytest.mark.unit
+class TestWhatCountsAsAnAmount:
+    """RF-23 lets a person correct a price; it does not let them write a hole.
+
+    The value goes straight into `core.product_price.price` and into the
+    correction that keeps it, so what is refused here is refused before any
+    column holds it.
+    """
+
+    def test_an_amount_is_read_with_its_cents(self) -> None:
+        # Act / Assert
+        assert CatalogService._as_number("1234.50", "price") == Decimal("1234.50")
+
+    def test_a_text_that_is_no_number_is_refused(self) -> None:
+        # Act / Assert
+        with pytest.raises(ValidationError) as refusal:
+            CatalogService._as_number("mil quinientos", "price")
+
+        assert refusal.value.message == "«price» tiene que ser un número."
+
+    @pytest.mark.parametrize("value", ["nan", "snan", "-nan", "inf", "-Infinity"])
+    def test_a_value_that_is_not_finite_is_refused_like_any_other(self, value: str) -> None:
+        """No spelling of "not a number" is a price, and no infinity either.
+
+        A NaN in the column is the expensive one: it is equal to nothing, not
+        even to itself, so every list that follows contradicts the correction
+        and the owner is told about the same conflict every morning, forever
+        (RF-28).
+        """
+        # Act / Assert
+        with pytest.raises(ValidationError) as refusal:
+            CatalogService._as_number(value, "price")
+
+        # The refusal has to be *this* one and not some later accident: the
+        # message is what tells the person what to type instead.
+        assert refusal.value.message == "«price» tiene que ser un número."
+        assert refusal.value.details["field"] == "price"
+
+    @pytest.mark.parametrize("value", ["-1", "-0.01", -1500])
+    def test_an_amount_below_zero_is_refused_as_the_daily_list_already_is(
+        self, value: str | int
+    ) -> None:
+        """The same rule from the other door.
+
+        `ingestion` quarantines a row whose price is negative instead of
+        writing it; a correction reaches the same column, so it cannot be the
+        way that number gets in by hand.
+        """
+        # Act / Assert
+        with pytest.raises(ValidationError) as refusal:
+            CatalogService._as_number(value, "price")
+
+        assert refusal.value.message == NEGATIVE_AMOUNT
+
+    def test_zero_is_a_price_and_is_accepted(self) -> None:
+        """Free of charge is a number the portal may report; below zero is not."""
+        # Act / Assert
+        assert CatalogService._as_number("0", "price") == Decimal("0")
+
+
+@pytest.mark.unit
+class TestWhereTheStartingThresholdComesFrom:
+    """A parameter nobody has changed still has a value (RF-04, RF-20 of 001).
+
+    Which value is declared once, in the catalog of business parameters, and
+    read from there. A copy in this module would be a second answer to the same
+    question, and the day somebody moved the catalog the installation nobody
+    configured would go on highlighting by the old one.
+    """
+
+    def test_it_is_read_from_the_catalog_and_not_written_here(self) -> None:
+        """Read from the source, not compared against it.
+
+        The obvious test — `initial_value(KEY) == DEFAULT_HIGHLIGHT_THRESHOLD` —
+        cannot fail: it is the definition of the constant restated, so putting
+        the literal `Decimal("10")` back would leave it green, and that literal
+        is the whole regression this guards against. The constant is computed
+        once at import, so no fixture can move the catalog underneath it either.
+
+        What is left is to read the line that defines it, which is the shape of
+        the question anyway: *is the value written here, or asked for?*
+        """
+        # Arrange
+        source = Path(catalog_service.__file__).read_text(encoding="utf-8")
+
+        # Act
+        defined = re.search(r"^DEFAULT_HIGHLIGHT_THRESHOLD\s*=\s*(?P<value>.+)$", source, re.M)
+
+        # Assert
+        assert defined is not None, (
+            "DEFAULT_HIGHLIGHT_THRESHOLD is no longer defined at the top level of "
+            "catalog/service.py. If it moved, this rule moved with it."
+        )
+        assert "initial_value" in defined["value"], (
+            f"DEFAULT_HIGHLIGHT_THRESHOLD is written as `{defined['value'].strip()}` instead "
+            f"of being read from the catalog with `initial_value({HIGHLIGHT_THRESHOLD_KEY!r})`. "
+            "A second copy is a second answer to the same question, and the day the "
+            "catalog moves, the installation nobody configured keeps highlighting by the "
+            "old number."
+        )
+        # And that asking for it still yields something usable as an amount.
+        assert Decimal(str(initial_value(HIGHLIGHT_THRESHOLD_KEY))) == DEFAULT_HIGHLIGHT_THRESHOLD
+
+
+@pytest.mark.unit
+class TestThePriceSomebodyTypedResolvingACase:
+    """The third door into the same column, and the one nobody was watching.
+
+    A person resolving a case from the review queue types an amount, and it
+    reaches `core.product_price.price` through `_price_of` — not through
+    `CatalogService._as_number`, which is the guard everybody remembers. Two
+    doors that disagree about what a price is are one door.
+    """
+
+    @pytest.mark.parametrize("value", ["nan", "snan", "inf", "-Infinity"])
+    def test_a_price_that_is_not_finite_never_reaches_the_column(self, value: str) -> None:
+        """And this one is not merely wrong, it is an outage.
+
+        A `NaN` written here is compared against the highlight threshold by the
+        next daily list, `Decimal` signals on that comparison, and the batch
+        falls over — the whole list, not the row. Article II calls for
+        quarantine; a crash is the opposite of it.
+        """
+        # Act / Assert
+        assert _price_of({"price": value}) is None
+
+    @pytest.mark.parametrize("value", ["-1", -1500])
+    def test_a_negative_price_never_reaches_it_either(self, value: str | int) -> None:
+        """`ingestion` already quarantines a negative price from the daily list.
+
+        Resolving a case by hand must not be the way that number gets in.
+        """
+        # Act / Assert
+        assert _price_of({"price": value}) is None
+
+    def test_the_amount_a_person_actually_typed_gets_through(self) -> None:
+        """The guard is a filter, not a wall: zero is a price and so is 1234.50."""
+        # Act / Assert
+        assert _price_of({"price": "1234.50"}) == Decimal("1234.50")
+        assert _price_of({"price": 0}) == Decimal("0")
+        assert _price_of({}) is None

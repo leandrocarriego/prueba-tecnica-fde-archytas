@@ -18,19 +18,24 @@ which is where undoing is actually easy to get wrong:
 * **what is left behind** — a line in the log with who and when, and a
   correction row marked rather than deleted (RF-32);
 * **that the field stays correctable afterwards**, because the unique index
-  covers only the corrections still in force.
+  covers only the corrections still in force;
+* **the index itself**, asked of the database in raw SQL rather than through
+  the service — the way `test_change_log.py` asks it about the append-only log.
+  A rule the schema enforces is only enforced if the schema has it.
 
 Everything runs against a real session: this is authorisation, SQL and a
 partial unique index, and none of the three is exercised by a mock.
 """
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.catalog.models import Correction, Product
@@ -58,6 +63,10 @@ AUDIT = f"{API_PREFIX}/operations/audit"
 # What the portal reported the day the product was registered, and what every
 # reversal in this file has to give back.
 PORTAL_PRICE = Decimal("1000.0000")
+
+# A product id no factory ever hands out. The rows written in raw SQL below
+# hang from it so they cannot collide with a product some other test built.
+UNCLAIMED_ID = 9_999_999
 
 
 def portal_row(price: Decimal | int, *, row_id: int) -> NormalizedPriceRow:
@@ -108,6 +117,43 @@ async def correction_rows(
         .order_by(Correction.id)
     )
     return list(result.scalars().all())
+
+
+async def write_correction_row(
+    session: AsyncSession,
+    *,
+    status: CorrectionStatus,
+    entity_id: int = UNCLAIMED_ID,
+    field: str = "price",
+    corrected_value: str = "1200",
+) -> None:
+    """Put one correction row into the table in raw SQL, past the service.
+
+    The question the tests below ask is what the **database** allows, so they
+    ask it the way `test_change_log.py` asks about the append-only log: with
+    the statement a `psql` session would type. Going through
+    `apply_correction` would only prove that `apply_correction` checks first,
+    and the index is there for the day something else writes the row.
+    """
+    await session.execute(
+        text(
+            "INSERT INTO core.correction "
+            "(entity_type, entity_id, field, portal_value, corrected_value, "
+            "reason_code, corrected_by_user_id, corrected_at, status) "
+            "VALUES (:entity_type, :entity_id, :field, CAST(:portal AS jsonb), "
+            "CAST(:corrected AS jsonb), :reason, 1, now(), "
+            "CAST(:status AS correction_status))"
+        ),
+        {
+            "entity_type": PRICE_ENTITY,
+            "entity_id": str(entity_id),
+            "field": field,
+            "portal": json.dumps(str(PORTAL_PRICE)),
+            "corrected": json.dumps(corrected_value),
+            "reason": REASON,
+            "status": status.value,
+        },
+    )
 
 
 class TestWhatAReversalGivesBack:
@@ -658,3 +704,127 @@ class TestTheBordersOfUndoing:
         history = await CatalogService(session).price_history(product.id)
         assert history.price == PORTAL_PRICE
         assert history.corrections == []
+
+
+class TestOnlyOneCorrectionStandsPerField:
+    """The invariant the schema keeps, asked of the schema and not of the service.
+
+    `uq_correction_in_force` is unique over `(entity_type, entity_id, field)`
+    among the rows that are **not** `REVERTED`, and it decides two things the
+    spec signed. A datum cannot carry two corrections at once — with two, RF-27
+    would have two answers to "what did the portal say" and RF-31 two numbers to
+    give back. And a datum whose correction was undone stays correctable, which
+    is what keeps RF-30 from costing the field every correction it might still
+    need.
+
+    The append-only log is checked this way already (`test_change_log.py`):
+    around the repository, straight at the database. The reason is the same
+    here — the service checking first proves the service checks, and the index
+    exists for the day something else writes the row.
+    """
+
+    async def test_the_database_under_test_has_the_index(self, session: AsyncSession) -> None:
+        """Named, unique, over the three columns, and only over what is in force.
+
+        The suite builds its schema from the models with
+        `Base.metadata.create_all()` and never runs Alembic (`tests/conftest.py`
+        says why), so this asks the database the three tests below actually run
+        against. It is also what keeps a green run from meaning less than it
+        says: without it, a refused insert only proves that *something* refused
+        it. Whether the migration declares the same index is a different
+        question, and CI answers it with `alembic check`.
+        """
+        # Act
+        definition = await session.scalar(
+            text(
+                "SELECT indexdef FROM pg_indexes "
+                "WHERE schemaname = 'core' AND tablename = 'correction' "
+                "AND indexname = 'uq_correction_in_force'"
+            )
+        )
+
+        # Assert
+        assert definition is not None, (
+            "core.correction has no uq_correction_in_force in the test database. "
+            "The schema here comes from the models, so the index is missing from "
+            "app/modules/catalog/models.py, and nothing stops a datum from "
+            "carrying two corrections at once."
+        )
+        assert "UNIQUE" in definition
+        assert "(entity_type, entity_id, field)" in definition
+        assert "REVERTED" in definition
+
+    async def test_a_second_correction_on_the_same_field_is_refused(
+        self, session: AsyncSession
+    ) -> None:
+        """Two values standing on one datum is the state the table may not reach."""
+        # Arrange
+        await write_correction_row(session, status=CorrectionStatus.ACTIVE)
+        await session.commit()
+
+        # Act
+        with pytest.raises(IntegrityError) as refused:
+            await write_correction_row(
+                session, status=CorrectionStatus.ACTIVE, corrected_value="1400"
+            )
+
+        # Assert — a refused statement aborts the transaction, so the session is
+        # rolled back before it is asked anything else.
+        await session.rollback()
+        assert "uq_correction_in_force" in str(refused.value)
+        assert [row.corrected_value for row in await correction_rows(session, UNCLAIMED_ID)] == [
+            "1200"
+        ]
+
+    async def test_a_correction_in_conflict_still_holds_the_field(
+        self, session: AsyncSession
+    ) -> None:
+        """`CONFLICTED` is in force too: the predicate reads `<> REVERTED`, not `= ACTIVE`.
+
+        A conflict is an open question about a correction that is still applied
+        (RF-28): the portal's new number was recorded, not written. A field
+        holding one is as taken as a field holding an active correction, and
+        writing a second row would be the overwrite RF-28 forbids, arriving by
+        another door.
+        """
+        # Arrange
+        await write_correction_row(session, status=CorrectionStatus.CONFLICTED)
+        await session.commit()
+
+        # Act
+        with pytest.raises(IntegrityError) as refused:
+            await write_correction_row(
+                session, status=CorrectionStatus.ACTIVE, corrected_value="1400"
+            )
+
+        # Assert
+        await session.rollback()
+        assert "uq_correction_in_force" in str(refused.value)
+        assert len(await correction_rows(session, UNCLAIMED_ID)) == 1
+
+    async def test_a_reverted_correction_leaves_the_field_free(self, session: AsyncSession) -> None:
+        """And undone rows never take it back, however many of them pile up.
+
+        `test_the_same_field_can_be_corrected_again_after_a_reversal` tells this
+        story through the service. This one asks the index, because the index is
+        what the story depends on: drop the `WHERE` from it and a field could be
+        corrected exactly once in its life, with the second attempt dying on a
+        constraint the person cannot see.
+        """
+        # Arrange — corrected and undone twice, which is a run of two mistakes
+        # and not a state the table forbids.
+        await write_correction_row(session, status=CorrectionStatus.REVERTED)
+        await write_correction_row(session, status=CorrectionStatus.REVERTED)
+        await session.commit()
+
+        # Act
+        await write_correction_row(session, status=CorrectionStatus.ACTIVE, corrected_value="1400")
+        await session.commit()
+
+        # Assert
+        rows = await correction_rows(session, UNCLAIMED_ID)
+        assert [row.status for row in rows] == [
+            CorrectionStatus.REVERTED,
+            CorrectionStatus.REVERTED,
+            CorrectionStatus.ACTIVE,
+        ]

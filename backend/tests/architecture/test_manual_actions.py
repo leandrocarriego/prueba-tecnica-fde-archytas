@@ -50,15 +50,25 @@ hidden from somebody the route would admit.
 
 RF-22 closes the same screen and is the last section here: an action that
 finishes has to tell whoever ran it whether it was applied or whether it
-failed. That one is not about the registry but about the components where a
-correction is actually made and undone — and it is checked the same way, and
-for the same reason, because it is the same missing test runner. Those
-components are searched for rather than named, which is the lesson of how RF-22
-was missed **three times**: the rule was right, and the screens it did not name
-were simply never inside it. So the search asks for the four actions the
-registry publishes, by their exported name, wherever they are imported from —
-naming the module instead would drag in the rule and alias screens of 001, which
-this rule has nothing to say about.
+failed. That one is not about the registry's rows but about the components
+where a correction is actually made and undone — and it is checked the same
+way, and for the same reason, because it is the same missing test runner.
+
+**Which components those are is decided by the registry, row by row.** That is
+the lesson of how RF-22 was missed **three times**: the rule was right, and the
+screens it did not name were simply never inside it — and a handful of names
+written here cannot tell an action nobody added from one that does not exist.
+So the list is `MANUAL_ACTIONS` itself, every row of it, and each row is
+answered below with the Server Action that runs it. That last step cannot be
+derived: `classify-product` is run by `setProductCategory` and nothing in the
+id says so. What it can be is *demanded* — a row with no answer fails this
+file. Adding an action and forgetting this test is no longer possible; the only
+thing that was ever possible before is exactly what happened three times.
+
+The registry is shared by every feature and RF-22 belongs to 003's spec, so the
+nine rows that arrived with 004 to 010 are answered «another feature's» instead
+of being judged here. That is a skip that is written down, counted, and
+impossible to mistake for a row nobody thought about.
 
 What no reading of the source can settle — whether a successful run takes the
 component off the screen, and therefore whether its verdict may live in local
@@ -381,68 +391,99 @@ class TestTheScreenFiltersByTheSession:
 
 # --- RF-22: an action that finishes says whether it was applied -------
 
-# Where a manual action of this feature actually finishes in front of somebody:
-# every component that calls one of the correction Server Actions. They are
-# searched for rather than listed, and that is the point — 003 added two of
-# these and only the first one was ever checked here, so the second went on
-# saying nothing for as long as it did. A third correction written against
-# `@/app/actions/corrections` lands in this test the day it is written, without
-# anybody remembering to add it.
+# Where a manual action actually finishes in front of somebody: the component
+# that calls its Server Action. **Which actions those are is `MANUAL_ACTIONS`,
+# all of it** — the registry is the only thing in the repository that knows what
+# a manual action is, so it is the only honest source for the list, and the two
+# structures below have to account for every row of it or
+# `TestTheScopeOfThisRuleIsTheRegistry` fails.
 #
-# Two things this section does **not** decide, written down because a gap
-# nobody wrote down is how RF-22 got missed twice:
+# That is the fix for how this went wrong three times. The rule was never
+# wrong; the set it ran over was a handful of names, and a set of names cannot
+# tell «this action has no screen yet» from «nobody remembered this file». Both
+# read as silence, and silence is green.
 #
-# 1. A manual action run through another Server Action module.
-#    `resolve-triage-case` is one: `MANUAL_ACTIONS` above registers it as an
-#    action of this feature, and `CaseCard` refreshes on success without saying
-#    anything, which is letter for letter the defect this section exists for.
-#    It is left out because covering it is two changes and not one — that
-#    component has to say that it was applied, and these rules have to learn a
-#    third honest channel first: `UpdateNowButton`, the other registered action
-#    outside this module, reports both outcomes in an `outcome` state that is
-#    neither `{ ok: true }` nor a toast, and a rule that only knows those two
-#    would fail correct code. Until both land, this is a hole and not a
-#    boundary the file earned.
+# What the registry cannot supply is the last step, and it is the reason
+# anything is written by hand here at all: nothing in a row says which function
+# executes it. `resolve-triage-case` is run by `resolveCase`, `classify-product`
+# by `setProductCategory`, and no rule turns one into the other. Neither does
+# the `href`: `/precios` is the screen of three different rows, and the two that
+# 003 cares most about are run from components the page does not import — they
+# live on the product's own page, one URL away. A discovery that walked the
+# imports of the `href` would have missed `CorrectionDialog` and
+# `RevertCorrectionButton`, which is this file's original bug with a longer
+# derivation in front of it.
 #
-# 2. Whether a successful run leaves the component mounted. Nothing in the
-#    source answers it: `router.refresh()` re-renders the page, and whether the
-#    component survives depends on whether the refreshed page still lists the
-#    row it hangs off. `RevertCorrectionButton` does not survive its own
-#    success and announces to the toaster for that reason — a judgement made by
-#    whoever wrote it, which this file cannot check. What it checks is the half
-#    that is written down: a verdict kept in the component's own state is
-#    rendered by everything that component can put on screen.
+# So the exported name is written down, once per row, and the writing is
+# checked: `test_every_action_it_reaches_is_imported_somewhere` fails when a
+# name here matches nothing in the repository, which is what a rename or a
+# deleted screen looks like.
+EXECUTED_BY = {
+    "request-price-update": "requestPriceUpdate",
+    "resolve-triage-case": "resolveCase",
+    "correct-product": "correctProduct",
+    "revert-correction": "revertCorrection",
+}
+
+# And the other half of accounting for the registry, which is what keeps this
+# file from failing code it has no business judging.
+#
+# The registry is shared: thirteen rows today, four of them 003's and nine that
+# arrived with 004 to 010. RF-22 is a requirement of **003's** spec and this
+# file is the gate that reads it, so judging the other nine here would put
+# another feature's components in red inside this feature's suite — components
+# still being written, whose own spec may answer «se aplicó» somewhere this file
+# has never been taught to look. That was measured before it was decided, and
+# not assumed: with the nine included, seven of their components failed.
+#
+# Naming them is the point. A row listed here is a decision —«not mine»— that a
+# reader can disagree with; a row in neither structure is a bug, and it fails.
+# If RF-22 is ever adopted as a rule of the whole product, what changes is these
+# nine lines, not the mechanism.
+ANOTHER_FEATURES = frozenset(
+    {
+        "resolve-invoice-review",
+        "correct-supplier",
+        "register-payment",
+        "issue-receipt",
+        "add-due-date",
+        "dismiss-repeat-order",
+        "resolve-message",
+        "classify-product",
+        "resolve-sale",
+    }
+)
+
+# What this section does **not** decide, written down because a gap nobody wrote
+# down is how RF-22 got missed twice: whether a successful run leaves the
+# component mounted. Nothing in the source answers it — `router.refresh()`
+# re-renders the page, and whether the component survives depends on whether the
+# refreshed page still lists the row it hangs off. `RevertCorrectionButton` does
+# not survive its own success and announces to the toaster for that reason — a
+# judgement made by whoever wrote it, which this file cannot check. What it
+# checks is the half that is written down: a verdict kept in the component's own
+# state is rendered by everything that component can put on screen.
 FRONTEND = REPOSITORY_ROOT / "frontend"
 COMPONENTS = FRONTEND / "components"
 APP = FRONTEND / "app"
 LAYOUT = APP / "layout.tsx"
 
-# `import { correctProduct, … } from '@/app/actions/corrections'`. This is the
-# discovery too, and not a plain substring search. What was imported still has
+# `import { correctProduct, … } from '@/app/actions/corrections'`. This is how a
+# screen is found, and not a plain substring search. What was imported still has
 # to be filtered: a file that imports only a **type** from there executes
 # nothing, and would be dragged in to fail a rule that has nothing to say about
 # it. A type hides under two spellings — `import type { X }`, which this pattern
 # does not match at all, and `import { type X }`, which it does match and
-# `correction_actions_in()` drops.
+# `manual_actions_in()` drops.
 #
-# Two modules and not one. The rule is about **manual actions**, which is what
-# `frontend/lib/operations/actions.ts` enumerates, not about corrections in
-# particular — and reading only the corrections module is exactly how the same
-# defect survived in `CaseCard` after being fixed twice next door: resolving a
-# case is one of the four manual actions 003 published, and it imports from
-# `@/app/actions/triage`.
-ACTION_MODULES = ("corrections", "triage", "prices")
-# The module is not the unit: `@/app/actions/triage` also exports the rule and
-# alias management of 001, whose components are not manual actions of the
-# registry and have nothing to do with this rule. What the rule is about is the
-# four actions `frontend/lib/operations/actions.ts` publishes, so those are
-# named here — by their **exported** name, which is what survives an alias.
-THE_FOUR = frozenset({"correctProduct", "revertCorrection", "resolveCase", "requestPriceUpdate"})
-CORRECTION_ACTIONS = re.compile(
-    r"^import\s*\{(?P<names>[^}]*)\}\s*from\s*'@/app/actions/(?:"
-    + "|".join(ACTION_MODULES)
-    + r")'",
-    re.MULTILINE,
+# Any module under `@/app/actions/`, because which module an action lives in is
+# not this file's business: `EXECUTED_BY` names the functions, and the registry
+# names those. Listing modules instead is exactly how the same defect survived
+# in `CaseCard` after being fixed twice next door — and it would still drag in
+# the rule and alias screens of 001, which share `@/app/actions/triage` with a
+# registered action and have nothing to do with this rule.
+IMPORTED_FROM_ACTIONS = re.compile(
+    r"^import\s*\{(?P<names>[^}]*)\}\s*from\s*'@/app/actions/\w+'", re.MULTILINE
 )
 # `type CorrectionOutcome` inside the braces: a name that exists for the type
 # checker and never runs.
@@ -634,35 +675,42 @@ def what_a_successful_run_does(run: str) -> str:
     return "".join(reached)
 
 
-def correction_actions_in(source: str) -> list[str]:
-    """The correction actions a file imports in order to *run* them.
+def actions_imported_by(source: str) -> list[tuple[str, str]]:
+    """The registered actions a file imports in order to *run* them.
+
+    Each one as `(exported name, the name this file calls it by)`. The two
+    differ under an alias, and both are needed: the export is what
+    `EXECUTED_BY` registered, and the alias is what the calls are written with.
 
     A specifier marked `type` is dropped: it executes nothing, and a file that
     imported only one of those would be pulled into every rule below and fail
     `test_the_run_that_finishes_it_was_found` for having no run to read. Today
     `app/actions/corrections.ts` exports no type, so nothing is being excluded —
     which is exactly why it is worth writing down before one is exported.
-
-    An aliased import is taken by its alias, because that is the name the calls
-    in this file are written with.
     """
-    names: list[str] = []
-    for imported in CORRECTION_ACTIONS.finditer(source):
+    reached = set(EXECUTED_BY.values())
+    found: list[tuple[str, str]] = []
+    for imported in IMPORTED_FROM_ACTIONS.finditer(source):
         for specifier in imported["names"].split(","):
             specifier = specifier.strip()
             if not specifier or A_TYPE.match(specifier):
                 continue
             identifiers = IDENTIFIER.findall(specifier)
-            # The **first** identifier decides whether this is one of the four,
-            # because that is the exported name; the **last** is what the calls
-            # in this file are written with, aliased or not.
-            if identifiers and identifiers[0] in THE_FOUR:
-                names.append(identifiers[-1])
-    return names
+            # The **first** identifier decides whether this is a registered
+            # action, because that is the exported name; the **last** is what
+            # the calls in this file are written with, aliased or not.
+            if identifiers and identifiers[0] in reached:
+                found.append((identifiers[0], identifiers[-1]))
+    return found
+
+
+def manual_actions_in(source: str) -> list[str]:
+    """The registered actions a file runs, by the name its own calls use."""
+    return [called_by for _, called_by in actions_imported_by(source)]
 
 
 def runs_that_finish_an_action(source: str) -> list[str]:
-    """The body of every async run that calls one of the correction actions.
+    """The body of every async run that calls one of the registered actions.
 
     The *innermost* one around each call, so a handler is read whole and once
     even when it was written inside another function — and so a component that
@@ -670,7 +718,7 @@ def runs_that_finish_an_action(source: str) -> list[str]:
     """
     called = [
         call.start()
-        for name in correction_actions_in(source)
+        for name in manual_actions_in(source)
         for call in re.finditer(rf"\b{name}\s*\(", source)
     ]
     if not called:
@@ -772,13 +820,13 @@ class FinishedAction:
     runs: tuple[Run, ...]
 
 
-def screens_that_finish_a_correction() -> list[Path]:
-    """Every component through which one of 003's corrections is executed."""
+def screens_that_finish_an_action() -> list[Path]:
+    """Every component through which one of the actions in `EXECUTED_BY` is run."""
     return [
         path
         for root in (COMPONENTS, APP)
         for path in sorted(root.rglob("*.tsx"))
-        if correction_actions_in(path.read_text(encoding="utf-8"))
+        if manual_actions_in(path.read_text(encoding="utf-8"))
     ]
 
 
@@ -806,6 +854,108 @@ def read_screen(path: Path) -> FinishedAction | None:
     )
 
 
+def where_each_action_is_run() -> dict[str, list[Path]]:
+    """For every action of `EXECUTED_BY`, the components that import it to run it.
+
+    Keyed by the **exported** name, which is the one written down: an alias
+    changes what a component calls it, never what the registry reached for.
+    """
+    found: dict[str, list[Path]] = {name: [] for name in EXECUTED_BY.values()}
+    for root in (COMPONENTS, APP):
+        for path in sorted(root.rglob("*.tsx")):
+            for exported, _ in actions_imported_by(path.read_text(encoding="utf-8")):
+                found[exported].append(path)
+    return found
+
+
+@pytest.mark.unit
+class TestTheScopeOfThisRuleIsTheRegistry:
+    """What RF-22 is asked about is every row of `MANUAL_ACTIONS`, and nothing else.
+
+    The rules below run over whatever components happen to import a registered
+    action. That is the right way round — a screen is found, not remembered —
+    but it answers only half the question: it finds the screens of the actions
+    this file reached for, and says nothing about an action it never reached
+    for at all. That silence is the whole history of RF-22 here. Three screens
+    were missed, and not one of them failed anything on its way past.
+
+    So the registry is counted. Every row is either an action this file runs
+    RF-22 over, or a row of another feature that this file deliberately does
+    not judge, and a row that is neither fails. The judgement about which is
+    which stays a judgement — what stops being possible is making it by
+    accident.
+    """
+
+    def test_every_registered_action_is_accounted_for(self) -> None:
+        """A row nobody answered breaks this file, instead of being skipped in silence."""
+        # Arrange / Act
+        unaccounted = {action.id for action in registry()} - set(EXECUTED_BY) - ANOTHER_FEATURES
+
+        # Assert
+        assert not unaccounted, (
+            f"{sorted(unaccounted)} are registered in {REGISTRY} and this file does not "
+            "know what to do with them. RF-22 asks that every manual action say whether "
+            "it was applied, and an action nobody listed here is one nobody checks. Add "
+            "it to EXECUTED_BY with the Server Action that runs it, or to "
+            "ANOTHER_FEATURES if it is not this feature's to judge — but decide, "
+            "because leaving it out is how the same defect survived three times."
+        )
+
+    def test_nothing_is_accounted_for_that_the_registry_dropped(self) -> None:
+        """And the other direction, so this file cannot become a second registry.
+
+        An action removed from `MANUAL_ACTIONS` and left behind here would go on
+        being searched for, found nowhere, and reported by
+        `test_every_action_it_reaches_is_imported_somewhere` as a rename that
+        never happened.
+        """
+        # Arrange / Act
+        registered = {action.id for action in registry()}
+        invented = (set(EXECUTED_BY) | ANOTHER_FEATURES) - registered
+
+        # Assert
+        assert not invented, (
+            f"{sorted(invented)} are accounted for here and are not in {REGISTRY} any "
+            "more: this file is describing a screen the product no longer offers."
+        )
+
+    def test_an_action_is_accounted_for_once(self) -> None:
+        """Judged here or left to its own feature — claiming both hides which one won."""
+        # Arrange / Act
+        both = set(EXECUTED_BY) & ANOTHER_FEATURES
+
+        # Assert
+        assert not both, (
+            f"{sorted(both)} are listed as this feature's and as another's at the same "
+            "time: EXECUTED_BY wins, and the second listing is a reader being told "
+            "something untrue."
+        )
+
+    def test_every_action_it_reaches_is_imported_somewhere(self) -> None:
+        """A name written here that matches nothing reaches nothing.
+
+        This is what keeps the last hand-written step honest. Rename
+        `resolveCase`, or delete the component that runs it, and the search goes
+        on running — over an empty list, in green, with the row still looking
+        accounted for. Exactly the shape of the failure this whole section
+        exists to make impossible.
+        """
+        # Arrange / Act
+        unreachable = {
+            action: name
+            for action, name in EXECUTED_BY.items()
+            if not where_each_action_is_run()[name]
+        }
+
+        # Assert
+        assert not unreachable, (
+            f"{unreachable} name Server Actions that no component under {COMPONENTS} nor "
+            f"{APP} imports. Either the export was renamed and this file was not, or the "
+            "screen that ran the action is gone — and RF-22 stopped being checked on it "
+            "either way. Point the entry at the name that runs it now."
+        )
+
+
 @pytest.mark.unit
 class TestTheResultOfACorrectionReachesTheScreen:
     """RF-22: an action that finishes tells whoever ran it how it went.
@@ -816,11 +966,12 @@ class TestTheResultOfACorrectionReachesTheScreen:
     an outcome the API returned and the screen never showed is, from the desk
     where the work happens, indistinguishable from nothing having happened.
 
-    003 brought two components where a correction is executed: the one that
-    corrects a value and the one that undoes that correction. They are not named
-    here one by one, they are looked for, because the way this went wrong the
-    first time was not that somebody wrote the rule badly — it was that the
-    second button was never inside it.
+    Which components are asked is not decided here: `EXECUTED_BY` names the
+    four actions 003 registered, and the component that runs one is whichever
+    imports it. Nothing about that is a list of screens — the way this went
+    wrong the first time was not that somebody wrote the rule badly, it was that
+    the second button was never inside it, and `TestTheScopeOfThisRuleIsTheRegistry`
+    is what now makes an action nobody accounted for fail out loud.
 
     Why a Python test for TSX: the same reason as the rest of this file — the
     frontend has no runner. And why it is written against the code's decisions
@@ -852,16 +1003,17 @@ class TestTheResultOfACorrectionReachesTheScreen:
     def test_there_are_screens_to_check(self) -> None:
         """A move or a rename must not quietly turn this whole rule off."""
         # Arrange / Act
-        screens = screens_that_finish_a_correction()
+        screens = screens_that_finish_an_action()
 
         # Assert
         assert screens, (
-            "no component calls the correction actions any more: RF-22's two "
-            f"screens are not under {COMPONENTS} nor {APP}, and this rule is "
-            "checking nothing. Find where a correction is confirmed now."
+            "no component imports any of the actions this file reaches for: the "
+            f"screens of {sorted(EXECUTED_BY)} are not under {COMPONENTS} nor "
+            f"{APP}, and this rule is checking nothing. Find where a manual "
+            "action is confirmed now."
         )
 
-    @pytest.mark.parametrize("path", screens_that_finish_a_correction(), ids=lambda path: path.name)
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
     def test_the_run_that_finishes_it_was_found(self, path: Path) -> None:
         """A component this file cannot read must break it, not disappear.
 
@@ -877,7 +1029,7 @@ class TestTheResultOfACorrectionReachesTheScreen:
             "is executed now, and rewrite this rule around it rather than dropping it."
         )
 
-    @pytest.mark.parametrize("path", screens_that_finish_a_correction(), ids=lambda path: path.name)
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
     def test_what_the_screen_can_render_was_found(self, path: Path) -> None:
         """And neither may the half that says *where the verdict is read*.
 
@@ -903,7 +1055,7 @@ class TestTheResultOfACorrectionReachesTheScreen:
                 "against nothing. Teach this file that shape rather than leaving it green."
             )
 
-    @pytest.mark.parametrize("path", screens_that_finish_a_correction(), ids=lambda path: path.name)
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
     def test_it_says_that_it_was_applied(self, path: Path) -> None:
         """A run that succeeds has to leave something that says so.
 
@@ -927,7 +1079,7 @@ class TestTheResultOfACorrectionReachesTheScreen:
                 "the second half."
             )
 
-    @pytest.mark.parametrize("path", screens_that_finish_a_correction(), ids=lambda path: path.name)
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
     def test_the_success_message_can_be_read(self, path: Path) -> None:
         """And a verdict kept in state has to be rendered wherever it can be needed.
 
@@ -977,7 +1129,7 @@ class TestTheResultOfACorrectionReachesTheScreen:
         # Arrange
         announced = [
             screen.path
-            for screen in map(read_screen, screens_that_finish_a_correction())
+            for screen in map(read_screen, screens_that_finish_an_action())
             if screen is not None and any(ANNOUNCES_SUCCESS.search(run.body) for run in screen.runs)
         ]
         if not announced:
@@ -1325,4 +1477,30 @@ class TestTheseRulesReadWhatTheyClaimTo:
         read — and the rules have nothing to say about it.
         """
         # Arrange / Act / Assert
-        assert correction_actions_in(source) == expected
+        assert manual_actions_in(source) == expected
+
+    @pytest.mark.parametrize(
+        ("source", "expected"),
+        [
+            ("import { resolveCase } from '@/app/actions/triage'", ["resolveCase"]),
+            ("import { revokeRule } from '@/app/actions/triage'", []),
+            ("import { resolveSaleGroup } from '@/app/actions/sales'", []),
+            (
+                "import { resolveCase as resolve } from '@/app/actions/triage'",
+                ["resolve"],
+            ),
+        ],
+        ids=["registered", "same-module-unregistered", "another-feature", "aliased"],
+    )
+    def test_only_a_registered_action_is_a_screen(self, source: str, expected: list[str]) -> None:
+        """The module a name comes from decides nothing; `EXECUTED_BY` decides everything.
+
+        `@/app/actions/triage` exports a manual action of this feature and the
+        rule management of 001 side by side, and `@/app/actions/sales` exports a
+        manual action this file leaves to its own feature. Reading a whole
+        module would drag both in and fail them against a rule neither answers
+        to; reading none of it but `corrections` is how `CaseCard` went
+        unchecked. What is read is the name.
+        """
+        # Arrange / Act / Assert
+        assert manual_actions_in(source) == expected

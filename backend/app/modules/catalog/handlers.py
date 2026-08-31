@@ -35,15 +35,36 @@ DISCONTINUE = "discontinue"
 
 
 def _price_of(decision: dict[str, object]) -> Decimal | None:
-    """Read the price a person typed, without trusting it to be a number."""
+    """Read the price a person typed, without trusting it to be a number.
+
+    Parsing is not enough to trust it. `Decimal` builds `nan`, `snan` and
+    `Infinity` without complaining, and this is the third door into
+    `core.product_price.price` — the other two, `ParameterSpec._as_number` and
+    `CatalogService._as_number`, already refuse them. A `NaN` that got through
+    here would not sit quietly: the next daily list compares `variation >
+    threshold` against it, `Decimal` signals on that comparison, and the whole
+    batch falls over. That is not quarantine, it is an outage (Article II).
+
+    Negative is refused for the same reason `ingestion` refuses it upstream: a
+    price below zero is not a price, and a correction must not be the way in for
+    what the daily list already sends to quarantine. Zero stays valid, exactly
+    as the parser has it.
+    """
     raw = decision.get("price")
     if raw is None:
         return None
     try:
-        return Decimal(str(raw))
+        price = Decimal(str(raw))
     except (InvalidOperation, ArithmeticError):
         logger.warning("A decision carried a price that is not a number")
         return None
+    if not price.is_finite():
+        logger.warning("A decision carried a price that is not a finite number")
+        return None
+    if price < 0:
+        logger.warning("A decision carried a negative price")
+        return None
+    return price
 
 
 @events.subscribe(PriceListNormalized)

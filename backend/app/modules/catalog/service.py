@@ -66,6 +66,7 @@ from app.shared.events import (
     UnknownProductsObserved,
     events,
 )
+from app.shared.parameters import initial_value
 from app.shared.sections import BusinessSection
 from app.shared.text import collapse_written_form, normalize
 from app.shared.time import BUSINESS_TIME_ZONE
@@ -75,7 +76,13 @@ logger = get_logger(__name__)
 HIGHLIGHT_THRESHOLD_KEY = "price_update.highlight_threshold_pct"
 # What the platform highlights while nobody has changed it (RF-20). The owner
 # moves it from the settings screen, and the new value arrives as an event.
-DEFAULT_HIGHLIGHT_THRESHOLD = Decimal("10")
+#
+# The starting value is read from the catalog that declares it, never written
+# again here: a second copy is a second answer to the same question, and the
+# day somebody moves the catalog the installation nobody configured would go on
+# highlighting by the old number — which is the very duplication this feature
+# removed from `operations`.
+DEFAULT_HIGHLIGHT_THRESHOLD = Decimal(str(initial_value(HIGHLIGHT_THRESHOLD_KEY)))
 
 HUNDRED = Decimal("100")
 
@@ -136,6 +143,13 @@ NO_PRICE_YET = "El producto todavía no tiene un precio para corregir"
 # (RF-22). In Spanish like every other refusal of this module: the envelope in
 # `main.py` serves this string straight to the screen (Artículo VIII).
 NO_SUCH_PRODUCT = "No encontramos ese producto"
+# An amount below zero is not a price. The daily list is already turned away
+# with this sentence when it brings one, and a correction is the other door
+# into the same column: the two doors cannot disagree about what a price is.
+# The sentence is written again instead of imported because the pipeline that
+# owns it is another module (`GEN-02`); what has to agree is the rule, and a
+# rule this module states about its own column is this module's to state.
+NEGATIVE_AMOUNT = "El precio no puede ser negativo"
 
 
 class CatalogService:
@@ -1275,13 +1289,44 @@ class CatalogService:
 
     @staticmethod
     def _as_number(value: Any, field: str) -> Decimal:
-        """Read a value as the number its field holds."""
+        """Read a value as the number its field holds, or refuse it.
+
+        `nan`, `snan` and every spelling of infinity spell themselves as a
+        `Decimal` without complaining and only detonate later, one screen away
+        from whoever typed them: a NaN written into a price is equal to
+        nothing, not even to itself, so every list that follows contradicts it
+        and the owner is warned about the same conflict every morning, forever
+        (RF-28). They are refused right here, beside the text that never
+        parsed, because this is where the correction path decides what a number
+        is — the same guard `ParameterSpec._as_number` already keeps over the
+        value the owner types on the settings screen.
+
+        A **negative** amount is refused for a different reason: the rule is not
+        this method's invention, it is the one the daily list already obeys —
+        `ingestion` sends a row with a price below zero to quarantine instead of
+        writing it. Every numeric field a person may correct is an amount
+        (today, only `price`), so a correction that got past this would put in
+        by hand the number the pipeline is not allowed to bring.
+        """
         try:
-            return Decimal(str(value))
+            number = Decimal(str(value))
         except (InvalidOperation, ArithmeticError, ValueError) as error:
-            raise ValidationError(
-                f"«{field}» tiene que ser un número.", details={"field": field}
-            ) from error
+            raise CatalogService._not_a_number_error(field) from error
+        if not number.is_finite():
+            raise CatalogService._not_a_number_error(field)
+        if number < 0:
+            raise ValidationError(NEGATIVE_AMOUNT, details={"field": field})
+        return number
+
+    @staticmethod
+    def _not_a_number_error(field: str) -> ValidationError:
+        """Build the refusal for a value that is no number at all.
+
+        It returns the error instead of raising it because two paths reach it —
+        the text that never parsed and the text that parsed into something not
+        finite — and each wants its own `from`.
+        """
+        return ValidationError(f"«{field}» tiene que ser un número.", details={"field": field})
 
     @staticmethod
     def _as_text(value: Any, field: str, *, limit: int | None = None) -> str:

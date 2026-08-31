@@ -1,6 +1,6 @@
 import { NoPermission } from '@/components/common/NoPermission'
 import { ParameterRow } from '@/components/operations/ParameterRow'
-import { fetchFromApi } from '@/lib/api/server'
+import { readFromApi } from '@/lib/api/server'
 import type { Parameter } from '@/lib/operations/types'
 
 export const metadata = {
@@ -21,16 +21,29 @@ export const metadata = {
  * yet, and each of those says so out loud rather than pretending to be a knob.
  *
  * The gate is the endpoint. `GET /operations/parameters` is owner-only, so
- * anybody else gets nothing back and lands on the refusal below — hiding a link
- * was never the restriction.
+ * anybody else is refused and lands on the refusal below — hiding a link was
+ * never the restriction. What the refusal is *not* is the answer to everything
+ * else: an unreachable backend is read here as an outage and said as one,
+ * because "pedíselo al dueño" is advice nobody can act on when the API is down.
  */
 export default async function ParametersPage() {
-  const parameters = await fetchFromApi<Parameter[]>('/operations/parameters')
+  const read = await readFromApi<Parameter[]>('/operations/parameters')
 
-  if (parameters === null) {
-    return <NoPermission what="los parámetros del sistema" />
+  if (!read.ok) {
+    if (read.failure === 'unauthorized') {
+      return <NoPermission what="los parámetros del sistema" />
+    }
+    return (
+      <main className="mx-auto max-w-3xl space-y-6 p-8">
+        <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
+        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          No pudimos traer los parámetros. Probá de nuevo en unos minutos.
+        </p>
+      </main>
+    )
   }
 
+  const parameters = read.data
   const waiting = parameters.filter(parameter => !parameter.has_effect).length
 
   return (
