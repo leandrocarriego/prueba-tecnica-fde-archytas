@@ -20,6 +20,7 @@ from app.modules.ingestion.parsers import (
     parse_supplier_ledger,
     sale_code_key,
 )
+from app.modules.purchases.service import RECEIVED_STATUS
 from app.shared.errors import ExtractionError
 
 pytestmark = [pytest.mark.unit, pytest.mark.portal]
@@ -161,6 +162,28 @@ class TestThePurchaseOrders:
             "Confirmada por proveedor": 10,
             "Recibida": 11,
         }
+
+    def test_the_state_that_means_arrived_is_the_one_the_portal_writes(self) -> None:
+        """D-4: `RECEIVED_STATUS` contra la grafía real, y no contra la recordada.
+
+        `_is_stalled` decide con una comparación de texto exacta: una orden cuyo
+        `status_text` es `RECEIVED_STATUS` está terminada y nunca se señala. Si
+        el portal cambiara esa grafía —«Recibido», «Recibida ✓», un espacio de
+        más—, la constante dejaría de coincidir **en silencio** y las once
+        órdenes ya recibidas empezarían a estancarse todas juntas.
+
+        Es la dependencia más frágil de la 007 y no la delata ningún nombre. El
+        test la ata al fixture: si la grafía se mueve, rompe acá y no en un
+        teléfono a las ocho de la mañana.
+        """
+        orders = parse_purchase_orders(fixture("purchase-orders-page-2026-08-29.html"))
+
+        arrived = [order for order in orders if order.status_text == RECEIVED_STATUS]
+
+        assert len(arrived) == 11, (
+            f"{RECEIVED_STATUS!r} ya no es lo que el portal escribe: "
+            f"los estados de la captura son {sorted({o.status_text for o in orders})}"
+        )
 
     def test_an_order_is_one_product_of_the_catalog(self) -> None:
         """Se cruza con el catálogo por código, no por nombre."""
