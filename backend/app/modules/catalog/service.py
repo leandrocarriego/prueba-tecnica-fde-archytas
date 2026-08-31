@@ -1,21 +1,40 @@
 """Catalog business logic: what the business knows, and what it refuses to guess.
 
-Three decisions live here, and all three come straight from the spec:
+Every decision here is the same refusal wearing a different hat: the module
+does not invent an answer nobody gave it.
 
-* **The first list establishes the catalog** (RF-02). Before it there are no
-  products, so every row of that list becomes one.
-* **After that, an unknown product is never created** (RF-07). It is reported so
-  a person can decide, because the assumption that the list only changes prices
-  is exactly that — an assumption, and one the client has not confirmed.
-* **A known product that stops appearing keeps its last price** (RF-08). It is
-  flagged, not deleted, and never estimated.
+* **The first list establishes the catalog, and no later one grows it**
+  (RF-02, RF-07 of 001). Before the first there are no products, so every row
+  becomes one; after it, a code nobody knows is reported so a person decides,
+  because "the list only changes prices" is an assumption the client never
+  confirmed. A known product that stops appearing keeps its last registered
+  price, flagged rather than deleted, and never estimated (RF-08 of 001).
+* **A written form of a category nobody has decided about gets no rubro**
+  (RF-21, RF-22 of 008). Classifying is a lookup against equivalences somebody
+  approved (RF-02, RF-25 of 008); a subcategory that would fit two rubros
+  proposes neither, because breaking the tie would be the system deciding.
+* **A value corrected by hand sits on top of what the portal said, never
+  instead of it** (RF-25 of 003). The original stays on the correction row,
+  which is what a reversal gives back (RF-31) and what turns a later list that
+  disagrees into a conflict the owner is told about instead of an overwrite
+  (RF-28, RF-29).
+* **Who wrote a row travels with the row** (`source`). It separates the portal
+  reporting an amount from this platform writing one on somebody's decision:
+  only the portal can contradict a correction, and only a value it reported
+  offers a way back (RF-33 of 003).
+
+The reads at the end — the prices screen, the history of one product and the
+cuts of the dashboard that are about the catalog (009) — assemble what these
+decisions left behind, and where one of them decides something itself it is the
+same refusal: a cut reports the products it left out instead of counting a
+stock nobody photographed as a zero (RF-46, RF-27 of 009).
 """
 
 from collections import defaultdict
 from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -119,18 +138,49 @@ PRICE_FIELD = "price"
 CURRENCY_FIELD = "currency"
 DESCRIPTION_FIELD = "description"
 
-# Which fields a person may correct, and where each one lives. RF-23 asks for
-# *any* field of a datum brought from the portal, not only the amounts — which
-# is why the description is here beside the price.
+
+class CorrectableField(NamedTuple):
+    """One field a person may correct: where it lives, and what it is called.
+
+    `label` is the Spanish word for the field, and it rides in this table
+    rather than in a second map beside it. A field added without its word
+    would be a refusal that reaches the screen naming a database column, and
+    two tables that have to agree only find out they stopped agreeing on the
+    morning somebody reads the message.
+
+    **The vocabulary is this module's own, and duplicated on purpose.** The
+    browser says these same three words and so does the nightly alert, each
+    from its own copy. Moving them to `shared/` would put the column names of
+    `catalog` in the kernel, which is where no module's schema belongs
+    (`GEN-03`), and reading somebody else's copy is the import the boundary
+    forbids (`GEN-02`). What has to agree between the three is the word — and
+    the word for a column of `catalog` is `catalog`'s to say.
+
+    Today the three say the same three words, and nothing checks that they
+    still will: the drift argued against one paragraph up is exactly the one
+    left open here. The check belongs beside the static frontend rules already
+    in `backend/tests/architecture/`; until it is written, the agreement holds
+    by eye.
+    """
+
+    entity_type: str
+    numeric: bool
+    label: str
+
+
+# Which fields a person may correct, where each one lives, and what it is
+# called in Spanish. RF-23 asks for *any* field of a datum brought from the
+# portal, not only the amounts — which is why the description is here beside
+# the price.
 #
 # `code` is deliberately absent. It is the supplier's own identifier, the key
 # the daily list is matched by: "correcting" it would silently detach the
 # product from every list that follows, which is not a correction but a
 # different product.
-CORRECTABLE_FIELDS: dict[str, tuple[str, bool]] = {
-    DESCRIPTION_FIELD: (PRODUCT_ENTITY, False),
-    PRICE_FIELD: (PRICE_ENTITY, True),
-    CURRENCY_FIELD: (PRICE_ENTITY, False),
+CORRECTABLE_FIELDS: dict[str, CorrectableField] = {
+    DESCRIPTION_FIELD: CorrectableField(PRODUCT_ENTITY, False, "descripción"),
+    PRICE_FIELD: CorrectableField(PRICE_ENTITY, True, "precio"),
+    CURRENCY_FIELD: CorrectableField(PRICE_ENTITY, False, "moneda"),
 }
 
 # Prices and the product catalog belong to sales in the map of roles, so that
@@ -1267,14 +1317,38 @@ class CatalogService:
 
     @staticmethod
     def _correctable(field: str) -> tuple[str, bool]:
-        """Where a field lives and whether it holds a number, or refuse it."""
+        """Where a field lives and whether it holds a number, or refuse it.
+
+        This is the one refusal that echoes the name it was handed: a field
+        the module does not have has no word in its vocabulary to answer with.
+        What it can do is name, in Spanish, the fields it does have — the list
+        was only in `details` before, which no one reading the sentence ever
+        sees (`ERR-02`). The words come out sorted rather than in the table's
+        order, so the list a person reads does not quietly rearrange itself the
+        day somebody moves a row of `CORRECTABLE_FIELDS`.
+        """
         target = CORRECTABLE_FIELDS.get(field)
         if target is None:
+            offered = ", ".join(sorted(entry.label for entry in CORRECTABLE_FIELDS.values()))
             raise ValidationError(
-                f"«{field}» no es un campo que se pueda corregir.",
+                f"«{field}» no es un campo que se pueda corregir. Se pueden corregir: {offered}.",
                 details={"field": field, "correctable": sorted(CORRECTABLE_FIELDS)},
             )
-        return target
+        return target.entity_type, target.numeric
+
+    @staticmethod
+    def _field_label(field: str) -> str:
+        """The word a person reads for a field, or the field's own name.
+
+        A refusal names the datum it is about, and the person who typed the
+        value knows «precio», not `price` (Artículo VIII). The fallback to the
+        code is unreachable through the correction path — everything that gets
+        this far went through `_correctable` first — and it is there so a
+        future caller gets a sentence naming the wrong word rather than a
+        `KeyError` naming nothing.
+        """
+        entry = CORRECTABLE_FIELDS.get(field)
+        return field if entry is None else entry.label
 
     @staticmethod
     def _reason(reason_code: str) -> CorrectionReason:
@@ -1326,7 +1400,10 @@ class CatalogService:
         the text that never parsed and the text that parsed into something not
         finite — and each wants its own `from`.
         """
-        return ValidationError(f"«{field}» tiene que ser un número.", details={"field": field})
+        return ValidationError(
+            f"«{CatalogService._field_label(field)}» tiene que ser un número.",
+            details={"field": field},
+        )
 
     @staticmethod
     def _as_text(value: Any, field: str, *, limit: int | None = None) -> str:
@@ -1345,7 +1422,10 @@ class CatalogService:
         as a 500 (ERR-06).
         """
         if not isinstance(value, str):
-            raise ValidationError(f"«{field}» tiene que ser texto.", details={"field": field})
+            raise ValidationError(
+                f"«{CatalogService._field_label(field)}» tiene que ser texto.",
+                details={"field": field},
+            )
         text = value.strip()
         if not text:
             raise ValidationError(
@@ -1353,7 +1433,7 @@ class CatalogService:
             )
         if limit is not None and len(text) > limit:
             raise ValidationError(
-                f"«{field}» no puede superar los {limit} caracteres.",
+                f"«{CatalogService._field_label(field)}» no puede superar los {limit} caracteres.",
                 details={"field": field, "max_length": limit},
             )
         return text

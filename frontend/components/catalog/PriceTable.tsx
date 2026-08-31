@@ -9,6 +9,23 @@ interface PriceTableProps {
 }
 
 /**
+ * What a correction carries, narrowed to what `formatPrice` can read.
+ *
+ * The generated schema types these values `unknown`, and rightly: a correction
+ * row holds whatever the field it corrects held, and the same column serves a
+ * price, a currency and a description. `formatPrice` takes an amount, so the
+ * question gets asked instead of asserted — asserting `as string` would promise
+ * the compiler a shape nothing checked, and the day the API sends anything else
+ * the table writes «$ NaN» where a price should be: `Number.isNaN` does not
+ * coerce, so whatever arrived walks straight past the formatter's own guard and
+ * into `Intl`. Asked, it renders the «—» that guard reserves for a value it
+ * cannot read.
+ */
+function amount(value: unknown): string | number | null {
+  return typeof value === 'string' || typeof value === 'number' ? value : null
+}
+
+/**
  * The price list in force (RF-04).
  *
  * A Server Component: it renders data and has no interactivity of its own, so
@@ -81,13 +98,23 @@ export function PriceTable({ items }: PriceTableProps) {
                       No vino en la última lista
                     </span>
                   )}
+                  {/*
+                    Keyed by the field, and the row cannot carry two marks of
+                    one: the backend's `CORRECTABLE_FIELDS` maps each field to
+                    exactly one entity, and the database holds a partial unique
+                    index over `(entity_type, entity_id, field)` covering every
+                    correction that is not `REVERTED` — which is precisely the
+                    set `corrections_in_force` selects. A second mark for the
+                    same field is not something this list happens not to see: it
+                    is a row the database will not accept.
+                  */}
                   {contradicted.map(mark => (
                     <span
                       className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900"
                       key={mark.field}
                     >
                       {mark.field === 'price'
-                        ? `El portal informa ${formatPrice(mark.conflict_value as string)}`
+                        ? `El portal informa ${formatPrice(amount(mark.conflict_value))}`
                         : `El portal informa otra ${FIELD_NOUNS[mark.field] ?? mark.field}`}
                     </span>
                   ))}
@@ -97,7 +124,7 @@ export function PriceTable({ items }: PriceTableProps) {
                   {corrected && (
                     <span className="block text-xs font-normal text-muted-foreground">
                       Corregido a mano · el portal decía{' '}
-                      {formatPrice(corrected.portal_value as string)}
+                      {formatPrice(amount(corrected.portal_value))}
                     </span>
                   )}
                 </td>

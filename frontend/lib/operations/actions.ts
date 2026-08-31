@@ -32,8 +32,19 @@ export interface ManualAction {
   readonly description: string
   /** Where it is done. The action itself lives on that screen. */
   readonly href: string
-  /** The section its route demands, and whether it demands the level to write. */
+  /** The section its route demands. */
   readonly section: Section
+  /**
+   * Whether that route demands the level to write, or only the level to see.
+   *
+   * Every action declared below writes, and that is not an accident of the
+   * list: what RF-20 gathers here are loads and corrections, and there is no
+   * such thing as a correction somebody may only look at. `false` is therefore
+   * unused today and is still the right thing to declare — the level an action
+   * demands is the action's to say, and one that only reads (a list to export,
+   * a receipt to print again) belongs on this screen too. It would be offered
+   * to whoever reaches the section without the level to change anything in it.
+   */
   readonly writes: boolean
 }
 
@@ -144,7 +155,19 @@ export const MANUAL_ACTIONS: readonly ManualAction[] = [
   },
 ]
 
-/** The actions this person may actually run, in the order they are declared. */
+/**
+ * The actions this person may actually run, in the order they are declared.
+ *
+ * The `canSee` half is unreached while every action above writes (see
+ * `writes`), and it stays because it is half of the rule, not a leftover: an
+ * action asks for the level its own route asks for, so a reading one lands
+ * already offered to the right people instead of arriving with a filter to fix.
+ *
+ * `tests/architecture/test_manual_actions.py` pins this expression exactly, and
+ * that is deliberate: swapping the two would leave every test about who is
+ * offered what green while the screen offered a writing action to somebody the
+ * route then refuses. Rewriting the filter means editing that test on purpose.
+ */
 export function actionsFor(permissions: Permissions): ManualAction[] {
   return MANUAL_ACTIONS.filter(action =>
     action.writes ? canEdit(permissions, action.section) : canSee(permissions, action.section)

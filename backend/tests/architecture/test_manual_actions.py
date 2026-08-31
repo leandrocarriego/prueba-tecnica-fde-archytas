@@ -35,6 +35,18 @@ So the questions this file asks are the ones the matrix answers:
    screen is not there is a dead card that still counts as "purchasing has
    something".
 
+What none of them asks is the sentence the registry opens with: that the section
+a row declares is the one **its route** already demands. Nothing derives one
+from the other — the `href` is a page and not an endpoint, and the endpoint is
+reached through a Server Action whose name no field of the row carries. Checking
+it would mean pulling the path out of each of those functions, matching it
+against the route table and reading the section back off the dependency: three
+hops of parsing, and only over the rows whose function is written down below,
+which is four of the thirteen. A rule that covers a third of the registry and
+reads as if it covered all of it is the shape this file already failed in, so
+the hole is written here rather than half-built. When this was written the four
+rows of 003 named the section their route demands; nothing keeps them naming it.
+
 And two more about the code rather than the registry: that the screen filters
 by the session instead of listing the actions itself, and that `actionsFor()`
 asks `canEdit` for a writing action and `canSee` for a reading one. That last
@@ -66,7 +78,7 @@ file. Adding an action and forgetting this test is no longer possible; the only
 thing that was ever possible before is exactly what happened three times.
 
 The registry is shared by every feature and RF-22 belongs to 003's spec, so the
-nine rows that arrived with 004 to 010 are answered «another feature's» instead
+nine rows that arrived with 004 to 009 are answered «another feature's» instead
 of being judged here. That is a skip that is written down, counted, and
 impossible to mistake for a row nobody thought about.
 
@@ -429,7 +441,7 @@ EXECUTED_BY = {
 # file from failing code it has no business judging.
 #
 # The registry is shared: thirteen rows today, four of them 003's and nine that
-# arrived with 004 to 010. RF-22 is a requirement of **003's** spec and this
+# arrived with 004 to 009. RF-22 is a requirement of **003's** spec and this
 # file is the gate that reads it, so judging the other nine here would put
 # another feature's components in red inside this feature's suite — components
 # still being written, whose own spec may answer «se aplicó» somewhere this file
@@ -455,14 +467,14 @@ ANOTHER_FEATURES = frozenset(
 )
 
 # What this section does **not** decide, written down because a gap nobody wrote
-# down is how RF-22 got missed twice: whether a successful run leaves the
-# component mounted. Nothing in the source answers it — `router.refresh()`
-# re-renders the page, and whether the component survives depends on whether the
-# refreshed page still lists the row it hangs off. `RevertCorrectionButton` does
-# not survive its own success and announces to the toaster for that reason — a
-# judgement made by whoever wrote it, which this file cannot check. What it
-# checks is the half that is written down: a verdict kept in the component's own
-# state is rendered by everything that component can put on screen.
+# down is the same mistake again: whether a successful run leaves the component
+# mounted. Nothing in the source answers it — `router.refresh()` re-renders the
+# page, and whether the component survives depends on whether the refreshed page
+# still lists the row it hangs off. `RevertCorrectionButton` does not survive its
+# own success and announces to the toaster for that reason — a judgement made by
+# whoever wrote it, which this file cannot check. What it checks is the half
+# that is written down: a verdict kept in the component's own state is rendered
+# by everything that component can put on screen.
 FRONTEND = REPOSITORY_ROOT / "frontend"
 COMPONENTS = FRONTEND / "components"
 APP = FRONTEND / "app"

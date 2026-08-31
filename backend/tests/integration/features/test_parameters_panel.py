@@ -603,12 +603,17 @@ class TestWhatTheScreenCanTellApart:
     """RF-05 and the distinction between a knob that moves something and one that does not.
 
     The panel says, per parameter, whether some built functionality reads it.
-    It mattered while five of them were waiting for their feature; since 004 to
-    009 landed, **every** parameter of the catalog is consumed by somebody. So
-    what is asserted here is the rule and not the census: `has_effect` is never
-    an opinion of its own — it is exactly whether a module was named — and a
-    parameter added tomorrow without a consumer shows up marked, instead of
-    offering the owner a knob that moves nothing.
+    The rule comes first: `has_effect` is never an opinion of its own — it is
+    exactly whether a module was named — so a parameter still waiting for its
+    feature shows up marked instead of offering the owner a knob that moves
+    nothing.
+
+    The census is asserted too, and deliberately, because that is where the lie
+    hides. A `consumed_by` is a claim about code somewhere else, and nothing
+    but a test makes it answer for itself: `due_date.notice_days` named
+    `purchases` from 004 to 009 while no line of `purchases` ever read the key.
+    So the parameters that move nothing are pinned by name here, and the next
+    consumer declared ahead of its reader fails on this file.
     """
 
     async def test_every_parameter_says_what_changes_if_it_moves(
@@ -632,15 +637,25 @@ class TestWhatTheScreenCanTellApart:
     async def test_the_panel_names_the_module_that_reads_each_parameter(
         self, owner_client: AsyncClient
     ) -> None:
-        """Named one by one: the owner is told *what* obeys the knob they move."""
+        """Named one by one: the owner is told *what* obeys the knob they move.
+
+        Spelled out rather than derived from the key, because the two do not
+        have to agree in either direction. `price_update.interval_hours` is
+        read by `operations` — `catalog`'s handler filters it out — and
+        `due_date.notice_days` is read by nobody at all, though both its name
+        and the plan of 003 pointed at the calendar of due dates. A check that
+        trusted the prefix would have blessed both names.
+        """
         # Act
         panel = by_key((await owner_client.get(PANEL)).json())
 
         # Assert
         assert panel[INTERVAL]["has_effect"] is True
-        assert panel[INTERVAL]["consumed_by"] == "catalog"
-        assert panel[NOTICE_DAYS]["has_effect"] is True
-        assert panel[NOTICE_DAYS]["consumed_by"] == "purchases"
+        assert panel[INTERVAL]["consumed_by"] == "operations"
+        assert panel[IDLE_MINUTES]["has_effect"] is True
+        assert panel[IDLE_MINUTES]["consumed_by"] == "identity"
+        assert panel[NOTICE_DAYS]["has_effect"] is False
+        assert panel[NOTICE_DAYS]["consumed_by"] == ""
 
     async def test_the_two_classes_agree_with_each_other_everywhere(
         self, owner_client: AsyncClient
@@ -651,10 +666,12 @@ class TestWhatTheScreenCanTellApart:
 
         # Assert
         assert all(parameter["has_effect"] is bool(parameter["consumed_by"]) for parameter in panel)
-        # Today that means every one of them: there is no parameter left whose
-        # feature has not been built. The rule above is what keeps the panel
-        # honest the next time one is added ahead of its feature.
-        assert all(parameter["has_effect"] for parameter in panel)
+        # And exactly which ones move nothing, by name. `due_date.notice_days`
+        # is the only one left: 006 built the notice around the missing receipt
+        # and reads `receipt.notice_days` instead. A list and not a count, so
+        # the day a parameter is declared consumed without a reader — or the
+        # day this one finally gets one — the row that changed is named here.
+        assert [row["key"] for row in panel if not row["has_effect"]] == [NOTICE_DAYS]
 
 
 @pytest.mark.integration
@@ -662,11 +679,12 @@ class TestWhatTheScreenCanTellApart:
 class TestAChangeTakesEffectOnItsOwn:
     """RF-07: the new value governs without anybody doing anything else.
 
-    Two of the three parameters that have a consumer today are read by
-    `catalog`, inside the same request path. The third, the idle timeout, is
-    read by `identity` — another module — and therefore only ever arrives by
-    event. That is the crossing that can break silently, so it is tested here
-    end to end rather than by checking that the row was written.
+    Two roads, and only one of them can break in silence. The interval is read
+    inside this process — `OperationsService.due_for_update` asks the parameter
+    on every decision — so the new value governs as soon as the `PUT` commits.
+    The idle timeout is read by `identity`, another module, and therefore only
+    ever arrives as `BusinessParameterChanged`. That crossing is the one tested
+    here end to end, rather than by checking that a row was written.
     """
 
     @pytest.mark.usefixtures("an_update_six_hours_ago")

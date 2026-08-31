@@ -463,8 +463,13 @@ class OperationsService:
         """The history of manual changes, newest first (RF-13, RF-14, RF-18, RF-19).
 
         `sections` is the caller's own reach, resolved by `identity`, and it is
-        applied to the query rather than checked afterwards: the owner passes
-        `None` and sees everything, everybody else sees their sections only.
+        applied to the query rather than checked afterwards — the difference
+        between a row that never loads and a row that loads and is then hidden.
+
+        Over HTTP it always arrives spelled out: the owner's role reaches every
+        section, so the owner asks for all of them rather than for `None`.
+        `None` means no section filter at all, and belongs to a caller inside
+        the process that has no reach to respect; no route passes it.
         """
         entries = await self.audit.list(
             skip=skip,

@@ -78,8 +78,14 @@ class Parameter(Base):
 
     Thresholds, schedules and tolerances belong to the business, not to the
     source code. The value is JSONB so a parameter can be a number, a flag or
-    a small structure without a migration per setting; `description` is what
-    the owner reads next to the field.
+    a small structure without a migration per setting.
+
+    `description` is **not** what the owner reads. Since the catalog exists
+    (`app/shared/parameters.py`), the screen is drawn from `ParameterSpec`, and
+    `set_parameters` copies the catalog's label in here on every write only so a
+    `psql` session reading this table sees the same sentence the owner does.
+    Nothing reads the column back, and nothing should: a second sentence is a
+    second source, and the day they disagree the table would be lying.
     """
 
     __tablename__ = "parameter"

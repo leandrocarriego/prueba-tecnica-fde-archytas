@@ -61,11 +61,24 @@ class TestWhichFieldsCanBeCorrected:
             CatalogService._correctable("code")
 
     def test_an_unknown_field_says_which_ones_there_are(self) -> None:
+        """And says it in the message, not only in `details`.
+
+        `details` is read by code; the sentence is read by the person who was
+        just refused, and a refusal that will not say what *is* allowed sends
+        them back to guess (`ERR-02`).
+
+        The order is pinned because it used to be the table's: the sentence
+        listed the fields as `CORRECTABLE_FIELDS` happens to declare them, so
+        moving a row rewrote a message a person reads.
+        """
         # Act / Assert
         with pytest.raises(ValidationError) as refusal:
             CatalogService._correctable("descuento")
 
         assert refusal.value.details["correctable"] == sorted(CORRECTABLE_FIELDS)
+        for entry in CORRECTABLE_FIELDS.values():
+            assert entry.label in refusal.value.message
+        assert "descripción, moneda, precio" in refusal.value.message
 
 
 @pytest.mark.unit
@@ -158,7 +171,7 @@ class TestWhatCountsAsAnAmount:
         with pytest.raises(ValidationError) as refusal:
             CatalogService._as_number("mil quinientos", "price")
 
-        assert refusal.value.message == "«price» tiene que ser un número."
+        assert refusal.value.message == "«precio» tiene que ser un número."
 
     @pytest.mark.parametrize("value", ["nan", "snan", "-nan", "inf", "-Infinity"])
     def test_a_value_that_is_not_finite_is_refused_like_any_other(self, value: str) -> None:
@@ -175,7 +188,7 @@ class TestWhatCountsAsAnAmount:
 
         # The refusal has to be *this* one and not some later accident: the
         # message is what tells the person what to type instead.
-        assert refusal.value.message == "«price» tiene que ser un número."
+        assert refusal.value.message == "«precio» tiene que ser un número."
         assert refusal.value.details["field"] == "price"
 
     @pytest.mark.parametrize("value", ["-1", "-0.01", -1500])
@@ -281,3 +294,39 @@ class TestThePriceSomebodyTypedResolvingACase:
         assert _price_of({"price": "1234.50"}) == Decimal("1234.50")
         assert _price_of({"price": 0}) == Decimal("0")
         assert _price_of({}) is None
+
+
+@pytest.mark.unit
+class TestTheWordsARefusalUses:
+    """A refusal is read by whoever typed the value, and they read Spanish.
+
+    The field names are columns — `price`, `description` — and a sentence in
+    Spanish that names one of them is asking the person to know the schema
+    (Artículo VIII, `ERR-02`). The word travels with the field itself, so a
+    field cannot be added without one.
+    """
+
+    def test_every_correctable_field_is_named_in_spanish(self) -> None:
+        # Assert
+        assert [entry.label for entry in CORRECTABLE_FIELDS.values()] == [
+            "descripción",
+            "precio",
+            "moneda",
+        ]
+
+    def test_a_text_refusal_names_the_field_the_way_the_person_does(self) -> None:
+        # Act / Assert
+        with pytest.raises(ValidationError) as refusal:
+            CatalogService._as_text(None, "description")
+
+        assert refusal.value.message == "«descripción» tiene que ser texto."
+        assert refusal.value.details["field"] == "description"
+
+    def test_a_text_too_long_for_its_column_says_so_in_spanish_too(self) -> None:
+        """The limit is the column's, and the sentence is the person's."""
+        # Act / Assert
+        with pytest.raises(ValidationError) as refusal:
+            CatalogService._as_text("Tornillo hexagonal", "description", limit=5)
+
+        assert refusal.value.message == "«descripción» no puede superar los 5 caracteres."
+        assert refusal.value.details == {"field": "description", "max_length": 5}

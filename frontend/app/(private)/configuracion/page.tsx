@@ -17,8 +17,14 @@ export const metadata = {
  *
  * The list is the backend's — it is drawn from the catalog that also validates
  * the ranges, so what the screen offers and what the API accepts cannot drift
- * apart. Including the honest part: five of the seven are not read by anything
- * yet, and each of those says so out loud rather than pretending to be a knob.
+ * apart. Including the honest part: a parameter nothing reads yet is shown
+ * saying so instead of pretending to be a knob.
+ *
+ * How many of those there are is not written down here, on purpose. It is the
+ * catalog's answer and it changes every time a feature lands — this comment
+ * used to carry a number, and it was wrong twice: first counting a parameter
+ * that was already being read, and then counting at all. The banner below asks
+ * `has_effect` on every render, which is the only count that cannot go stale.
  *
  * The gate is the endpoint. `GET /operations/parameters` is owner-only, so
  * anybody else is refused and lands on the refusal below — hiding a link was

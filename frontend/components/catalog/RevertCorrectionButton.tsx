@@ -34,6 +34,14 @@ import { useToast } from '@/components/ui/toast'
  * can afford, because it is rendered whether or not there is anything left to
  * correct — would be this same defect again: a message written where nobody
  * will be around to read it.
+ *
+ * Both halves reach a screen reader, and by different means. The success is
+ * sonner's problem and sonner already solves it: its `<Toaster />` is a
+ * `aria-live="polite"` region that outlives every toast put into it. The
+ * refusal is this component's, so the region it goes into is declared here and
+ * stays on the page empty — a live region that appears together with its first
+ * message is announced by some readers and skipped by others, and a person who
+ * cannot see the red text is left pressing a button that does nothing.
  */
 export function RevertCorrectionButton({ correctionId }: { correctionId: number }) {
   const router = useRouter()
@@ -68,7 +76,9 @@ export function RevertCorrectionButton({ correctionId }: { correctionId: number 
       >
         {working ? 'Deshaciendo…' : 'Volver al valor del portal'}
       </button>
-      {error && <span className="text-sm text-red-700">{error}</span>}
+      <span aria-live="polite" className="text-sm text-red-700" role="status">
+        {error ?? ''}
+      </span>
     </span>
   )
 }

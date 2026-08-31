@@ -9,28 +9,43 @@
 
 ## Estado
 
-**Implementadas el 2026-08-30**, en la rama `feat/003-system-control`.
+**Implementadas el 2026-08-30**, en la rama `feat/003-system-control`, y **mergeadas a `main` en el
+PR #20** (`a2d7201`).
 
 - ✅ **30 de 30** — 25 del `Developer` y 5 del `Tester`, las cinco historias completas.
-- ✅ **11 defectos** que la suite destapó, todos arreglados. Están en **Los once defectos que
+- ✅ **10 defectos** que la suite destapó, todos arreglados. Están en **Los diez defectos que
   encontró la suite**, más abajo, con su arreglo.
 
-Suite: **879 passed · 1 skipped · 0 xfailed**, cobertura 95.25%. `ruff`, `mypy`, `alembic check`,
-`tsc`, `eslint` y `prettier`, limpios.
+La suite del día del merge: **879 passed · 1 skipped · 0 xfailed**, cobertura 95.25%.
 
-> **Dónde quedó la cadena (2026-08-30).** La implementación y los tests están terminados y
-> verificados. **Faltan los dos gates del final**, y ninguno corrió:
+> **Dónde quedó la cadena (reescrito el 2026-08-30, ya con los dos gates corridos).** Esta sección
+> decía que faltaban los dos gates del final y que la rama no tenía ni un commit. Las dos cosas
+> dejaron de ser ciertas el mismo día, y lo que sigue es lo que pasó después — que es la parte que
+> le sirve a quien llegue mañana.
 >
-> - **`/converge`** (`Lead`) — se lanzó dos veces y no se completó ninguna: la primera murió con
->   los diez agentes en el límite de sesión, la segunda se cortó a propósito por presupuesto. **No
->   hay tabla de trazabilidad ni veredicto.** Que la suite pase no lo reemplaza: el converge no
->   pregunta si el código funciona, pregunta si es lo que el cliente firmó.
-> - **`/review-feature`** (`Code-Reviewer`) — no se lanzó. Por la cadena de `AGENTS.md` no puede
->   arrancar sin el veredicto del converge.
+> - **`/converge`** (`Lead`) — corrió y dejó su informe en [`converge.md`](converge.md). Veredicto
+>   **🔴 deriva mayor**: 45 hallazgos, 7 mayores y 38 menores, sobre una feature que **ya estaba
+>   mergeada**, así que lo que el veredicto movió no fue si entraba sino qué había que resolver
+>   antes de desplegar y archivar. Los siete mayores eran cuatro problemas; el humano eligió
+>   implementar en vez de enmendar la spec, y los cerró `e5eb56f` junto con dos más que aparecieron
+>   al cerrarlos.
+> - **`/review-feature`** (`Code-Reviewer`) — corrió después del converge y devolvió **1 Blocker,
+>   13 Major y 34 Minor**.
+>   - El **Blocker** es el que más caro salía, y ningún test lo veía: `apply_correction` y
+>     `revert_correction` flusheaban, publicaban y **nunca commiteaban**, así que las dos rutas de
+>     escritura que existen para H4 y H5 contestaban 200 y no persistían nada. Lo cerró `c7c7f68`,
+>     con el test estático que recorre todos los verbos de escritura del repositorio y falla si el
+>     servicio detrás de uno escribe sin commitear.
+>   - Los **13 Major** eran ocho defectos vistos por reviewers distintos. Los cerró `9d413fe`.
+>   - Los **34 Minor** son el último tramo: hallazgos chicos, uno por uno, y es lo que cierran esta
+>     página y los diagramas.
 >
-> Además, **la rama no tiene commits**: las 83 entradas del changeset están sin commitear en el
-> working tree. `/ship` es del `Release-Manager` y todavía no corresponde, pero el trabajo está
-> sin respaldo hasta que alguien lo commitee.
+> Suite medida hoy con `make quality`, que es de donde sale `backend/app/quality.json` y la pantalla
+> de estado: **1389 passed · 8 skipped**, cobertura 89.61% — más tests y menos cobertura que el día
+> del merge porque el repositorio creció con las features que vinieron detrás, no porque la 003 haya
+> perdido nada. `ruff`, `mypy`, `tsc` y `prettier`, limpios en `9d413fe`. El número describe el árbol
+> de este momento, que varios frentes comparten: **se vuelve a medir antes de shippear, no se
+> tipea**.
 
 Lo que se desvió de lo planificado y por qué está en **Desvíos de la implementación**, al final.
 
@@ -102,20 +117,28 @@ migración → backend → frontend → tests.
 | ✅ 29 | Frontend: la acción de anular, alcanzable desde el historial y **ausente** sobre un dato cargado enteramente a mano. | `add_frontend_feature` | Developer | RF-30, RF-33 |
 | ✅ 30 | Tests de H5: que restituya el valor del portal y **no** el anterior después de dos correcciones seguidas, y que anular sobre un dato sin corrección falle limpio. | `add_tests` | Tester | RF-30, RF-31, RF-32, RF-33 |
 
-## Los once defectos que encontró la suite
+> **La tarea 29 planificó una pantalla y la implementación eligió otra.** El ✅ es de la acción, no
+> del lugar: anular existe y está restringida al dueño, pero **no** se llega desde el historial —se
+> llega desde la pantalla del dato corregido, que es donde está el valor que se restituye—. El texto
+> planificado se deja como está, porque es lo que se planificó; `diagrams/flujo-dueno.mmd` ya dice
+> dónde quedó. La spec firmada sigue pidiendo «desde el historial» en el criterio de aceptación de
+> RF-30, y por eso [`converge.md`](converge.md) marca ese requisito **🟡 Parcial**: la deriva está
+> abierta y la cierra el humano —moviendo la acción o enmendando la spec—, no esta página.
 
-Ninguno lo encontró una revisión de código: los once los encontró **escribir el test que el
+## Los diez defectos que encontró la suite
+
+Ninguno lo encontró una revisión de código: los diez los encontró **escribir el test que el
 requisito pedía**. El `Tester` no arregló ninguno —su rol no le permite tocar `app/` ni
 `frontend/`— y los dejó demostrados con `@pytest.mark.xfail(strict=True)`. `strict` es lo que hizo
 que el traspaso funcionara solo: cuando el `Developer` arregló cada uno, el test pasó, y un `xfail`
 que pasa **rompe la suite** hasta que alguien le saca el marcador. El aviso no dependió de que
 nadie se acordara.
 
-Los cuatro primeros salieron al escribir la suite; los tres siguientes, al corregirla; los dos
-últimos no los encontró ningún test que falle, sino la pregunta de completitud contra los 33
-requisitos.
+Los cuatro primeros salieron al escribir la suite; los del medio, al corregirla; los dos últimos no
+los encontró ningún test que falle, sino la pregunta de completitud contra los 33 requisitos.
 
-**Todos arreglados el 2026-08-30.** Suite: **879 passed · 1 skipped · 0 xfailed**, cobertura 95.25%.
+**Todos arreglados el 2026-08-30**, antes del merge. La suite de ese día: **879 passed · 1 skipped ·
+0 xfailed**, cobertura 95.25%.
 
 | # | Defecto | Arreglo | Requisitos |
 |---|---------|---------|------------|
@@ -135,6 +158,11 @@ requisito tiene quien lo demuestre. No lo veía nadie porque la suite arma el es
 `Base.metadata.create_all()` y **no ejecuta alembic en ningún lado**, así que el hueco de test
 tapaba un defecto de producción. El test que lo cierra lee el fuente de las migraciones y lo
 compara contra el catálogo.
+
+Y la simetría, que se escribe acá para que la página no se lea como que la suite alcanzó: **la
+revisión de código encontró después lo que la suite no veía** —el Blocker de las dos rutas que
+contestaban 200 sin commitear, y los ocho defectos detrás de los 13 Major—. Están en **Estado**,
+arriba, con el commit que cerró cada grupo. Ninguna de las dos formas de mirar reemplaza a la otra.
 
 ## Lo que quedó anotado para después
 
@@ -165,6 +193,11 @@ correspondía arreglar, anotadas acá para que no se pierdan.
 - **`CorrectionConflicted` no lleva `code` ni `description`**, así que el aviso del defecto 8
   identifica el producto por su id interno y no como lo lee el dueño. Ampliar el evento es la
   salida correcta; leer la tabla de `catalog` desde `notifications` no lo es (Artículo IV).
+- **`diagrams/flujo-general.mmd` deja abierta la ambigüedad que `flujo-dueno.mmd` cerró.** Pone
+  «Deja sin efecto una corrección» inmediatamente después de «Abre el historial y filtra por persona
+  y fechas», que es la vecindad que sugiere que se anula desde el historial. No nombra una pantalla,
+  así que no afirma nada falso, pero ahora los dos diagramas de la misma feature no dicen lo mismo.
+  **Queda para el frente que lo tenga asignado**: no se tocó acá porque es archivo de otro.
 - **`npx next lint` ya no existe en Next 16.** El comando quedó viejo en la documentación; lo que
   corre el repositorio es `npm run lint`.
 

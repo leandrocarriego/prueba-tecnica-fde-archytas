@@ -22,6 +22,7 @@ stateDiagram-v2
     [*] --> Portal: lo trae el portal
     [*] --> Manual: lo carga una persona
     Manual --> Manual: se modifica con un motivo, conservando el valor anterior
+    Manual --> Portal: la lista diaria informa ese mismo dato, y desde esa mañana el valor es del portal
     Portal --> Corregido: una persona de esa sección lo corrige, con un motivo
     Corregido --> Conflicto: el portal informa un valor distinto del original
     Conflicto --> Corregido: una persona lo corrige otra vez
@@ -52,8 +53,13 @@ stateDiagram-v2
     end note
 
     note right of Manual
-        No ofrece volver al valor del portal,
-        porque nunca vino de ahí
+        Mientras el portal no lo haya informado
+        no ofrece volver a su valor, porque no
+        hay a qué volver. Pero la pregunta se
+        hace por dato y no por producto: el
+        precio que tipeó una persona pasa a
+        ofrecerlo el día que la lista informa
+        ese producto
     end note
 ```
 
@@ -111,10 +117,15 @@ flowchart TD
     K --> L["Ve los cambios de las tres personas, de más nuevo a más viejo"]
     K --> M["Filtra por persona y por rango de fechas"]
     K --> N["De cada cambio lee el motivo por el que se hizo"]
-    K --> O["Deja sin efecto una corrección manual"]
+
+    A --> U["Pantalla del dato corregido"]
+    U --> V["Ve el valor corregido y, al lado, el que había informado el portal"]
+    U --> K2["Llega al historial de ese dato sin buscarlo en otra pantalla"]
+    K2 --> K
+    U --> O["Deja sin efecto la corrección, desde acá y no desde el historial"]
     O --> P["El dato vuelve a mostrar lo que informó el portal"]
     O --> Q["Queda registrado quién la anuló y cuándo"]
-    O --> R["Sobre un dato cargado enteramente a mano, esta opción no se ofrece"]
+    O --> R["Sobre un dato que el portal nunca informó no hay corrección que anular, y la opción no aparece"]
 
     S["El portal informa un valor distinto del original sobre un dato ya corregido"] --> T["Le llega el aviso, sin tener que estar mirando la pantalla"]
 ```

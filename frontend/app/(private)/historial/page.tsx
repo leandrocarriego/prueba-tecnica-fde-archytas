@@ -4,6 +4,7 @@ import { getSession } from '@/app/actions/auth'
 import { AuditTable } from '@/components/operations/AuditTable'
 import { readFromApi } from '@/lib/api/server'
 import type { components } from '@/lib/api/types'
+import { isKnownEntityType } from '@/lib/operations/audit'
 import type { AuditEntry, AuditEntryList } from '@/lib/operations/types'
 
 type UserList = components['schemas']['UserList']
@@ -60,6 +61,45 @@ function pageHref({ persona, desde, hasta }: SearchParams, page: number): string
 }
 
 /**
+ * An origin nobody dials, for resolving a path the way `fetch` is about to.
+ *
+ * The real one lives in `lib/api/server` and is of no consequence here: a URL
+ * is parsed the same way whatever it points at, and it is only the parsing
+ * this file needs to see.
+ */
+const RESOLUTION_ORIGIN = 'http://api.invalid'
+
+/**
+ * The API path for the history of one datum, or nothing if there is no such
+ * datum to ask about.
+ *
+ * Both halves arrive from the address bar, so both are text somebody can type,
+ * and neither used to be treated as such: interpolated straight into the path,
+ * a value carrying `../`, `?` or `#` rewrites the URL and sends this request —
+ * with the session of whoever is reading — at a different endpoint of the API.
+ *
+ * So each half is closed in the way its own shape allows. The kind is matched
+ * against the ones this screen can name (`isKnownEntityType`), because a kind
+ * it has no word for is a link it cannot answer, not a question worth asking.
+ * The identifier cannot be matched — each module writes it in its own shape, a
+ * product id here and a parameter key there — so it is escaped, and then the
+ * path it produced is resolved and compared with the one that was meant.
+ *
+ * That second step is not belt and braces: escaping alone does not close this.
+ * `.` and `..` are unreserved characters and come back from
+ * `encodeURIComponent` unchanged, and the URL parser collapses them while
+ * building the request — `?id=..` leaves for the listing endpoint, and the
+ * whole log comes back and is rendered under «Mostrando sólo los cambios de un
+ * dato». Comparing says it in one line, without this function having to keep a
+ * list of the spellings that mean "go up".
+ */
+function auditPathFor({ entidad, id }: SearchParams): string | null {
+  if (!entidad || !id || !isKnownEntityType(entidad)) return null
+  const path = `/operations/audit/${encodeURIComponent(entidad)}/${encodeURIComponent(id)}`
+  return new URL(path, RESOLUTION_ORIGIN).pathname === path ? path : null
+}
+
+/**
  * The un-paginated answer, read as the single page it is.
  *
  * The history of one datum is bounded by the datum, so the API answers it as a
@@ -85,6 +125,19 @@ function countLabel(page: AuditEntryList): string {
   return `Mostrando ${first}–${last} de ${page.total} cambios.`
 }
 
+/** The heading, which every shape of this screen carries. */
+function Header() {
+  return (
+    <header className="space-y-1">
+      <h1 className="text-2xl font-bold">Historial de cambios</h1>
+      <p className="text-sm text-muted-foreground">
+        Todo lo que alguien cargó o corrigió a mano, de lo más nuevo a lo más viejo. No se puede
+        editar ni borrar.
+      </p>
+    </header>
+  )
+}
+
 /**
  * Every manual change, and who made it (H2).
  *
@@ -105,8 +158,29 @@ export default async function HistoryPage({
   searchParams: Promise<SearchParams>
 }) {
   const filters = await searchParams
-  const session = await getSession()
   const ofOneDatum = Boolean(filters.entidad && filters.id)
+  const datumPath = auditPathFor(filters)
+
+  // One datum was asked for and the link cannot be answered: either the kind is
+  // not one this screen names, or the identifier would not stay a single path
+  // segment. Neither is an outage nor a history with nothing in it, and showing
+  // the whole log instead would answer a question nobody asked. Said before
+  // anything reaches the API, because there is nothing to ask it.
+  if (ofOneDatum && datumPath === null) {
+    return (
+      <main className="mx-auto max-w-6xl space-y-6 p-8">
+        <Header />
+        <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          El enlace pide el historial de un dato que esta pantalla no conoce.{' '}
+          <Link className="underline underline-offset-2" href="/historial">
+            Ver todo el historial
+          </Link>
+        </p>
+      </main>
+    )
+  }
+
+  const session = await getSession()
   const current = ofOneDatum ? 1 : pageFrom(filters.pagina)
   const skip = (current - 1) * PAGE_SIZE
 
@@ -118,20 +192,14 @@ export default async function HistoryPage({
   const people = ofOneDatum ? null : await readFromApi<UserList>('/users?limit=100')
   const roster = people !== null && people.ok ? people.data.items : null
 
-  const read = ofOneDatum
-    ? await readFromApi<AuditEntry[]>(`/operations/audit/${filters.entidad}/${filters.id}`)
+  const read = datumPath
+    ? await readFromApi<AuditEntry[]>(datumPath)
     : await readFromApi<AuditEntryList>(`/operations/audit?${queryFor(filters, skip)}`)
   const page = read.ok ? (Array.isArray(read.data) ? asPage(read.data) : read.data) : null
 
   return (
     <main className="mx-auto max-w-6xl space-y-6 p-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Historial de cambios</h1>
-        <p className="text-sm text-muted-foreground">
-          Todo lo que alguien cargó o corrigió a mano, de lo más nuevo a lo más viejo. No se puede
-          editar ni borrar.
-        </p>
-      </header>
+      <Header />
 
       {ofOneDatum ? (
         <p className="text-sm">
