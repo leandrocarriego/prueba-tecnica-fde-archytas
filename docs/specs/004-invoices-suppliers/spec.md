@@ -8,7 +8,11 @@
 -->
 
 **Estado:** Aprobado · **Feature:** 004-invoices-suppliers · **Fecha:** 2026-08-28
-**Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-29
+**Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-31
+
+**Segunda firma.** La primera fue el 2026-08-29 y quedó reabierta el 2026-08-31, cuando el criterio
+de RF-11 y la regla del CUIT se corrigieron para decir dónde está escrito ese número y cuándo llega
+la certeza que da. Esta firma cubre ese texto.
 
 <!-- `/approve-spec` completa Aprobada por y Fecha de aprobación, y pasa Estado a Aprobado. -->
 
@@ -206,9 +210,13 @@ con esa misma grafía entra directo, sin pasar por revisión.
   compensar es dar por bueno un dato dudoso.
 - **Ningún dato de una factura se completa por suposición.** Un total dudoso se pregunta; no se
   redondea, no se estima y no se deja en cero.
-- **El CUIT manda cuando está.** El cliente confirmó que algunas facturas lo traen y otras no: con
-  CUIT, reconocer al proveedor es una certeza; sin CUIT, se resuelve por el nombre contra el padrón,
-  y toda interpretación que no sea concluyente va a revisión humana.
+- **El CUIT manda cuando está, y llega con el archivo.** El cliente confirmó que algunas facturas lo
+  traen y otras no: con CUIT, reconocer al proveedor es una certeza; sin CUIT, se resuelve por el
+  nombre contra el padrón, y toda interpretación que no sea concluyente va a revisión humana. El
+  CUIT **no está en la lista de facturas del portal**: está impreso dentro del archivo de cada
+  factura, que se busca después de leer la lista. Así que esa certeza llega un rato más tarde que
+  la factura, y hasta entonces la factura queda apartada — pero se resuelve sola cuando el archivo
+  llega, sin que nadie la mire.
 - **El padrón son los ocho proveedores del portal.** El cliente confirmó que son ocho y que las
   condiciones de pago que publica el portal —30, 45 o 60 días— son las vigentes. Ese plazo entra como
   valor inicial de cada ficha y se corrige desde ahí.
@@ -252,7 +260,9 @@ con esa misma grafía entra directo, sin pasar por revisión.
 - [ ] **RF-08** — La pantalla de proveedores muestra los proveedores del padrón del portal.
 - [ ] **RF-09** — Cada factura procesada muestra a qué proveedor del padrón quedó asociada.
 - [ ] **RF-10** — Al abrir un proveedor se ven todas las formas en que llegó escrito su nombre.
-- [ ] **RF-11** — Una factura que trae CUIT queda asociada a su proveedor sin pasar por revisión.
+- [ ] **RF-11** — Una factura que trae el CUIT del proveedor queda asociada a ese proveedor
+      **sin que nadie tenga que resolverla a mano**: queda apartada hasta que llega su archivo,
+      que es donde el CUIT está escrito, y ahí el sistema la resuelve solo.
 - [ ] **RF-12** — Una factura sin CUIT, con un nombre que corresponde sin dudas a un proveedor del padrón, queda asociada a ese proveedor.
 - [ ] **RF-13** — Una factura con un nombre que podría ser de dos proveedores queda apartada.
 - [ ] **RF-14** — Una factura de un proveedor que no está en el padrón no crea un proveedor nuevo ni deja darlo de alta desde la revisión: queda apartada, y el motivo dice que el proveedor no está en el padrón.

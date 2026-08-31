@@ -2,35 +2,52 @@
 title: El sistema — qué hace con cada factura que trae del portal
 ---
 flowchart TD
-    A["Con la frecuencia configurada, entra al portal y trae las facturas de compra"] --> B["Conserva el archivo de cada una tal como llegó"]
-    B --> C{"¿Qué formato tiene el archivo?"}
-    C -->|PDF con texto| D["Lee número, fecha, proveedor y total"]
-    C -->|Imagen escaneada| D
-    C -->|Planilla| D
-    C -->|Una forma que no reconoce| E["La aparta para revisión, sin frenar a las demás"]
+    A["Con la frecuencia configurada, entra al portal y trae la lista de facturas de compra"] --> B["Lee de la lista el número, la fecha, el proveedor y el total de cada una"]
+    B --> C{"¿La fila se pudo interpretar?"}
+    C -->|No| D["La aparta para revisión, sin frenar a las demás"]
 
-    D --> F["Anota, dato por dato, si lo obtuvo con certeza o le quedó en duda"]
-    F --> G{"¿Algún dato quedó en duda?"}
-    G -->|Sí| E
-    G -->|No| H{"¿La factura trae el CUIT del proveedor?"}
+    C -->|Sí| E["Busca el nombre del proveedor contra el padrón de ocho"]
+    E --> F{"¿La grafía ya fue asignada antes por una persona?"}
+    F -->|Sí| G["Queda asociada a ese proveedor"]
+    F -->|No, y el nombre corresponde sin dudas| G
+    F -->|No, y el nombre podría ser de dos| H["La aparta: no se puede saber de quién es"]
+    F -->|No está en el padrón| I["La aparta indicando que el proveedor no está en el padrón"]
 
-    H -->|Sí| I["Identifica al proveedor por su CUIT"]
-    H -->|No| J["Busca el nombre contra el padrón de ocho proveedores"]
-    J --> K{"¿La grafía ya fue asignada antes por una persona?"}
-    K -->|Sí| I
-    K -->|No, y el nombre no es concluyente| E
-    K -->|No está en el padrón| L["La aparta indicando que el proveedor no está en el padrón"]
+    G --> J{"¿Esta factura ya estaba en esta misma lectura?"}
+    J -->|No| K["La registra con su proveedor, su número, su fecha y su total"]
+    J -->|Sí, igual en todo| L["Conserva una sola y anota cuántas veces llegó"]
+    J -->|Sí, pero con otro total| M["La aparta con los dos totales a la vista"]
 
-    I --> M{"¿Esta factura ya estaba registrada?"}
-    M -->|No| N["La registra con su proveedor, su número, su fecha y su total"]
-    M -->|Sí, igual en todo| O["Conserva una sola y anota cuántas veces llegó"]
-    M -->|Sí, pero con otro total| P["La aparta con los dos totales a la vista"]
+    K --> N["Busca el archivo de la factura y lo conserva tal como llegó"]
+    H --> N
+    I --> N
+    L --> N
 
-    E --> Q["Queda contada y visible en la pantalla de revisión, con su motivo"]
-    L --> Q
-    P --> Q
-    N --> R["Aparece en la lista de facturas y en la ficha de su proveedor"]
-    O --> R
+    N --> O{"¿Qué formato tiene el archivo?"}
+    O -->|PDF con texto| P["Lee del archivo número, fecha, proveedor y total"]
+    O -->|Imagen escaneada| P
+    O -->|Planilla| P
+    O -->|Una forma que no reconoce| Q["Queda apartada: el archivo no se pudo leer"]
 
-    S["Nunca da de alta un proveedor por su cuenta"] --- L
-    T["Nunca completa un dato por suposición"] --- E
+    P --> R["Compara lo que dice el archivo con lo que decía la lista"]
+    R --> S{"¿Dicen lo mismo?"}
+    S -->|Sí| T["Los datos quedan como certeza"]
+    S -->|No| U["La aparta con el recorte del archivo a la vista"]
+
+    P --> V{"¿El archivo trae el CUIT del proveedor,<br/>y la factura estaba esperando por eso?"}
+    V -->|"Sí, y ese CUIT es de un proveedor del padrón"| W["Queda asociada a ese proveedor, sin que nadie la mire"]
+    V -->|"No, o el CUIT no es de nadie del padrón"| X["Sigue esperando una decisión"]
+
+    D --> Y["Queda contada y visible con su motivo, para que una persona decida"]
+    H --> Y
+    I --> Y
+    Q --> Y
+    U --> Y
+    X --> Y
+
+    T --> Z["Aparece en la lista de facturas y en la ficha de su proveedor"]
+    W --> Z
+
+    AA["Nunca da de alta un proveedor por su cuenta"] --- I
+    AB["Nunca completa un dato por suposición"] --- U
+    AC["El CUIT que estas facturas imprimen suele ser el del propio cliente:<br/>por eso sólo identifica si es de alguno de los ocho del padrón"] --- V

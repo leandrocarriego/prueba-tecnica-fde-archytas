@@ -14,39 +14,41 @@
 title: Qué le pasa a cada factura que llega del portal
 ---
 stateDiagram-v2
-    state "Obtenida del portal, con su archivo guardado" as Obtenida
-    state "Leída con certeza" as Leida
-    state "Con algún dato en duda" as Dudosa
+    state "Leída de la lista del portal" as Leida
+    state "Registrada, con sus cuatro datos" as Registrada
     state "Con el proveedor sin identificar" as SinProveedor
     state "De un proveedor que no está en el padrón" as FueraDelPadron
     state "Repetida, con un total distinto" as Discrepante
+    state "Con algún dato en duda" as Dudosa
     state "Apartada, esperando una decisión" as Apartada
     state "Resuelta por una persona" as Resuelta
-    state "Registrada, con sus cuatro datos" as Registrada
 
-    [*] --> Obtenida
-    Obtenida --> Leida: se leen número, fecha, proveedor y total
-    Obtenida --> Dudosa: un dato no se pudo leer con certeza
-    Obtenida --> Apartada: el archivo tiene una forma que el sistema no reconoce
-
-    Leida --> Registrada: el proveedor queda identificado
+    [*] --> Leida
+    Leida --> Registrada: el proveedor queda identificado por su nombre
     Leida --> SinProveedor: el nombre no alcanza para saber cuál es
     Leida --> FueraDelPadron: el proveedor no es ninguno de los ocho
-    Leida --> Discrepante: ya había una igual, con otro total
+    Leida --> Discrepante: ya había llegado una igual en esta lectura, con otro total
 
-    Dudosa --> Apartada
     SinProveedor --> Apartada
     FueraDelPadron --> Apartada
     Discrepante --> Apartada
 
-    Apartada --> Resuelta: una persona confirma el dato o asigna el proveedor
+    Registrada --> Dudosa: el archivo dice algo distinto de la lista, o no se pudo leer
+    Dudosa --> Apartada
+
+    Apartada --> Registrada: el archivo trae el CUIT de un proveedor del padrón
+    Apartada --> Resuelta: una persona confirma o corrige el dato, o asigna el proveedor
     Resuelta --> Registrada
+    Registrada --> Apartada: se deja sin efecto la grafía que la había resuelto
     Registrada --> [*]
 
-    note right of Obtenida
-        El archivo se conserva tal como llegó
-        y no se vuelve a tocar. Si mañana
-        mejora la forma de leerlo, se puede
+    note right of Leida
+        El archivo se busca después de leer la
+        lista, para toda factura: también para
+        la apartada, que es la que más lo
+        necesita. Se conserva tal como llegó y
+        no se vuelve a tocar, así que si mañana
+        mejora la forma de leerlo se puede
         volver a leer sin pedirle nada al portal
     end note
 
@@ -54,14 +56,19 @@ stateDiagram-v2
         Contada y visible con su motivo, sin
         frenar el procesamiento de las demás.
         Nada se descarta y nada se completa
-        por suposición
+        por suposición. Una fila que ni
+        siquiera se pudo interpretar también
+        llega a una persona, en la cola general
+        de revisión
     end note
 
     note right of Registrada
         Nunca queda registrada sin número, sin
         fecha, sin proveedor o sin total. La
         misma factura entra una sola vez, y si
-        llegó varias, lo indica
+        el portal la publicó varias en la misma
+        lectura, lo indica. Volver a leer la
+        pantalla no cuenta como una llegada
     end note
 ```
 
@@ -139,42 +146,51 @@ sequenceDiagram
     actor Julian as Julián, ventas
 
     loop Con la frecuencia configurada
-        Sistema->>Portal: Entra por su cuenta y pide las facturas de compra
-        Portal-->>Sistema: Las facturas y sus archivos
-        Sistema->>Sistema: Conserva cada archivo tal como llegó
-        Sistema->>Sistema: Lee número, fecha, proveedor y total, sea PDF, imagen escaneada o planilla
-        Sistema->>Sistema: Anota, dato por dato, si lo obtuvo con certeza o le quedó en duda
+        Sistema->>Portal: Entra por su cuenta y pide la lista de facturas de compra
+        Portal-->>Sistema: La lista, con el número, la fecha, el proveedor y el total de cada una
+        Sistema->>Sistema: Resuelve el proveedor por el nombre, contra el padrón de ocho
 
-        alt La factura trae el CUIT del proveedor
-            Sistema->>Sistema: Lo identifica por el CUIT, sin interpretar nada
-        else No lo trae
-            Sistema->>Sistema: Lo resuelve por el nombre contra el padrón de ocho proveedores
-        end
-
-        alt Todo quedó con certeza y el proveedor es del padrón
+        alt El proveedor es del padrón, sin dudas
             Sistema->>Sistema: Registra la factura asociada a su proveedor
-        else Un dato en duda, un proveedor ambiguo o uno que no está en el padrón
+        else El nombre no alcanza, o el proveedor no está en el padrón
             Sistema->>Sistema: La aparta con su motivo, sin frenar a las demás
         end
 
-        opt La misma factura ya estaba registrada
+        Sistema->>Portal: Pide el archivo de cada factura, apartada o no
+        Portal-->>Sistema: El PDF, el escaneado o la planilla
+        Sistema->>Sistema: Conserva cada archivo tal como llegó
+        Sistema->>Sistema: Lee del archivo número, fecha, proveedor y total, y lo compara con la lista
+        Sistema->>Sistema: Anota, dato por dato, si lo obtuvo con certeza o le quedó en duda
+
+        opt El archivo trae el CUIT del proveedor y la factura estaba esperando por eso
+            Sistema->>Sistema: La asocia a ese proveedor, si el CUIT es de alguno del padrón
+            Note over Sistema: El CUIT que estas facturas imprimen suele ser el del<br/>propio cliente, y por eso no identifica a nadie del padrón
+        end
+
+        opt El archivo no dice lo mismo que la lista, o no se pudo leer
+            Sistema->>Sistema: La aparta con el recorte del archivo a la vista
+        end
+
+        opt La misma factura vino dos veces en la misma lectura
             Sistema->>Sistema: Conserva una sola y anota cuántas veces llegó
             Note over Sistema: Si el total difiere, no descarta ninguna:<br/>la aparta con los dos totales a la vista
         end
     end
 
     Marcela->>Sistema: Abre la pantalla de revisión
-    Sistema-->>Marcela: Cada caso con su motivo y el recorte del archivo del que salió el dato
-    Marcela->>Sistema: Confirma o corrige el dato, o asigna la grafía del nombre a un proveedor
+    Sistema-->>Marcela: Cada caso con su motivo, el recorte del archivo y el enlace al original
+    Marcela->>Sistema: Confirma el número, la fecha y el total o los corrige, y dice de qué proveedor es
     Sistema-->>Marcela: Le avisa a cuántas facturas apartadas alcanza esa asignación
     Marcela->>Sistema: Confirma
     Sistema->>Sistema: Resuelve esas facturas y guarda la decisión para las que lleguen después
+    Sistema->>Sistema: Registra qué se decidió, quién lo decidió y cuándo
 
     Marcela->>Sistema: Corrige el correo, el teléfono o el plazo pactado de un proveedor
     Sistema->>Sistema: Registra quién lo corrigió, cuándo y qué valor tenía antes
 
     Duenio->>Sistema: Abre un proveedor y pide un período
-    Sistema-->>Duenio: Sus facturas, el total facturado y cuántas quedaron afuera por estar en revisión
+    Sistema-->>Duenio: Sus datos, todas las formas en que llega escrito su nombre, y sus facturas
+    Sistema-->>Duenio: El total del período, y cuántas quedaron afuera por estar en revisión
 
     Julian->>Sistema: Intenta abrir las facturas de compra
     Sistema-->>Julian: No tiene permiso, ni siquiera conociendo la dirección de la pantalla
@@ -242,36 +258,54 @@ flowchart TD
 title: El sistema — qué hace con cada factura que trae del portal
 ---
 flowchart TD
-    A["Con la frecuencia configurada, entra al portal y trae las facturas de compra"] --> B["Conserva el archivo de cada una tal como llegó"]
-    B --> C{"¿Qué formato tiene el archivo?"}
-    C -->|PDF con texto| D["Lee número, fecha, proveedor y total"]
-    C -->|Imagen escaneada| D
-    C -->|Planilla| D
-    C -->|Una forma que no reconoce| E["La aparta para revisión, sin frenar a las demás"]
+    A["Con la frecuencia configurada, entra al portal y trae la lista de facturas de compra"] --> B["Lee de la lista el número, la fecha, el proveedor y el total de cada una"]
+    B --> C{"¿La fila se pudo interpretar?"}
+    C -->|No| D["La aparta para revisión, sin frenar a las demás"]
 
-    D --> F["Anota, dato por dato, si lo obtuvo con certeza o le quedó en duda"]
-    F --> G{"¿Algún dato quedó en duda?"}
-    G -->|Sí| E
-    G -->|No| H{"¿La factura trae el CUIT del proveedor?"}
+    C -->|Sí| E["Busca el nombre del proveedor contra el padrón de ocho"]
+    E --> F{"¿La grafía ya fue asignada antes por una persona?"}
+    F -->|Sí| G["Queda asociada a ese proveedor"]
+    F -->|No, y el nombre corresponde sin dudas| G
+    F -->|No, y el nombre podría ser de dos| H["La aparta: no se puede saber de quién es"]
+    F -->|No está en el padrón| I["La aparta indicando que el proveedor no está en el padrón"]
 
-    H -->|Sí| I["Identifica al proveedor por su CUIT"]
-    H -->|No| J["Busca el nombre contra el padrón de ocho proveedores"]
-    J --> K{"¿La grafía ya fue asignada antes por una persona?"}
-    K -->|Sí| I
-    K -->|No, y el nombre no es concluyente| E
-    K -->|No está en el padrón| L["La aparta indicando que el proveedor no está en el padrón"]
+    G --> J{"¿Esta factura ya estaba en esta misma lectura?"}
+    J -->|No| K["La registra con su proveedor, su número, su fecha y su total"]
+    J -->|Sí, igual en todo| L["Conserva una sola y anota cuántas veces llegó"]
+    J -->|Sí, pero con otro total| M["La aparta con los dos totales a la vista"]
 
-    I --> M{"¿Esta factura ya estaba registrada?"}
-    M -->|No| N["La registra con su proveedor, su número, su fecha y su total"]
-    M -->|Sí, igual en todo| O["Conserva una sola y anota cuántas veces llegó"]
-    M -->|Sí, pero con otro total| P["La aparta con los dos totales a la vista"]
+    K --> N["Busca el archivo de la factura y lo conserva tal como llegó"]
+    H --> N
+    I --> N
+    L --> N
 
-    E --> Q["Queda contada y visible en la pantalla de revisión, con su motivo"]
-    L --> Q
-    P --> Q
-    N --> R["Aparece en la lista de facturas y en la ficha de su proveedor"]
-    O --> R
+    N --> O{"¿Qué formato tiene el archivo?"}
+    O -->|PDF con texto| P["Lee del archivo número, fecha, proveedor y total"]
+    O -->|Imagen escaneada| P
+    O -->|Planilla| P
+    O -->|Una forma que no reconoce| Q["Queda apartada: el archivo no se pudo leer"]
 
-    S["Nunca da de alta un proveedor por su cuenta"] --- L
-    T["Nunca completa un dato por suposición"] --- E
+    P --> R["Compara lo que dice el archivo con lo que decía la lista"]
+    R --> S{"¿Dicen lo mismo?"}
+    S -->|Sí| T["Los datos quedan como certeza"]
+    S -->|No| U["La aparta con el recorte del archivo a la vista"]
+
+    P --> V{"¿El archivo trae el CUIT del proveedor,<br/>y la factura estaba esperando por eso?"}
+    V -->|"Sí, y ese CUIT es de un proveedor del padrón"| W["Queda asociada a ese proveedor, sin que nadie la mire"]
+    V -->|"No, o el CUIT no es de nadie del padrón"| X["Sigue esperando una decisión"]
+
+    D --> Y["Queda contada y visible con su motivo, para que una persona decida"]
+    H --> Y
+    I --> Y
+    Q --> Y
+    U --> Y
+    X --> Y
+
+    T --> Z["Aparece en la lista de facturas y en la ficha de su proveedor"]
+    W --> Z
+
+    AA["Nunca da de alta un proveedor por su cuenta"] --- I
+    AB["Nunca completa un dato por suposición"] --- U
+    AC["El CUIT que estas facturas imprimen suele ser el del propio cliente:<br/>por eso sólo identifica si es de alguno de los ocho del padrón"] --- V
 ```
+
