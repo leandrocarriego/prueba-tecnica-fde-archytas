@@ -15,7 +15,7 @@
 | II — Nada se descarta | Sí | Cada movimiento de un vencimiento queda en `core.due_date_change` con quién lo hizo y el motivo. Nada se pisa |
 | III — Flujo unidireccional, `raw` inmutable | Sí | No hay extracción en esta feature |
 | IV — Las fronteras entre módulos son reales | Sí | El calendario vive en `purchases`, con la factura. Ver *Alternativas descartadas* |
-| **V — Spec primero, y con firma** | **NO** | **Excepción, ver abajo** |
+| **V — Spec primero, y con firma** | **Fuera de orden** | Firmada el 2026-08-30, después de construir. Ver abajo |
 | VI — Lo que no está tipado y testeado no está terminado | Parcial | 8 tests de integración sobre las reglas de mover un vencimiento. **La H5 —el canal en vivo— no está construida**, ver *Lo que falta* |
 | VII — Las credenciales de terceros viven sólo en el entorno | Sí | No hay credenciales en juego |
 | VIII — Un idioma para cada audiencia | Sí | |
@@ -23,18 +23,29 @@
 
 ### Excepción al Artículo V, y quién la aprobó
 
-`spec.md` está en **Borrador**: el cliente no la firmó. El Artículo V dice que ninguna feature pasa
-a planificación técnica sin firma, y que una excepción **la aprueba el humano y queda registrada en
-el plan**. Es lo que pasó: el 2026-08-30 el humano pidió implementar las seis specs pendientes y,
-consultado sobre las tres en borrador, respondió *"Las seis, igual"*.
+El Artículo V dice que ninguna feature pasa a planificación técnica sin firma, y que una excepción
+**la aprueba el humano y queda registrada en el plan**. Es lo que pasó, en dos momentos.
 
-Lo que eso implica, dicho para que se vea al firmar:
+**Al construir, el 2026-08-30.** El humano pidió implementar las seis specs pendientes y,
+consultado sobre las tres que estaban en borrador, respondió *"Las seis, igual"*. Se construyó sin
+acuerdo del cliente, sabiendo que si al firmar pedía cambios el costo sería de rehacer, no de
+construir.
 
-- lo construido **no está acordado con el cliente**, y `/converge` sobre esta feature va a comparar
-  código contra una spec que nadie firmó;
-- si el cliente pide cambios al firmar, el costo es de rehacer, no de construir;
-- la spec sigue en Borrador. **Firmarla ahora, sobre lo ya construido, sería convertir el gate en un
-  trámite**: la decisión de qué hacer con eso es del humano.
+**Al firmar, el mismo día.** La spec quedó **Aprobada el 2026-08-30**, después de que una auditoría
+la recorriera entera contra el paso 1 de `approve_spec.md` y no encontrara nada que corregir: sin
+marcadores pendientes, sin secciones vacías, sin decisiones técnicas filtradas, con sus siete
+diagramas hechos, validados y en lenguaje de negocio.
+
+Queda dicho, porque el orden importa y este documento es donde consta: **se firmó sobre código ya
+construido**. Eso convierte el gate del Artículo V en un registro, no en un filtro — para esta
+feature no hubo un momento en que el acuerdo pudiera haber cambiado lo que se construía. Lo que el
+gate sí puede hacer todavía es `/converge`: contrastar el código contra lo que quedó firmado, y si
+no describen el mismo producto, la decisión de qué corregir sigue siendo del humano.
+
+Al firmar estaba sobre la mesa que **la H5 completa —RF-31 a RF-36, el canal en vivo— no está
+construida** (ver *Lo que falta*). Las ocho historias son severables entre sí: si se decide diferir
+o descartar el canal en vivo, se saca H5 con sus seis requisitos y el resto de la spec se sostiene
+sin reescritura.
 
 ## Enfoque
 

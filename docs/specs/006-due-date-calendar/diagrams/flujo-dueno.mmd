@@ -1,0 +1,23 @@
+---
+title: El dueño — el mismo calendario, al mismo tiempo
+---
+flowchart TD
+    A["Abre el calendario completo"] --> B["Todo lo que vence, mes por mes, con su monto y su proveedor"]
+    B --> C["Cuáles facturas están saldadas, cuáles van por la mitad y cuáles no se tocaron"]
+    C --> D["Oculta las saldadas y le queda a la vista lo que todavía hay que resolver"]
+    B --> E["Cuáles tienen su recibo de recepción emitido y cuáles no"]
+    E --> F["Las que ya vencieron sin su recibo aparecen señaladas"]
+
+    A --> G["Agrega vencimientos propios y reprograma, igual que compras"]
+
+    A --> H{"¿Marcela está mirando el mismo calendario?"}
+    H -->|Ella mueve un vencimiento| I["Él lo ve moverse en el momento, sin recargar la pantalla"]
+    I --> J["Y ve que ese cambio lo hizo ella"]
+    H -->|Los dos mueven el mismo| K["Queda la última fecha, y el historial conserva los dos movimientos"]
+    H -->|Se interrumpe la conexión en vivo| L["El sistema le avisa que el calendario puede estar desactualizado"]
+    L --> M["Cuando se restablece, se lo muestra al día"]
+
+    A --> N["Abre un vencimiento reprogramado"]
+    N --> O["Su fecha original, todas sus reprogramaciones, quién las hizo y los motivos escritos"]
+
+    A --> P["Julián consulta el calendario, pero no lo cambia"]

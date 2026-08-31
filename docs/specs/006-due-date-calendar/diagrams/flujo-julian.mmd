@@ -1,0 +1,10 @@
+---
+title: Julián, ventas — consulta el calendario, no lo cambia
+---
+flowchart TD
+    A["Abre el calendario y lo ve completo"] --> B["Sabe qué vence cada día, con su monto y su proveedor"]
+    B --> C{"¿Intenta cambiar algo?"}
+    C -->|Arrastrar un vencimiento a otro día| D["El sistema no se lo permite"]
+    C -->|Agregar un vencimiento propio| D
+    C -->|Corregirlo o eliminarlo| D
+    D --> E["Mover fechas de compras no es su trabajo; saber qué se viene, sí"]

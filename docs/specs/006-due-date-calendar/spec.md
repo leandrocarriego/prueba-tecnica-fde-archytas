@@ -7,9 +7,8 @@
   Las notas como esta no salen en el PDF: el exportador las descarta.
 -->
 
-**Estado:** Borrador · **Feature:** 006-due-date-calendar · **Fecha:** 2026-08-29
-
-<!-- `/approve-spec` completa Aprobada por y Fecha de aprobación, y pasa Estado a Aprobado. -->
+**Estado:** Aprobado · **Feature:** 006-due-date-calendar · **Fecha:** 2026-08-29
+**Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-30
 
 ## Problema
 
@@ -220,7 +219,7 @@ reprograma un vencimiento eligiendo la fecha nueva de un selector, sin arrastrar
 - [ ] **RF-22** — Se puede mover un vencimiento sin escribir nada, y también escribiendo el motivo.
 - [ ] **RF-23** — Un vencimiento movido tres veces muestra las tres fechas por las que pasó y los motivos escritos.
 - [ ] **RF-24** — Los vencimientos reprogramados se distinguen en el calendario de los que nunca se movieron.
-- [ ] **RF-25** — Al arrastrar un vencimiento a una fecha ya pasada, el sistema pide confirmación, y sin ella el vencimiento no se mueve.
+- [ ] **RF-25** — Al mover un vencimiento a una fecha ya pasada, arrastrándolo o eligiendo la fecha, el sistema pide confirmación, y sin ella el vencimiento no se mueve.
 - [ ] **RF-26** — Reprogramada del 10 al 20 una factura que todavía no venció, su recibo se puede emitir hasta el 20.
 - [ ] **RF-27** — Esa misma factura, pagada el 18, no cuenta como atraso de su proveedor.
 - [ ] **RF-28** — Una factura que venció el 10 sin recibo, reprogramada el 12 para el 20, sigue sin permitir emitirlo.

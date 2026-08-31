@@ -1,0 +1,38 @@
+---
+title: El vencimiento de una factura — reprogramar a tiempo y reprogramar tarde
+---
+stateDiagram-v2
+    state "Por vencer, sin su recibo de recepción" as PorVencer
+    state "Reprogramada antes de vencer" as ATiempo
+    state "Vencida sin su recibo de recepción" as VencidaSinRecibo
+    state "Reprogramada después de haber vencido" as Tarde
+    state "Con su recibo de recepción emitido" as ConRecibo
+
+    [*] --> PorVencer: la factura entra al calendario en la fecha en que vence
+    PorVencer --> ATiempo: el dueño o compras la mueve antes de que llegue su fecha
+    ATiempo --> PorVencer: la fecha nueva vale a todos los efectos
+    PorVencer --> ConRecibo: se emite su recibo antes del vencimiento
+    PorVencer --> VencidaSinRecibo: llega su fecha y el recibo no se emitió
+    VencidaSinRecibo --> Tarde: el dueño o compras la mueve después de que su fecha pasó
+    Tarde --> VencidaSinRecibo: la fecha nueva dice cuándo se va a pagar, y nada más
+    ConRecibo --> [*]
+
+    note right of ATiempo
+        El acuerdo con el proveedor se hizo antes: hasta
+        la fecha nueva se puede emitir el recibo, y contra
+        ella se mide el atraso del proveedor
+    end note
+
+    note right of Tarde
+        No destraba el recibo ni borra el atraso: eso ya
+        pasó y el sistema no lo reescribe. El atraso se
+        sigue midiendo contra la fecha original, y en el
+        calendario sigue señalada como vencida sin recibo
+    end note
+
+    note right of ConRecibo
+        El calendario distingue a simple vista las que
+        tienen su recibo de las que no, y permite mostrar
+        sólo las que no lo tienen. Emitirlo se hace fuera
+        del calendario
+    end note

@@ -1,0 +1,48 @@
+---
+title: Calendario de vencimientos — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Sistema as El sistema
+    actor Marcela as Marcela, compras
+    actor Duenio as El dueño
+    actor Julian as Julián, ventas
+
+    Sistema->>Sistema: Coloca en el calendario el vencimiento de cada factura registrada
+    Marcela->>Sistema: Abre el calendario
+    Sistema-->>Marcela: El mes en curso, con cada vencimiento en su día, su descripción, su monto y su proveedor
+    Sistema-->>Marcela: Distingue lo ya vencido de lo por venir, lo que tiene su recibo de lo que no, y si la factura está saldada, a medias o sin pagos
+    Note over Sistema,Marcela: Un día con más vencimientos de los que entran en pantalla<br/>indica cuántos hay y deja verlos todos
+    Marcela->>Sistema: Pide ver sólo las facturas sin su recibo, y ocultar las saldadas
+    Marcela->>Sistema: Abre un vencimiento y llega a la factura que lo originó
+
+    Marcela->>Sistema: Carga un vencimiento propio con su fecha, su descripción y su monto
+    Sistema->>Sistema: Lo coloca en su día, lo distingue de los que vienen de una factura, y registra quién lo cargó y cuándo
+
+    Marcela->>Sistema: Arrastra un vencimiento del 10 al 20
+    alt La fecha nueva ya pasó
+        Sistema-->>Marcela: Pide confirmación antes de aplicar el cambio
+    end
+    Sistema->>Sistema: Guarda la fecha anterior, quién lo movió y cuándo, y le ofrece escribir un motivo sin exigirlo
+
+    alt La factura todavía no había vencido
+        Sistema->>Sistema: Su recibo se puede emitir hasta la fecha nueva, y el atraso del proveedor se mide contra ella
+    else La factura ya se había vencido
+        Sistema->>Sistema: Su recibo sigue sin poder emitirse, el atraso se mide contra la fecha original, y sigue señalada como vencida sin recibo
+    end
+
+    Sistema-->>Duenio: En su pantalla, abierta al mismo tiempo, el vencimiento se mueve solo y con el nombre de quién lo movió
+    Note over Sistema,Duenio: Sin que tenga que recargar nada. Si dos personas mueven el mismo vencimiento,<br/>queda la última fecha y los dos movimientos quedan en el historial
+    alt Se interrumpe la conexión en vivo
+        Sistema-->>Duenio: Le avisa que el calendario puede estar desactualizado
+        Sistema-->>Duenio: Al restablecerse, le muestra el calendario al día
+    end
+
+    Duenio->>Sistema: Abre un vencimiento reprogramado
+    Sistema-->>Duenio: Su fecha original, todas sus reprogramaciones y los motivos que se hayan escrito
+
+    Julian->>Sistema: Abre el calendario y consulta qué se viene
+    Julian->>Sistema: Intenta arrastrar un vencimiento
+    Sistema-->>Julian: No se lo permite, porque agregar, corregir, mover y eliminar no son de su rol
+
+    Marcela->>Sistema: Desde el teléfono, consulta qué vence y reprograma eligiendo la fecha nueva de un selector
