@@ -4,10 +4,18 @@ WORKDIR /app
 
 # curl backs the container healthcheck (GET /health) declared in docker-compose.yml.
 # postgresql-client is for `psql` from inside the container when debugging.
+# tesseract reads the scanned invoices: 46 of the 100 the portal publishes are
+# a JPEG per page and there is no text to extract from them. Without the binary
+# the reader does not fail loudly — it returns an empty string and every one of
+# those invoices goes to quarantine with «no se pudo leer» (RF-26). `spa` is
+# tried first and `eng` is the fallback, so both packs ship.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-spa \
+    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv

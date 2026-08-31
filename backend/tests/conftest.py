@@ -252,10 +252,17 @@ async def session(connection: AsyncConnection) -> AsyncIterator[AsyncSession]:
 # test the queue is exactly the part that must not be exercised: the suite runs
 # with RabbitMQ down, like it runs with the portal down.
 #
-# It is autouse and it lives here, not beside the feature tests, because the
-# rule belongs to the suite and not to one package. Kept local, it passes on
-# the machine that happens to have the broker up and fails in CI, which is the
-# worst place to find out.
+# It lives here, not beside the feature tests, because the rule belongs to the
+# suite and not to one package. Kept local, it passes on the machine that
+# happens to have the broker up and fails in CI, which is the worst place to
+# find out — and it did: seven tests of 004 failed there for a year of commits
+# because `extract_invoice_file` had no fixture at all.
+#
+# Which is why the one below is **autouse** and these two are not. A recorder a
+# test has to remember to ask for only protects the tests whose author knew the
+# task existed; the invoice files are queued from a handler nobody calls
+# directly, so nobody remembered. Asking for it by name still works, and is how
+# a test asserts on what would have been queued.
 
 
 class Queued:
@@ -280,6 +287,23 @@ def queued_history(monkeypatch: pytest.MonkeyPatch) -> Iterator[Queued]:
     """The history visits a registered product would trigger (RF-38)."""
     recorder = Queued()
     monkeypatch.setattr(portal_handlers, "extract_product_history", recorder)
+    yield recorder
+
+
+@pytest.fixture(autouse=True)
+def queued_invoice_files(monkeypatch: pytest.MonkeyPatch) -> Iterator[Queued]:
+    """The browser visit each registered invoice would queue to fetch its file.
+
+    Autouse, unlike its siblings. `bring_invoice_files` runs inside the
+    publisher's transaction (`GEN-09`), so when the broker refuses the
+    connection the handler raises and takes the whole registration down with
+    it: seven integration tests of 004 fail with `OperationalError: [Errno 111]
+    Connection refused` on a machine without RabbitMQ, which is every CI run.
+    Nothing in the test asks for the queue, so nothing in the test would have
+    asked for the fixture either.
+    """
+    recorder = Queued()
+    monkeypatch.setattr(portal_handlers, "extract_invoice_file", recorder)
     yield recorder
 
 
