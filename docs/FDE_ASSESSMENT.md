@@ -125,7 +125,7 @@ muestra.
   **Tesseract 5 + `spa`** para el escaneado, `openpyxl` para la planilla y `rapidfuzz` para la
   grafía del proveedor. **Ningún modelo de lenguaje.** Sobre las 12 facturas escaneadas medidas,
   Tesseract acertó los 48 datos de cabecera en 0,22 s cada una. La evidencia y las alternativas
-  descartadas están en `docs/specs/004-invoices-suppliers/research.md`.
+  descartadas están en `docs/specs/archive/004-invoices-suppliers/research.md`.
 - **Umbral de confianza por dato.** El brief ya compromete el comportamiento (se carga lo confiable,
   se pregunta lo dudoso, mostrando el recorte de la imagen); falta el número y cómo se calibra.
 - **Reproceso.** Como `raw` es inmutable y el contenido se conserva tal como llegó, un cambio de
@@ -384,7 +384,7 @@ para todo el proyecto.
 
 | # | Decisión | Afecta | Quién la toma |
 |---|---|---|---|
-| D1 | ~~**Qué OCR y qué modelo** para leer facturas escaneadas y planillas irregulares~~ → **Tesseract 5 + `spa`, `pypdf`, `openpyxl` y ningún modelo de lenguaje**, decidido por el Backend-Architect el 2026-08-29 sobre medición, en `docs/specs/004-invoices-suppliers/research.md`. El cliente ya había respondido que **no** acepta costo por documento | P2 (y por dependencia, P3, P4, P5) | El arquitecto — el **costo recurrente** lo aprobaba el cliente, y quedó en cero |
+| D1 | ~~**Qué OCR y qué modelo** para leer facturas escaneadas y planillas irregulares~~ → **Tesseract 5 + `spa`, `pypdf`, `openpyxl` y ningún modelo de lenguaje**, decidido por el Backend-Architect el 2026-08-29 sobre medición, en `docs/specs/archive/004-invoices-suppliers/research.md`. El cliente ya había respondido que **no** acepta costo por documento | P2 (y por dependencia, P3, P4, P5) | El arquitecto — el **costo recurrente** lo aprobaba el cliente, y quedó en cero |
 | D2 | ~~**Canal de avisos** fuera del sistema~~ → **WhatsApp. Cerrada**: el cliente la confirmó el 2026-08-29 en el `/clarify` de `007-orders-alerts`, con sus tres bordes definidos — avisos a los **números personales** de cada persona, **reclamos y vencimientos a compras** y **resumen diario al dueño**, y ningún aviso inmediato fuera de la franja **lunes a viernes de 8:00 a 18:00** | P6, P8, P12 | El cliente ✅ |
 | D3 | **Mecanismo de tiempo real** para el calendario compartido | P11 | Los dos arquitectos |
 | D4 | **Aplicación instalable en el teléfono**, sí o no | P8, P11 (si el calendario se usa en el teléfono) | El cliente, con el costo de que las tres personas la instalen |
