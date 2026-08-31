@@ -1011,6 +1011,10 @@ class CatalogService:
             ),
             self.session,
         )
+        # After the handlers, never before: a log line that could not be written
+        # has to take the correction down with it (`GEN-09`), and committing
+        # first would leave the value changed and the reason for it lost.
+        await self.session.commit()
         logger.info(
             "Value corrected by hand",
             extra={
@@ -1093,6 +1097,7 @@ class CatalogService:
             ),
             self.session,
         )
+        await self.session.commit()
         logger.info(
             "Correction reverted",
             extra={"correction_id": correction.id, "actor_user_id": actor_user_id},
