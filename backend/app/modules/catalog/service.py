@@ -31,7 +31,7 @@ stock nobody photographed as a zero (RF-46, RF-27 of 009).
 """
 
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, NamedTuple
@@ -54,6 +54,7 @@ from app.modules.catalog.schemas import (
     CategoryAliasRead,
     CategoryList,
     CategoryRead,
+    CorrectionInForceRead,
     CorrectionMark,
     CorrectionRead,
     NewProductRead,
@@ -1601,6 +1602,36 @@ class CatalogService:
         ]
 
     # --- Reading ----------------------------------------------------------
+
+    async def corrections_in_force(self, product_ids: Sequence[int]) -> list[CorrectionInForceRead]:
+        """The corrections standing on these products, whatever field they are on.
+
+        It exists for a reader that is not the datum's own page: the change log
+        lists corrections of many products at once and has to offer the undo
+        beside each one (RF-30). Asking the product page for each row would be
+        one request per row, so the whole page is answered in one query — the
+        same reason `list_prices` reads its marks in one go.
+
+        Nothing here is a second copy of the rule about who may undo: this route
+        asks for `MANUAL_CORRECTIONS`, which is the owner's alone, so a reader
+        who cannot undo never receives the ids either.
+        """
+        corrections = await self.catalog.corrections_in_force(
+            [str(product_id) for product_id in product_ids]
+        )
+        return [
+            CorrectionInForceRead(
+                correction_id=correction.id,
+                field=correction.field,
+                portal_value=correction.portal_value,
+                corrected_value=correction.corrected_value,
+                status=correction.status,
+                conflict_value=correction.conflict_value,
+                entity_type=correction.entity_type,
+                entity_id=correction.entity_id,
+            )
+            for correction in corrections
+        ]
 
     async def list_prices(
         self,

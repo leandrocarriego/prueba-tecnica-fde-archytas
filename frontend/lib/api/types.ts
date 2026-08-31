@@ -618,6 +618,35 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/catalog/corrections': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The corrections still standing on a set of products
+     * @description The owner alone, and for the same reason the undo below is.
+     *
+     *     It is asked by the change log, which lists corrections of many products at
+     *     once and offers the undo beside each row (RF-30): without it the screen
+     *     would know that something was corrected and not which correction to undo.
+     *     Whoever cannot undo never gets here, so the ids are not handed to a screen
+     *     that has no use for them.
+     *
+     *     The products come as repeated `product_id`, bounded like a page of the log:
+     *     one query for the page instead of one request per row.
+     */
+    get: operations['corrections_in_force_api_v1_catalog_corrections_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/catalog/corrections/{correction_id}': {
     parameters: {
       query?: never
@@ -791,6 +820,15 @@ export interface paths {
      *     person who took the decision, and a body could name somebody else. The name
      *     travels as a plain string — the first name, which is how the business names
      *     these people — and not as a user of another module (Artículo IV).
+     *
+     *     A refusal on the way out gets one more name put on it, and that is why this
+     *     route knows about `identity` at all: a decision this queue publishes can be
+     *     turned away by whoever handles the event, and the one refusal that happens
+     *     for a *human* reason — an amount somebody already corrected — names that
+     *     somebody by id, because the module that raised it may not read `identity`.
+     *     Here it may: `dependencies.py` is the one file of `identity` a module is
+     *     allowed to cross, and this is the same trip `operations` makes to put a name
+     *     beside each line of the history.
      */
     post: operations['resolve_case_api_v1_triage_cases__case_id__resolution_post']
     delete?: never
@@ -2006,6 +2044,34 @@ export interface components {
       status: components['schemas']['HealthState']
       /** Detail */
       detail?: string | null
+    }
+    /**
+     * CorrectionInForceRead
+     * @description A standing correction, said in the words a screen away from the datum needs.
+     *
+     *     `CorrectionMark` is enough on the product's own page: the page already knows
+     *     which datum it is about. The change log does not — it shows the corrections
+     *     of many data at once — so which datum a correction stands on travels with
+     *     it, in the same vocabulary the log writes (`catalog.product_price`, the
+     *     product id as text). That is what lets the log offer the undo beside the row
+     *     that reported the correction (RF-30) instead of only linking away to it.
+     */
+    CorrectionInForceRead: {
+      /** Correction Id */
+      correction_id: number
+      /** Field */
+      field: string
+      /** Portal Value */
+      portal_value: unknown
+      /** Corrected Value */
+      corrected_value: unknown
+      status: components['schemas']['CorrectionStatus']
+      /** Conflict Value */
+      conflict_value?: unknown | null
+      /** Entity Type */
+      entity_type: string
+      /** Entity Id */
+      entity_id: string
     }
     /**
      * CorrectionMark
@@ -4675,6 +4741,37 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['CorrectionRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  corrections_in_force_api_v1_catalog_corrections_get: {
+    parameters: {
+      query: {
+        product_id: number[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CorrectionInForceRead'][]
         }
       }
       /** @description Validation Error */

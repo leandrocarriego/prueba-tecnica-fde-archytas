@@ -828,3 +828,143 @@ class TestOnlyOneCorrectionStandsPerField:
             CorrectionStatus.REVERTED,
             CorrectionStatus.ACTIVE,
         ]
+
+
+class TestFindingWhatThereIsToUndo:
+    """RF-30 from the change log, which is where the acceptance criterion puts it.
+
+    The product's own page knows which datum it is about, so `CorrectionMark` is
+    all it needs. The log does not: it lists corrections of many products at
+    once, and to offer the undo beside a row it has to know **which** correction
+    stands on that datum. So the answer carries the datum with it, in the same
+    words the log writes (`catalog.product_price`, the product id as text).
+
+    One question for a page of the log, not one per row — and only for whoever
+    may undo, because handing correction ids to a screen that cannot use them
+    would be a permission decided twice.
+    """
+
+    @pytest.fixture
+    async def two_corrected_products(
+        self, session: AsyncSession, owner_client: AsyncClient
+    ) -> tuple[int, int]:
+        """A corrected price on one product and a corrected description on another."""
+        first = await ProductFactory.create(session, price=PORTAL_PRICE)
+        second = await ProductFactory.create(session, price=PORTAL_PRICE)
+        for product_id, field, value in (
+            (first.id, "price", "1200"),
+            (second.id, "description", "Tornillo hexagonal 3/8"),
+        ):
+            response = await owner_client.post(
+                f"{CATALOG}/products/{product_id}/corrections",
+                json={"field": field, "value": value, "reason_code": REASON},
+            )
+            assert response.status_code == 200
+        return first.id, second.id
+
+    async def test_each_correction_says_which_datum_it_stands_on(
+        self, owner_client: AsyncClient, two_corrected_products: tuple[int, int]
+    ) -> None:
+        """Both products in one question, and each answer names its own datum."""
+        # Arrange
+        priced, described = two_corrected_products
+
+        # Act
+        response = await owner_client.get(CORRECTIONS, params={"product_id": [priced, described]})
+
+        # Assert
+        assert response.status_code == 200
+        standing = {
+            (item["entity_type"], item["entity_id"], item["field"]): item
+            for item in response.json()
+        }
+        assert set(standing) == {
+            (PRICE_ENTITY, str(priced), "price"),
+            (PRODUCT_ENTITY, str(described), "description"),
+        }
+        price = standing[(PRICE_ENTITY, str(priced), "price")]
+        assert price["corrected_value"] == "1200"
+        assert price["portal_value"] == "1000.0000"
+        assert price["status"] == "ACTIVE"
+        # The id is the whole point: it is what the undo button is built from.
+        assert isinstance(price["correction_id"], int)
+
+    async def test_a_product_nobody_corrected_answers_with_nothing(
+        self, session: AsyncSession, owner_client: AsyncClient
+    ) -> None:
+        """An empty list, not a 404: asking is how the screen finds out."""
+        # Arrange
+        untouched = await ProductFactory.create(session, price=PORTAL_PRICE)
+
+        # Act
+        response = await owner_client.get(CORRECTIONS, params={"product_id": untouched.id})
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json() == []
+
+    async def test_an_undone_correction_is_not_offered_again(
+        self, owner_client: AsyncClient, two_corrected_products: tuple[int, int]
+    ) -> None:
+        """What was undone no longer stands, so the log stops offering to undo it."""
+        # Arrange
+        priced, _ = two_corrected_products
+        listed = (await owner_client.get(CORRECTIONS, params={"product_id": priced})).json()
+        assert await owner_client.delete(f"{CORRECTIONS}/{listed[0]['correction_id']}")
+
+        # Act
+        response = await owner_client.get(CORRECTIONS, params={"product_id": priced})
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json() == []
+
+    async def test_sales_may_not_ask_which_corrections_stand(
+        self, sales_client: AsyncClient, two_corrected_products: tuple[int, int]
+    ) -> None:
+        """The same asymmetry as the undo itself: sales corrects, and does not undo."""
+        # Arrange
+        priced, _ = two_corrected_products
+
+        # Act
+        response = await sales_client.get(CORRECTIONS, params={"product_id": priced})
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_purchasing_may_not_ask_either(
+        self, purchasing_client: AsyncClient, two_corrected_products: tuple[int, int]
+    ) -> None:
+        """Purchasing does not reach the catalog, and does not reach this."""
+        # Arrange
+        priced, _ = two_corrected_products
+
+        # Act
+        response = await purchasing_client.get(CORRECTIONS, params={"product_id": priced})
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_an_anonymous_caller_is_asked_to_log_in(
+        self, client: AsyncClient, two_corrected_products: tuple[int, int]
+    ) -> None:
+        """401 before any 403, like every other route of this feature."""
+        # Arrange
+        priced, _ = two_corrected_products
+
+        # Act
+        response = await client.get(CORRECTIONS, params={"product_id": priced})
+
+        # Assert
+        assert response.status_code == 401
+
+    async def test_a_question_about_no_product_at_all_is_refused(
+        self, owner_client: AsyncClient
+    ) -> None:
+        """A bounded question or none: an unfiltered dump of every correction
+        standing in the system is not what any screen asks for."""
+        # Act
+        response = await owner_client.get(CORRECTIONS)
+
+        # Assert
+        assert response.status_code == 422

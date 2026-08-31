@@ -16,6 +16,7 @@ export type PriceUpdateSettings = components['schemas']['PriceUpdateSettingsRead
 export type JobRun = components['schemas']['JobRunRead']
 export type Correction = components['schemas']['CorrectionRead']
 export type CorrectionMark = components['schemas']['CorrectionMark']
+export type CorrectionInForce = components['schemas']['CorrectionInForceRead']
 export type CorrectionStatus = components['schemas']['CorrectionStatus']
 
 // --- The rubros of the catalog (008) ---

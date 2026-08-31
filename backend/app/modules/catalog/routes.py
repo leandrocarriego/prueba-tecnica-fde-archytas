@@ -31,6 +31,7 @@ from app.modules.catalog.schemas import (
     CategoryList,
     CategoryRead,
     CategoryWrite,
+    CorrectionInForceRead,
     CorrectionRead,
     CorrectionWrite,
     PriceHistoryRead,
@@ -50,6 +51,9 @@ from app.modules.identity.dependencies import (
 
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 500
+# How many products one question about standing corrections may name. A page
+# of the change log is fifty rows, so this is room to spare and still a bound.
+MAX_ENTITIES = 200
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
@@ -121,6 +125,29 @@ async def correct_product(
         reason_detail=payload.reason_detail,
         actor_user_id=current_user.id,
     )
+
+
+@corrections_router.get(
+    "/corrections",
+    dependencies=[require_section(Section.MANUAL_CORRECTIONS)],
+    summary="The corrections still standing on a set of products",
+)
+async def corrections_in_force(
+    product_id: Annotated[list[int], Query(min_length=1, max_length=MAX_ENTITIES)],
+    service: CatalogDep,
+) -> list[CorrectionInForceRead]:
+    """The owner alone, and for the same reason the undo below is.
+
+    It is asked by the change log, which lists corrections of many products at
+    once and offers the undo beside each row (RF-30): without it the screen
+    would know that something was corrected and not which correction to undo.
+    Whoever cannot undo never gets here, so the ids are not handed to a screen
+    that has no use for them.
+
+    The products come as repeated `product_id`, bounded like a page of the log:
+    one query for the page instead of one request per row.
+    """
+    return await service.corrections_in_force(product_id)
 
 
 @corrections_router.delete(
