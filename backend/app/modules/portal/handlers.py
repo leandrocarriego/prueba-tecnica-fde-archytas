@@ -1,19 +1,21 @@
 """What `portal` does when something happens elsewhere.
 
-One subscription: the catalog got to know a product for the first time, so the
-history that the portal already publishes for it has to be brought in (RF-38).
+Two subscriptions, and the same shape: something was registered for the first
+time, so the document the portal already publishes about it has to be brought
+in — the price history of a product (RF-38 of 001), the file of an invoice
+(RF-02 of 004).
 
-The handler **queues and returns**. It runs inside the transaction of whoever
+Both handlers **queue and return**. They run inside the transaction of whoever
 published, and a hundred visits to a third party's system cannot be held open
-inside a transaction that is registering products (`GEN-09`).
+inside a transaction that is registering rows (`GEN-09`).
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.logging import get_logger
-from app.modules.portal.tasks import extract_product_history
-from app.shared.events import ProductsRegistered, events
+from app.modules.portal.tasks import extract_invoice_file, extract_product_history
+from app.shared.events import InvoicesRegistered, ProductsRegistered, events
 
 logger = get_logger(__name__)
 
@@ -31,3 +33,22 @@ async def bring_published_history(event: ProductsRegistered, _session: AsyncSess
         "Published history queued",
         extra={"products": len(event.products), "batch_id": event.batch_id},
     )
+
+
+@events.subscribe(InvoicesRegistered)
+async def bring_invoice_files(event: InvoicesRegistered, _session: AsyncSession) -> None:
+    """Queue one download per invoice, spaced out, never in a burst (RF-02, RF-25).
+
+    A hundred invoices land on the first day and each one is a visit to
+    somebody else's system with a shared account. They go out at the same pace
+    the price histories do, and the invoices list is usable from the first
+    moment: the document is evidence for the review, not a condition for the
+    invoice to exist.
+    """
+    for position, invoice in enumerate(event.invoices):
+        extract_invoice_file.apply_async(
+            kwargs={"invoice_number": invoice.number},
+            countdown=position * settings.PORTAL_HISTORY_SPACING_SECONDS,
+        )
+
+    logger.info("Invoice files queued", extra={"invoices": len(event.invoices)})

@@ -35,6 +35,18 @@ So the questions this file asks are the ones the matrix answers:
    screen is not there is a dead card that still counts as "purchasing has
    something".
 
+What none of them asks is the sentence the registry opens with: that the section
+a row declares is the one **its route** already demands. Nothing derives one
+from the other — the `href` is a page and not an endpoint, and the endpoint is
+reached through a Server Action whose name no field of the row carries. Checking
+it would mean pulling the path out of each of those functions, matching it
+against the route table and reading the section back off the dependency: three
+hops of parsing, and only over the rows whose function is written down below,
+which is four of the thirteen. A rule that covers a third of the registry and
+reads as if it covered all of it is the shape this file already failed in, so
+the hole is written here rather than half-built. When this was written the four
+rows of 003 named the section their route demands; nothing keeps them naming it.
+
 And two more about the code rather than the registry: that the screen filters
 by the session instead of listing the actions itself, and that `actionsFor()`
 asks `canEdit` for a writing action and `canSee` for a reading one. That last
@@ -50,9 +62,30 @@ hidden from somebody the route would admit.
 
 RF-22 closes the same screen and is the last section here: an action that
 finishes has to tell whoever ran it whether it was applied or whether it
-failed. That one is not about the registry but about the dialog where a
-correction is actually made — and it is checked the same way, and for the same
-reason, because it is the same missing test runner.
+failed. That one is not about the registry's rows but about the components
+where a correction is actually made and undone — and it is checked the same
+way, and for the same reason, because it is the same missing test runner.
+
+**Which components those are is decided by the registry, row by row.** That is
+the lesson of how RF-22 was missed **three times**: the rule was right, and the
+screens it did not name were simply never inside it — and a handful of names
+written here cannot tell an action nobody added from one that does not exist.
+So the list is `MANUAL_ACTIONS` itself, every row of it, and each row is
+answered below with the Server Action that runs it. That last step cannot be
+derived: `classify-product` is run by `setProductCategory` and nothing in the
+id says so. What it can be is *demanded* — a row with no answer fails this
+file. Adding an action and forgetting this test is no longer possible; the only
+thing that was ever possible before is exactly what happened three times.
+
+The registry is shared by every feature and RF-22 belongs to 003's spec, so the
+nine rows that arrived with 004 to 009 are answered «another feature's» instead
+of being judged here. That is a skip that is written down, counted, and
+impossible to mistake for a row nobody thought about.
+
+What no reading of the source can settle — whether a successful run takes the
+component off the screen, and therefore whether its verdict may live in local
+state or has to be announced to the toaster — is written down where the search
+is defined, because a gap nobody wrote down is the same mistake again.
 """
 
 import re
@@ -368,52 +401,265 @@ class TestTheScreenFiltersByTheSession:
         )
 
 
-# The one place where an action actually finishes in front of somebody, and so
-# the one place RF-22 can be broken: a dialog that hides itself.
-DIALOG = REPOSITORY_ROOT / "frontend" / "components" / "catalog" / "CorrectionDialog.tsx"
+# --- RF-22: an action that finishes says whether it was applied -------
 
-# `if (!open) { … return … }` — what the component renders while it is closed.
-# The flag is read out of the condition instead of being spelled here, so a
-# rename does not turn this rule off.
-WHILE_CLOSED = re.compile(r"if\s*\(\s*!\s*(?P<flag>\w+)\s*\)\s*\{")
-RETURNS = re.compile(r"\breturn\b")
-# `setSomething({ ok: true, … })` — recording that the action was applied. The
-# setter is captured because the state it writes is what the JSX renders, and
-# the name of that state follows from it.
-RECORDS_SUCCESS = re.compile(r"\b(?P<setter>set[A-Z]\w*)\(\s*\{[^{}]*\bok:\s*true\b[^{}]*\}\s*\)")
-# The function that submits, written either way. Which one it is, is decided by
-# what it does — it is the one that records the outcome — and not by its name.
-SUBMIT_HANDLER = re.compile(
-    r"async\s+function\s+\w+\s*\([^()]*\)\s*\{|const\s+\w+\s*=\s*async\s*\([^()]*\)[^{]*\{"
+# Where a manual action actually finishes in front of somebody: the component
+# that calls its Server Action. **Which actions those are is `MANUAL_ACTIONS`,
+# all of it** — the registry is the only thing in the repository that knows what
+# a manual action is, so it is the only honest source for the list, and the two
+# structures below have to account for every row of it or
+# `TestTheScopeOfThisRuleIsTheRegistry` fails.
+#
+# That is the fix for how this went wrong three times. The rule was never
+# wrong; the set it ran over was a handful of names, and a set of names cannot
+# tell «this action has no screen yet» from «nobody remembered this file». Both
+# read as silence, and silence is green.
+#
+# What the registry cannot supply is the last step, and it is the reason
+# anything is written by hand here at all: nothing in a row says which function
+# executes it. `resolve-triage-case` is run by `resolveCase`, `classify-product`
+# by `setProductCategory`, and no rule turns one into the other. Neither does
+# the `href`: `/precios` is the screen of three different rows, and the two that
+# 003 cares most about are run from components the page does not import — they
+# live on the product's own page, one URL away. A discovery that walked the
+# imports of the `href` would have missed `CorrectionDialog` and
+# `RevertCorrectionButton`, which is this file's original bug with a longer
+# derivation in front of it.
+#
+# So the exported name is written down, once per row, and the writing is
+# checked: `test_every_action_it_reaches_is_imported_somewhere` fails when a
+# name here matches nothing in the repository, which is what a rename or a
+# deleted screen looks like.
+EXECUTED_BY = {
+    "request-price-update": "requestPriceUpdate",
+    "resolve-triage-case": "resolveCase",
+    "correct-product": "correctProduct",
+    "revert-correction": "revertCorrection",
+}
+
+# And the other half of accounting for the registry, which is what keeps this
+# file from failing code it has no business judging.
+#
+# The registry is shared: thirteen rows today, four of them 003's and nine that
+# arrived with 004 to 009. RF-22 is a requirement of **003's** spec and this
+# file is the gate that reads it, so judging the other nine here would put
+# another feature's components in red inside this feature's suite — components
+# still being written, whose own spec may answer «se aplicó» somewhere this file
+# has never been taught to look. That was measured before it was decided, and
+# not assumed: with the nine included, seven of their components failed.
+#
+# Naming them is the point. A row listed here is a decision —«not mine»— that a
+# reader can disagree with; a row in neither structure is a bug, and it fails.
+# If RF-22 is ever adopted as a rule of the whole product, what changes is these
+# nine lines, not the mechanism.
+ANOTHER_FEATURES = frozenset(
+    {
+        "resolve-invoice-review",
+        "correct-supplier",
+        "register-payment",
+        "issue-receipt",
+        "add-due-date",
+        "dismiss-repeat-order",
+        "resolve-message",
+        "classify-product",
+        "resolve-sale",
+    }
 )
 
+# What this section does **not** decide, written down because a gap nobody wrote
+# down is the same mistake again: whether a successful run leaves the component
+# mounted. Nothing in the source answers it — `router.refresh()` re-renders the
+# page, and whether the component survives depends on whether the refreshed page
+# still lists the row it hangs off. `RevertCorrectionButton` does not survive its
+# own success and announces to the toaster for that reason — a judgement made by
+# whoever wrote it, which this file cannot check. What it checks is the half
+# that is written down: a verdict kept in the component's own state is rendered
+# by everything that component can put on screen.
+FRONTEND = REPOSITORY_ROOT / "frontend"
+COMPONENTS = FRONTEND / "components"
+APP = FRONTEND / "app"
+LAYOUT = APP / "layout.tsx"
 
-def braced_block(source: str, opening: int) -> str:
-    """What lies between the brace at `opening` and the one that closes it."""
+# `import { correctProduct, … } from '@/app/actions/corrections'`. This is how a
+# screen is found, and not a plain substring search. What was imported still has
+# to be filtered: a file that imports only a **type** from there executes
+# nothing, and would be dragged in to fail a rule that has nothing to say about
+# it. A type hides under two spellings — `import type { X }`, which this pattern
+# does not match at all, and `import { type X }`, which it does match and
+# `manual_actions_in()` drops.
+#
+# Any module under `@/app/actions/`, because which module an action lives in is
+# not this file's business: `EXECUTED_BY` names the functions, and the registry
+# names those. Listing modules instead is exactly how the same defect survived
+# in `CaseCard` after being fixed twice next door — and it would still drag in
+# the rule and alias screens of 001, which share `@/app/actions/triage` with a
+# registered action and have nothing to do with this rule.
+IMPORTED_FROM_ACTIONS = re.compile(
+    r"^import\s*\{(?P<names>[^}]*)\}\s*from\s*'@/app/actions/\w+'", re.MULTILINE
+)
+# `type CorrectionOutcome` inside the braces: a name that exists for the type
+# checker and never runs.
+A_TYPE = re.compile(r"^type\s+\w")
+IDENTIFIER = re.compile(r"\b\w+\b")
+
+# --- reading a component ----------------------------------------------------
+
+# Where a function's body starts is worked out by walking past its parameter
+# list, never by taking the first brace after the keyword. A destructured
+# parameter — `async ({ id }: { id: number }) => {` — opens two braces of its
+# own before the body ever begins, and a reading that took the first one would
+# call the destructuring the function: the run would come back as ` id `, the
+# call inside it would belong to no run at all, and the rules below would fail
+# a component that is perfectly correct.
+ASYNC = re.compile(r"\basync\b")
+# The name of a declaration, when there is one: `async function onClick(`. The
+# `\w*` also swallows the lone parameter of `async id => …`, which is harmless —
+# what comes next is read the same way in both cases.
+A_NAME = re.compile(r"\s*(?:function\s+)?\w*\s*")
+# What separates a parameter list from the body: a return type annotation, an
+# arrow, or nothing at all.
+THE_BODY = re.compile(r"\s*(?::[^={;]*)?(?:=>\s*)?\{")
+# The two ways this repository declares a function that could be a component.
+A_DECLARATION = re.compile(r"\bfunction\s+\w+\s*(?=\()")
+AN_ASSIGNMENT = re.compile(r"\b(?:const|let)\s+\w+\s*(?::[^=;]*)?=\s*(?:async\s+)?(?=[(\w])")
+RETURNS = re.compile(r"\breturn\b")
+# `return ( … )` — one of the things a component can put on screen. Prettier
+# wraps every multi-line JSX in those parentheses, so this is how the repository
+# writes them; a `return <span/>` on one line is not read, and
+# `test_what_the_screen_can_render_was_found` is what says so out loud instead
+# of letting the rule below quietly check nothing.
+RETURNS_JSX = re.compile(r"\breturn\s*\(")
+# `if (result.ok) { … }` — the branch that only runs when it worked. Told from
+# `if (!result.ok)`, which guards the opposite branch, by forbidding the `!`
+# rather than by spelling the whole condition: what matters is which side of the
+# test the code sits on.
+SUCCEEDED = re.compile(r"if\s*\(\s*[^()!]*\.ok\b[^()]*\)\s*\{")
+# `setSomething({ ok: true, … })` — recording that it was applied in the
+# component's own state. The setter is captured because the state it writes is
+# what the JSX renders, and the name of that state follows from it.
+# Recording the verdict for this component's own JSX to render. Two spellings,
+# because the repository has two and neither is wrong: a boolean `ok: true`, and
+# a discriminant whose value names the good case (`tone: 'ok'`, `status:
+# 'success'`). What is **not** accepted is a bare setter call with no literal in
+# it — that says the run stored something, not that it stored good news.
+RECORDS_SUCCESS = re.compile(
+    r"\b(?P<setter>set[A-Z]\w*)\(\s*\{[^{}]*"
+    r"(?:\bok:\s*true\b|:\s*'(?:ok|success)')"
+    r"[^{}]*\}\s*\)"
+)
+# `setOutcome(await follow(id))` — the verdict computed somewhere else and only
+# stored here. `UpdateNowButton` is written this way because it has to follow a
+# run it started before it can say how it went, and the answer is built by the
+# function that does the following. Reading only the run body would call that
+# component mute, which it is not.
+HANDS_OVER_THE_VERDICT = re.compile(r"\bset[A-Z]\w*\(\s*(?:await\s+)?(?P<fn>\w+)\s*\(")
+# And what that function does is **return** the verdict, not store it: the
+# setter is at the call site. Same two spellings of a good case as above.
+RETURNS_SUCCESS = re.compile(r"\breturn\s*\{[^{}]*(?:\bok:\s*true\b|:\s*'(?:ok|success)')[^{}]*\}")
+# The other honest channel: saying it out loud, to something that is not this
+# component. Either spelling of the project's helper counts.
+ANNOUNCES_SUCCESS = re.compile(
+    r"\baddToast\(\s*\{[^{}]*\btype:\s*'success'[^{}]*\}|\btoast\.success\s*\("
+)
+# `<Toaster />` in the root layout: where an announcement is rendered, and the
+# reason it survives the component that made it.
+TOASTER_IS_MOUNTED = re.compile(r"<Toaster\b")
+
+PAIRS = {"{": "}", "(": ")"}
+
+
+def balanced_block(source: str, opening: int) -> str:
+    """What lies between the bracket at `opening` and the one that closes it."""
+    opened = source[opening]
+    closed = PAIRS[opened]
     depth = 0
     for index in range(opening, len(source)):
-        if source[index] == "{":
+        if source[index] == opened:
             depth += 1
-        elif source[index] == "}":
+        elif source[index] == closed:
             depth -= 1
             if depth == 0:
                 return source[opening + 1 : index]
     return ""
 
 
+def body_after_parameters(source: str, at: int) -> tuple[int, str] | None:
+    """The `{ … }` a function opens after its parameter list, and where it opens.
+
+    `at` is just past the function's name, on its parameter list if it has one.
+    The list is skipped as a balanced pair, which is the whole point of reading
+    it this way rather than jumping to the next brace: the parameters may open
+    braces of their own.
+
+    Nothing means this is not a function — the same walk runs over every `const`
+    in the file, and most of them are not.
+    """
+    if source[at : at + 1] == "(":
+        at += len(balanced_block(source, at)) + 2
+    body = THE_BODY.match(source, at)
+    if body is None:
+        return None
+    opening = body.end() - 1
+    return opening, balanced_block(source, opening)
+
+
+def blocks(source: str, starts: list[int]) -> list[tuple[int, int, str]]:
+    """The body each of those functions opens, as (start, end, code)."""
+    found = []
+    for at in starts:
+        body = body_after_parameters(source, at)
+        if body is None:
+            continue
+        opening, code = body
+        found.append((opening + 1, opening + 1 + len(code), code))
+    return found
+
+
+def past_the_name(source: str, at: int) -> int:
+    """Where a function's name ends, which is `at` when it has none.
+
+    Every piece of `A_NAME` is optional, so the match is always there — but an
+    arrow written inline in the JSX has no name to walk past, and saying that
+    out loud is cheaper than a reader working out that the empty match is legal.
+    """
+    name = A_NAME.match(source, at)
+    return name.end() if name is not None else at
+
+
+def async_runs(source: str) -> list[tuple[int, int, str]]:
+    """Every `async … { … }`: a named function, an assigned arrow, or one in the JSX.
+
+    Which of them runs an action is decided by what it calls, never by what it
+    is called.
+    """
+    return blocks(source, [past_the_name(source, found.end()) for found in ASYNC.finditer(source)])
+
+
+def functions(source: str) -> list[tuple[int, int, str]]:
+    """Every function in the file, however it was declared."""
+    return blocks(
+        source,
+        [
+            found.end()
+            for pattern in (A_DECLARATION, AN_ASSIGNMENT)
+            for found in pattern.finditer(source)
+        ],
+    )
+
+
 def what_runs_on_success(code: str) -> str:
     """The code with every branch that returns early taken out of it.
 
-    What is left is what a run that reaches the end executes — the success
-    path — whatever order the statements were written in. That is the whole
-    point of asking it this way: the rule below is about which decisions the
-    component takes together, not about which line sits under which.
+    What is left is what a run that reaches the end executes, whatever order the
+    statements were written in. That is the whole point of asking it this way:
+    the rules below are about which decisions a component takes together, not
+    about which line sits under which.
     """
     kept: list[str] = []
     index = 0
     while index < len(code):
         if code[index] == "{":
-            body = braced_block(code, index)
+            body = balanced_block(code, index)
             if not RETURNS.search(body):
                 kept.append("{" + what_runs_on_success(body) + "}")
             index += len(body) + 2
@@ -423,64 +669,303 @@ def what_runs_on_success(code: str) -> str:
     return "".join(kept)
 
 
+def what_a_successful_run_does(run: str) -> str:
+    """Everything the run executes when the action worked, both guards allowed.
+
+    A component may test the failure and return —`if (!result.ok) { … return }`—
+    and speak afterwards, or test the success and speak inside it before
+    returning. Those are the same behaviour written two ways, so both are read:
+    the trimmed path for the first, the success-guarded blocks for the second.
+
+    What is left out is what only ever runs when it failed. That matters:
+    reading the run whole would count a message written inside
+    `if (!result.ok)` as an answer to RF-22, and telling somebody it was applied
+    on the way to telling them it was not is not an answer to anything.
+    """
+    reached = [what_runs_on_success(run)]
+    reached += [balanced_block(run, found.end() - 1) for found in SUCCEEDED.finditer(run)]
+    return "".join(reached)
+
+
+def actions_imported_by(source: str) -> list[tuple[str, str]]:
+    """The registered actions a file imports in order to *run* them.
+
+    Each one as `(exported name, the name this file calls it by)`. The two
+    differ under an alias, and both are needed: the export is what
+    `EXECUTED_BY` registered, and the alias is what the calls are written with.
+
+    A specifier marked `type` is dropped: it executes nothing, and a file that
+    imported only one of those would be pulled into every rule below and fail
+    `test_the_run_that_finishes_it_was_found` for having no run to read. Today
+    `app/actions/corrections.ts` exports no type, so nothing is being excluded —
+    which is exactly why it is worth writing down before one is exported.
+    """
+    reached = set(EXECUTED_BY.values())
+    found: list[tuple[str, str]] = []
+    for imported in IMPORTED_FROM_ACTIONS.finditer(source):
+        for specifier in imported["names"].split(","):
+            specifier = specifier.strip()
+            if not specifier or A_TYPE.match(specifier):
+                continue
+            identifiers = IDENTIFIER.findall(specifier)
+            # The **first** identifier decides whether this is a registered
+            # action, because that is the exported name; the **last** is what
+            # the calls in this file are written with, aliased or not.
+            if identifiers and identifiers[0] in reached:
+                found.append((identifiers[0], identifiers[-1]))
+    return found
+
+
+def manual_actions_in(source: str) -> list[str]:
+    """The registered actions a file runs, by the name its own calls use."""
+    return [called_by for _, called_by in actions_imported_by(source)]
+
+
+def runs_that_finish_an_action(source: str) -> list[str]:
+    """The body of every async run that calls one of the registered actions.
+
+    The *innermost* one around each call, so a handler is read whole and once
+    even when it was written inside another function — and so a component that
+    finishes two different actions is checked on both.
+    """
+    called = [
+        call.start()
+        for name in manual_actions_in(source)
+        for call in re.finditer(rf"\b{name}\s*\(", source)
+    ]
+    if not called:
+        return []
+    runs = async_runs(source)
+    innermost: dict[tuple[int, int], str] = {}
+    for at in called:
+        holding = [run for run in runs if run[0] <= at < run[1]]
+        if holding:
+            start, end, body = min(holding, key=lambda run: run[1] - run[0])
+            innermost[(start, end)] = body
+    return list(innermost.values())
+
+
+def what_holds(source: str, run: str) -> str:
+    """The whole component a run lives in, its JSX included.
+
+    The outermost function around it, because the run is a handler declared
+    inside the component and what has to show the verdict is what the
+    *component* returns. Read this way, a helper component written in the same
+    file — `Outcome`, beside `CorrectionDialog` — is not mistaken for it.
+    """
+    at = source.find(run)
+    holding = [body for start, end, body in functions(source) if start <= at < end]
+    return max(holding, key=len) if holding else ""
+
+
+def what_it_can_render(component: str) -> tuple[str, ...]:
+    """Every `return ( … )` of that component: each thing it can put on screen."""
+    return tuple(
+        balanced_block(component, found.end() - 1) for found in RETURNS_JSX.finditer(component)
+    )
+
+
+def state_behind(setter: str) -> str:
+    """The state a setter writes to: `setMessage` → `message`."""
+    return setter[3].lower() + setter[4:]
+
+
+def body_of(source: str, name: str) -> str:
+    """The body of the function declared under that name, or nothing."""
+    declared = re.compile(
+        rf"\bfunction\s+{re.escape(name)}\s*(?=\()"
+        rf"|\b(?:const|let)\s+{re.escape(name)}\s*(?::[^=;]*)?=\s*(?:async\s+)?(?=[(\w])"
+    )
+    bodies = blocks(source, [found.end() for found in declared.finditer(source)])
+    return bodies[0][2] if bodies else ""
+
+
+def says_it_was_applied(run: str, source: str = "") -> bool:
+    """Whether this run leaves anything behind that says the action worked.
+
+    Three honest channels, and the third is why this takes the file too. The
+    first two are written in the run itself: record the verdict for the
+    component's own JSX to render, or announce it to the toaster in the root
+    layout. The third hands the verdict over — `setOutcome(await follow(id))` —
+    and then what says the action worked is written in the function that was
+    called, not here. Judging that run by its own body alone would call it mute
+    while it is the most talkative of the three.
+
+    A run that does none of the three answers only half of RF-22 — and one that
+    does any of them only on the way out of a failure answers neither half.
+    """
+    on_success = what_a_successful_run_does(run)
+    if RECORDS_SUCCESS.search(on_success) or ANNOUNCES_SUCCESS.search(on_success):
+        return True
+    for handed in HANDS_OVER_THE_VERDICT.finditer(on_success):
+        computed = body_of(source, handed["fn"])
+        if RETURNS_SUCCESS.search(computed) or ANNOUNCES_SUCCESS.search(computed):
+            return True
+    return False
+
+
 @dataclass(frozen=True, slots=True)
-class SelfHidingDialog:
-    """A component that shows a form while open and a button while closed."""
+class Run:
+    """One run through which a manual action ends, as far as RF-22 is concerned."""
 
-    flag: str
-    """The state that says the form is open."""
+    body: str
+    """The run whole, failure branches and all."""
 
-    while_closed: str
-    """What it renders when that state is false."""
+    on_success: str
+    """Everything it does when the action worked, whichever way its guard is written."""
 
-    on_submit: str
-    """The body of the function that sends the correction."""
+    branches: tuple[str, ...]
+    """Every JSX its component can return.
 
-    setter: str
-    """The state setter it calls to record that the action was applied."""
-
-    @property
-    def closes_itself(self) -> re.Pattern[str]:
-        """`setOpen(false)`, spelled from the flag rather than assumed."""
-        return re.compile(rf"\bset{self.flag[0].upper()}{self.flag[1:]}\(\s*false\s*\)")
-
-    @property
-    def outcome(self) -> str:
-        """The state the outcome is written to: what the JSX has to render."""
-        return self.setter[3].lower() + self.setter[4:]
+    Not the branch that shows *after* this run: which one that is depends on
+    state this file cannot evaluate, and deciding it from the shape of an `if`
+    is what quietly stopped applying before. So the verdict is asked of all of
+    them, and a component that cannot honestly answer that has the toaster.
+    """
 
 
-def read_dialog() -> SelfHidingDialog | None:
-    """`CorrectionDialog.tsx` as far as RF-22 is concerned, or nothing.
+@dataclass(frozen=True, slots=True)
+class FinishedAction:
+    """A component where a manual action ends, read as these rules need it."""
 
-    Nothing means the component stopped being the shape this rule talks about
-    — it no longer hides itself, or no longer records an outcome — and
-    `test_it_hides_itself_and_reports_a_result` is what turns that into a
+    path: Path
+    runs: tuple[Run, ...]
+
+
+def screens_that_finish_an_action() -> list[Path]:
+    """Every component through which one of the actions in `EXECUTED_BY` is run."""
+    return [
+        path
+        for root in (COMPONENTS, APP)
+        for path in sorted(root.rglob("*.tsx"))
+        if manual_actions_in(path.read_text(encoding="utf-8"))
+    ]
+
+
+def read_screen(path: Path) -> FinishedAction | None:
+    """One of those components, or nothing if no run of it calls the action.
+
+    Nothing means the component stopped being the shape these rules talk about,
+    and `test_the_run_that_finishes_it_was_found` is what turns that into a
     failure instead of a rule that quietly stops applying.
     """
-    source = DIALOG.read_text(encoding="utf-8")
-
-    closed = next(
-        (
-            (found["flag"], block)
-            for found in WHILE_CLOSED.finditer(source)
-            if RETURNS.search(block := braced_block(source, found.end() - 1))
-        ),
-        None,
-    )
-    submitted = next(
-        (
-            (block, recorded["setter"])
-            for found in SUBMIT_HANDLER.finditer(source)
-            if (recorded := RECORDS_SUCCESS.search(block := braced_block(source, found.end() - 1)))
-        ),
-        None,
-    )
-    if closed is None or submitted is None:
+    source = path.read_text(encoding="utf-8")
+    runs = runs_that_finish_an_action(source)
+    if not runs:
         return None
-    return SelfHidingDialog(
-        flag=closed[0], while_closed=closed[1], on_submit=submitted[0], setter=submitted[1]
+    return FinishedAction(
+        path=path,
+        runs=tuple(
+            Run(
+                body=run,
+                on_success=what_a_successful_run_does(run),
+                branches=what_it_can_render(what_holds(source, run)),
+            )
+            for run in runs
+        ),
     )
+
+
+def where_each_action_is_run() -> dict[str, list[Path]]:
+    """For every action of `EXECUTED_BY`, the components that import it to run it.
+
+    Keyed by the **exported** name, which is the one written down: an alias
+    changes what a component calls it, never what the registry reached for.
+    """
+    found: dict[str, list[Path]] = {name: [] for name in EXECUTED_BY.values()}
+    for root in (COMPONENTS, APP):
+        for path in sorted(root.rglob("*.tsx")):
+            for exported, _ in actions_imported_by(path.read_text(encoding="utf-8")):
+                found[exported].append(path)
+    return found
+
+
+@pytest.mark.unit
+class TestTheScopeOfThisRuleIsTheRegistry:
+    """What RF-22 is asked about is every row of `MANUAL_ACTIONS`, and nothing else.
+
+    The rules below run over whatever components happen to import a registered
+    action. That is the right way round — a screen is found, not remembered —
+    but it answers only half the question: it finds the screens of the actions
+    this file reached for, and says nothing about an action it never reached
+    for at all. That silence is the whole history of RF-22 here. Three screens
+    were missed, and not one of them failed anything on its way past.
+
+    So the registry is counted. Every row is either an action this file runs
+    RF-22 over, or a row of another feature that this file deliberately does
+    not judge, and a row that is neither fails. The judgement about which is
+    which stays a judgement — what stops being possible is making it by
+    accident.
+    """
+
+    def test_every_registered_action_is_accounted_for(self) -> None:
+        """A row nobody answered breaks this file, instead of being skipped in silence."""
+        # Arrange / Act
+        unaccounted = {action.id for action in registry()} - set(EXECUTED_BY) - ANOTHER_FEATURES
+
+        # Assert
+        assert not unaccounted, (
+            f"{sorted(unaccounted)} are registered in {REGISTRY} and this file does not "
+            "know what to do with them. RF-22 asks that every manual action say whether "
+            "it was applied, and an action nobody listed here is one nobody checks. Add "
+            "it to EXECUTED_BY with the Server Action that runs it, or to "
+            "ANOTHER_FEATURES if it is not this feature's to judge — but decide, "
+            "because leaving it out is how the same defect survived three times."
+        )
+
+    def test_nothing_is_accounted_for_that_the_registry_dropped(self) -> None:
+        """And the other direction, so this file cannot become a second registry.
+
+        An action removed from `MANUAL_ACTIONS` and left behind here would go on
+        being searched for, found nowhere, and reported by
+        `test_every_action_it_reaches_is_imported_somewhere` as a rename that
+        never happened.
+        """
+        # Arrange / Act
+        registered = {action.id for action in registry()}
+        invented = (set(EXECUTED_BY) | ANOTHER_FEATURES) - registered
+
+        # Assert
+        assert not invented, (
+            f"{sorted(invented)} are accounted for here and are not in {REGISTRY} any "
+            "more: this file is describing a screen the product no longer offers."
+        )
+
+    def test_an_action_is_accounted_for_once(self) -> None:
+        """Judged here or left to its own feature — claiming both hides which one won."""
+        # Arrange / Act
+        both = set(EXECUTED_BY) & ANOTHER_FEATURES
+
+        # Assert
+        assert not both, (
+            f"{sorted(both)} are listed as this feature's and as another's at the same "
+            "time: EXECUTED_BY wins, and the second listing is a reader being told "
+            "something untrue."
+        )
+
+    def test_every_action_it_reaches_is_imported_somewhere(self) -> None:
+        """A name written here that matches nothing reaches nothing.
+
+        This is what keeps the last hand-written step honest. Rename
+        `resolveCase`, or delete the component that runs it, and the search goes
+        on running — over an empty list, in green, with the row still looking
+        accounted for. Exactly the shape of the failure this whole section
+        exists to make impossible.
+        """
+        # Arrange / Act
+        unreachable = {
+            action: name
+            for action, name in EXECUTED_BY.items()
+            if not where_each_action_is_run()[name]
+        }
+
+        # Assert
+        assert not unreachable, (
+            f"{unreachable} name Server Actions that no component under {COMPONENTS} nor "
+            f"{APP} imports. Either the export was renamed and this file was not, or the "
+            "screen that ran the action is gone — and RF-22 stopped being checked on it "
+            "either way. Point the entry at the name that runs it now."
+        )
 
 
 @pytest.mark.unit
@@ -493,66 +978,541 @@ class TestTheResultOfACorrectionReachesTheScreen:
     an outcome the API returned and the screen never showed is, from the desk
     where the work happens, indistinguishable from nothing having happened.
 
-    `CorrectionDialog` is where it can go wrong, because it hides itself: while
-    `open` is false it renders only the button that opens it. So *saying it
-    worked* and *closing* are one decision, and a component that takes both in
-    the same run writes the message into a place nobody will ever look.
+    Which components are asked is not decided here: `EXECUTED_BY` names the
+    four actions 003 registered, and the component that runs one is whichever
+    imports it. Nothing about that is a list of screens — the way this went
+    wrong the first time was not that somebody wrote the rule badly, it was that
+    the second button was never inside it, and `TestTheScopeOfThisRuleIsTheRegistry`
+    is what now makes an action nobody accounted for fail out loud.
 
     Why a Python test for TSX: the same reason as the rest of this file — the
     frontend has no runner. And why it is written against the code's decisions
     rather than its lines: a static reading of a component is only worth having
     if it survives the component being rearranged. The question asked is the
-    behaviour — *can the person read that it worked?* — and there is more than
-    one honest answer: keep the dialog open on success, or render the outcome
-    from the closed branch too. Either passes.
+    behaviour — *can the person read that it worked?* — and there are two honest
+    answers to it. Keep the verdict in the component's own state, and render it
+    from everything the component can put on screen; or announce it to the
+    toaster in the root layout, which outlives the component that spoke. The one
+    that does not pass is the component that says nothing.
+
+    **Which of the two a component owes is not decided here.** The toaster is
+    what a component has to use when its own success takes it off the screen,
+    and nothing in the source says whether a refresh does that — that hole is
+    written down above `FRONTEND`, and it is the reason this class cannot claim
+    that `RevertCorrectionButton` announces for the right reason, only that it
+    announces. What is enforced is the half that *is* written down, and it is
+    deliberately strict: a verdict written into state has to be readable from
+    every branch, because working out which branch shows after the run is the
+    reasoning that silently stopped applying. A component with a branch that has
+    nothing to do with the correction has the toaster.
+
+    Rearranged includes the shape of the guard. A component may test the failure
+    and return —`if (!result.ok) { … return }`— and speak afterwards, or test
+    the success and speak inside it before returning. `what_a_successful_run_does`
+    reads both, and reads neither the code that only runs when it failed.
     """
 
-    def test_the_dialog_is_there_to_read(self) -> None:
-        """A move or a rename must not quietly turn this rule off."""
-        # Assert
-        assert DIALOG.exists(), f"{DIALOG} is where a correction is confirmed (RF-11, RF-22)"
-
-    def test_it_hides_itself_and_reports_a_result(self) -> None:
-        """The two facts the rule below stands on, checked before it is applied.
-
-        If the component stops hiding itself, or stops recording an outcome,
-        the next test has nothing to say and would say it in green. This one
-        fails instead, and whoever reads it knows the rule has to be rewritten
-        rather than deleted.
-        """
+    def test_there_are_screens_to_check(self) -> None:
+        """A move or a rename must not quietly turn this whole rule off."""
         # Arrange / Act
-        dialog = read_dialog()
+        screens = screens_that_finish_an_action()
 
         # Assert
-        assert dialog is not None, (
-            f"{DIALOG.name} no longer reads as a dialog that hides itself behind a flag "
-            "and records `{ ok: true }` when the correction goes through, which is what "
-            "this rule is about: check whether RF-22 moved, and rewrite it here."
+        assert screens, (
+            "no component imports any of the actions this file reaches for: the "
+            f"screens of {sorted(EXECUTED_BY)} are not under {COMPONENTS} nor "
+            f"{APP}, and this rule is checking nothing. Find where a manual "
+            "action is confirmed now."
         )
 
-    def test_the_success_message_can_be_read(self) -> None:
-        """A correction that worked has to leave something on screen that says so.
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
+    def test_the_run_that_finishes_it_was_found(self, path: Path) -> None:
+        """A component this file cannot read must break it, not disappear.
 
-        Either the run that succeeds does not close the dialog, or what the
-        dialog renders while closed shows the outcome as well. Taking both
-        decisions at once — write the message, then close — is the one
-        combination that leaves the person with nothing: the correction was
-        applied, the row refreshes, and RF-22's «se aplicó» never appears.
+        Both rules below are asked of the run that calls the action. If that
+        run cannot be found — the call moved out of an async function, or into
+        a shape this file does not parse — they have nothing to say and would
+        say it in green.
+        """
+        # Assert
+        assert read_screen(path) is not None, (
+            f"{path.name} imports a correction action and no async run of it calls "
+            "one: RF-22 is no longer checked on this screen. Find where the action "
+            "is executed now, and rewrite this rule around it rather than dropping it."
+        )
+
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
+    def test_what_the_screen_can_render_was_found(self, path: Path) -> None:
+        """And neither may the half that says *where the verdict is read*.
+
+        `test_the_success_message_can_be_read` compares the verdict against the
+        JSX the component returns. If none was found — the component is written
+        in a shape this file does not walk, or its JSX is returned without the
+        parentheses Prettier puts there — that comparison is against an empty
+        list, which passes for free. This is the guard that broke when the rule
+        was last rewritten, and it is what keeps it from being rewritten away
+        again: the parse failing has to look like a failure.
         """
         # Arrange
-        dialog = read_dialog()
-        assert dialog is not None, "guarded by test_it_hides_itself_and_reports_a_result"
+        screen = read_screen(path)
+        assert screen is not None, "guarded by test_the_run_that_finishes_it_was_found"
 
-        # Act
-        on_success = what_runs_on_success(dialog.on_submit)
-        closes_on_success = dialog.closes_itself.search(on_success) is not None
-        readable_while_closed = re.search(rf"\b{dialog.outcome}\b", dialog.while_closed) is not None
+        # Act / Assert
+        for run in screen.runs:
+            assert run.branches, (
+                f"{path.name} finishes a manual action and this file found nothing it "
+                "can render: it walks `function Name(…)` and `const Name = (…) =>`, and "
+                "reads what they `return ( … )`. The component is written some other "
+                "way, so the rule about where the verdict can be read is comparing "
+                "against nothing. Teach this file that shape rather than leaving it green."
+            )
+
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
+    def test_it_says_that_it_was_applied(self, path: Path) -> None:
+        """A run that succeeds has to leave something that says so.
+
+        This is the half RF-22 lost twice. A component that only ever writes
+        the failure answers «si falló» and stays silent on «si se aplicó»: the
+        person presses the button, the row refreshes, and the only difference
+        between it having worked and nothing having happened is that the button
+        is gone.
+        """
+        # Arrange
+        screen = read_screen(path)
+        assert screen is not None, "guarded by test_the_run_that_finishes_it_was_found"
+
+        # Act / Assert
+        for run in screen.runs:
+            assert says_it_was_applied(run.body, path.read_text(encoding="utf-8")), (
+                f"{path.name} finishes a manual action and its successful run says "
+                "nothing: it records no verdict for its own JSX to render, hands none "
+                "to a function that would, and announces none to the toaster. RF-22 "
+                "asks for «si se aplicó o si falló», and this screen only ever answers "
+                "the second half."
+            )
+
+    @pytest.mark.parametrize("path", screens_that_finish_an_action(), ids=lambda path: path.name)
+    def test_the_success_message_can_be_read(self, path: Path) -> None:
+        """And a verdict kept in state has to be rendered wherever it can be needed.
+
+        Writing `{ ok: true }` into a state that no JSX reads puts the
+        confirmation in a variable; hiding the one branch that reads it puts the
+        confirmation behind a form nobody reopens. They are the same defect —
+        the message exists and the person cannot get to it — and both are the
+        same question: does everything this component can render read the
+        verdict?
+
+        Asked of every branch on purpose. Which branch shows after the run
+        depends on state this file cannot evaluate, and the reading that tried
+        to work it out from `if (!open)` stopped applying the day the condition
+        was written differently. A component that has a branch with no business
+        showing the verdict is not stuck: it announces to the toaster instead,
+        and this rule never fires.
+        """
+        # Arrange
+        screen = read_screen(path)
+        assert screen is not None, "guarded by test_the_run_that_finishes_it_was_found"
+
+        # Act / Assert
+        for run in screen.runs:
+            recorded = RECORDS_SUCCESS.search(run.on_success)
+            if recorded is None:
+                continue
+            outcome = state_behind(recorded["setter"])
+            silent = [branch for branch in run.branches if not re.search(rf"\b{outcome}\b", branch)]
+            assert not silent, (
+                f"{path.name} writes the verdict of a correction into `{outcome}`, and "
+                f"{len(silent)} of the {len(run.branches)} things it can render never read "
+                f"it. Whoever corrected a value lands on one of those and finds the "
+                "confirmation nowhere: RF-22 answers when an action fails, because a "
+                "failure leaves the form open, and says nothing when it works. Render "
+                f"`{outcome}` from every branch, or announce the verdict to the toaster, "
+                "which outlives this component."
+            )
+
+    def test_what_is_announced_is_rendered_somewhere(self) -> None:
+        """The toaster is the other half of announcing, and it lives elsewhere.
+
+        A screen that speaks to it is trusting a component in the root layout
+        to be there. Take `<Toaster />` out of the layout and every one of those
+        confirmations goes into a store nothing renders — with no error, and
+        with this file otherwise green.
+        """
+        # Arrange
+        announced = [
+            screen.path
+            for screen in map(read_screen, screens_that_finish_an_action())
+            if screen is not None and any(ANNOUNCES_SUCCESS.search(run.body) for run in screen.runs)
+        ]
+        if not announced:
+            pytest.skip("no screen announces its outcome to the toaster")
+
+        # Act / Assert
+        assert TOASTER_IS_MOUNTED.search(LAYOUT.read_text(encoding="utf-8")), (
+            f"{[path.name for path in announced]} announce that the action was applied "
+            f"to the toaster, and {LAYOUT} no longer renders it: nothing on screen shows "
+            "what they say."
+        )
+
+
+# Components written on purpose, to ask the rules above about shapes that are
+# not in the repository today. They are the smallest thing that parses as what
+# those rules look for: an import of a correction action and one async run that
+# calls it.
+SAYS_IT_INSIDE_THE_GUARD = """\
+import { revertCorrection } from '@/app/actions/corrections'
+
+export function Undo() {
+  async function onClick() {
+    const result = await revertCorrection(1)
+    if (result.ok) {
+      addToast({ type: 'success', title: 'Hecho', description: 'Volvió al valor del portal.' })
+      router.refresh()
+      return
+    }
+    setError(result.message)
+  }
+}
+"""
+
+SAYS_IT_AFTER_THE_GUARD = """\
+import { revertCorrection } from '@/app/actions/corrections'
+
+export function Undo() {
+  async function onClick() {
+    const result = await revertCorrection(1)
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    addToast({ type: 'success', title: 'Hecho', description: 'Volvió al valor del portal.' })
+    router.refresh()
+  }
+}
+"""
+
+SAYS_NOTHING = """\
+import { revertCorrection } from '@/app/actions/corrections'
+
+export function Undo() {
+  async function onClick() {
+    const result = await revertCorrection(1)
+    if (result.ok) {
+      router.refresh()
+      return
+    }
+    setError(result.message)
+  }
+}
+"""
+
+
+SAYS_IT_ON_THE_WAY_OUT_OF_THE_FAILURE = """\
+import { revertCorrection } from '@/app/actions/corrections'
+
+export function Undo() {
+  async function onClick() {
+    const result = await revertCorrection(1)
+    if (!result.ok) {
+      addToast({ type: 'success', title: 'No se pudo deshacer', description: result.message })
+      return
+    }
+    router.refresh()
+  }
+}
+"""
+
+A_DESTRUCTURED_PARAMETER = """\
+import { revertCorrection } from '@/app/actions/corrections'
+
+export function Undo() {
+  const onClick = async ({ correctionId }: { correctionId: number }) => {
+    const result = await revertCorrection(correctionId)
+    if (!result.ok) {
+      setError(result.message)
+      return
+    }
+    addToast({ type: 'success', title: 'Hecho', description: 'Volvió al valor del portal.' })
+  }
+
+  return (
+    <button onClick={() => onClick({ correctionId: 1 })}>Volver al valor del portal</button>
+  )
+}
+"""
+
+HIDES_THE_ONLY_PLACE_IT_SAYS_SO = """\
+import { correctProduct } from '@/app/actions/corrections'
+
+function Outcome({ ok, text }: { ok: boolean; text: string }) {
+  return (
+    <span className={ok ? 'ok' : 'bad'}>{text}</span>
+  )
+}
+
+export function Correct() {
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}>Corregir</button>
+    )
+  }
+
+  async function onSubmit() {
+    const result = await correctProduct({ productId: 1 })
+    if (!result.ok) {
+      setMessage({ ok: false, text: result.message })
+      return
+    }
+    setMessage({ ok: true, text: 'Corregido.' })
+    setOpen(false)
+  }
+
+  return (
+    <form onSubmit={onSubmit}>{message && <Outcome ok={message.ok} text={message.text} />}</form>
+  )
+}
+"""
+
+SAYS_IT_WHEREVER_IT_ENDS_UP = """\
+import { correctProduct } from '@/app/actions/corrections'
+
+function Outcome({ ok, text }: { ok: boolean; text: string }) {
+  return (
+    <span className={ok ? 'ok' : 'bad'}>{text}</span>
+  )
+}
+
+export function Correct() {
+  if (!open) {
+    return (
+      <span>
+        <button onClick={() => setOpen(true)}>Corregir</button>
+        {message && <Outcome ok={message.ok} text={message.text} />}
+      </span>
+    )
+  }
+
+  async function onSubmit() {
+    const result = await correctProduct({ productId: 1 })
+    if (!result.ok) {
+      setMessage({ ok: false, text: result.message })
+      return
+    }
+    setMessage({ ok: true, text: 'Corregido.' })
+    setOpen(false)
+  }
+
+  return (
+    <form onSubmit={onSubmit}>{message && <Outcome ok={message.ok} text={message.text} />}</form>
+  )
+}
+"""
+
+
+def branches_around_the_run(source: str) -> tuple[str, ...]:
+    """What the component holding the first run of `source` can put on screen."""
+    return what_it_can_render(what_holds(source, runs_that_finish_an_action(source)[0]))
+
+
+@pytest.mark.unit
+class TestTheseRulesReadWhatTheyClaimTo:
+    """The section above is a parser, and a parser that is wrong fails good code.
+
+    Its rules run against whatever components happen to exist, so nothing else
+    says they still accept the shapes they promise to accept — a component
+    rearranged into one of them would look like a defect, and a rule that fails
+    correct code is the shortest road to somebody weakening it (`TEST-06`).
+
+    Every case pinned here was a real mistake of this file or of a reading of
+    it: it read the success path where it meant to read the whole run, it called
+    a type import a screen, it took the braces of a destructured parameter for a
+    function body, and — for as long as it read the whole run — it would have
+    taken a success message written on the way out of a failure for an answer to
+    RF-22.
+    """
+
+    def test_a_run_that_says_it_inside_the_guard_answers_rf_22(self) -> None:
+        """`if (result.ok) { addToast(…); return }` tells the person it worked.
+
+        The same behaviour as the guard written the other way round, and the
+        reading that trims every returning branch does not see it: the whole
+        success path lives inside a block that returns.
+        """
+        # Arrange / Act
+        runs = runs_that_finish_an_action(SAYS_IT_INSIDE_THE_GUARD)
 
         # Assert
-        assert not closes_on_success or readable_while_closed, (
-            f"{DIALOG.name} writes the outcome to `{dialog.outcome}` and, in the same run, "
-            f"sets `{dialog.flag}` to false — and what it renders while closed never reads "
-            f"`{dialog.outcome}`. So the person who corrected a value watches the dialog "
-            "vanish and finds the confirmation nowhere: RF-22 answers when an action fails, "
-            "because a failure leaves the dialog open, and says nothing when it works."
+        assert len(runs) == 1
+        assert says_it_was_applied(runs[0]), (
+            "a component that announces the success inside `if (result.ok)` is being "
+            "read as saying nothing: the rule is failing correct code."
         )
+
+    def test_a_run_that_says_it_after_the_guard_answers_rf_22(self) -> None:
+        """And the other spelling, which is how the repository writes it today."""
+        # Arrange / Act
+        runs = runs_that_finish_an_action(SAYS_IT_AFTER_THE_GUARD)
+
+        # Assert
+        assert len(runs) == 1
+        assert says_it_was_applied(runs[0])
+
+    def test_a_run_that_only_writes_the_failure_does_not(self) -> None:
+        """The defect itself, so widening the reading did not empty the rule."""
+        # Arrange / Act
+        runs = runs_that_finish_an_action(SAYS_NOTHING)
+
+        # Assert
+        assert len(runs) == 1
+        assert not says_it_was_applied(runs[0]), (
+            "a run that refreshes and says nothing is passing: the rule no longer "
+            "catches the half of RF-22 it exists for."
+        )
+
+    def test_a_success_message_written_into_the_failure_does_not(self) -> None:
+        """«Se aplicó» inside `if (!result.ok)` answers neither half of RF-22.
+
+        The counterpart of reading the run whole. Widening the question to
+        *does it say so anywhere* is right for a guard written either way round,
+        and wrong the moment the message is on the branch that only runs when it
+        failed: the run that succeeds still goes on saying nothing, and the one
+        that fails says the opposite of what happened.
+        """
+        # Arrange / Act
+        runs = runs_that_finish_an_action(SAYS_IT_ON_THE_WAY_OUT_OF_THE_FAILURE)
+
+        # Assert
+        assert len(runs) == 1
+        assert not says_it_was_applied(runs[0]), (
+            "a success message written inside `if (!result.ok)` is being counted as "
+            "an answer to RF-22: the successful run says nothing and this rule agrees "
+            "with it."
+        )
+
+    def test_a_destructured_parameter_is_not_the_body(self) -> None:
+        """`async ({ id }: { id: number }) => {` opens braces before its body does.
+
+        A reading that took the first brace after `async` would come back with
+        the destructuring — ` correctionId ` — as the run, find the call to the
+        action inside no run at all, and fail
+        `test_the_run_that_finishes_it_was_found` on a component that answers
+        RF-22 perfectly well.
+        """
+        # Arrange / Act
+        runs = runs_that_finish_an_action(A_DESTRUCTURED_PARAMETER)
+
+        # Assert
+        assert len(runs) == 1, (
+            "the run of a handler with a destructured parameter was not found: this "
+            "file is about to fail correct code for the shape of its arguments."
+        )
+        assert says_it_was_applied(runs[0])
+
+    def test_the_trimmed_success_path_still_drops_what_returns(self) -> None:
+        """The other reading is unchanged, and both rules are built on it.
+
+        `what_runs_on_success` is about decisions taken when the action worked,
+        so it has to keep dropping every branch that returns — the one that
+        reports the failure above all, which is what keeps a message written
+        there from counting.
+        """
+        # Arrange / Act
+        trimmed = what_runs_on_success(runs_that_finish_an_action(SAYS_IT_INSIDE_THE_GUARD)[0])
+
+        # Assert
+        assert "addToast" not in trimmed
+        assert "setError" in trimmed
+
+    def test_the_component_around_the_run_is_the_one_read(self) -> None:
+        """Its own JSX, not a helper's, and not the handler's.
+
+        `what_holds` takes the outermost function around the run, so a helper
+        component written in the same file — `Outcome`, exactly as
+        `CorrectionDialog` writes it — is not counted among the things the
+        component can render. If it were, every rule below would demand that the
+        helper read a state that is not its.
+        """
+        # Arrange / Act
+        branches = branches_around_the_run(SAYS_IT_WHEREVER_IT_ENDS_UP)
+
+        # Assert
+        assert len(branches) == 2, (
+            f"the component around the run was not read as the two things it can render: {branches}"
+        )
+        assert all("message" in branch for branch in branches), (
+            "a component that renders the verdict from both of its branches is being "
+            "read as hiding it: the rule is failing correct code."
+        )
+
+    def test_a_verdict_the_component_can_hide_is_caught(self) -> None:
+        """And the defect: written into state, rendered from only one branch.
+
+        The person corrects a value, the form closes, and the confirmation is
+        left inside the branch that closing took away. This is asked without
+        reading the condition that hides it, which is the point — the previous
+        reading understood `if (!open)` and nothing else, so rewriting it as
+        `if (open === false)` turned the rule off in silence.
+        """
+        # Arrange / Act
+        branches = branches_around_the_run(HIDES_THE_ONLY_PLACE_IT_SAYS_SO)
+
+        # Assert
+        assert len(branches) == 2
+        assert [branch for branch in branches if "message" not in branch], (
+            "a component that writes the verdict and renders it from only one of its "
+            "two branches is passing: the rule no longer catches the combination it "
+            "exists for."
+        )
+
+    @pytest.mark.parametrize(
+        ("source", "expected"),
+        [
+            ("import type { CorrectionOutcome } from '@/app/actions/corrections'", []),
+            ("import { type CorrectionOutcome } from '@/app/actions/corrections'", []),
+            (
+                "import { type CorrectionOutcome, revertCorrection } "
+                "from '@/app/actions/corrections'",
+                ["revertCorrection"],
+            ),
+            (
+                "import { correctProduct, revertCorrection } from '@/app/actions/corrections'",
+                ["correctProduct", "revertCorrection"],
+            ),
+        ],
+        ids=["import-type", "inline-type", "a-type-and-an-action", "two-actions"],
+    )
+    def test_a_type_is_not_an_action(self, source: str, expected: list[str]) -> None:
+        """A name imported for the type checker runs nothing, in either spelling.
+
+        This is what keeps a file that imports only a type out of the search. If
+        it were dragged in, it would fail every rule below for having no run to
+        read — and the rules have nothing to say about it.
+        """
+        # Arrange / Act / Assert
+        assert manual_actions_in(source) == expected
+
+    @pytest.mark.parametrize(
+        ("source", "expected"),
+        [
+            ("import { resolveCase } from '@/app/actions/triage'", ["resolveCase"]),
+            ("import { revokeRule } from '@/app/actions/triage'", []),
+            ("import { resolveSaleGroup } from '@/app/actions/sales'", []),
+            (
+                "import { resolveCase as resolve } from '@/app/actions/triage'",
+                ["resolve"],
+            ),
+        ],
+        ids=["registered", "same-module-unregistered", "another-feature", "aliased"],
+    )
+    def test_only_a_registered_action_is_a_screen(self, source: str, expected: list[str]) -> None:
+        """The module a name comes from decides nothing; `EXECUTED_BY` decides everything.
+
+        `@/app/actions/triage` exports a manual action of this feature and the
+        rule management of 001 side by side, and `@/app/actions/sales` exports a
+        manual action this file leaves to its own feature. Reading a whole
+        module would drag both in and fail them against a rule neither answers
+        to; reading none of it but `corrections` is how `CaseCard` went
+        unchecked. What is read is the name.
+        """
+        # Arrange / Act / Assert
+        assert manual_actions_in(source) == expected

@@ -8,38 +8,88 @@
  */
 import type { AuditAction, AuditEntry } from '@/lib/operations/types'
 
-const ACTIONS: Record<AuditAction, string> = {
-  CREATED: 'Cargó',
-  UPDATED: 'Modificó',
-  CORRECTED: 'Corrigió',
-  CORRECTION_REVERTED: 'Deshizo una corrección',
-}
+/**
+ * The word this screen reads for each action the backend records.
+ *
+ * A `Map`, like the two below and for the same reason: every key looked up in
+ * this file arrives from outside — the API, or the address bar — and an object
+ * answers `constructor` or `toString` with something inherited that is not a
+ * label at all, which the `??` fallbacks below would then hand to the screen
+ * as if it were one.
+ *
+ * The entries are still written as a record so `satisfies` can demand all of
+ * them: these keys are the whole enum, so an action added to the backend has
+ * to break the build here instead of reaching the screen as `MERGED`.
+ */
+const ACTIONS = new Map<string, string>(
+  Object.entries({
+    CREATED: 'Cargó',
+    UPDATED: 'Modificó',
+    CORRECTED: 'Corrigió',
+    CORRECTION_REVERTED: 'Deshizo una corrección',
+  } satisfies Record<AuditAction, string>)
+)
 
-const ENTITIES: Record<string, string> = {
-  'operations.parameter': 'Parámetro del sistema',
-  'catalog.product': 'Producto',
-  'catalog.product_price': 'Precio',
-}
+/** The kinds of datum this screen has a word for. Every feature adds its line. */
+const ENTITIES = new Map<string, string>([
+  ['operations.parameter', 'Parámetro del sistema'],
+  ['catalog.product', 'Producto'],
+  ['catalog.product_price', 'Precio'],
+])
 
-const FIELDS: Record<string, string> = {
-  price: 'precio',
-  currency: 'moneda',
-  description: 'descripción',
-}
+const FIELDS = new Map<string, string>([
+  ['price', 'precio'],
+  ['currency', 'moneda'],
+  ['description', 'descripción'],
+])
 
 /** What the change did, in one word. */
 export function actionLabel(action: AuditAction): string {
-  return ACTIONS[action] ?? action
+  return ACTIONS.get(action) ?? action
 }
 
-/** What kind of datum it touched. An unknown kind answers with its own name. */
+/**
+ * What kind of datum it touched.
+ *
+ * A kind with no line in `ENTITIES` is a gap in this screen's vocabulary, not
+ * an ordinary row, and it is neither hidden nor shown raw. Raw is jargon the
+ * owner never asked for — `purchases.supplier`, which the backend already
+ * writes, on a screen in Spanish (`TS-09`) — and hiding it would make two
+ * different kinds of datum read the same, in a log whose whole job is letting
+ * a number be explained afterwards.
+ * So it is named in Spanish and keeps its technical key, which is also what
+ * makes the missing line visible to whoever has to add it.
+ */
 export function entityLabel(entityType: string): string {
-  return ENTITIES[entityType] ?? entityType
+  return ENTITIES.get(entityType) ?? `Otro dato (${entityType})`
 }
 
-/** Which field, when the change was to one field and not to the whole record. */
+/**
+ * Which field, when the change was to one field and not to the whole record.
+ *
+ * Same decision as `entityLabel`, in lower case because the row reads it right
+ * after one: which field changed survives even when its name does not.
+ */
 export function fieldLabel(field: string | null): string | null {
-  return field === null ? null : (FIELDS[field] ?? field)
+  if (field === null) return null
+  return FIELDS.get(field) ?? `otro campo (${field})`
+}
+
+/**
+ * Whether this is a kind of datum the screen knows by name.
+ *
+ * The history of a single datum is asked for through the address bar
+ * (`?entidad=…&id=…`), so the kind is text anybody can type. It is not cleaned,
+ * it is *matched* — and against the kinds this screen can name, not against
+ * everything that exists: `purchases.supplier` is written by the backend
+ * today, and until the feature that writes it adds its line above it is
+ * answered here the same as a typo. Which is the honest answer while it lasts,
+ * because the screen has no word for it either, and a different answer from
+ * "no hubo cambios", so it has to be said differently. A feature that starts
+ * linking here adds its line above, the same line that gives it a label.
+ */
+export function isKnownEntityType(entityType: string): boolean {
+  return ENTITIES.has(entityType)
 }
 
 /**

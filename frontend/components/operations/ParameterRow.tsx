@@ -9,6 +9,25 @@ import { Input } from '@/components/ui/input'
 import type { Parameter } from '@/lib/operations/types'
 
 /**
+ * A bound as `min`/`max` can read it, or nothing at all.
+ *
+ * The generated schema types a bound `unknown`, and honestly so: what a
+ * parameter's range is made of depends on what it measures — minutes, days, a
+ * percentage, an hour of the day — and the API sends whatever that kind holds.
+ * The attributes take a string or a number, so the question is asked rather
+ * than asserted: an assertion here would promise the compiler a `string` for a
+ * shape nobody checked, and React would hand the DOM the `[object Object]` it
+ * stringifies to. That is not a number the browser can parse, so it drops the
+ * bound and the courtesy below stops existing without a word — the same silence
+ * this leaves, only chosen instead of stumbled into, and with no bound written
+ * into the markup that means nothing. What refuses the value either way is the
+ * API.
+ */
+function bound(value: unknown): string | number | undefined {
+  return typeof value === 'string' || typeof value === 'number' ? value : undefined
+}
+
+/**
  * One parameter of the system, with what it does and what it may be (RF-05).
  *
  * A Client Component because it is a field with state. Each row saves on its
@@ -18,6 +37,12 @@ import type { Parameter } from '@/lib/operations/types'
  *
  * The `min` and `max` on the input are a courtesy, never the rule. The refusal
  * is the API's, and the browser only spares the round trip.
+ *
+ * The verdict goes into a live region that is on the page from the start and
+ * only changes its text. Whoever saves a parameter without seeing the screen
+ * has nothing else to go on: the value in the field is the one they typed
+ * whether it was accepted or refused, so «Guardado.» and the range the API
+ * answers with are the entire difference between the two (RF-22, RF-06).
  */
 export function ParameterRow({ parameter }: { parameter: Parameter }) {
   const router = useRouter()
@@ -64,8 +89,8 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
           className="w-40"
           type={isTime ? 'time' : 'number'}
           step={parameter.kind === 'DECIMAL' ? '0.01' : undefined}
-          min={isTime ? undefined : ((parameter.minimum as string | null) ?? undefined)}
-          max={isTime ? undefined : ((parameter.maximum as string | null) ?? undefined)}
+          min={isTime ? undefined : bound(parameter.minimum)}
+          max={isTime ? undefined : bound(parameter.maximum)}
           required
           value={value}
           onChange={event => setValue(event.target.value)}
@@ -74,11 +99,13 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
         <Button type="submit" disabled={saving || !changed}>
           {saving ? 'Guardando…' : 'Guardar'}
         </Button>
-        {message && (
-          <p className={`text-sm ${message.ok ? 'text-emerald-700' : 'text-red-700'}`}>
-            {message.text}
-          </p>
-        )}
+        <p
+          aria-live="polite"
+          className={`text-sm ${message?.ok ? 'text-emerald-700' : 'text-red-700'}`}
+          role="status"
+        >
+          {message?.text ?? ''}
+        </p>
       </div>
 
       <p className="text-xs text-muted-foreground">

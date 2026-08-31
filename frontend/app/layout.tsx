@@ -12,26 +12,19 @@ export const metadata: Metadata = {
   description: 'Plataforma de gestión de Ferretería Industrial Cordillera',
 }
 
-// Apply the persisted theme before hydration, so the page does not flash the
-// wrong one. The key is namespaced to this product.
-const themeInitScript = `
-(function () {
-  try {
-    var stored = localStorage.getItem('cordillera-theme');
-    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (stored === 'dark' || (!stored && prefersDark)) {
-      document.documentElement.classList.add('dark');
-    }
-  } catch (e) {}
-})();
-`
+// There is no theme script here any more, and that is the point: the platform
+// has one theme, the light one (`app/globals.css` explains why). What used to
+// be here read the operating system's preference and switched the whole app to
+// a dark theme nobody could turn off.
+//
+// `suppressHydrationWarning` went with it: it was there because that script
+// wrote a class onto <html> before React arrived. With one theme, the server
+// and the browser render the same markup, and silencing the warning would only
+// hide a real mismatch the day one appears.
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={outfit.variable} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
+    <html lang="es" className={outfit.variable}>
       <body className="font-sans antialiased">
         {children}
         <Toaster />

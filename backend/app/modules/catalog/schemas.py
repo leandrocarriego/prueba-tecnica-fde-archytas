@@ -1,12 +1,12 @@
 """Catalog schemas: the HTTP contract of the prices screen and the product page."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.catalog.models import CorrectionStatus, PriceSource, ProductStatus
+from app.modules.catalog.models import AliasSource, CorrectionStatus, PriceSource, ProductStatus
 
 REASON_DETAIL_MAX = 1000
 
@@ -115,3 +115,130 @@ class PriceHistoryRead(BaseModel):
     # Shown on the datum's own screen, which is where a conflict is resolved:
     # the spec is explicit that there is no separate queue for them (RF-28).
     corrections: list[CorrectionMark] = []
+
+
+# --- The rubros of the catalog (008) --------------------------------------
+
+
+class CategoryAliasRead(BaseModel):
+    """One written form pointing at a rubro, as the screens show it (RF-03, RF-27)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    category_id: int
+    text_original: str
+    text_normalized: str
+    rule_id: int | None
+    source: AliasSource
+    created_at: datetime
+
+
+class CategoryRead(BaseModel):
+    """A rubro with what the screen shows next to it: its count and its forms."""
+
+    id: int
+    name: str
+    product_count: int
+    aliases: list[CategoryAliasRead]
+
+
+class CategoryList(BaseModel):
+    """The rubros, plus «sin rubro» as one more group (RF-09, RF-10, RF-11)."""
+
+    items: list[CategoryRead]
+    # Not a row of `core.category`: null is «sin rubro», and it is reported
+    # beside the list so every cut adds up to the total (RF-10).
+    unclassified_count: int
+    total_products: int
+
+
+class CategoryWrite(BaseModel):
+    """The name of a rubro, on the way in (RF-05, RF-06)."""
+
+    name: str = Field(min_length=1, max_length=100)
+
+
+class UnclassifiedProduct(BaseModel):
+    """A product with no rubro, with the proposal the system derived — or none.
+
+    `proposed_category_id` is computed on the way out and stored nowhere: while
+    nobody confirms it the product **is** «sin rubro», it counts as such and it
+    stays in this queue (RF-16).
+    """
+
+    product_id: int
+    code: str
+    description: str
+    category_raw: str | None
+    subcategory_raw: str | None
+    proposed_category_id: int | None = None
+    proposed_category_name: str | None = None
+
+
+class UnclassifiedList(BaseModel):
+    """A page of the queue of products waiting for a rubro (RF-11, RF-12)."""
+
+    items: list[UnclassifiedProduct]
+    total: int
+    skip: int
+    limit: int
+
+
+class ProductCategoryWrite(BaseModel):
+    """The rubro somebody chose for a product.
+
+    Confirming the proposal and correcting it are the same write, and the only
+    difference is which rubro travels: the system has no reason to tell them
+    apart, and does not (RF-15).
+    """
+
+    category_id: int
+
+
+# --- The cuts of the dashboard that come from the catalog (009) -----------
+
+
+class PriceCurvePoint(BaseModel):
+    """One month of the curve of what the supplier charges (RF-42 of 009)."""
+
+    month: date
+    average_price: Decimal
+    changes: int
+
+
+class StockCut(BaseModel):
+    """What one product had at the start and at the end of the window (RF-43)."""
+
+    product_id: int
+    code: str
+    description: str
+    opening: int | None
+    closing: int | None
+    ran_out: bool = False
+
+
+class NewProductRead(BaseModel):
+    """A product the catalog started to know inside the window (RF-45)."""
+
+    product_id: int
+    code: str
+    description: str
+    first_seen_at: datetime
+
+
+class CatalogDashboard(BaseModel):
+    """The three cuts of the dashboard that are about the catalog.
+
+    `excluded` travels with each of them, and is reported even when it is zero:
+    RF-46 asks each cut to say how many records it left out, and RF-27 that it
+    say so when it left out none.
+    """
+
+    since: date | None
+    until: date | None
+    price_curve: list[PriceCurvePoint]
+    price_curve_excluded: int
+    stock: list[StockCut]
+    stock_excluded: int
+    new_products: list[NewProductRead]

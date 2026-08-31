@@ -61,8 +61,24 @@ class RuleRead(BaseModel):
     kind: str
     matcher: dict[str, Any]
     decision: dict[str, Any]
-    created_by_user_id: int
+    created_by_user_id: int | None
     created_by_name: str | None
     created_at: datetime
     revoked_by_user_id: int | None
     revoked_at: datetime | None
+    updated_by_user_id: int | None = None
+    updated_at: datetime | None = None
+
+
+class RedecisionRequest(BaseModel):
+    """Where a rule already in force should point from now on.
+
+    It is not a revocation and it does not send anything back to the queue:
+    whoever projected the rule re-points what it had resolved. Confusing the
+    two is the classic mistake of 008 — revoking returns the products to
+    review, re-pointing reassigns them (RF-29 against RF-31).
+    """
+
+    decision: dict[str, Any] = Field(
+        description="The new decision. For instance {'category_id': 4}"
+    )

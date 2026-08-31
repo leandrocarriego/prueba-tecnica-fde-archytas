@@ -1,0 +1,33 @@
+---
+title: Marcela, compras — el calendario en el día a día
+---
+flowchart TD
+    A["Abre el calendario y lo encuentra en el mes en curso"] --> B["En cada día, lo que vence, con su descripción, su monto y su proveedor"]
+    B --> C["Pasa al mes siguiente y al anterior"]
+    B --> D["Un día con más vencimientos de los que entran indica cuántos hay y los muestra todos"]
+    B --> E["Lo ya vencido se distingue a simple vista de lo que está por venir"]
+    B --> F["Abre un vencimiento y llega a la factura que lo originó"]
+
+    A --> G{"¿Qué me falta hacer esta semana?"}
+    G -->|Facturas sin su recibo de recepción| H["Se distinguen de las que ya lo tienen, y puede mostrar sólo esas"]
+    H --> I["Las que ya vencieron sin su recibo aparecen señaladas"]
+    G -->|Facturas sin terminar de pagar| J["Cada una se ve saldada, a medias o sin pagos, y puede ocultar las saldadas"]
+
+    A --> K{"¿Este vencimiento viene de una factura?"}
+    K -->|No, lo cargo yo| L["Carga su fecha, su descripción y su monto, y queda con su nombre y el momento en que lo cargó"]
+    L --> M["En el calendario se distingue de los que vienen de una factura"]
+    M --> N{"¿Lo cargó mal?"}
+    N -->|Sí| O["Corrige la descripción o el monto, y queda registrado quién corrigió, cuándo y qué valor había antes"]
+    N -->|Ya no corresponde| P["Lo elimina del calendario"]
+    K -->|Sí| Q["El monto y la descripción se corrigen en la factura, no acá, y el vencimiento no se puede eliminar"]
+
+    A --> R{"¿El proveedor avisó una fecha nueva?"}
+    R -->|Desde la computadora| S["Arrastra el vencimiento al día nuevo"]
+    R -->|Desde el teléfono| T["Elige la fecha nueva de un selector, sin arrastrar"]
+    S --> U{"¿La fecha nueva ya pasó?"}
+    T --> U
+    U -->|Sí| V["El sistema pide confirmación antes de aplicar el cambio"]
+    U -->|No| W["Queda guardada la fecha anterior, quién lo movió y cuándo"]
+    V --> W
+    W --> X["Puede escribir un motivo, y también dejarlo sin motivo"]
+    X --> Y["El vencimiento queda señalado como reprogramado, y al abrirlo se ven todas las fechas por las que pasó"]

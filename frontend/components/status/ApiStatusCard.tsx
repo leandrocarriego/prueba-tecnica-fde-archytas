@@ -20,17 +20,17 @@ const TONE_STYLES: Record<Tone, { dot: string; halo: string; label: string }> = 
   ok: {
     dot: 'bg-emerald-500',
     halo: 'bg-emerald-500/20',
-    label: 'text-emerald-600 dark:text-emerald-400',
+    label: 'text-emerald-600',
   },
   degraded: {
     dot: 'bg-amber-500',
     halo: 'bg-amber-500/20',
-    label: 'text-amber-600 dark:text-amber-400',
+    label: 'text-amber-600',
   },
   unreachable: {
     dot: 'bg-red-500',
     halo: 'bg-red-500/20',
-    label: 'text-red-600 dark:text-red-400',
+    label: 'text-red-600',
   },
 }
 

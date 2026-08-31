@@ -1,6 +1,6 @@
 import { NoPermission } from '@/components/common/NoPermission'
 import { ParameterRow } from '@/components/operations/ParameterRow'
-import { fetchFromApi } from '@/lib/api/server'
+import { readFromApi } from '@/lib/api/server'
 import type { Parameter } from '@/lib/operations/types'
 
 export const metadata = {
@@ -17,20 +17,39 @@ export const metadata = {
  *
  * The list is the backend's — it is drawn from the catalog that also validates
  * the ranges, so what the screen offers and what the API accepts cannot drift
- * apart. Including the honest part: five of the seven are not read by anything
- * yet, and each of those says so out loud rather than pretending to be a knob.
+ * apart. Including the honest part: a parameter nothing reads yet is shown
+ * saying so instead of pretending to be a knob.
+ *
+ * How many of those there are is not written down here, on purpose. It is the
+ * catalog's answer and it changes every time a feature lands — this comment
+ * used to carry a number, and it was wrong twice: first counting a parameter
+ * that was already being read, and then counting at all. The banner below asks
+ * `has_effect` on every render, which is the only count that cannot go stale.
  *
  * The gate is the endpoint. `GET /operations/parameters` is owner-only, so
- * anybody else gets nothing back and lands on the refusal below — hiding a link
- * was never the restriction.
+ * anybody else is refused and lands on the refusal below — hiding a link was
+ * never the restriction. What the refusal is *not* is the answer to everything
+ * else: an unreachable backend is read here as an outage and said as one,
+ * because "pedíselo al dueño" is advice nobody can act on when the API is down.
  */
 export default async function ParametersPage() {
-  const parameters = await fetchFromApi<Parameter[]>('/operations/parameters')
+  const read = await readFromApi<Parameter[]>('/operations/parameters')
 
-  if (parameters === null) {
-    return <NoPermission what="los parámetros del sistema" />
+  if (!read.ok) {
+    if (read.failure === 'unauthorized') {
+      return <NoPermission what="los parámetros del sistema" />
+    }
+    return (
+      <main className="mx-auto max-w-3xl space-y-6 p-8">
+        <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
+        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          No pudimos traer los parámetros. Probá de nuevo en unos minutos.
+        </p>
+      </main>
+    )
   }
 
+  const parameters = read.data
   const waiting = parameters.filter(parameter => !parameter.has_effect).length
 
   return (

@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.catalog.models import Product, ProductPrice, ProductStatus
+from app.modules.catalog.service import CatalogService
 from app.modules.identity.models import User
 from app.modules.ingestion.models import ResolutionRuleProjection
 from app.modules.portal.service import PortalService
@@ -24,6 +25,7 @@ from app.modules.triage.service import (
     UNREADABLE_ROW,
     TriageService,
 )
+from app.shared.corrections import CorrectionReason
 from app.shared.errors import ConflictError
 from tests.factories.portal_factory import FakePortal, broken_list_bytes, price_list_with
 
@@ -314,6 +316,51 @@ class TestResolvingAProductThatStoppedComing:
         assert price is not None
         assert price.price == Decimal("48210")
 
+    async def test_a_product_whose_price_a_correction_holds_can_still_be_discontinued(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """A standing correction refuses an **amount**, not a decision about a product.
+
+        `apply_decision` has four ways out and only one of them writes a price.
+        The refusal lives in that write, and this is what says so: put in the
+        handler instead — where it would have been one `if` shorter — it would
+        also turn away the person saying that a product stopped coming, and the
+        queue RF-31 exists to empty would have rows nobody could ever clear,
+        for a reason about a price they never touched.
+        """
+        # Arrange
+        await PortalService(session, reader_factory=FakePortal()).extract_price_list()
+        gone = await product(session, FIRST_PRODUCT)
+        assert gone is not None
+        await CatalogService(session).apply_correction(
+            product_id=gone.id,
+            field="price",
+            value="9999",
+            reason_code=CorrectionReason.PORTAL_WAS_WRONG.value,
+            reason_detail=None,
+            actor_user_id=owner.id,
+        )
+        await PortalService(
+            session,
+            reader_factory=FakePortal(price_list=price_list_with(without={FIRST_PRODUCT})),
+        ).extract_price_list()
+        case = (await pending(session, MISSING_PRODUCT))[0]
+
+        # Act
+        await TriageService(session).resolve(
+            case.id, decision={"action": "discontinue"}, user_id=owner.id
+        )
+
+        # Assert
+        found = await product(session, FIRST_PRODUCT)
+        assert found is not None
+        assert found.status is ProductStatus.DISCONTINUED
+        # And the correction is still exactly where it was: nothing about
+        # discontinuing a product moves the amount somebody fixed.
+        price = await session.get(ProductPrice, found.id)
+        assert price is not None
+        assert price.price == Decimal("9999")
+
 
 class TestTheRules:
     """RF-36 and RF-37: they are visible, and they can be undone."""
@@ -330,7 +377,11 @@ class TestTheRules:
         )
 
         # Act
-        rules = await TriageService(session).list_rules()
+        # Scoped by kind: the platform ships with the table of category
+        # equivalences the client signed already seeded as rules (008), so the
+        # list is never empty. What is asserted is that this decision produced
+        # exactly one rule of its own.
+        rules = await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT)
 
         # Assert
         assert len(rules) == 1
@@ -352,7 +403,7 @@ class TestTheRules:
         )
 
         # Assert
-        assert await TriageService(session).list_rules() == []
+        assert await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT) == []
 
     async def test_revoking_a_rule_undoes_what_it_did(
         self, session: AsyncSession, owner: User
@@ -364,7 +415,7 @@ class TestTheRules:
         await TriageService(session).resolve(
             case.id, decision={"action": "incorporate"}, user_id=owner.id
         )
-        rule = (await TriageService(session).list_rules())[0]
+        rule = (await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT))[0]
 
         # Act
         await TriageService(session).revoke_rule(rule.id, user_id=owner.id)
@@ -406,13 +457,15 @@ class TestTheRules:
         await TriageService(session).resolve(
             case.id, decision={"action": "incorporate"}, user_id=owner.id
         )
-        rule = (await TriageService(session).list_rules())[0]
+        rule = (await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT))[0]
 
         # Act
         await TriageService(session).revoke_rule(rule.id, user_id=owner.id)
 
         # Assert
-        revoked = await TriageService(session).list_rules(include_revoked=True)
+        revoked = await TriageService(session).list_rules(
+            include_revoked=True, kind=UNKNOWN_PRODUCT
+        )
         assert len(revoked) == 1
         assert revoked[0].revoked_by_user_id == owner.id
 

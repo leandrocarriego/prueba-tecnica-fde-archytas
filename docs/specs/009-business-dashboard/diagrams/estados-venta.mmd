@@ -1,0 +1,59 @@
+---
+title: Qué le pasa a cada venta que llega del portal
+---
+stateDiagram-v2
+    state "Obtenida del portal, conservada tal como llegó" as Obtenida
+    state "Repetida idéntica, unificada sin preguntar" as Unificada
+    state "Repetida con datos en conflicto" as EnConflicto
+    state "Con un dato roto" as Rota
+    state "Con un monto fuera de lo habitual" as MontoAtipico
+    state "Apartada, esperando una decisión" as Apartada
+    state "Contada en los indicadores" as Contada
+    state "Contada por decisión de una persona" as ContadaResuelta
+    state "Descartada como versión no válida" as Descartada
+
+    [*] --> Obtenida
+    Obtenida --> Unificada: comparte código con otra y no difiere en ningún dato
+    Obtenida --> EnConflicto: comparte código con otra y difieren en algún dato
+    Obtenida --> Rota: llegó sin fecha, con una fecha que no existe, sin total, con cantidad negativa o apuntando a un producto que no existe
+    Obtenida --> MontoAtipico: su total se aparta del promedio de su producto más que la diferencia tolerada
+    Obtenida --> Contada: el dato está completo y es plausible
+
+    Unificada --> Contada: se cuenta una sola vez y el tablero informa cuántas unificó
+
+    EnConflicto --> Apartada
+    Rota --> Apartada
+    MontoAtipico --> Apartada
+
+    Apartada --> Contada: una persona corrige el dato que faltaba o carga uno estimado
+    Apartada --> ContadaResuelta: una persona la elige como la versión válida, o declara que son ventas distintas
+    Apartada --> Descartada: es la versión de la repetida que la persona no eligió
+
+    ContadaResuelta --> Apartada: se deshace la resolución de la repetida
+    Descartada --> Apartada: se deshace la resolución de la repetida
+
+    Contada --> [*]
+    ContadaResuelta --> [*]
+
+    note right of Obtenida
+        Lo que informó el portal se conserva siempre.
+        Una corrección se muestra encima, y el dato
+        original queda para explicar cualquier diferencia
+    end note
+
+    note right of Apartada
+        No suma en ningún indicador y no se borra.
+        Queda contada y visible con su motivo, y el
+        sistema no completa por suposición lo que falta
+    end note
+
+    note right of ContadaResuelta
+        Suma igual que cualquier otra. Lo que la distingue
+        es que salió de una decisión, y por eso se puede
+        deshacer: lo que se contó solo no tiene nada que deshacer
+    end note
+
+    note right of Descartada
+        Se sigue viendo junto a la elegida: una decisión
+        se puede deshacer, y los números se recalculan
+    end note

@@ -1,0 +1,51 @@
+---
+title: Qué le pasa a un grupo de ventas que comparten el mismo código
+---
+stateDiagram-v2
+    state "Detectado: dos o más ventas con el mismo código" as Detectado
+    state "Sin diferencias entre sus versiones" as Identico
+    state "Con diferencias entre sus versiones" as Discrepante
+    state "Pendiente de decisión" as Pendiente
+    state "Contado una sola vez, sin que nadie decidiera" as Contado
+    state "Resuelto: vale una versión, y es la que suma" as ResueltoUna
+    state "Resuelto: son ventas distintas, y suman todas" as ResueltoDistintas
+
+    [*] --> Detectado: los códigos se comparan ignorando las diferencias de escritura que no cambian el código
+    Detectado --> Identico: ninguna versión difiere de las otras
+    Detectado --> Discrepante: alguna versión difiere en algún dato
+
+    Identico --> Contado: se cuenta una sola vez, sin intervención humana
+    Discrepante --> Pendiente
+
+    Pendiente --> ResueltoUna: una persona elige cuál de las versiones vale
+    Pendiente --> ResueltoDistintas: una persona declara que son ventas distintas
+
+    ResueltoUna --> Pendiente: se deshace la resolución y los indicadores se recalculan
+    ResueltoDistintas --> Pendiente: se deshace la resolución y los indicadores se recalculan
+
+    Contado --> [*]
+    ResueltoUna --> [*]
+    ResueltoDistintas --> [*]
+
+    note right of Identico
+        Lo idéntico no necesita a una persona.
+        El tablero informa cuántas ventas unificó solo
+    end note
+
+    note right of Pendiente
+        Ninguna de sus versiones suma mientras el grupo
+        esté pendiente, y el tablero dice cuántos grupos
+        están esperando una decisión
+    end note
+
+    note right of ResueltoUna
+        Queda registrado qué se decidió, quién lo decidió
+        y cuándo. La versión elegida suma y la descartada
+        se sigue viendo al lado
+    end note
+
+    note right of ResueltoDistintas
+        Sólo se deshace lo que una persona decidió: un
+        grupo que el sistema contó solo no tiene ninguna
+        resolución que deshacer
+    end note

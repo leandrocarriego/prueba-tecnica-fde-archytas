@@ -22,6 +22,16 @@ class PortalSection(enum.StrEnum):
 
     PRICES = "prices"
     PRICE_HISTORY = "price-history"
+    # The three screens 004 reads. `INVOICE_FILE` is one document per invoice
+    # and not a screen: it is the evidence the review shows a person, and it is
+    # stored verbatim like everything else that comes from outside.
+    INVOICES = "invoices"
+    INVOICE_FILE = "invoice-file"
+    SUPPLIER_LEDGER = "supplier-ledger"
+    # 007 and 009.
+    PURCHASE_ORDERS = "purchase-orders"
+    MESSAGES = "messages"
+    SALES = "sales"
 
 
 class PortalDocument(Base):

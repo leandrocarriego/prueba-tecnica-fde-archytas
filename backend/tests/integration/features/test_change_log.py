@@ -28,14 +28,19 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.catalog.models import Correction, CorrectionStatus, Product
 from app.modules.catalog.service import CatalogService
 from app.modules.identity.models import User
+from app.modules.operations.schemas import AuditEntryRead
 from app.modules.operations.service import OperationsService
+from app.modules.triage.models import CaseStatus, ExceptionCase
+from app.modules.triage.service import UNKNOWN_PRODUCT, UNREADABLE_ROW, TriageService
 from app.shared.corrections import CorrectionReason
+from app.shared.errors import ConflictError
 from app.shared.events import AuditAction, ManualChangeRecorded
 from app.shared.sections import BusinessSection
 from tests.conftest import API_PREFIX
@@ -106,6 +111,51 @@ async def a_logged_correction(session: AsyncSession, *, actor_user_id: int = 1) 
     )
     await session.commit()
     return product_id
+
+
+LOADED_CODE = "COR-CARGA"
+
+
+async def a_case_decided_by(
+    session: AsyncSession,
+    user: User,
+    *,
+    kind: str,
+    payload: dict[str, Any],
+    decision: dict[str, Any],
+    remember: bool = False,
+) -> None:
+    """A person empties one case of the review queue, the way the screen does.
+
+    Driven through `triage` and not by calling `catalog` directly, because what
+    is under test lives in the whole chain: the decision, the event that carries
+    who took it and when, the handler that hands both down, and the one door of
+    the log at the far end. Calling the service would skip the two pieces that
+    were missing.
+
+    `remember=False` by default so the decision stays one person's and does not
+    also become a rule: a rule replays the row, and the amount it writes is the
+    portal's. A test about a **refused** decision turns it on, because what a
+    rollback has to take with it includes the rule the resolution had created.
+
+    The case is committed before it is decided, the way the run that opened it
+    committed it hours earlier. Without that, a resolution that gets rolled back
+    would take the case itself down too, and «el caso sigue pendiente» could not
+    be asked at all.
+    """
+    service = TriageService(session)
+    await service.open_case(kind=kind, reason="Para esta prueba", payload=payload, key=str(payload))
+    case_id = await session.scalar(select(ExceptionCase.id).order_by(ExceptionCase.id.desc()))
+    assert case_id is not None
+    await session.commit()
+    await service.resolve(
+        case_id, decision=decision, user_id=user.id, user_name=user.name, remember=remember
+    )
+
+
+async def the_log(session: AsyncSession) -> list[AuditEntryRead]:
+    """Every line of the history that anybody may read, newest first."""
+    return (await OperationsService(session).list_audit(sections=None)).items
 
 
 async def rows_in_the_log(session: AsyncSession) -> int:
@@ -719,3 +769,516 @@ class TestTheHistoryOfOneDatum:
         # Assert
         assert response.status_code == 200
         assert response.json() == []
+
+
+class TestALoadIsWrittenDownToo:
+    """RF-09 covers *«cargue»* with the same words it covers *«modifique»*.
+
+    The platform's one way of **loading** a datum by hand is emptying the review
+    queue: a product nobody knew gets incorporated, or a row nobody could read
+    gets the amount a person typed. Neither of them left a line, so the log
+    answered *quién cambió esto* and stayed quiet on *quién puso esto acá* —
+    against a signed rule that says «sin excepciones».
+
+    The action is `CREATED` and not `CORRECTED`: nobody is disagreeing with the
+    portal here, because the portal reported nothing. That is exactly why a
+    person had to type it.
+    """
+
+    async def test_incorporating_a_product_leaves_its_line(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """RF-09: *«Después de que Marcela carga algo a mano, ese dato muestra su nombre»*.
+
+        The line names the **product**, which is the datum that came into being,
+        and `old_value` is empty — truthfully, since there was nothing to say
+        anything about a moment before.
+        """
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNKNOWN_PRODUCT,
+            payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
+            decision={"action": "incorporate", "price": "1500"},
+        )
+
+        # Assert
+        product_id = await session.scalar(select(Product.id).where(Product.code == LOADED_CODE))
+        entry = (await the_log(session))[0]
+        assert entry.action is AuditAction.CREATED
+        assert entry.entity_type == "catalog.product"
+        assert entry.entity_id == str(product_id)
+        assert entry.field == "description"
+        assert entry.old_value is None
+        assert entry.new_value == "Bulón hexagonal 8mm"
+        assert entry.actor_user_id == sales_user.id
+        assert entry.section is BusinessSection.SALES
+
+    async def test_incorporating_leaves_one_line_even_when_the_person_typed_the_amount(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """One decision, one line — the amount of a load is not a second one.
+
+        Here the price is the person's: the case carried no number, so what
+        gets written is what they typed. It still leaves no line of its own,
+        because it arrives inside the birth of the product, and the product is
+        the datum they decided about. The other door — `set_price_by_code`, for
+        a row nobody could read — does file its line under
+        `catalog.product_price`, since there the amount is the only datum that
+        came into being.
+
+        The asymmetry is deliberate and this is what pins it: two lines would
+        say twice what happened once, and the second would sit under a screen
+        nobody reached that morning. If RF-09's «sin excepciones» is ever read
+        as covering the amount on its own, this test is the one that has to
+        change first.
+        """
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNKNOWN_PRODUCT,
+            payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
+            decision={"action": "incorporate", "price": "1500"},
+        )
+
+        # Assert
+        product_id = await session.scalar(select(Product.id).where(Product.code == LOADED_CODE))
+        assert product_id is not None
+        history = await CatalogService(session).price_history(product_id)
+        assert history.price == Decimal("1500")
+        assert [(entry.entity_type, entry.field) for entry in await the_log(session)] == [
+            ("catalog.product", "description")
+        ]
+
+    async def test_the_line_is_dated_by_the_decision_and_not_by_a_later_clock(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """RF-09 asks for *cuándo*, and the queue behind a person is not part of it.
+
+        The moment travels on the event. Read off `datetime.now()` inside the
+        handler instead, the line would be dated by however long the rest of the
+        batch took, and two people emptying the same queue would come out in the
+        wrong order in a history RF-13 sorts by date.
+        """
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNKNOWN_PRODUCT,
+            payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
+            decision={"action": "incorporate", "price": "1500"},
+        )
+
+        # Assert
+        decided_at = await session.scalar(
+            select(ExceptionCase.resolved_at).order_by(ExceptionCase.id.desc())
+        )
+        assert (await the_log(session))[0].occurred_at == decided_at
+
+    async def test_a_load_asks_for_no_reason(self, session: AsyncSession, sales_user: User) -> None:
+        """RF-11 is written about a datum *«existente»*, and a load creates one.
+
+        A reason is what somebody's disagreement with a value is about, and
+        there is nothing for it to be about when the value did not exist a
+        moment ago. Checked against the signed text by the human on 2026-08-30,
+        so it is a decision the suite pins rather than an oversight it tolerates.
+        """
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNKNOWN_PRODUCT,
+            payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
+            decision={"action": "incorporate", "price": "1500"},
+        )
+
+        # Assert
+        entry = (await the_log(session))[0]
+        assert entry.reason_code is None
+        assert entry.reason_detail is None
+        assert entry.reason_label is None
+
+    async def test_the_product_leads_to_the_line_that_says_who_loaded_it(
+        self, session: AsyncSession, owner_client: AsyncClient, sales_user: User
+    ) -> None:
+        """RF-15 on top of RF-09: the screen of the datum links this by type and id.
+
+        The product page offers «Historial de cambios del producto», keyed by
+        `catalog.product` and the product's own id, so the line has to be filed
+        under exactly that pair to be found by somebody asking who put it there.
+        """
+        # Arrange
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNKNOWN_PRODUCT,
+            payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
+            decision={"action": "incorporate", "price": "1500"},
+        )
+        product_id = await session.scalar(select(Product.id).where(Product.code == LOADED_CODE))
+
+        # Act
+        response = await owner_client.get(
+            f"{API_PREFIX}/operations/audit/catalog.product/{product_id}"
+        )
+
+        # Assert
+        assert response.status_code == 200
+        entry = response.json()[0]
+        assert entry["action"] == AuditAction.CREATED.value
+        assert entry["actor_name"] == sales_user.name
+        assert entry["occurred_at"] is not None
+
+    async def test_pricing_an_unreadable_row_leaves_a_line_on_the_price(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """The other load: the row could not be read, and the amount is now a person's.
+
+        Filed under the price and not under the product, because that is the
+        datum that was loaded — and it is where the other link of the product
+        page goes looking (RF-15).
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        await session.commit()
+
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNREADABLE_ROW,
+            payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+            decision={"price": "1500"},
+        )
+
+        # Assert
+        entry = (await the_log(session))[0]
+        assert entry.action is AuditAction.CREATED
+        assert entry.entity_type == "catalog.product_price"
+        assert entry.entity_id == str(product.id)
+        assert entry.field == "price"
+        assert Decimal(entry.old_value) == Decimal("1000")
+        assert Decimal(entry.new_value) == Decimal("1500")
+        assert (await CatalogService(session).price_history(product.id)).price == Decimal("1500")
+
+    async def test_a_price_that_had_nothing_before_it_says_so(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """RF-10 keeps the value that was there, and here there was none."""
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=None)
+        await session.commit()
+
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNREADABLE_ROW,
+            payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+            decision={"price": "1500"},
+        )
+
+        # Assert
+        entry = (await the_log(session))[0]
+        assert entry.entity_id == str(product.id)
+        assert entry.old_value is None
+        assert Decimal(entry.new_value) == Decimal("1500")
+
+    async def test_confirming_the_amount_already_in_force_is_still_a_load(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """Somebody typing the number that was already there took a decision.
+
+        The same answer `apply_correction` gives to a correction back to the
+        value a datum already had: what RF-09 records is the act, not the
+        difference between two numbers. And the difference is not nothing —
+        from this morning on the amount is a person's word and no longer the
+        portal's, which is what decides whether it can be given back (RF-33).
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        await session.commit()
+
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNREADABLE_ROW,
+            payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+            decision={"price": "1000"},
+        )
+
+        # Assert
+        entry = (await the_log(session))[0]
+        assert entry.action is AuditAction.CREATED
+        assert entry.entity_id == str(product.id)
+        assert Decimal(entry.old_value) == Decimal(entry.new_value) == Decimal("1000")
+
+    async def test_an_amount_a_correction_holds_back_is_refused_and_the_case_stays_open(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """A load that cannot land is refused out loud, not filed as resolved.
+
+        This test used to pin the opposite, and the opposite was the defect: the
+        amount was skipped, no line was written, and the case still came back
+        «resuelto». The person went back to the shop floor sure they had loaded
+        the price. That is the silent loss the Artículo II forbids, dressed up
+        as a success message.
+
+        Now the write refuses, and the refusal is what makes the rest true: a
+        handler that raises aborts whoever published (`GEN-09`), so `triage`
+        never reaches its `commit()` and everything it had flushed goes with it.
+        So the assertions are the whole of it and not only the price — the case
+        is still pending and its decision never became a rule, which is what
+        «no quedó resuelto» actually means to whoever has to decide it again.
+
+        `remember=True` on purpose: the rule is the piece a rollback would be
+        most likely to leave behind, and a rule the person never got is a
+        decision applying itself on their behalf tomorrow morning.
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        # Read out now, before the act: the rollback below expires every loaded
+        # object, and re-reading an id off one of them afterwards is a lazy load
+        # firing outside the async context — a `MissingGreenlet` where a test
+        # was trying to ask a question.
+        product_id, actor_id = product.id, sales_user.id
+        # Counted rather than asserted empty: the installation ships with
+        # equivalences already seeded, so «no rules» was never the question.
+        # The question is whether *this* decision left one.
+        rules_before = len(await TriageService(session).list_rules(kind=UNREADABLE_ROW))
+        await CatalogService(session).apply_correction(
+            product_id=product_id,
+            field="price",
+            value="1200",
+            reason_code=REASON,
+            reason_detail=None,
+            actor_user_id=actor_id,
+        )
+        await session.commit()
+
+        # Act
+        with pytest.raises(ConflictError) as refused:
+            await a_case_decided_by(
+                session,
+                sales_user,
+                kind=UNREADABLE_ROW,
+                payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+                decision={"price": "1500"},
+                remember=True,
+            )
+        # The statement the service abandoned is still open on this session:
+        # nothing closed it, because the harness hands the same session to the
+        # test that a request would have thrown away. Without this the
+        # assertions below would read a state production never has.
+        await session.rollback()
+
+        # Assert
+        assert "corrección" in refused.value.message.lower(), (
+            f"the refusal does not name what stopped it: {refused.value.message!r}"
+        )
+        assert refused.value.details["correction_id"] is not None
+        assert refused.value.details["corrected_value"] == "1200"
+        assert refused.value.details["corrected_by_user_id"] == actor_id
+        assert refused.value.details["rejected_value"] == "1500"
+        assert [entry.action for entry in await the_log(session)] == [AuditAction.CORRECTED]
+        assert (await CatalogService(session).price_history(product_id)).price == Decimal("1200")
+        case = await session.scalar(select(ExceptionCase).order_by(ExceptionCase.id.desc()))
+        assert case is not None and case.status is CaseStatus.PENDING
+        assert len(await TriageService(session).list_rules(kind=UNREADABLE_ROW)) == rules_before
+
+    async def test_confirming_the_amount_a_correction_holds_leaves_its_line(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """The same number as the correction is not a contradiction, so it lands.
+
+        What is refused above is an amount that **disagrees**. This one agrees:
+        the person read «el precio dice 1200», typed 1200, and confirmed the
+        value the screen shows. Nothing is overwritten because there is nothing
+        to overwrite — and the case leaves the queue, which is the only reason
+        this branch exists: `TriageService.resolve` is the single road to
+        `RESOLVED` and it runs through the write that refuses, so without this
+        a row whose price a correction holds could never be emptied by anybody.
+
+        The line is the point of this file. It reads «cargó 1200» over a screen
+        that says 1200 — the agreement between the log and the screen it
+        explains, which is what the old silence was protecting by saying
+        nothing about either. Recorded like any other confirmation of a value
+        already in force (RF-09), the way `apply_correction` records a
+        correction back to the number a datum already had.
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        product_id = product.id
+        await CatalogService(session).apply_correction(
+            product_id=product_id,
+            field="price",
+            value="1200",
+            reason_code=REASON,
+            reason_detail=None,
+            actor_user_id=sales_user.id,
+        )
+        await session.commit()
+
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNREADABLE_ROW,
+            payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+            decision={"price": "1200"},
+        )
+
+        # Assert
+        newest = (await the_log(session))[0]
+        assert newest.action is AuditAction.CREATED
+        assert newest.entity_type == "catalog.product_price"
+        assert Decimal(newest.old_value) == Decimal(newest.new_value) == Decimal("1200")
+        # The correction is exactly where it was, and so is the amount: an
+        # equality that got there by writing the price would leave the same
+        # number behind and this file would never notice.
+        correction = await session.scalar(select(Correction).order_by(Correction.id.desc()))
+        assert correction is not None and correction.status is CorrectionStatus.ACTIVE
+        assert Decimal(str(correction.corrected_value)) == Decimal("1200")
+        assert (await CatalogService(session).price_history(product_id)).price == Decimal("1200")
+        case = await session.scalar(select(ExceptionCase).order_by(ExceptionCase.id.desc()))
+        assert case is not None and case.status is CaseStatus.RESOLVED
+
+    async def test_a_correction_on_another_field_does_not_hold_the_amount_back(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """The refusal is about the price, and the description is not the price.
+
+        A corrected description says nothing about what the amount may be. A
+        guard written one field too wide — `if standing:` instead of «is there
+        one on *this* field» — would make every product whose wording somebody
+        fixed impossible to price out of the queue, and the load would go back
+        to being refused for a reason nobody could act on. So the line is
+        written and the amount is the person's, exactly as when no correction
+        stood at all.
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        product_id = product.id
+        await CatalogService(session).apply_correction(
+            product_id=product_id,
+            field="description",
+            value="Bulón hexagonal 8mm zincado",
+            reason_code=REASON,
+            reason_detail=None,
+            actor_user_id=sales_user.id,
+        )
+        await session.commit()
+
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNREADABLE_ROW,
+            payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+            decision={"price": "1500"},
+        )
+
+        # Assert
+        assert (await CatalogService(session).price_history(product_id)).price == Decimal("1500")
+        assert [(entry.entity_type, entry.field) for entry in await the_log(session)] == [
+            ("catalog.product_price", "price"),
+            ("catalog.product", "description"),
+        ]
+
+    async def test_a_correction_that_was_undone_no_longer_holds_the_amount_back(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """What holds an amount back is a correction **in force**, and this one is not.
+
+        Undoing a correction gives the datum back to the portal (RF-31), and
+        from that moment the queue is the way to put a person's number on it
+        again. A refusal that looked at the correction **row** instead of at
+        its state would leave the product refusing loads forever, with a
+        correction the screen no longer shows as the reason.
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        product_id = product.id
+        corrected = await CatalogService(session).apply_correction(
+            product_id=product_id,
+            field="price",
+            value="1200",
+            reason_code=REASON,
+            reason_detail=None,
+            actor_user_id=sales_user.id,
+        )
+        assert corrected.correction_id is not None
+        await CatalogService(session).revert_correction(
+            corrected.correction_id, actor_user_id=sales_user.id
+        )
+        await session.commit()
+
+        # Act
+        await a_case_decided_by(
+            session,
+            sales_user,
+            kind=UNREADABLE_ROW,
+            payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+            decision={"price": "1500"},
+        )
+
+        # Assert
+        assert (await CatalogService(session).price_history(product_id)).price == Decimal("1500")
+        newest = (await the_log(session))[0]
+        assert newest.action is AuditAction.CREATED
+        assert newest.entity_type == "catalog.product_price"
+        assert Decimal(newest.new_value) == Decimal("1500")
+
+    async def test_a_correction_the_portal_contradicted_still_holds_the_amount_back(
+        self, session: AsyncSession, sales_user: User
+    ) -> None:
+        """A conflict is a correction waiting for a person, not one that gave up.
+
+        This is the state RF-28 leaves behind when a later list disagrees with
+        the number somebody fixed, and it is the state in which a person is
+        most likely to try to settle it from the review queue — which is the
+        one door that cannot ask them for a reason (RF-11). «En vigor» means
+        *not reverted*, so the load is refused here too, and the settling
+        happens where the datum lives.
+
+        The conflict is stamped on the row rather than provoked with a whole
+        portal run: how it gets there is the subject of
+        `test_correction_conflicts.py`, and what is under test here is only
+        which states hold an amount back.
+        """
+        # Arrange
+        product = await ProductFactory.create(session, code=LOADED_CODE, price=1000)
+        product_id = product.id
+        await CatalogService(session).apply_correction(
+            product_id=product_id,
+            field="price",
+            value="1200",
+            reason_code=REASON,
+            reason_detail=None,
+            actor_user_id=sales_user.id,
+        )
+        correction = await session.scalar(select(Correction).order_by(Correction.id.desc()))
+        assert correction is not None
+        correction.status = CorrectionStatus.CONFLICTED
+        correction.conflict_value = "1400"
+        await session.commit()
+
+        # Act
+        with pytest.raises(ConflictError):
+            await a_case_decided_by(
+                session,
+                sales_user,
+                kind=UNREADABLE_ROW,
+                payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
+                decision={"price": "1500"},
+            )
+        await session.rollback()
+
+        # Assert
+        assert (await CatalogService(session).price_history(product_id)).price == Decimal("1200")
+        assert [entry.action for entry in await the_log(session)] == [AuditAction.CORRECTED]
+        case = await session.scalar(select(ExceptionCase).order_by(ExceptionCase.id.desc()))
+        assert case is not None and case.status is CaseStatus.PENDING

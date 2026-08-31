@@ -1,0 +1,24 @@
+---
+title: El sistema — qué pone en el calendario y qué avisa
+---
+flowchart TD
+    A["Se registra una factura con su vencimiento"] --> B["La coloca en el calendario, en su día, sin que nadie la agregue"]
+    B --> C["La muestra con su descripción, su monto y su proveedor"]
+    C --> D["Y con si tiene su recibo emitido, y si está saldada, a medias o sin pagos"]
+
+    E["El dueño o compras mueve un vencimiento"] --> F["Guarda la fecha anterior, quién lo movió, cuándo, y el motivo si lo escribió"]
+    F --> G{"¿La factura ya se había vencido cuando la movieron?"}
+    G -->|Todavía no vencía| H["El plazo para emitir su recibo pasa a ser la fecha nueva"]
+    H --> I["Y el atraso de su proveedor se mide contra la fecha nueva"]
+    G -->|Ya estaba vencida| J["No destraba el recibo: sigue sin poder emitirse"]
+    J --> K["El atraso de su proveedor se mide contra la fecha original"]
+    K --> L["Y en el calendario sigue señalada como vencida sin su recibo"]
+    F --> M["El monto de la factura, su estado de pago y lo que se le debe al proveedor no cambian"]
+
+    N["Alguien agrega, mueve, corrige o elimina un vencimiento"] --> O["Refleja el cambio en las pantallas de las demás personas que están mirando el calendario"]
+    O --> P["Sin que tengan que recargar la pantalla, e indicando quién lo hizo"]
+    P --> Q{"¿Dos personas movieron el mismo vencimiento?"}
+    Q -->|Sí| R["Aplica el último cambio y conserva el anterior en el historial"]
+
+    S{"¿La conexión en vivo se interrumpió?"} -->|Sí| T["Avisa a quien está mirando que el calendario puede estar desactualizado"]
+    T --> U["Cuando se restablece, le muestra el estado actualizado del calendario"]

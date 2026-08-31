@@ -11,6 +11,8 @@ from app.logging import get_logger
 from app.modules.triage.service import (
     MISSING_PRODUCT,
     MISSING_PRODUCT_REASON,
+    UNKNOWN_CATEGORY,
+    UNKNOWN_CATEGORY_REASON,
     UNKNOWN_PRODUCT,
     UNKNOWN_PRODUCT_REASON,
     UNREADABLE_HISTORY,
@@ -21,6 +23,7 @@ from app.shared.events import (
     KnownProductsMissing,
     PriceHistoryRowsQuarantined,
     PriceRowsQuarantined,
+    UnknownCategoryObserved,
     UnknownProductsObserved,
     events,
 )
@@ -110,3 +113,27 @@ async def open_unreadable_history(
         "Unreadable history queued",
         extra={"product_code": event.product_code, "cases": len(event.cases)},
     )
+
+
+@events.subscribe(UnknownCategoryObserved)
+async def open_unknown_categories(event: UnknownCategoryObserved, session: AsyncSession) -> None:
+    """A written form of a category nobody has decided about (RF-21 of 008).
+
+    One case per written form, and the fingerprint is the text: a hundred
+    products of the same batch spelled the same way ask **one** question, and
+    the count of how many times it came back is what the screen shows.
+    """
+    service = TriageService(session)
+    for case in event.cases:
+        await service.open_case(
+            kind=UNKNOWN_CATEGORY,
+            reason=UNKNOWN_CATEGORY_REASON,
+            payload={
+                "category_text": case.category_text,
+                "product_codes": list(case.product_codes),
+                "products": len(case.product_codes),
+            },
+            key=case.category_text,
+            batch_id=event.batch_id or None,
+        )
+    logger.info("Unknown categories queued", extra={"cases": len(event.cases)})

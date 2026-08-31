@@ -175,7 +175,11 @@ class AuditEntryRepository:
 
         `sections` is not one of them: it is the authorisation, applied to
         every read so that whoever asks never sees a section they cannot
-        reach. `None` means "every section", which is the owner.
+        reach. `None` is no section filter at all, and it is **not** the
+        owner's road: the owner arrives with their sections spelled out, the
+        way `identity` resolved them, and no route ever passes `None`. Reading
+        it as "the owner" is what would let somebody skip the filter the day
+        the roles change.
         """
         if sections is not None:
             statement = statement.where(AuditEntry.section.in_(list(sections)))

@@ -7,6 +7,7 @@ the kind of value it holds. Every one of those would only show up on the
 owner's screen, at the worst possible moment.
 """
 
+from datetime import datetime
 from decimal import Decimal
 
 import pytest
@@ -41,12 +42,33 @@ class TestTheCatalogIsConsistent:
 
     @pytest.mark.parametrize("spec", PARAMETERS, ids=lambda spec: spec.key)
     def test_the_initial_value_is_inside_its_own_range(self, spec: ParameterSpec) -> None:
-        """A starting value the owner could not have typed is a contradiction (RF-04, RF-06)."""
+        """A starting value the owner could not have typed is a contradiction (RF-04, RF-06).
+
+        Asked twice on purpose, because the two ways of asking fail at different
+        moments. The act asks `coerce`, which is what a PUT of the same value
+        would do: an `initial` outside the bounds this very spec declares raises
+        here, with the sentence the owner would have read.
+
+        The assertion asks the bounds directly, and that is the half worth
+        writing: a range check that disappeared from `coerce` would take a test
+        that only called `coerce` down with it, silently, leaving a catalog that
+        starts wherever it likes. So the bound is compared here, and a time of
+        day is handed to `datetime` — the clock is that kind's range, and
+        `_as_time_of_day` cannot be the witness for its own reading of it.
+        """
         # Act — coercing the initial value is exactly what a PUT of it would do
-        stored = spec.coerce(spec.initial)
+        stored = spec.stored_initial
 
         # Assert
-        assert stored is not None
+        if spec.kind is ParameterKind.TIME_OF_DAY:
+            assert datetime.strptime(stored, "%H:%M").strftime("%H:%M") == stored, (
+                f"«{spec.key}» starts at {stored!r}, which is not a time of day the clock has."
+            )
+            return
+        assert Decimal(str(spec.minimum)) <= Decimal(str(stored)) <= Decimal(str(spec.maximum)), (
+            f"«{spec.key}» starts at {stored!r} and admits {spec.minimum} to "
+            f"{spec.maximum}: the owner is shown a value the same screen would refuse."
+        )
 
     @pytest.mark.parametrize("spec", PARAMETERS, ids=lambda spec: spec.key)
     def test_a_numeric_parameter_declares_both_bounds(self, spec: ParameterSpec) -> None:

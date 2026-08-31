@@ -1,0 +1,55 @@
+---
+title: El camino de una orden de compra
+---
+stateDiagram-v2
+    state "Apartada para revisión" as Apartada
+    state "En curso, antes de la recepción" as EnCurso {
+        state "Pendiente de envío" as Pendiente
+        state "Enviada" as Enviada
+        state "Confirmada" as Confirmada
+        [*] --> Pendiente
+        Pendiente --> Enviada: el portal la muestra enviada
+        Enviada --> Confirmada: el portal la muestra confirmada
+    }
+    state "Señalada como estancada" as Estancada
+    state "Recibida" as Recibida
+
+    [*] --> Apartada: su proveedor no se puede identificar con certeza
+    [*] --> EnCurso: el sistema la trae del portal con su proveedor identificado
+    Apartada --> EnCurso: el dueño o compras le asigna un proveedor del padrón
+    Apartada --> EnCurso: otra orden igual ya se resolvió y esa decisión alcanza a ésta
+    EnCurso --> Estancada: lleva en el mismo estado más días que el límite configurado
+    Estancada --> EnCurso: avanza de estado y deja de estar señalada
+    EnCurso --> Recibida: el portal la muestra recibida
+    Estancada --> Recibida: llega la mercadería y deja de estar señalada
+    Recibida --> [*]
+
+    note right of Apartada
+        Nada se descarta y nada se supone: queda
+        apartada con su motivo, sin asignarla al
+        proveedor que más se le parece. Sigue en la
+        lista con el nombre tal como llegó, se cuenta
+        aparte y se puede pedir ver sólo esas. La
+        resuelven el dueño y compras asignándole uno de
+        los ocho proveedores del padrón, y queda
+        registrado quién lo decidió y cuándo. Esa
+        decisión se guarda como criterio: alcanza a las
+        otras que estaban apartadas escritas de esa
+        misma forma y a las que lleguen después.
+        Mientras siga apartada no se la compara con
+        ninguna otra
+    end note
+
+    note right of Estancada
+        El reloj es del sistema, no del portal: cuenta
+        desde que lo ve por sí mismo. El día uno no hay
+        ninguna señalada. Una orden ya recibida no se
+        estanca
+    end note
+
+    note right of Recibida
+        Además del estado, cada orden muestra desde
+        cuándo el sistema la viene viendo así. Las
+        anteriores a la puesta en marcha muestran
+        cuántos días pasaron desde el pedido
+    end note

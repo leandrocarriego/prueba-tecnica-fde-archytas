@@ -7,6 +7,7 @@ record what they did, and the rest of the platform reads its parameters through
 """
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -107,6 +108,80 @@ ALREADY_RUNNING = "A price update is already running"
 # to record its own failure instead of being reaped first.
 ABANDONED_AFTER = timedelta(seconds=celery_app.conf.task_time_limit or 1800) + timedelta(minutes=15)
 ABANDONED = "The run was interrupted: its worker never came back"
+
+
+@dataclass(frozen=True, slots=True)
+class SyncJob:
+    """One extraction that runs on a schedule of its own.
+
+    Everything that separates the six scheduled extractions of the platform is
+    here — the name their runs are recorded under, the Celery task that does
+    the work, the parameter that says how often, and its advisory lock — so the
+    heartbeat below is one loop and not six copies of the same fifteen lines.
+
+    `celery_task` is a **string** on purpose: the work belongs to `portal`, and
+    one module never imports another (Artículo IV). A name over the broker is
+    the same kind of contract an event is.
+    """
+
+    key: str
+    task_name: str
+    celery_task: str
+    interval_key: str
+    lock_key: int
+    # The parameter of `message_sync` is in minutes and every other one is in
+    # hours. Carrying the unit next to the key is what keeps the heartbeat from
+    # having to know which is which.
+    unit: str = "hours"
+
+    def interval(self, value: int) -> timedelta:
+        """How long to wait between runs, in the unit this parameter is written in."""
+        return timedelta(**{self.unit: value})
+
+
+# The scheduled extractions of the platform. Adding one is a line here plus the
+# task that does the work — never a change to `celery_app.py`, and never a
+# second schedule to keep in step with the parameters panel.
+SYNC_JOBS: tuple[SyncJob, ...] = (
+    SyncJob(
+        key="invoices",
+        task_name="extract_invoices",
+        celery_task="portal.extract_invoices",
+        interval_key="invoice_sync.interval_hours",
+        lock_key=0x9C1D_0002,
+    ),
+    SyncJob(
+        key="supplier_ledger",
+        task_name="extract_supplier_ledger",
+        celery_task="portal.extract_supplier_ledger",
+        interval_key="invoice_sync.interval_hours",
+        lock_key=0x9C1D_0003,
+    ),
+    SyncJob(
+        key="purchase_orders",
+        task_name="extract_purchase_orders",
+        celery_task="portal.extract_purchase_orders",
+        interval_key="invoice_sync.interval_hours",
+        lock_key=0x9C1D_0004,
+    ),
+    SyncJob(
+        key="messages",
+        task_name="extract_messages",
+        celery_task="portal.extract_messages",
+        interval_key="message_sync.interval_minutes",
+        lock_key=0x9C1D_0005,
+        unit="minutes",
+    ),
+    SyncJob(
+        key="sales",
+        task_name="extract_sales",
+        celery_task="portal.extract_sales",
+        interval_key="sales_sync.interval_hours",
+        lock_key=0x9C1D_0006,
+    ),
+)
+
+SYNC_BY_KEY: dict[str, SyncJob] = {job.key: job for job in SYNC_JOBS}
 
 
 def dispatch_price_extraction(job_run_id: int) -> None:
@@ -388,8 +463,13 @@ class OperationsService:
         """The history of manual changes, newest first (RF-13, RF-14, RF-18, RF-19).
 
         `sections` is the caller's own reach, resolved by `identity`, and it is
-        applied to the query rather than checked afterwards: the owner passes
-        `None` and sees everything, everybody else sees their sections only.
+        applied to the query rather than checked afterwards — the difference
+        between a row that never loads and a row that loads and is then hidden.
+
+        Over HTTP it always arrives spelled out: the owner's role reaches every
+        section, so the owner asks for all of them rather than for `None`.
+        `None` means no section filter at all, and belongs to a caller inside
+        the process that has no reach to respect; no route passes it.
         """
         entries = await self.audit.list(
             skip=skip,
@@ -490,6 +570,53 @@ class OperationsService:
             extra={"job_run_id": run.id, "requested_by_user_id": requested_by_user_id},
         )
         return PriceUpdateRequested(job_run_id=run.id, status=run.status)
+
+    async def request_sync(
+        self, job: SyncJob, *, requested_by_user_id: int | None = None
+    ) -> int | None:
+        """Open a run for one scheduled extraction and hand it to the worker.
+
+        Returns the run id, or `None` when one of these is already running: the
+        same rule as the price update, for the same reason — the portal account
+        is shared with the client's own staff, and two browsers signed in as the
+        same person is not a thing to do to somebody else's system.
+        """
+        if not await self.runs.try_lock(job.lock_key):
+            return None
+        if await self.runs.running(job.task_name) is not None:
+            return None
+
+        run = await self.runs.add(
+            JobRun(
+                task_name=job.task_name,
+                status=JobStatus.RUNNING,
+                started_at=datetime.now(UTC),
+                payload={"requested_by_user_id": requested_by_user_id},
+                attempts=1,
+            )
+        )
+        await self.session.commit()
+        celery_app.send_task(job.celery_task, kwargs={"job_run_id": run.id})
+        logger.info("Extraction requested", extra={"job": job.key, "job_run_id": run.id})
+        return run.id
+
+    async def due_for_sync(self, job: SyncJob) -> bool:
+        """Whether this extraction is due, by the parameter that governs it.
+
+        Read every time rather than cached, which is what makes a change to the
+        frequency apply from the following query instead of from a redeploy.
+        """
+        if await self.runs.running(job.task_name) is not None:
+            return False
+        runs = await self.runs.latest(job.task_name, limit=1)
+        if not runs or runs[0].started_at is None:
+            return True
+        every = job.interval(int(await self.get_parameter_value(job.interval_key)))
+        return datetime.now(UTC) - runs[0].started_at >= every
+
+    async def record_sync_success(self, job_run_id: int) -> None:
+        """Close a scheduled extraction as successful."""
+        await self.complete_run(job_run_id, result={})
 
     async def price_update_status(self) -> PriceUpdateStatusRead:
         """When the last successful update was, and whether it is interrupted."""

@@ -4,2721 +4,6521 @@
  */
 
 export interface paths {
-    "/api/v1/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Service and database health
-         * @description Public and unauthenticated: Docker's healthcheck calls it before anyone logs in.
-         *
-         *     It answers 503 rather than 200 when a dependency is down, because an
-         *     orchestrator restarts on the status code, not on the body.
-         */
-        get: operations["health_api_v1_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Exchange credentials for a session
-         * @description Public: anyone may attempt to log in.
-         *
-         *     An unknown email, a wrong password, a deactivated access and a temporarily
-         *     locked one all fail the same way, so the endpoint cannot be used to find
-         *     out which addresses exist or which accounts are blocked.
-         */
-        post: operations["login_api_v1_auth_login_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Who is working, and what they may reach
-         * @description Any live session, restricted to the caller's own account.
-         *
-         *     Returns the permission map so the menu is drawn from what the backend
-         *     enforces instead of from a second copy of the rules in the frontend.
-         */
-        get: operations["read_current_user_api_v1_auth_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Close your session
-         * @description Any live session. Closes the one the caller is using, not the others.
-         */
-        post: operations["logout_api_v1_auth_logout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/password/change": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Change your own password
-         * @description Any live session, and only on the caller's own account.
-         *
-         *     The target is taken from the session, never from the body, so this route
-         *     cannot be pointed at somebody else. Every other session of the same person
-         *     is closed: a password that stopped being valid must not survive elsewhere.
-         */
-        post: operations["change_password_api_v1_auth_password_change_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/password-reset/request": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Ask for a recovery link
-         * @description Public, and always answers the same.
-         *
-         *     Saying whether the address is registered would turn a recovery form into a
-         *     way of finding out who has an account, so the answer never varies. The link
-         *     itself goes out by WhatsApp and is never returned here.
-         */
-        post: operations["request_password_reset_api_v1_auth_password_reset_request_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/password-reset/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Is this recovery link still good?
-         * @description Public: the single-use token is the credential.
-         */
-        get: operations["check_reset_token_api_v1_auth_password_reset__token__get"];
-        put?: never;
-        /**
-         * Set a new password with a recovery link
-         * @description Public: the single-use token is the credential. Spending it kills it.
-         */
-        post: operations["confirm_password_reset_api_v1_auth_password_reset__token__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/invitation/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Is this invitation still good?
-         * @description Public: whoever was invited holds no session yet.
-         */
-        get: operations["check_invitation_api_v1_auth_invitation__token__get"];
-        put?: never;
-        /**
-         * Accept an invitation and set your password
-         * @description Public: the invitation is the credential, and it works once.
-         *
-         *     This is the only way a password is ever set for the first time. The owner
-         *     never types one for somebody else.
-         */
-        post: operations["accept_invitation_api_v1_auth_invitation__token__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List accesses
-         * @description Owner only: administering accesses is the owner's, and so is seeing them.
-         */
-        get: operations["list_users_api_v1_users_get"];
-        put?: never;
-        /**
-         * Create an access and invite its person
-         * @description Owner only. Returns no credential: the invitation goes out by WhatsApp.
-         */
-        post: operations["create_user_api_v1_users_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users/{user_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read one access
-         * @description Owner only.
-         */
-        get: operations["get_user_api_v1_users__user_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update an access
-         * @description Owner only: this route can change a role, so it changes what someone may do.
-         */
-        patch: operations["update_user_api_v1_users__user_id__patch"];
-        trace?: never;
-    };
-    "/api/v1/users/{user_id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Deactivate an access
-         * @description Owner only, and never on themselves.
-         *
-         *     The access is deactivated, not deleted: everything it authored has to keep
-         *     pointing at a real person. Its open sessions are closed on the spot.
-         */
-        post: operations["deactivate_user_api_v1_users__user_id__deactivate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/users/{user_id}/reactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reactivate an access
-         * @description Owner only. The same person comes back, with a new invitation and no old password.
-         */
-        post: operations["reactivate_user_api_v1_users__user_id__reactivate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/access-log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Who got in, and who was turned away
-         * @description Owner only: nobody else sees other people's activity.
-         */
-        get: operations["list_access_events_api_v1_access_log_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operations/quality": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Tests and coverage of the build this image came from
-         * @description Every authenticated role, and nobody else.
-         *
-         *     `/health` is public and deliberately says nothing about this: how well the
-         *     system is tested is a fact about the people who build it, not something to
-         *     be read off the internet by anyone who finds the domain.
-         *
-         *     `None` when the image carries no snapshot. Saying nothing is the honest
-         *     answer to "we do not know"; a number nobody measured would not be.
-         */
-        get: operations["read_quality_api_v1_operations_quality_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operations/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Recent background runs
-         * @description Every authenticated role.
-         *
-         *     Whoever handles purchasing needs to know whether last night's extraction
-         *     ran, without having to ask the owner.
-         */
-        get: operations["list_jobs_api_v1_operations_jobs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operations/parameters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read the business parameters
-         * @description Owner only: these values decide how the platform behaves.
-         */
-        get: operations["list_parameters_api_v1_operations_parameters_get"];
-        /**
-         * Update the business parameters
-         * @description Owner only (RF-02, RF-03).
-         *
-         *     The whole set is written in one transaction, so the platform never runs on
-         *     half of the old rules and half of the new ones. A key outside the catalog
-         *     or a value outside its range is refused with the range in the message
-         *     (RF-06), and who changed what is taken from the token, never from the body
-         *     (RF-08).
-         */
-        put: operations["update_parameters_api_v1_operations_parameters_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operations/audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The history of manual changes
-         * @description Every authenticated role, each seeing their own sections.
-         *
-         *     The owner reaches all three and therefore sees everybody (RF-18); anybody
-         *     else sees the sections they reach and nothing else (RF-19). Newest first
-         *     (RF-13), filterable by person and by date range (RF-14).
-         */
-        get: operations["list_audit_api_v1_operations_audit_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operations/audit/{entity_type}/{entity_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The history of one datum
-         * @description Every authenticated role, filtered by section like the listing.
-         *
-         *     It exists so a corrected datum leads to its own history without anybody
-         *     having to go looking for it on another screen (RF-15).
-         */
-        get: operations["audit_for_entity_api_v1_operations_audit__entity_type___entity_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/operations/corrections/reasons": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The reasons a correction may be given
-         * @description Every authenticated role.
-         *
-         *     Served by the API because the API is what validates the code (RF-11): the
-         *     list and the rule that checks it come from the same place.
-         */
-        get: operations["correction_reasons_api_v1_operations_corrections_reasons_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/price-updates/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The state of the price update
-         * @description Every authenticated role.
-         *
-         *     It answers the last **successful** update (RF-09) and whether the update is
-         *     interrupted (RF-11), which is what the prices screen shows at the top.
-         */
-        get: operations["price_update_status_api_v1_price_updates_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/price-updates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bring the list now
-         * @description The owner and purchasing, and nobody else.
-         *
-         *     Asking for the list by hand is knocking on a third party's door, so it is
-         *     not a read that any role can do. Who asked is taken from the token and
-         *     recorded with the run (RF-17); a second request while one is running is
-         *     answered with a 409 rather than starting another (RF-15).
-         */
-        post: operations["request_price_update_api_v1_price_updates_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/price-updates/settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The two parameters of the price update
-         * @description Owner only: these values decide how the platform behaves.
-         */
-        get: operations["read_price_update_settings_api_v1_price_updates_settings_get"];
-        /**
-         * Change how often and what counts as a big rise
-         * @description Owner only (RF-18, RF-19). The new frequency applies from the next query.
-         *
-         *     The two keys it writes are the same ones the general parameters panel
-         *     writes, so a change here is validated, logged and published exactly like
-         *     one made there.
-         */
-        put: operations["write_price_update_settings_api_v1_price_updates_settings_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/price-updates/{job_run_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * How one update ended
-         * @description The owner and purchasing.
-         *
-         *     Deliberately a different route from `/status`: that one reports the last
-         *     **successful** update, so a run that failed would never show up there and
-         *     whoever asked for it would never learn that it failed (RF-16).
-         */
-        get: operations["read_price_update_api_v1_price_updates__job_run_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/prices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The price list in force
-         * @description Every authenticated role: the owner, purchasing and sales.
-         */
-        get: operations["list_prices_api_v1_prices_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/prices/{product_id}/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * How the price of a product evolved
-         * @description Every authenticated role.
-         */
-        get: operations["price_history_api_v1_prices__product_id__history_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/catalog/products/{product_id}/corrections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Correct a value of a product by hand
-         * @description The owner and sales: the catalog and its prices are theirs (RF-24).
-         *
-         *     Any field the portal brought, not only the amounts (RF-23), always with a
-         *     reason picked from the list (RF-11). What the portal had said is kept
-         *     (RF-25), and who changed it is taken from the token rather than the body.
-         */
-        post: operations["correct_product_api_v1_catalog_products__product_id__corrections_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/catalog/corrections/{correction_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Undo a manual correction
-         * @description The owner alone (RF-30), even over a datum somebody else corrected.
-         *
-         *     The datum goes back to the value the portal reported (RF-31) and the
-         *     correction is marked as undone with who and when — never deleted (RF-32).
-         *     A datum the portal never brought has no correction, so this answers 404
-         *     rather than inventing one to undo (RF-33).
-         */
-        delete: operations["revert_correction_api_v1_catalog_corrections__correction_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/triage/cases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * What the update set aside
-         * @description The owner and purchasing: this is the screen where the queue is emptied.
-         */
-        get: operations["list_cases_api_v1_triage_cases_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/triage/cases/{case_id}/resolution": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Decide what to do with a case
-         * @description The owner and purchasing.
-         *
-         *     Who decided is taken from the token, never from the body: RF-32 asks for the
-         *     person who took the decision, and a body could name somebody else. The name
-         *     travels as a plain string — the first name, which is how the business names
-         *     these people — and not as a user of another module (Artículo IV).
-         */
-        post: operations["resolve_case_api_v1_triage_cases__case_id__resolution_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/triage/rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The decisions that are being applied on their own
-         * @description The owner and purchasing (RF-36).
-         */
-        get: operations["list_rules_api_v1_triage_rules_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/triage/rules/{rule_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Leave a rule without effect
-         * @description The owner and purchasing.
-         *
-         *     The rule is revoked, not deleted, and what it was resolving comes back to
-         *     the queue (RF-37).
-         */
-        delete: operations["revoke_rule_api_v1_triage_rules__rule_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
+  '/api/v1/health': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Service and database health
+     * @description Public and unauthenticated: Docker's healthcheck calls it before anyone logs in.
+     *
+     *     It answers 503 rather than 200 when a dependency is down, because an
+     *     orchestrator restarts on the status code, not on the body.
+     */
+    get: operations['health_api_v1_health_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/login': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Exchange credentials for a session
+     * @description Public: anyone may attempt to log in.
+     *
+     *     An unknown email, a wrong password, a deactivated access and a temporarily
+     *     locked one all fail the same way, so the endpoint cannot be used to find
+     *     out which addresses exist or which accounts are blocked.
+     */
+    post: operations['login_api_v1_auth_login_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/me': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Who is working, and what they may reach
+     * @description Any live session, restricted to the caller's own account.
+     *
+     *     Returns the permission map so the menu is drawn from what the backend
+     *     enforces instead of from a second copy of the rules in the frontend.
+     */
+    get: operations['read_current_user_api_v1_auth_me_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/logout': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Close your session
+     * @description Any live session. Closes the one the caller is using, not the others.
+     */
+    post: operations['logout_api_v1_auth_logout_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/password/change': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Change your own password
+     * @description Any live session, and only on the caller's own account.
+     *
+     *     The target is taken from the session, never from the body, so this route
+     *     cannot be pointed at somebody else. Every other session of the same person
+     *     is closed: a password that stopped being valid must not survive elsewhere.
+     */
+    post: operations['change_password_api_v1_auth_password_change_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/password-reset/request': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Ask for a recovery link
+     * @description Public, and always answers the same.
+     *
+     *     Saying whether the address is registered would turn a recovery form into a
+     *     way of finding out who has an account, so the answer never varies. The link
+     *     itself goes out by WhatsApp and is never returned here.
+     */
+    post: operations['request_password_reset_api_v1_auth_password_reset_request_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/password-reset/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Is this recovery link still good?
+     * @description Public: the single-use token is the credential.
+     */
+    get: operations['check_reset_token_api_v1_auth_password_reset__token__get']
+    put?: never
+    /**
+     * Set a new password with a recovery link
+     * @description Public: the single-use token is the credential. Spending it kills it.
+     */
+    post: operations['confirm_password_reset_api_v1_auth_password_reset__token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/auth/invitation/{token}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Is this invitation still good?
+     * @description Public: whoever was invited holds no session yet.
+     */
+    get: operations['check_invitation_api_v1_auth_invitation__token__get']
+    put?: never
+    /**
+     * Accept an invitation and set your password
+     * @description Public: the invitation is the credential, and it works once.
+     *
+     *     This is the only way a password is ever set for the first time. The owner
+     *     never types one for somebody else.
+     */
+    post: operations['accept_invitation_api_v1_auth_invitation__token__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/users': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List accesses
+     * @description Owner only: administering accesses is the owner's, and so is seeing them.
+     */
+    get: operations['list_users_api_v1_users_get']
+    put?: never
+    /**
+     * Create an access and invite its person
+     * @description Owner only. Returns no credential: the invitation goes out by WhatsApp.
+     */
+    post: operations['create_user_api_v1_users_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/users/{user_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Read one access
+     * @description Owner only.
+     */
+    get: operations['get_user_api_v1_users__user_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Update an access
+     * @description Owner only: this route can change a role, so it changes what someone may do.
+     */
+    patch: operations['update_user_api_v1_users__user_id__patch']
+    trace?: never
+  }
+  '/api/v1/users/{user_id}/deactivate': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Deactivate an access
+     * @description Owner only, and never on themselves.
+     *
+     *     The access is deactivated, not deleted: everything it authored has to keep
+     *     pointing at a real person. Its open sessions are closed on the spot.
+     */
+    post: operations['deactivate_user_api_v1_users__user_id__deactivate_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/users/{user_id}/reactivate': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Reactivate an access
+     * @description Owner only. The same person comes back, with a new invitation and no old password.
+     */
+    post: operations['reactivate_user_api_v1_users__user_id__reactivate_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/access-log': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Who got in, and who was turned away
+     * @description Owner only: nobody else sees other people's activity.
+     */
+    get: operations['list_access_events_api_v1_access_log_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/operations/quality': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Tests and coverage of the build this image came from
+     * @description Every authenticated role, and nobody else.
+     *
+     *     `/health` is public and deliberately says nothing about this: how well the
+     *     system is tested is a fact about the people who build it, not something to
+     *     be read off the internet by anyone who finds the domain.
+     *
+     *     `None` when the image carries no snapshot. Saying nothing is the honest
+     *     answer to "we do not know"; a number nobody measured would not be.
+     */
+    get: operations['read_quality_api_v1_operations_quality_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/operations/jobs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Recent background runs
+     * @description Every authenticated role.
+     *
+     *     Whoever handles purchasing needs to know whether last night's extraction
+     *     ran, without having to ask the owner.
+     */
+    get: operations['list_jobs_api_v1_operations_jobs_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/operations/parameters': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Read the business parameters
+     * @description Owner only: these values decide how the platform behaves.
+     */
+    get: operations['list_parameters_api_v1_operations_parameters_get']
+    /**
+     * Update the business parameters
+     * @description Owner only (RF-02, RF-03).
+     *
+     *     The whole set is written in one transaction, so the platform never runs on
+     *     half of the old rules and half of the new ones. A key outside the catalog
+     *     or a value outside its range is refused with the range in the message
+     *     (RF-06), and who changed what is taken from the token, never from the body
+     *     (RF-08).
+     */
+    put: operations['update_parameters_api_v1_operations_parameters_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/operations/audit': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The history of manual changes
+     * @description Every authenticated role, each seeing their own sections.
+     *
+     *     The owner reaches all three and therefore sees everybody (RF-18); anybody
+     *     else sees the sections they reach and nothing else (RF-19). Newest first
+     *     (RF-13), filterable by person and by date range (RF-14).
+     */
+    get: operations['list_audit_api_v1_operations_audit_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/operations/audit/{entity_type}/{entity_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The history of one datum
+     * @description Every authenticated role, filtered by section like the listing.
+     *
+     *     It exists so a corrected datum leads to its own history without anybody
+     *     having to go looking for it on another screen (RF-15).
+     */
+    get: operations['audit_for_entity_api_v1_operations_audit__entity_type___entity_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/operations/corrections/reasons': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The reasons a correction may be given
+     * @description Every authenticated role.
+     *
+     *     Served by the API because the API is what validates the code (RF-11): the
+     *     list and the rule that checks it come from the same place.
+     */
+    get: operations['correction_reasons_api_v1_operations_corrections_reasons_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/price-updates/status': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The state of the price update
+     * @description Every authenticated role.
+     *
+     *     It answers the last **successful** update (RF-09) and whether the update is
+     *     interrupted (RF-11), which is what the prices screen shows at the top.
+     */
+    get: operations['price_update_status_api_v1_price_updates_status_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/price-updates': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Bring the list now
+     * @description The owner and purchasing, and nobody else.
+     *
+     *     Asking for the list by hand is knocking on a third party's door, so it is
+     *     not a read that any role can do. Who asked is taken from the token and
+     *     recorded with the run (RF-17); a second request while one is running is
+     *     answered with a 409 rather than starting another (RF-15).
+     */
+    post: operations['request_price_update_api_v1_price_updates_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/price-updates/settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The two parameters of the price update
+     * @description Owner only: these values decide how the platform behaves.
+     */
+    get: operations['read_price_update_settings_api_v1_price_updates_settings_get']
+    /**
+     * Change how often and what counts as a big rise
+     * @description Owner only (RF-18, RF-19). The new frequency applies from the next query.
+     *
+     *     The two keys it writes are the same ones the general parameters panel
+     *     writes, so a change here is validated, logged and published exactly like
+     *     one made there.
+     */
+    put: operations['write_price_update_settings_api_v1_price_updates_settings_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/price-updates/{job_run_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * How one update ended
+     * @description The owner and purchasing.
+     *
+     *     Deliberately a different route from `/status`: that one reports the last
+     *     **successful** update, so a run that failed would never show up there and
+     *     whoever asked for it would never learn that it failed (RF-16).
+     */
+    get: operations['read_price_update_api_v1_price_updates__job_run_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/prices': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The price list in force
+     * @description Every authenticated role: the owner, purchasing and sales.
+     */
+    get: operations['list_prices_api_v1_prices_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/prices/{product_id}/history': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * How the price of a product evolved
+     * @description Every authenticated role.
+     */
+    get: operations['price_history_api_v1_prices__product_id__history_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/catalog/products/{product_id}/corrections': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Correct a value of a product by hand
+     * @description The owner and sales: the catalog and its prices are theirs (RF-24).
+     *
+     *     Any field the portal brought, not only the amounts (RF-23), always with a
+     *     reason picked from the list (RF-11). What the portal had said is kept
+     *     (RF-25), and who changed it is taken from the token rather than the body.
+     */
+    post: operations['correct_product_api_v1_catalog_products__product_id__corrections_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/catalog/corrections/{correction_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Undo a manual correction
+     * @description The owner alone (RF-30), even over a datum somebody else corrected.
+     *
+     *     The datum goes back to the value the portal reported (RF-31) and the
+     *     correction is marked as undone with who and when — never deleted (RF-32).
+     *     A datum the portal never brought has no correction, so this answers 404
+     *     rather than inventing one to undo (RF-33).
+     */
+    delete: operations['revert_correction_api_v1_catalog_corrections__correction_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/categories': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The rubros, with their count and their written forms
+     * @description Every authenticated role (RF-01, RF-03, RF-04, RF-09 to RF-11).
+     */
+    get: operations['list_categories_api_v1_categories_get']
+    put?: never
+    /**
+     * Add a rubro
+     * @description The owner and sales (RF-05).
+     */
+    post: operations['create_category_api_v1_categories_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/categories/unclassified': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The products waiting for a rubro
+     * @description Every authenticated role. Each product carries its proposal, or none.
+     */
+    get: operations['list_unclassified_api_v1_categories_unclassified_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/categories/aliases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The equivalences in force
+     * @description Every authenticated role (RF-27).
+     */
+    get: operations['list_aliases_api_v1_categories_aliases_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/categories/{category_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Remove a rubro
+     * @description The owner and sales. Refused, with the reason, if anything points at it (RF-07).
+     */
+    delete: operations['delete_category_api_v1_categories__category_id__delete']
+    options?: never
+    head?: never
+    /**
+     * Change the name of a rubro
+     * @description The owner and sales (RF-06).
+     */
+    patch: operations['rename_category_api_v1_categories__category_id__patch']
+    trace?: never
+  }
+  '/api/v1/products/{product_id}/category': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Give a product its rubro
+     * @description The owner and sales.
+     *
+     *     Confirming the proposal and correcting it are this same call (RF-13, RF-15,
+     *     RF-20). Who decided comes from the token, never from the body (RF-18).
+     */
+    put: operations['set_product_category_api_v1_products__product_id__category_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/triage/cases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What the update set aside
+     * @description The owner and purchasing: this is the screen where the queue is emptied.
+     */
+    get: operations['list_cases_api_v1_triage_cases_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/triage/cases/{case_id}/resolution': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Decide what to do with a case
+     * @description The owner and purchasing.
+     *
+     *     Who decided is taken from the token, never from the body: RF-32 asks for the
+     *     person who took the decision, and a body could name somebody else. The name
+     *     travels as a plain string — the first name, which is how the business names
+     *     these people — and not as a user of another module (Artículo IV).
+     */
+    post: operations['resolve_case_api_v1_triage_cases__case_id__resolution_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/triage/rules': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The decisions that are being applied on their own
+     * @description The owner and purchasing (RF-36).
+     */
+    get: operations['list_rules_api_v1_triage_rules_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/triage/rules/{rule_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Leave a rule without effect
+     * @description The owner and purchasing.
+     *
+     *     The rule is revoked, not deleted, and what it was resolving comes back to
+     *     the queue (RF-37).
+     */
+    delete: operations['revoke_rule_api_v1_triage_rules__rule_id__delete']
+    options?: never
+    head?: never
+    /**
+     * Point a rule at another decision
+     * @description The owner and purchasing.
+     *
+     *     The rule stays in force and what it had resolved is re-pointed — nothing
+     *     comes back to the queue. That is the difference from `DELETE` right below,
+     *     and it is the whole of RF-28 and RF-29 of 008.
+     */
+    patch: operations['redecide_rule_api_v1_triage_rules__rule_id__patch']
+    trace?: never
+  }
+  '/api/v1/invoices': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The invoices, with every filter of the screen
+     * @description The owner and purchasing (RF-03, RF-05, RF-39 to RF-46 of 004).
+     */
+    get: operations['list_invoices_api_v1_invoices_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/invoices/{invoice_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * One invoice, with what its document said
+     * @description The owner and purchasing (RF-03, RF-27, RF-39 of 004).
+     */
+    get: operations['get_invoice_api_v1_invoices__invoice_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/invoices/{invoice_id}/payments': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The payments imputed to an invoice
+     * @description The owner and purchasing (RF-10, RF-20 of 005).
+     */
+    get: operations['invoice_payments_api_v1_invoices__invoice_id__payments_get']
+    put?: never
+    /**
+     * Register a payment by hand
+     * @description Purchasing and the owner (RF-18, RF-19, RF-21 of 005).
+     *
+     *     A payment over the outstanding balance comes back as a conflict the first
+     *     time, with the balance in it: that is the warning, and it is answered by
+     *     sending it again with `confirm_over_balance`.
+     */
+    post: operations['register_payment_api_v1_invoices__invoice_id__payments_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/invoices/{invoice_id}/receipt': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The reception receipt of an invoice
+     * @description The owner and purchasing (RF-29, RF-47 of 005).
+     */
+    get: operations['get_receipt_api_v1_invoices__invoice_id__receipt_get']
+    put?: never
+    /**
+     * Issue the reception receipt of an invoice
+     * @description Purchasing and the owner (RF-33, RF-36, RF-47, RF-48 of 005).
+     *
+     *     Refused with its reason when the invoice already fell due (RF-34) or already
+     *     has a receipt in force (RF-35).
+     */
+    post: operations['issue_receipt_api_v1_invoices__invoice_id__receipt_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/invoices/{invoice_id}/file': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What the document of the invoice said
+     * @description The owner and purchasing (RF-04 of 004).
+     *
+     *     The **excerpt** of the document, as plain text, and not the bytes the portal
+     *     delivered: `raw` is evidence and is never served to a browser, and what a
+     *     person reviewing needs is what the file said next to what the table said.
+     */
+    get: operations['invoice_file_api_v1_invoices__invoice_id__file_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/suppliers': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The supplier register
+     * @description The owner and purchasing (RF-08, RF-24 of 004).
+     */
+    get: operations['list_suppliers_api_v1_suppliers_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/suppliers/{supplier_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * One supplier, with what the portal did not publish marked
+     * @description The owner and purchasing (RF-10, RF-15, RF-20 of 004).
+     */
+    get: operations['get_supplier_api_v1_suppliers__supplier_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Correct the contact details of a supplier
+     * @description The owner and purchasing (RF-16 to RF-19 of 004).
+     *
+     *     What the portal had said is kept, so the correction can be undone and a
+     *     later reading that contradicts it is reported instead of overwriting it.
+     */
+    patch: operations['correct_supplier_api_v1_suppliers__supplier_id__patch']
+    trace?: never
+  }
+  '/api/v1/suppliers/{supplier_id}/invoices': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The invoices of one supplier
+     * @description The owner and purchasing (RF-21 of 004).
+     */
+    get: operations['supplier_invoices_api_v1_suppliers__supplier_id__invoices_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/suppliers/{supplier_id}/totals': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What a supplier was invoiced, paid and still owes
+     * @description The owner and purchasing (RF-22, RF-23 of 004; RF-24 to RF-28 of 005).
+     *
+     *     What it left out travels with the number, never quietly.
+     */
+    get: operations['supplier_totals_api_v1_suppliers__supplier_id__totals_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/invoice-review': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The invoices waiting for a person
+     * @description The owner and purchasing (RF-30, RF-34, RF-46 of 004).
+     */
+    get: operations['review_queue_api_v1_invoice_review_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/invoice-review/{invoice_id}/resolve': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Decide about an invoice held for review
+     * @description The owner and purchasing (RF-31, RF-32, RF-33, RF-36 of 004).
+     *
+     *     Who decided comes from the token, never from the body.
+     */
+    post: operations['resolve_invoice_api_v1_invoice_review__invoice_id__resolve_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/supplier-aliases': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The spellings assigned to a supplier
+     * @description The owner and purchasing (RF-51 of 004).
+     */
+    get: operations['list_aliases_api_v1_supplier_aliases_get']
+    put?: never
+    /**
+     * Assign a spelling to a supplier
+     * @description The owner and purchasing (RF-47, RF-49, RF-50 of 004).
+     */
+    post: operations['save_alias_api_v1_supplier_aliases_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/supplier-aliases/preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * How many invoices this assignment would resolve
+     * @description The owner and purchasing (RF-48 of 004).
+     *
+     *     Counted with the query that will resolve them, so the number promised here
+     *     is the number that happens.
+     */
+    post: operations['preview_alias_api_v1_supplier_aliases_preview_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/supplier-aliases/{alias_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Leave an assignment without effect
+     * @description The owner and purchasing (RF-52, RF-53 of 004).
+     *
+     *     What that assignment resolved goes back to the queue. What somebody decided
+     *     one by one does not.
+     */
+    delete: operations['drop_alias_api_v1_supplier_aliases__alias_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/payments/pending': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The vouchers waiting to be distributed
+     * @description The owner and purchasing (RF-11, RF-12, RF-54 of 005).
+     */
+    get: operations['pending_payments_api_v1_payments_pending_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/payments/{payment_id}/split': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Distribute a voucher between the invoices it covers
+     * @description The owner and purchasing (RF-53, RF-55, RF-56 of 005).
+     */
+    post: operations['split_payment_api_v1_payments__payment_id__split_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/payments/{payment_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Leave a payment loaded by hand without effect
+     * @description The owner and purchasing (RF-22 of 005). A voucher of the portal is refused (RF-23).
+     */
+    delete: operations['void_payment_api_v1_payments__payment_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/receipts/{receipt_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Annul a receipt already issued
+     * @description The owner and purchasing (RF-49, RF-50, RF-51 of 005).
+     */
+    delete: operations['void_receipt_api_v1_receipts__receipt_id__delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/receipt-incidents': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The invoices that fell due without their receipt
+     * @description The owner and purchasing (RF-37, RF-59 of 005).
+     */
+    get: operations['list_incidents_api_v1_receipt_incidents_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/receipt-incidents/{incident_id}/close': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Close an incident, saying what was done
+     * @description The owner and purchasing (RF-57, RF-58, RF-59 of 005).
+     */
+    post: operations['close_incident_api_v1_receipt_incidents__incident_id__close_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/calendar': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * One window of the calendar of due dates
+     * @description All three roles: sales consults the calendar and cannot change it (RF-37).
+     *
+     *     With no window given it opens on the current month, which is RF-04.
+     */
+    get: operations['read_calendar_api_v1_calendar_get']
+    put?: never
+    /**
+     * Add a due date by hand
+     * @description The owner and purchasing (RF-12, RF-13, RF-14 of 006). Sales is refused (RF-38).
+     */
+    post: operations['add_due_date_api_v1_calendar_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/calendar/{due_date_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Remove a due date loaded by hand
+     * @description The owner and purchasing (RF-17 of 006). One from an invoice is refused (RF-18).
+     */
+    delete: operations['remove_due_date_api_v1_calendar__due_date_id__delete']
+    options?: never
+    head?: never
+    /**
+     * Correct a due date loaded by hand
+     * @description The owner and purchasing (RF-15, RF-16 of 006).
+     */
+    patch: operations['edit_due_date_api_v1_calendar__due_date_id__patch']
+    trace?: never
+  }
+  '/api/v1/calendar/{due_date_id}/date': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Move a due date to another day
+     * @description The owner and purchasing (RF-19 to RF-30, RF-42 of 006).
+     *
+     *     Dragging it and picking a date are the same call: the browser decides how
+     *     the person says it, and the platform has no reason to tell them apart.
+     */
+    put: operations['move_due_date_api_v1_calendar__due_date_id__date_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/purchase-orders': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The purchase orders, with their counts
+     * @description The owner and purchasing. Sales is refused (RF-09 of 007).
+     */
+    get: operations['list_orders_api_v1_purchase_orders_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/purchase-orders/{order_id}/repeat-flag': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Drop the repeated-order flag
+     * @description The owner and purchasing (RF-18, RF-19 of 007).
+     */
+    delete: operations['dismiss_repeat_api_v1_purchase_orders__order_id__repeat_flag_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/messages': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The messages of the portal inbox
+     * @description The owner and purchasing (RF-22 to RF-26, RF-31 of 007).
+     */
+    get: operations['list_messages_api_v1_messages_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/messages/{message_id}/resolution': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Mark a message as dealt with
+     * @description The owner and purchasing (RF-28, RF-29 of 007).
+     *
+     *     Who resolved it comes from the token, never from the body.
+     */
+    post: operations['resolve_message_api_v1_messages__message_id__resolution_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/messages/{message_id}/assignee': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Say who is responsible for a message
+     * @description The owner and purchasing (RF-30 of 007).
+     */
+    put: operations['assign_message_api_v1_messages__message_id__assignee_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/messages/{message_id}/note': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Write a note on a message
+     * @description The owner and purchasing (RF-32 of 007).
+     */
+    post: operations['annotate_message_api_v1_messages__message_id__note_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/alerts/routes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Who receives each kind of alert
+     * @description The owner (RF-37 of 007).
+     *
+     *     Every kind is listed, including the ones nobody has configured: those show
+     *     the value that was signed, which is what the platform is actually obeying.
+     */
+    get: operations['list_routes_api_v1_alerts_routes_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/alerts/routes/{kind}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Say who receives one kind of alert
+     * @description The owner (RF-37 of 007).
+     */
+    put: operations['set_route_api_v1_alerts_routes__kind__put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/sales': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The sales records
+     * @description The owner and sales. Purchasing is refused (RF-08 of 009).
+     */
+    get: operations['list_sales_api_v1_sales_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/sales/review': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The sales waiting for a decision
+     * @description The owner and sales (RF-13, RF-14, RF-23, RF-26, RF-28, RF-30 of 009).
+     */
+    get: operations['review_queue_api_v1_sales_review_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/sales/groups/{code_key}/resolution': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Decide about a repeated sale
+     * @description The owner and sales, and nobody else (RF-29, RF-31 to RF-34, RF-36).
+     */
+    post: operations['resolve_group_api_v1_sales_groups__code_key__resolution_post']
+    /**
+     * Undo the decision about a repeated sale
+     * @description The owner and sales (RF-35 of 009). The indicators recalculate with it.
+     */
+    delete: operations['undo_resolution_api_v1_sales_groups__code_key__resolution_delete']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/sales/{sale_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * Correct a held sale, or estimate what cannot be known
+     * @description The owner and sales (RF-38, RF-39, RF-41 of 009).
+     *
+     *     What the portal reported is kept whatever is corrected, and a value the
+     *     person estimated is marked as such wherever it is added up.
+     */
+    patch: operations['correct_sale_api_v1_sales__sale_id__patch']
+    trace?: never
+  }
+  '/api/v1/dashboard/sales': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What the business invoiced, and what was left out of the number
+     * @description The owner and sales (RF-03 to RF-07, RF-25 to RF-28 of 009).
+     *
+     *     Each cut takes its own window, which is RF-05: choosing a period here
+     *     changes this number and no other.
+     */
+    get: operations['sales_dashboard_api_v1_dashboard_sales_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/dashboard/catalog': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What the supplier charged, what the stock did, and what is new
+     * @description The owner and sales (RF-42 to RF-46 of 009).
+     *
+     *     Its own window, independent of the other cuts of the dashboard (RF-05).
+     */
+    get: operations['catalog_dashboard_api_v1_dashboard_catalog_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
-export type webhooks = Record<string, never>;
+export type webhooks = Record<string, never>
 export interface components {
-    schemas: {
-        /**
-         * AccessEventKind
-         * @description What happened, in the vocabulary the owner reads on screen.
-         *
-         *     The first four are about getting in; the last four are the owner acting on
-         *     somebody else's access. They share a table because they answer the same
-         *     question — who did what to which access, and when — and the owner reads
-         *     them in a single list.
-         * @enum {string}
-         */
-        AccessEventKind: "LOGIN_SUCCEEDED" | "LOGIN_REJECTED" | "ACCESS_LOCKED" | "PERMISSION_DENIED" | "ACCESS_GRANTED" | "ACCESS_ROLE_CHANGED" | "ACCESS_DEACTIVATED" | "ACCESS_REACTIVATED";
-        /**
-         * AccessEventList
-         * @description A page of the access log.
-         */
-        AccessEventList: {
-            /** Items */
-            items: components["schemas"]["AccessEventRead"][];
-            /** Total */
-            total: number;
-            /** Skip */
-            skip: number;
-            /** Limit */
-            limit: number;
-        };
-        /**
-         * AccessEventRead
-         * @description One line of the access log.
-         */
-        AccessEventRead: {
-            /** Id */
-            id: number;
-            /**
-             * Occurred At
-             * Format: date-time
-             */
-            occurred_at: string;
-            kind: components["schemas"]["AccessEventKind"];
-            /** User Id */
-            user_id: number | null;
-            /** Actor User Id */
-            actor_user_id: number | null;
-            /** Attempted Email */
-            attempted_email: string | null;
-            /** Resource */
-            resource: string | null;
-            /** Reason */
-            reason: string | null;
-            /** Details */
-            details: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * AuditAction
-         * @description What a manual change did to the datum it touched.
-         *
-         *     One vocabulary rather than four events. Four — created, updated, corrected,
-         *     correction reverted — would be four handlers writing into the same table,
-         *     and the log would have four doors instead of one. The distinction survives
-         *     as a field, typed, in `shared/` so both the event and the row that stores it
-         *     read it from the same place.
-         * @enum {string}
-         */
-        AuditAction: "CREATED" | "UPDATED" | "CORRECTED" | "CORRECTION_REVERTED";
-        /**
-         * AuditEntryList
-         * @description A page of the history.
-         */
-        AuditEntryList: {
-            /** Items */
-            items: components["schemas"]["AuditEntryRead"][];
-            /** Total */
-            total: number;
-            /** Skip */
-            skip: number;
-            /** Limit */
-            limit: number;
-        };
-        /**
-         * AuditEntryRead
-         * @description One line of the history of manual changes (RF-12, RF-13).
-         */
-        AuditEntryRead: {
-            /** Id */
-            id: number;
-            /** Entity Type */
-            entity_type: string;
-            /** Entity Id */
-            entity_id: string;
-            /** Field */
-            field: string | null;
-            action: components["schemas"]["AuditAction"];
-            /** Old Value */
-            old_value: unknown;
-            /** New Value */
-            new_value: unknown;
-            /** Reason Code */
-            reason_code: string | null;
-            /** Reason Label */
-            reason_label: string | null;
-            /** Reason Detail */
-            reason_detail: string | null;
-            /** Actor User Id */
-            actor_user_id: number;
-            /** Actor Name */
-            actor_name?: string | null;
-            section: components["schemas"]["BusinessSection"];
-            /**
-             * Occurred At
-             * Format: date-time
-             */
-            occurred_at: string;
-        };
-        /**
-         * BusinessSection
-         * @description The part of the business a fact belongs to.
-         * @enum {string}
-         */
-        BusinessSection: "PURCHASING" | "SALES" | "SYSTEM";
-        /**
-         * CaseList
-         * @description A page of cases.
-         */
-        CaseList: {
-            /** Items */
-            items: components["schemas"]["CaseRead"][];
-            /** Total */
-            total: number;
-            /** Skip */
-            skip: number;
-            /** Limit */
-            limit: number;
-        };
-        /**
-         * CaseRead
-         * @description A case as the review screen shows it (RF-26).
-         */
-        CaseRead: {
-            /** Id */
-            id: number;
-            /** Kind */
-            kind: string;
-            /** Reason */
-            reason: string;
-            /** Payload */
-            payload: {
-                [key: string]: unknown;
-            };
-            status: components["schemas"]["CaseStatus"];
-            /** Batch Id */
-            batch_id: number | null;
-            /** Occurrences */
-            occurrences: number;
-            /** Decision */
-            decision: {
-                [key: string]: unknown;
-            } | null;
-            /** Resolved By User Id */
-            resolved_by_user_id: number | null;
-            /** Resolved By Name */
-            resolved_by_name: string | null;
-            /** Resolved At */
-            resolved_at: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
-        /**
-         * CaseStatus
-         * @description Whether somebody has already decided about a case.
-         * @enum {string}
-         */
-        CaseStatus: "PENDING" | "RESOLVED";
-        /**
-         * ComponentHealth
-         * @description The state of one dependency.
-         *
-         *     `detail` is deliberately generic: `/health` is public, so it must not leak
-         *     hostnames, drivers or credentials from the underlying exception. The real
-         *     exception goes to the log.
-         */
-        ComponentHealth: {
-            status: components["schemas"]["HealthState"];
-            /** Detail */
-            detail?: string | null;
-        };
-        /**
-         * CorrectionMark
-         * @description A field of this row that a person corrected by hand.
-         *
-         *     It is what makes a corrected value tell itself apart at a glance (RF-26)
-         *     and show what the portal had said right next to it (RF-27). A row with an
-         *     empty list is a row exactly as the portal delivered it.
-         */
-        CorrectionMark: {
-            /** Correction Id */
-            correction_id: number;
-            /** Field */
-            field: string;
-            /** Portal Value */
-            portal_value: unknown;
-            /** Corrected Value */
-            corrected_value: unknown;
-            status: components["schemas"]["CorrectionStatus"];
-            /** Conflict Value */
-            conflict_value?: unknown | null;
-        };
-        /**
-         * CorrectionRead
-         * @description What a correction did, as the screen that asked for it gets it back.
-         *
-         *     `correction_id` is null when the datum was never brought from the portal:
-         *     the change is recorded in the history all the same (RF-09), but there is no
-         *     original value to keep and nothing to give back (RF-33).
-         */
-        CorrectionRead: {
-            /** Correction Id */
-            correction_id: number | null;
-            /** Product Id */
-            product_id: number;
-            /** Entity Type */
-            entity_type: string;
-            /** Field */
-            field: string;
-            /** Portal Value */
-            portal_value: unknown | null;
-            /** Value */
-            value: unknown;
-            status: components["schemas"]["CorrectionStatus"] | null;
-        };
-        /**
-         * CorrectionReasonRead
-         * @description One of the reasons a correction may be given (RF-11).
-         *
-         *     Served by the API because the API is what validates it: a list living in
-         *     the browser would be a second list, and the two would drift.
-         */
-        CorrectionReasonRead: {
-            /** Code */
-            code: string;
-            /** Label */
-            label: string;
-        };
-        /**
-         * CorrectionStatus
-         * @description Where a correction stands.
-         *
-         *     `REVERTED` is a state and not a deletion: undoing a correction has to stay
-         *     readable in the history, and a row that disappeared would leave the log
-         *     pointing at nothing (Artículo II).
-         * @enum {string}
-         */
-        CorrectionStatus: "ACTIVE" | "CONFLICTED" | "REVERTED";
-        /**
-         * CorrectionWrite
-         * @description What somebody has to say to correct a value (RF-11, RF-23).
-         *
-         *     The reason is required by the schema and not only by the service: a
-         *     correction without a reason is a number that appeared, and counting how
-         *     many corrections happened for the same reason is the point of asking.
-         */
-        CorrectionWrite: {
-            /** Field */
-            field: string;
-            /** Value */
-            value: unknown;
-            /** Reason Code */
-            reason_code: string;
-            /** Reason Detail */
-            reason_detail?: string | null;
-        };
-        /**
-         * CurrentUser
-         * @description Who is working, and what they may reach.
-         *
-         *     The permission map travels with the user so the menu is drawn from what the
-         *     backend actually enforces. Without it the frontend would need its own copy
-         *     of the rules, and two copies of a rule are one rule and one bug.
-         */
-        CurrentUser: {
-            user: components["schemas"]["UserRead"];
-            /** Permissions */
-            permissions: {
-                [key: string]: components["schemas"]["Level"];
-            };
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /**
-         * HealthRead
-         * @description The answer of `/health`: the service plus every dependency it needs.
-         *
-         *     `status` is whether this process can serve a request, and **only the
-         *     database decides it**. WhatsApp is reported beside it and deliberately does
-         *     not count: the route answers 503 when `status` is not OK and Docker
-         *     restarts on that, so letting a WhatsApp outage in would restart the API
-         *     every fifteen seconds because a third party's gateway is down. That is the
-         *     opposite of what the channel promises — a message that cannot be sent never
-         *     takes anything else with it.
-         */
-        HealthRead: {
-            status: components["schemas"]["HealthState"];
-            /** Service */
-            service: string;
-            /** Environment */
-            environment: string;
-            database: components["schemas"]["ComponentHealth"];
-            whatsapp: components["schemas"]["ComponentHealth"];
-        };
-        /**
-         * HealthState
-         * @description How a component is answering right now.
-         *
-         *     `OFF` is not a milder `DOWN`: it means somebody decided this dependency is
-         *     not in use. A channel with no credentials is doing exactly what was asked
-         *     of it, and reporting that as a fault would train whoever reads this to
-         *     ignore the one time it is real.
-         * @enum {string}
-         */
-        HealthState: "ok" | "down" | "off";
-        /**
-         * JobRunList
-         * @description A page of runs.
-         */
-        JobRunList: {
-            /** Items */
-            items: components["schemas"]["JobRunRead"][];
-            /** Total */
-            total: number;
-            /** Skip */
-            skip: number;
-            /** Limit */
-            limit: number;
-        };
-        /**
-         * JobRunRead
-         * @description A run as exposed by the API and to other modules.
-         */
-        JobRunRead: {
-            /** Id */
-            id: number;
-            /** Task Name */
-            task_name: string;
-            status: components["schemas"]["JobStatus"];
-            /** Started At */
-            started_at: string | null;
-            /** Finished At */
-            finished_at: string | null;
-            /** Payload */
-            payload: {
-                [key: string]: unknown;
-            } | null;
-            /** Result */
-            result: {
-                [key: string]: unknown;
-            } | null;
-            /** Error */
-            error: string | null;
-            /** Attempts */
-            attempts: number;
-        };
-        /**
-         * JobStatus
-         * @description The life of a run: queued, executing, and how it ended.
-         * @enum {string}
-         */
-        JobStatus: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
-        /**
-         * Level
-         * @description How far into a section a role gets.
-         *
-         *     Ordered, not a set of flags: whoever may edit may also read, so
-         *     `require_section(x, READ)` admits somebody holding `WRITE`.
-         * @enum {integer}
-         */
-        Level: 0 | 1 | 2;
-        /**
-         * LoginRequest
-         * @description Credentials submitted at login.
-         */
-        LoginRequest: {
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
-            /** Password */
-            password: string;
-        };
-        /**
-         * LoginResponse
-         * @description A successful login.
-         */
-        LoginResponse: {
-            /** Access Token */
-            access_token: string;
-            /**
-             * Token Type
-             * @default bearer
-             */
-            token_type: string;
-            user: components["schemas"]["UserRead"];
-        };
-        /**
-         * MessageResponse
-         * @description A bare acknowledgement.
-         */
-        MessageResponse: {
-            /** Message */
-            message: string;
-        };
-        /**
-         * ParameterKind
-         * @description What kind of value a parameter holds, and therefore how it is checked.
-         * @enum {string}
-         */
-        ParameterKind: "INTEGER" | "DECIMAL" | "TIME_OF_DAY";
-        /**
-         * ParameterRead
-         * @description A business parameter: what it is, what it may be, and what it is worth.
-         *
-         *     Assembled from the declaration in `app.shared.parameters` with the stored
-         *     value on top — **not** read off the table. A parameter nobody ever changed
-         *     has no row and still appears here with its starting value, which is what
-         *     RF-01 and RF-04 ask for together.
-         */
-        ParameterRead: {
-            /** Key */
-            key: string;
-            /** Label */
-            label: string;
-            /** Effect */
-            effect: string;
-            kind: components["schemas"]["ParameterKind"];
-            /** Value */
-            value: unknown;
-            /** Initial */
-            initial: unknown;
-            /** Minimum */
-            minimum: unknown | null;
-            /** Maximum */
-            maximum: unknown | null;
-            /** Unit */
-            unit: string | null;
-            /** Consumed By */
-            consumed_by: string;
-            /** Has Effect */
-            has_effect: boolean;
-            /** Changed At */
-            changed_at: string | null;
-        };
-        /**
-         * ParameterUpdateRequest
-         * @description The body of `PUT /operations/parameters`.
-         *
-         *     The parameters screen saves every field at once, so the endpoint takes the
-         *     whole set and applies it in one transaction: either all the changes land or
-         *     none of them do.
-         */
-        ParameterUpdateRequest: {
-            /** Items */
-            items: components["schemas"]["ParameterWrite"][];
-        };
-        /**
-         * ParameterWrite
-         * @description A parameter to set.
-         *
-         *     No description: the sentence beside the field belongs to the catalog, which
-         *     is also where the range that validates this value lives. Two sources for
-         *     one parameter is one source and one bug.
-         */
-        ParameterWrite: {
-            /** Key */
-            key: string;
-            /** Value */
-            value: unknown;
-        };
-        /**
-         * PasswordChangeRequest
-         * @description Change your own password while authenticated.
-         */
-        PasswordChangeRequest: {
-            /** Current Password */
-            current_password: string;
-            /** New Password */
-            new_password: string;
-        };
-        /**
-         * PasswordResetRequest
-         * @description Ask for a recovery link.
-         */
-        PasswordResetRequest: {
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
-        };
-        /**
-         * PasswordSet
-         * @description Redeem a single-use link and set a password.
-         */
-        PasswordSet: {
-            /** New Password */
-            new_password: string;
-        };
-        /**
-         * PriceHistoryRead
-         * @description How the price of a product evolved (RF-23), and its monthly variation (RF-24).
-         */
-        PriceHistoryRead: {
-            /** Product Id */
-            product_id: number;
-            /** Code */
-            code: string;
-            /** Description */
-            description: string;
-            /** Price */
-            price: string | null;
-            /** Currency */
-            currency: string;
-            /** Monthly Variation Pct */
-            monthly_variation_pct: string | null;
-            /** Points */
-            points: components["schemas"]["PricePointRead"][];
-            /**
-             * Corrections
-             * @default []
-             */
-            corrections: components["schemas"]["CorrectionMark"][];
-        };
-        /**
-         * PriceList
-         * @description A page of prices.
-         */
-        PriceList: {
-            /** Items */
-            items: components["schemas"]["PriceRead"][];
-            /** Total */
-            total: number;
-            /** Skip */
-            skip: number;
-            /** Limit */
-            limit: number;
-        };
-        /**
-         * PricePointRead
-         * @description One point of a product's history.
-         */
-        PricePointRead: {
-            /** Price */
-            price: string;
-            /**
-             * Changed At
-             * Format: date-time
-             */
-            changed_at: string;
-            source: components["schemas"]["PriceSource"];
-        };
-        /**
-         * PriceRead
-         * @description A product with the price in force, as the prices screen shows it.
-         */
-        PriceRead: {
-            /** Product Id */
-            product_id: number;
-            /** Code */
-            code: string;
-            /** Description */
-            description: string;
-            status: components["schemas"]["ProductStatus"];
-            /** Price */
-            price: string | null;
-            /** Currency */
-            currency: string;
-            /** Effective At */
-            effective_at: string | null;
-            /** Previous Price */
-            previous_price: string | null;
-            /** Is Highlighted */
-            is_highlighted: boolean;
-            /** Is Stale */
-            is_stale: boolean;
-            /** Monthly Variation Pct */
-            monthly_variation_pct?: string | null;
-            /**
-             * Corrections
-             * @default []
-             */
-            corrections: components["schemas"]["CorrectionMark"][];
-        };
-        /**
-         * PriceSource
-         * @description Where a point of the history came from.
-         * @enum {string}
-         */
-        PriceSource: "PORTAL" | "SYSTEM";
-        /**
-         * PriceUpdateRequested
-         * @description The answer to asking for an update by hand (RF-14, RF-16).
-         */
-        PriceUpdateRequested: {
-            /** Job Run Id */
-            job_run_id: number;
-            status: components["schemas"]["JobStatus"];
-        };
-        /**
-         * PriceUpdateSettingsRead
-         * @description The two parameters of this feature, with the value in force (RF-20).
-         */
-        PriceUpdateSettingsRead: {
-            /** Interval Hours */
-            interval_hours: number;
-            /** Highlight Threshold Pct */
-            highlight_threshold_pct: string;
-        };
-        /**
-         * PriceUpdateSettingsWrite
-         * @description What the owner may change (RF-18, RF-19).
-         */
-        PriceUpdateSettingsWrite: {
-            /** Interval Hours */
-            interval_hours: number;
-            /** Highlight Threshold Pct */
-            highlight_threshold_pct: number | string;
-        };
-        /**
-         * PriceUpdateStatusRead
-         * @description What the prices screen shows about the update itself (RF-09, RF-11).
-         */
-        PriceUpdateStatusRead: {
-            /** Last Success At */
-            last_success_at: string | null;
-            /** Last Run Id */
-            last_run_id: number | null;
-            last_run_status: components["schemas"]["JobStatus"] | null;
-            /** Last Result */
-            last_result: {
-                [key: string]: unknown;
-            } | null;
-            /** Last Quarantined */
-            last_quarantined: number | null;
-            /** Consecutive Failures */
-            consecutive_failures: number;
-            /** Is Stalled */
-            is_stalled: boolean;
-            /** Interval Hours */
-            interval_hours: number;
-            /** Highlight Threshold Pct */
-            highlight_threshold_pct: string;
-        };
-        /**
-         * ProductStatus
-         * @description Whether the business still buys this product.
-         * @enum {string}
-         */
-        ProductStatus: "ACTIVE" | "DISCONTINUED";
-        /**
-         * Quality
-         * @description How many tests passed, and how much of the code they covered.
-         */
-        Quality: {
-            /** Tests */
-            tests: number;
-            /** Coverage */
-            coverage: number;
-        };
-        /**
-         * ResolutionRequest
-         * @description What a person decided about a case.
-         *
-         *     `decision` is free-form because the queue is generic: an unreadable row is
-         *     resolved with a price and a product, an unknown product with whether to
-         *     incorporate it, a missing one with whether it is discontinued.
-         */
-        ResolutionRequest: {
-            /**
-             * Decision
-             * @description What to do. For instance {'action': 'incorporate'} or {'price': '48210'}
-             */
-            decision: {
-                [key: string]: unknown;
-            };
-            /**
-             * Remember
-             * @default true
-             */
-            remember: boolean;
-        };
-        /**
-         * RuleRead
-         * @description A rule that is being applied on its own (RF-36).
-         */
-        RuleRead: {
-            /** Id */
-            id: number;
-            /** Kind */
-            kind: string;
-            /** Matcher */
-            matcher: {
-                [key: string]: unknown;
-            };
-            /** Decision */
-            decision: {
-                [key: string]: unknown;
-            };
-            /** Created By User Id */
-            created_by_user_id: number;
-            /** Created By Name */
-            created_by_name: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Revoked By User Id */
-            revoked_by_user_id: number | null;
-            /** Revoked At */
-            revoked_at: string | null;
-        };
-        /**
-         * Section
-         * @description The parts of the business a person can be let into.
-         * @enum {string}
-         */
-        Section: "PRICES" | "CALENDAR" | "SUPPLIERS" | "PURCHASE_INVOICES" | "PAYMENTS" | "PURCHASE_ORDERS" | "RECEIPTS" | "SALES" | "DASHBOARD" | "STOCK" | "PRODUCT_CATEGORIES" | "PRODUCT_CATALOG" | "ACCESS_ADMIN" | "ACCESS_LOG" | "SYSTEM_PARAMETERS" | "MANUAL_CORRECTIONS";
-        /**
-         * TokenStatus
-         * @description Whether a single-use link still works.
-         */
-        TokenStatus: {
-            /** Usable */
-            usable: boolean;
-        };
-        /**
-         * UserCreate
-         * @description Payload to create an access.
-         *
-         *     There is no password field, and that is the point: the owner hands out
-         *     accesses, not credentials. The person sets their own from the invitation.
-         */
-        UserCreate: {
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
-            /** Name */
-            name: string;
-            /** Last Name */
-            last_name?: string | null;
-            /** Phone */
-            phone: string;
-            /** @default SALES */
-            role: components["schemas"]["UserRole"];
-        };
-        /**
-         * UserList
-         * @description A page of accesses.
-         */
-        UserList: {
-            /** Items */
-            items: components["schemas"]["UserRead"][];
-            /** Total */
-            total: number;
-            /** Skip */
-            skip: number;
-            /** Limit */
-            limit: number;
-        };
-        /**
-         * UserRead
-         * @description An access as exposed by the API.
-         */
-        UserRead: {
-            /** Id */
-            id: number;
-            /**
-             * Email
-             * Format: email
-             */
-            email: string;
-            /** Name */
-            name: string;
-            /** Last Name */
-            last_name: string | null;
-            /** Phone */
-            phone: string;
-            role: components["schemas"]["UserRole"];
-            /** Is Active */
-            is_active: boolean;
-            /** Activated At */
-            activated_at: string | null;
-            /** Locked Until */
-            locked_until: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
-        /**
-         * UserRole
-         * @description The three roles the business actually has.
-         *
-         *     Taken from the client's own words: the owner, whoever handles purchasing,
-         *     and whoever handles sales. Authorisation is enforced per resource, not by
-         *     hiding links in a menu.
-         * @enum {string}
-         */
-        UserRole: "OWNER" | "PURCHASING" | "SALES";
-        /**
-         * UserUpdate
-         * @description Payload to update an access. Every field is optional.
-         */
-        UserUpdate: {
-            /** Name */
-            name?: string | null;
-            /** Last Name */
-            last_name?: string | null;
-            /** Phone */
-            phone?: string | null;
-            role?: components["schemas"]["UserRole"] | null;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
-        };
-    };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+  schemas: {
+    /**
+     * AccessEventKind
+     * @description What happened, in the vocabulary the owner reads on screen.
+     *
+     *     The first four are about getting in; the last four are the owner acting on
+     *     somebody else's access. They share a table because they answer the same
+     *     question — who did what to which access, and when — and the owner reads
+     *     them in a single list.
+     * @enum {string}
+     */
+    AccessEventKind:
+      | 'LOGIN_SUCCEEDED'
+      | 'LOGIN_REJECTED'
+      | 'ACCESS_LOCKED'
+      | 'PERMISSION_DENIED'
+      | 'ACCESS_GRANTED'
+      | 'ACCESS_ROLE_CHANGED'
+      | 'ACCESS_DEACTIVATED'
+      | 'ACCESS_REACTIVATED'
+    /**
+     * AccessEventList
+     * @description A page of the access log.
+     */
+    AccessEventList: {
+      /** Items */
+      items: components['schemas']['AccessEventRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * AccessEventRead
+     * @description One line of the access log.
+     */
+    AccessEventRead: {
+      /** Id */
+      id: number
+      /**
+       * Occurred At
+       * Format: date-time
+       */
+      occurred_at: string
+      kind: components['schemas']['AccessEventKind']
+      /** User Id */
+      user_id: number | null
+      /** Actor User Id */
+      actor_user_id: number | null
+      /** Attempted Email */
+      attempted_email: string | null
+      /** Resource */
+      resource: string | null
+      /** Reason */
+      reason: string | null
+      /** Details */
+      details: {
+        [key: string]: unknown
+      } | null
+    }
+    /**
+     * AgingBucket
+     * @description One band of a supplier's debt by age (RF-25 of 005).
+     */
+    AgingBucket: {
+      /** Label */
+      label: string
+      /** Amount */
+      amount: string
+      /** Invoices */
+      invoices: number
+    }
+    /**
+     * AlertKind
+     * @description The kinds of alert the owner routes separately (RF-37 of 007).
+     * @enum {string}
+     */
+    AlertKind: 'PAYMENT_CLAIM' | 'DUE_SOON' | 'DAILY_DIGEST'
+    /**
+     * AliasPreview
+     * @description How many invoices an assignment would resolve, before it is saved (RF-48).
+     */
+    AliasPreview: {
+      /** Text Original */
+      text_original: string
+      /** Supplier Id */
+      supplier_id: number
+      /** Invoices */
+      invoices: number
+      /** Numbers */
+      numbers: string[]
+    }
+    /**
+     * AliasSource
+     * @description Where an equivalence came from: the signed table, or a person deciding.
+     * @enum {string}
+     */
+    AliasSource: 'SEED' | 'LEARNED'
+    /**
+     * AliasWrite
+     * @description A spelling somebody assigns to a supplier (RF-47 of 004).
+     */
+    AliasWrite: {
+      /** Text */
+      text: string
+      /** Supplier Id */
+      supplier_id: number
+    }
+    /**
+     * AuditAction
+     * @description What a manual change did to the datum it touched.
+     *
+     *     One vocabulary rather than four events. Four — created, updated, corrected,
+     *     correction reverted — would be four handlers writing into the same table,
+     *     and the log would have four doors instead of one. The distinction survives
+     *     as a field, typed, in `shared/` so both the event and the row that stores it
+     *     read it from the same place.
+     * @enum {string}
+     */
+    AuditAction: 'CREATED' | 'UPDATED' | 'CORRECTED' | 'CORRECTION_REVERTED'
+    /**
+     * AuditEntryList
+     * @description A page of the history.
+     */
+    AuditEntryList: {
+      /** Items */
+      items: components['schemas']['AuditEntryRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * AuditEntryRead
+     * @description One line of the history of manual changes (RF-12, RF-13).
+     */
+    AuditEntryRead: {
+      /** Id */
+      id: number
+      /** Entity Type */
+      entity_type: string
+      /** Entity Id */
+      entity_id: string
+      /** Field */
+      field: string | null
+      action: components['schemas']['AuditAction']
+      /** Old Value */
+      old_value: unknown
+      /** New Value */
+      new_value: unknown
+      /** Reason Code */
+      reason_code: string | null
+      /** Reason Label */
+      reason_label: string | null
+      /** Reason Detail */
+      reason_detail: string | null
+      /** Actor User Id */
+      actor_user_id: number
+      /** Actor Name */
+      actor_name?: string | null
+      section: components['schemas']['BusinessSection']
+      /**
+       * Occurred At
+       * Format: date-time
+       */
+      occurred_at: string
+    }
+    /**
+     * BusinessSection
+     * @description The part of the business a fact belongs to.
+     * @enum {string}
+     */
+    BusinessSection: 'PURCHASING' | 'SALES' | 'SYSTEM'
+    /**
+     * CalendarRead
+     * @description One month of the calendar (RF-01 to RF-05 of 006).
+     */
+    CalendarRead: {
+      /**
+       * Since
+       * Format: date
+       */
+      since: string
+      /**
+       * Until
+       * Format: date
+       */
+      until: string
+      /** Items */
+      items: components['schemas']['DueDateRead'][]
+    }
+    /**
+     * CaseList
+     * @description A page of cases.
+     */
+    CaseList: {
+      /** Items */
+      items: components['schemas']['CaseRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * CaseRead
+     * @description A case as the review screen shows it (RF-26).
+     */
+    CaseRead: {
+      /** Id */
+      id: number
+      /** Kind */
+      kind: string
+      /** Reason */
+      reason: string
+      /** Payload */
+      payload: {
+        [key: string]: unknown
+      }
+      status: components['schemas']['CaseStatus']
+      /** Batch Id */
+      batch_id: number | null
+      /** Occurrences */
+      occurrences: number
+      /** Decision */
+      decision: {
+        [key: string]: unknown
+      } | null
+      /** Resolved By User Id */
+      resolved_by_user_id: number | null
+      /** Resolved By Name */
+      resolved_by_name: string | null
+      /** Resolved At */
+      resolved_at: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+    }
+    /**
+     * CaseStatus
+     * @description Whether somebody has already decided about a case.
+     * @enum {string}
+     */
+    CaseStatus: 'PENDING' | 'RESOLVED'
+    /**
+     * CatalogDashboard
+     * @description The three cuts of the dashboard that are about the catalog.
+     *
+     *     `excluded` travels with each of them, and is reported even when it is zero:
+     *     RF-46 asks each cut to say how many records it left out, and RF-27 that it
+     *     say so when it left out none.
+     */
+    CatalogDashboard: {
+      /** Since */
+      since: string | null
+      /** Until */
+      until: string | null
+      /** Price Curve */
+      price_curve: components['schemas']['PriceCurvePoint'][]
+      /** Price Curve Excluded */
+      price_curve_excluded: number
+      /** Stock */
+      stock: components['schemas']['StockCut'][]
+      /** Stock Excluded */
+      stock_excluded: number
+      /** New Products */
+      new_products: components['schemas']['NewProductRead'][]
+    }
+    /**
+     * CategoryAliasRead
+     * @description One written form pointing at a rubro, as the screens show it (RF-03, RF-27).
+     */
+    CategoryAliasRead: {
+      /** Id */
+      id: number
+      /** Category Id */
+      category_id: number
+      /** Text Original */
+      text_original: string
+      /** Text Normalized */
+      text_normalized: string
+      /** Rule Id */
+      rule_id: number | null
+      source: components['schemas']['AliasSource']
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+    }
+    /**
+     * CategoryList
+     * @description The rubros, plus «sin rubro» as one more group (RF-09, RF-10, RF-11).
+     */
+    CategoryList: {
+      /** Items */
+      items: components['schemas']['CategoryRead'][]
+      /** Unclassified Count */
+      unclassified_count: number
+      /** Total Products */
+      total_products: number
+    }
+    /**
+     * CategoryRead
+     * @description A rubro with what the screen shows next to it: its count and its forms.
+     */
+    CategoryRead: {
+      /** Id */
+      id: number
+      /** Name */
+      name: string
+      /** Product Count */
+      product_count: number
+      /** Aliases */
+      aliases: components['schemas']['CategoryAliasRead'][]
+    }
+    /**
+     * CategoryWrite
+     * @description The name of a rubro, on the way in (RF-05, RF-06).
+     */
+    CategoryWrite: {
+      /** Name */
+      name: string
+    }
+    /**
+     * ComponentHealth
+     * @description The state of one dependency.
+     *
+     *     `detail` is deliberately generic: `/health` is public, so it must not leak
+     *     hostnames, drivers or credentials from the underlying exception. The real
+     *     exception goes to the log.
+     */
+    ComponentHealth: {
+      status: components['schemas']['HealthState']
+      /** Detail */
+      detail?: string | null
+    }
+    /**
+     * CorrectionMark
+     * @description A field of this row that a person corrected by hand.
+     *
+     *     It is what makes a corrected value tell itself apart at a glance (RF-26)
+     *     and show what the portal had said right next to it (RF-27). A row with an
+     *     empty list is a row exactly as the portal delivered it.
+     */
+    CorrectionMark: {
+      /** Correction Id */
+      correction_id: number
+      /** Field */
+      field: string
+      /** Portal Value */
+      portal_value: unknown
+      /** Corrected Value */
+      corrected_value: unknown
+      status: components['schemas']['CorrectionStatus']
+      /** Conflict Value */
+      conflict_value?: unknown | null
+    }
+    /**
+     * CorrectionRead
+     * @description What a correction did, as the screen that asked for it gets it back.
+     *
+     *     `correction_id` is null when the datum was never brought from the portal:
+     *     the change is recorded in the history all the same (RF-09), but there is no
+     *     original value to keep and nothing to give back (RF-33).
+     */
+    CorrectionRead: {
+      /** Correction Id */
+      correction_id: number | null
+      /** Product Id */
+      product_id: number
+      /** Entity Type */
+      entity_type: string
+      /** Field */
+      field: string
+      /** Portal Value */
+      portal_value: unknown | null
+      /** Value */
+      value: unknown
+      status: components['schemas']['CorrectionStatus'] | null
+    }
+    /**
+     * CorrectionReasonRead
+     * @description One of the reasons a correction may be given (RF-11).
+     *
+     *     Served by the API because the API is what validates it: a list living in
+     *     the browser would be a second list, and the two would drift.
+     */
+    CorrectionReasonRead: {
+      /** Code */
+      code: string
+      /** Label */
+      label: string
+    }
+    /**
+     * CorrectionStatus
+     * @description Where a correction stands.
+     *
+     *     `REVERTED` is a state and not a deletion: undoing a correction has to stay
+     *     readable in the history, and a row that disappeared would leave the log
+     *     pointing at nothing (Artículo II).
+     * @enum {string}
+     */
+    CorrectionStatus: 'ACTIVE' | 'CONFLICTED' | 'REVERTED'
+    /**
+     * CorrectionWrite
+     * @description What somebody has to say to correct a value (RF-11, RF-23).
+     *
+     *     The reason is required by the schema and not only by the service: a
+     *     correction without a reason is a number that appeared, and counting how
+     *     many corrections happened for the same reason is the point of asking.
+     */
+    CorrectionWrite: {
+      /** Field */
+      field: string
+      /** Value */
+      value: unknown
+      /** Reason Code */
+      reason_code: string
+      /** Reason Detail */
+      reason_detail?: string | null
+    }
+    /**
+     * CurrentUser
+     * @description Who is working, and what they may reach.
+     *
+     *     The permission map travels with the user so the menu is drawn from what the
+     *     backend actually enforces. Without it the frontend would need its own copy
+     *     of the rules, and two copies of a rule are one rule and one bug.
+     */
+    CurrentUser: {
+      user: components['schemas']['UserRead']
+      /** Permissions */
+      permissions: {
+        [key: string]: components['schemas']['Level']
+      }
+    }
+    /**
+     * DueDateChangeRead
+     * @description One move of an entry of the calendar (RF-23 of 006).
+     */
+    DueDateChangeRead: {
+      /** Id */
+      id: number
+      /**
+       * Previous Date
+       * Format: date
+       */
+      previous_date: string
+      /**
+       * New Date
+       * Format: date
+       */
+      new_date: string
+      /** Reason */
+      reason: string | null
+      /** Actor User Id */
+      actor_user_id: number
+      /**
+       * Changed At
+       * Format: date-time
+       */
+      changed_at: string
+    }
+    /**
+     * DueDateEdit
+     * @description The description and the amount of a hand-made entry (RF-15 of 006).
+     */
+    DueDateEdit: {
+      /** Description */
+      description?: string | null
+      /** Amount */
+      amount?: number | string | null
+    }
+    /**
+     * DueDateMove
+     * @description A move of an entry to another date (RF-19, RF-22, RF-25, RF-42 of 006).
+     */
+    DueDateMove: {
+      /**
+       * On Date
+       * Format: date
+       */
+      on_date: string
+      /** Reason */
+      reason?: string | null
+      /**
+       * Confirm Past
+       * @default false
+       */
+      confirm_past: boolean
+    }
+    /**
+     * DueDateOrigin
+     * @description Whether a due date comes from an invoice or somebody added it (RF-14 of 006).
+     * @enum {string}
+     */
+    DueDateOrigin: 'INVOICE' | 'MANUAL'
+    /**
+     * DueDateRead
+     * @description One entry of the calendar, with everything the day shows about it.
+     */
+    DueDateRead: {
+      /** Id */
+      id: number
+      /**
+       * On Date
+       * Format: date
+       */
+      on_date: string
+      /** Description */
+      description: string
+      /** Amount */
+      amount: string | null
+      /** Invoice Id */
+      invoice_id: number | null
+      origin: components['schemas']['DueDateOrigin']
+      /**
+       * Original Date
+       * Format: date
+       */
+      original_date: string
+      /**
+       * Was Rescheduled
+       * @default false
+       */
+      was_rescheduled: boolean
+      /**
+       * Is Past
+       * @default false
+       */
+      is_past: boolean
+      /** Supplier Name */
+      supplier_name?: string | null
+      /**
+       * Receipt Issued
+       * @default false
+       */
+      receipt_issued: boolean
+      /**
+       * Is Overdue Without Receipt
+       * @default false
+       */
+      is_overdue_without_receipt: boolean
+      /** Payment State */
+      payment_state?: string | null
+      /** Changes */
+      changes?: components['schemas']['DueDateChangeRead'][]
+    }
+    /**
+     * DueDateWrite
+     * @description An entry somebody adds by hand (RF-12 of 006).
+     */
+    DueDateWrite: {
+      /**
+       * On Date
+       * Format: date
+       */
+      on_date: string
+      /** Description */
+      description: string
+      /** Amount */
+      amount?: number | string | null
+    }
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components['schemas']['ValidationError'][]
+    }
+    /**
+     * HealthRead
+     * @description The answer of `/health`: the service plus every dependency it needs.
+     *
+     *     `status` is whether this process can serve a request, and **only the
+     *     database decides it**. WhatsApp is reported beside it and deliberately does
+     *     not count: the route answers 503 when `status` is not OK and Docker
+     *     restarts on that, so letting a WhatsApp outage in would restart the API
+     *     every fifteen seconds because a third party's gateway is down. That is the
+     *     opposite of what the channel promises — a message that cannot be sent never
+     *     takes anything else with it.
+     */
+    HealthRead: {
+      status: components['schemas']['HealthState']
+      /** Service */
+      service: string
+      /** Environment */
+      environment: string
+      database: components['schemas']['ComponentHealth']
+      whatsapp: components['schemas']['ComponentHealth']
+    }
+    /**
+     * HealthState
+     * @description How a component is answering right now.
+     *
+     *     `OFF` is not a milder `DOWN`: it means somebody decided this dependency is
+     *     not in use. A channel with no credentials is doing exactly what was asked
+     *     of it, and reporting that as a fault would train whoever reads this to
+     *     ignore the one time it is real.
+     * @enum {string}
+     */
+    HealthState: 'ok' | 'down' | 'off'
+    /**
+     * IncidentClose
+     * @description What was done about an incident (RF-57, RF-58 of 005).
+     */
+    IncidentClose: {
+      /** Resolution */
+      resolution: string
+    }
+    /**
+     * IncidentRead
+     * @description An invoice that fell due without its receipt (RF-37, RF-59 of 005).
+     */
+    IncidentRead: {
+      /** Id */
+      id: number
+      /** Invoice Id */
+      invoice_id: number
+      /**
+       * Opened On
+       * Format: date
+       */
+      opened_on: string
+      /** Closed By User Id */
+      closed_by_user_id: number | null
+      /** Closed At */
+      closed_at: string | null
+      /** Resolution */
+      resolution: string | null
+      /** Invoice Number */
+      invoice_number?: string | null
+      /** Supplier Name */
+      supplier_name?: string | null
+    }
+    /**
+     * Indicator
+     * @description One number of the dashboard, with what it left out of itself.
+     *
+     *     `excluded` is part of the number and not a footnote: RF-25 asks every
+     *     indicator to report how many records it left out, and RF-27 that it says so
+     *     even when it left out none.
+     */
+    Indicator: {
+      /** Value */
+      value: string
+      /** Sales */
+      sales: number
+      /** Excluded */
+      excluded: number
+      /**
+       * Has Estimates
+       * @default false
+       */
+      has_estimates: boolean
+    }
+    /**
+     * InvoiceDocumentRead
+     * @description What the document of the invoice said, next to what the table said.
+     */
+    InvoiceDocumentRead: {
+      /** Readable */
+      readable: boolean
+      /** Agrees */
+      agrees: boolean
+      /** Excerpt */
+      excerpt: string | null
+      /** Reason */
+      reason: string | null
+      /** Read Number */
+      read_number: string | null
+      /** Read Issued On */
+      read_issued_on: string | null
+      /** Read Total */
+      read_total: string | null
+      /** Read Supplier Text */
+      read_supplier_text: string | null
+    }
+    /**
+     * InvoiceList
+     * @description A page of invoices, with what it left out of its own counting.
+     */
+    InvoiceList: {
+      /** Items */
+      items: components['schemas']['InvoiceRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * InvoiceRead
+     * @description An invoice as every screen of the feature shows it.
+     *
+     *     The payment state is **computed** from the payments imputed and never taken
+     *     from what the portal reports (RF-45 of 005). What the portal says travels
+     *     beside it, and when the two disagree the invoice says so (RF-46).
+     */
+    InvoiceRead: {
+      /** Id */
+      id: number
+      /** Number */
+      number: string
+      /**
+       * Issued On
+       * Format: date
+       */
+      issued_on: string
+      /** Total */
+      total: string
+      /** Supplier Id */
+      supplier_id: number | null
+      /** Supplier Text */
+      supplier_text: string
+      /** Supplier Name */
+      supplier_name?: string | null
+      /** Due On */
+      due_on: string | null
+      /** Original Due On */
+      original_due_on: string | null
+      review_state: components['schemas']['InvoiceReviewState']
+      /** Review Reason */
+      review_reason: string | null
+      /** Arrival Count */
+      arrival_count: number
+      /** File Kind */
+      file_kind: string | null
+      /** Product Code */
+      product_code: string | null
+      /**
+       * Paid
+       * @default 0
+       */
+      paid: string
+      /**
+       * Balance
+       * @default 0
+       */
+      balance: string
+      /**
+       * Paid Pct
+       * @default 0
+       */
+      paid_pct: number
+      /**
+       * Payment State
+       * @default SIN_PAGOS
+       */
+      payment_state: string
+      /** Portal Payment Status */
+      portal_payment_status?: string | null
+      /**
+       * Payment State Disagrees
+       * @default false
+       */
+      payment_state_disagrees: boolean
+      /**
+       * Is Inconsistent
+       * @default false
+       */
+      is_inconsistent: boolean
+      /**
+       * Receipt Issued
+       * @default false
+       */
+      receipt_issued: boolean
+      /** Receipt Number */
+      receipt_number?: string | null
+      /**
+       * Is Overdue Without Receipt
+       * @default false
+       */
+      is_overdue_without_receipt: boolean
+      document?: components['schemas']['InvoiceDocumentRead'] | null
+    }
+    /**
+     * InvoiceReviewResolution
+     * @description What a person decided about an invoice held for review.
+     *
+     *     `supplier_id` says who it is. `remember` is what turns that decision into a
+     *     saved spelling, so the next invoice written the same way does not ask again
+     *     (RF-31, RF-47 of 004).
+     */
+    InvoiceReviewResolution: {
+      /** Supplier Id */
+      supplier_id?: number | null
+      /**
+       * Remember
+       * @default true
+       */
+      remember: boolean
+      /** Action */
+      action?: string | null
+    }
+    /**
+     * InvoiceReviewState
+     * @description Whether an invoice can be trusted as it stands.
+     *
+     *     `PENDING` is not an error: it is an invoice waiting for a person, counted
+     *     and visible, and the run that brought it finished fine without it.
+     * @enum {string}
+     */
+    InvoiceReviewState: 'OK' | 'PENDING' | 'RESOLVED'
+    /**
+     * JobRunList
+     * @description A page of runs.
+     */
+    JobRunList: {
+      /** Items */
+      items: components['schemas']['JobRunRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * JobRunRead
+     * @description A run as exposed by the API and to other modules.
+     */
+    JobRunRead: {
+      /** Id */
+      id: number
+      /** Task Name */
+      task_name: string
+      status: components['schemas']['JobStatus']
+      /** Started At */
+      started_at: string | null
+      /** Finished At */
+      finished_at: string | null
+      /** Payload */
+      payload: {
+        [key: string]: unknown
+      } | null
+      /** Result */
+      result: {
+        [key: string]: unknown
+      } | null
+      /** Error */
+      error: string | null
+      /** Attempts */
+      attempts: number
+    }
+    /**
+     * JobStatus
+     * @description The life of a run: queued, executing, and how it ended.
+     * @enum {string}
+     */
+    JobStatus: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+    /**
+     * Level
+     * @description How far into a section a role gets.
+     *
+     *     Ordered, not a set of flags: whoever may edit may also read, so
+     *     `require_section(x, READ)` admits somebody holding `WRITE`.
+     * @enum {integer}
+     */
+    Level: 0 | 1 | 2
+    /**
+     * LoginRequest
+     * @description Credentials submitted at login.
+     */
+    LoginRequest: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string
+      /** Password */
+      password: string
+    }
+    /**
+     * LoginResponse
+     * @description A successful login.
+     */
+    LoginResponse: {
+      /** Access Token */
+      access_token: string
+      /**
+       * Token Type
+       * @default bearer
+       */
+      token_type: string
+      user: components['schemas']['UserRead']
+    }
+    /**
+     * MessageAssignment
+     * @description Who is responsible for a message (RF-30 of 007).
+     */
+    MessageAssignment: {
+      /** Assignee User Id */
+      assignee_user_id?: number | null
+    }
+    /**
+     * MessageKind
+     * @description What a message is about.
+     *
+     *     `UNCLASSIFIED` is a value like any other and not an error: a message whose
+     *     kind cannot be determined is **shown** as unclassified rather than discarded
+     *     (RF-25 of 007), which is Artículo II in the smallest possible place.
+     * @enum {string}
+     */
+    MessageKind: 'PAYMENT_CLAIM' | 'DUE_SOON' | 'LOW_STOCK' | 'UNCLASSIFIED'
+    /**
+     * MessageList
+     * @description A page of the inbox, with what is still pending beside it (RF-31).
+     */
+    MessageList: {
+      /** Items */
+      items: components['schemas']['MessageRead'][]
+      /** Total */
+      total: number
+      /** Pending */
+      pending: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * MessageNote
+     * @description A note somebody writes on a message (RF-32 of 007).
+     */
+    MessageNote: {
+      /** Note */
+      note: string
+    }
+    /**
+     * MessageRead
+     * @description One message of the inbox (RF-22 to RF-32 of 007).
+     */
+    MessageRead: {
+      /** Id */
+      id: number
+      /** External Id */
+      external_id: string
+      /**
+       * Received At
+       * Format: date-time
+       */
+      received_at: string
+      /** Sender Text */
+      sender_text: string
+      /** Supplier Name */
+      supplier_name: string | null
+      kind: components['schemas']['MessageKind']
+      /** Kind Text */
+      kind_text: string | null
+      /** Subject */
+      subject: string
+      /** Body */
+      body: string | null
+      state: components['schemas']['MessageState']
+      /** Assignee User Id */
+      assignee_user_id: number | null
+      /** Note */
+      note: string | null
+      /** Resolved By User Id */
+      resolved_by_user_id: number | null
+      /** Resolved At */
+      resolved_at: string | null
+      /** Alert Failure */
+      alert_failure: string | null
+      /**
+       * Sender Unidentified
+       * @default false
+       */
+      sender_unidentified: boolean
+    }
+    /**
+     * MessageResponse
+     * @description A bare acknowledgement.
+     */
+    MessageResponse: {
+      /** Message */
+      message: string
+    }
+    /**
+     * MessageState
+     * @description Whether somebody has dealt with a message yet (RF-27, RF-28 of 007).
+     * @enum {string}
+     */
+    MessageState: 'PENDING' | 'RESOLVED'
+    /**
+     * MonthTotal
+     * @description One month of the invoicing curve (RF-03 of 009).
+     */
+    MonthTotal: {
+      /**
+       * Month
+       * Format: date
+       */
+      month: string
+      /** Total */
+      total: string
+      /** Sales */
+      sales: number
+    }
+    /**
+     * NewProductRead
+     * @description A product the catalog started to know inside the window (RF-45).
+     */
+    NewProductRead: {
+      /** Product Id */
+      product_id: number
+      /** Code */
+      code: string
+      /** Description */
+      description: string
+      /**
+       * First Seen At
+       * Format: date-time
+       */
+      first_seen_at: string
+    }
+    /**
+     * ParameterKind
+     * @description What kind of value a parameter holds, and therefore how it is checked.
+     * @enum {string}
+     */
+    ParameterKind: 'INTEGER' | 'DECIMAL' | 'TIME_OF_DAY'
+    /**
+     * ParameterRead
+     * @description A business parameter: what it is, what it may be, and what it is worth.
+     *
+     *     Assembled from the declaration in `app.shared.parameters` with the stored
+     *     value on top — **not** read off the table. A parameter nobody ever changed
+     *     has no row and still appears here with its starting value, which is what
+     *     RF-01 and RF-04 ask for together.
+     */
+    ParameterRead: {
+      /** Key */
+      key: string
+      /** Label */
+      label: string
+      /** Effect */
+      effect: string
+      kind: components['schemas']['ParameterKind']
+      /** Value */
+      value: unknown
+      /** Initial */
+      initial: unknown
+      /** Minimum */
+      minimum: unknown | null
+      /** Maximum */
+      maximum: unknown | null
+      /** Unit */
+      unit: string | null
+      /** Consumed By */
+      consumed_by: string
+      /** Has Effect */
+      has_effect: boolean
+      /** Changed At */
+      changed_at: string | null
+    }
+    /**
+     * ParameterUpdateRequest
+     * @description The body of `PUT /operations/parameters`.
+     *
+     *     The parameters screen saves every field at once, so the endpoint takes the
+     *     whole set and applies it in one transaction: either all the changes land or
+     *     none of them do.
+     */
+    ParameterUpdateRequest: {
+      /** Items */
+      items: components['schemas']['ParameterWrite'][]
+    }
+    /**
+     * ParameterWrite
+     * @description A parameter to set.
+     *
+     *     No description: the sentence beside the field belongs to the catalog, which
+     *     is also where the range that validates this value lives. Two sources for
+     *     one parameter is one source and one bug.
+     */
+    ParameterWrite: {
+      /** Key */
+      key: string
+      /** Value */
+      value: unknown
+    }
+    /**
+     * PasswordChangeRequest
+     * @description Change your own password while authenticated.
+     */
+    PasswordChangeRequest: {
+      /** Current Password */
+      current_password: string
+      /** New Password */
+      new_password: string
+    }
+    /**
+     * PasswordResetRequest
+     * @description Ask for a recovery link.
+     */
+    PasswordResetRequest: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string
+    }
+    /**
+     * PasswordSet
+     * @description Redeem a single-use link and set a password.
+     */
+    PasswordSet: {
+      /** New Password */
+      new_password: string
+    }
+    /**
+     * PaymentOrigin
+     * @description Whether a payment came from the portal or somebody typed it (RF-20 of 005).
+     * @enum {string}
+     */
+    PaymentOrigin: 'PORTAL' | 'MANUAL'
+    /**
+     * PaymentRead
+     * @description One payment of an invoice, with where it came from (RF-10, RF-20 of 005).
+     */
+    PaymentRead: {
+      /** Id */
+      id: number
+      /** Invoice Id */
+      invoice_id: number | null
+      /** Supplier Id */
+      supplier_id: number | null
+      /** Amount */
+      amount: string
+      /**
+       * Paid On
+       * Format: date
+       */
+      paid_on: string
+      origin: components['schemas']['PaymentOrigin']
+      state: components['schemas']['PaymentState']
+      /** Reference */
+      reference: string | null
+      /** Supplier Text */
+      supplier_text: string | null
+      /** Review Reason */
+      review_reason: string | null
+      /** Created By User Id */
+      created_by_user_id: number | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Voided By User Id */
+      voided_by_user_id: number | null
+      /** Voided At */
+      voided_at: string | null
+    }
+    /**
+     * PaymentSplit
+     * @description One part of a voucher that covers several invoices (RF-53 of 005).
+     */
+    PaymentSplit: {
+      /** Invoice Id */
+      invoice_id: number
+      /** Amount */
+      amount: number | string
+    }
+    /**
+     * PaymentSplitWrite
+     * @description How a held voucher splits between invoices.
+     *
+     *     The parts have to add up to the voucher exactly (RF-55): a split that does
+     *     not is not a distribution, it is a different amount.
+     */
+    PaymentSplitWrite: {
+      /** Parts */
+      parts: components['schemas']['PaymentSplit'][]
+    }
+    /**
+     * PaymentState
+     * @description Whether a payment is counted, waiting for a decision, or undone.
+     * @enum {string}
+     */
+    PaymentState: 'IMPUTED' | 'PENDING' | 'VOIDED'
+    /**
+     * PaymentWrite
+     * @description A payment somebody registers by hand (RF-18 of 005).
+     */
+    PaymentWrite: {
+      /** Amount */
+      amount: number | string
+      /**
+       * Paid On
+       * Format: date
+       */
+      paid_on: string
+      /** Reference */
+      reference?: string | null
+      /**
+       * Confirm Over Balance
+       * @default false
+       */
+      confirm_over_balance: boolean
+    }
+    /**
+     * PriceCurvePoint
+     * @description One month of the curve of what the supplier charges (RF-42 of 009).
+     */
+    PriceCurvePoint: {
+      /**
+       * Month
+       * Format: date
+       */
+      month: string
+      /** Average Price */
+      average_price: string
+      /** Changes */
+      changes: number
+    }
+    /**
+     * PriceHistoryRead
+     * @description How the price of a product evolved (RF-23), and its monthly variation (RF-24).
+     */
+    PriceHistoryRead: {
+      /** Product Id */
+      product_id: number
+      /** Code */
+      code: string
+      /** Description */
+      description: string
+      /** Price */
+      price: string | null
+      /** Currency */
+      currency: string
+      /** Monthly Variation Pct */
+      monthly_variation_pct: string | null
+      /** Points */
+      points: components['schemas']['PricePointRead'][]
+      /**
+       * Corrections
+       * @default []
+       */
+      corrections: components['schemas']['CorrectionMark'][]
+    }
+    /**
+     * PriceList
+     * @description A page of prices.
+     */
+    PriceList: {
+      /** Items */
+      items: components['schemas']['PriceRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * PricePointRead
+     * @description One point of a product's history.
+     */
+    PricePointRead: {
+      /** Price */
+      price: string
+      /**
+       * Changed At
+       * Format: date-time
+       */
+      changed_at: string
+      source: components['schemas']['PriceSource']
+    }
+    /**
+     * PriceRead
+     * @description A product with the price in force, as the prices screen shows it.
+     */
+    PriceRead: {
+      /** Product Id */
+      product_id: number
+      /** Code */
+      code: string
+      /** Description */
+      description: string
+      status: components['schemas']['ProductStatus']
+      /** Price */
+      price: string | null
+      /** Currency */
+      currency: string
+      /** Effective At */
+      effective_at: string | null
+      /** Previous Price */
+      previous_price: string | null
+      /** Is Highlighted */
+      is_highlighted: boolean
+      /** Is Stale */
+      is_stale: boolean
+      /** Monthly Variation Pct */
+      monthly_variation_pct?: string | null
+      /**
+       * Corrections
+       * @default []
+       */
+      corrections: components['schemas']['CorrectionMark'][]
+    }
+    /**
+     * PriceSource
+     * @description Where a value came from: a list the portal published, or this platform.
+     *
+     *     It answers the question RF-33 rests on — whether there is a value the
+     *     portal reported underneath this one — so it marks the rows that hold a
+     *     value, not only the points of the history.
+     * @enum {string}
+     */
+    PriceSource: 'PORTAL' | 'SYSTEM'
+    /**
+     * PriceUpdateRequested
+     * @description The answer to asking for an update by hand (RF-14, RF-16).
+     */
+    PriceUpdateRequested: {
+      /** Job Run Id */
+      job_run_id: number
+      status: components['schemas']['JobStatus']
+    }
+    /**
+     * PriceUpdateSettingsRead
+     * @description The two parameters of this feature, with the value in force (RF-20).
+     */
+    PriceUpdateSettingsRead: {
+      /** Interval Hours */
+      interval_hours: number
+      /** Highlight Threshold Pct */
+      highlight_threshold_pct: string
+    }
+    /**
+     * PriceUpdateSettingsWrite
+     * @description What the owner may change (RF-18, RF-19).
+     */
+    PriceUpdateSettingsWrite: {
+      /** Interval Hours */
+      interval_hours: number
+      /** Highlight Threshold Pct */
+      highlight_threshold_pct: number | string
+    }
+    /**
+     * PriceUpdateStatusRead
+     * @description What the prices screen shows about the update itself (RF-09, RF-11).
+     */
+    PriceUpdateStatusRead: {
+      /** Last Success At */
+      last_success_at: string | null
+      /** Last Run Id */
+      last_run_id: number | null
+      last_run_status: components['schemas']['JobStatus'] | null
+      /** Last Result */
+      last_result: {
+        [key: string]: unknown
+      } | null
+      /** Last Quarantined */
+      last_quarantined: number | null
+      /** Consecutive Failures */
+      consecutive_failures: number
+      /** Is Stalled */
+      is_stalled: boolean
+      /** Interval Hours */
+      interval_hours: number
+      /** Highlight Threshold Pct */
+      highlight_threshold_pct: string
+    }
+    /**
+     * ProductCategoryWrite
+     * @description The rubro somebody chose for a product.
+     *
+     *     Confirming the proposal and correcting it are the same write, and the only
+     *     difference is which rubro travels: the system has no reason to tell them
+     *     apart, and does not (RF-15).
+     */
+    ProductCategoryWrite: {
+      /** Category Id */
+      category_id: number
+    }
+    /**
+     * ProductStatus
+     * @description Whether the business still buys this product.
+     * @enum {string}
+     */
+    ProductStatus: 'ACTIVE' | 'DISCONTINUED'
+    /**
+     * PurchaseOrderList
+     * @description A page of orders, with the counts the screen shows beside it.
+     */
+    PurchaseOrderList: {
+      /** Items */
+      items: components['schemas']['PurchaseOrderRead'][]
+      /** Total */
+      total: number
+      /** Per Status */
+      per_status: {
+        [key: string]: number
+      }
+      /** Stalled */
+      stalled: number
+    }
+    /**
+     * PurchaseOrderRead
+     * @description One purchase order, with how long it has been watched where it is.
+     */
+    PurchaseOrderRead: {
+      /** Id */
+      id: number
+      /** Number */
+      number: string
+      /**
+       * Ordered On
+       * Format: date
+       */
+      ordered_on: string
+      /** Supplier Id */
+      supplier_id: number | null
+      /** Supplier Text */
+      supplier_text: string
+      /** Supplier Name */
+      supplier_name?: string | null
+      /** Product Code */
+      product_code: string | null
+      /** Product Text */
+      product_text: string
+      /** Quantity */
+      quantity: number | null
+      /** Amount */
+      amount: string | null
+      /** Status Text */
+      status_text: string
+      /**
+       * Status Since
+       * Format: date
+       */
+      status_since: string
+      /** Observed From Start */
+      observed_from_start: boolean
+      /**
+       * Days In Status
+       * @default 0
+       */
+      days_in_status: number
+      /**
+       * Days Since Ordered
+       * @default 0
+       */
+      days_since_ordered: number
+      /**
+       * Is Stalled
+       * @default false
+       */
+      is_stalled: boolean
+      /** Repeat Of Order Id */
+      repeat_of_order_id?: number | null
+      /** Repeat Of Number */
+      repeat_of_number?: string | null
+      /** Repeat Dismissed At */
+      repeat_dismissed_at?: string | null
+    }
+    /**
+     * Quality
+     * @description How many tests passed, and how much of the code they covered.
+     */
+    Quality: {
+      /** Tests */
+      tests: number
+      /** Coverage */
+      coverage: number
+    }
+    /**
+     * ReceiptRead
+     * @description The reception receipt of an invoice (RF-29, RF-36, RF-47 of 005).
+     */
+    ReceiptRead: {
+      /** Id */
+      id: number
+      /** Invoice Id */
+      invoice_id: number
+      /** Number */
+      number: string
+      /** Issued By User Id */
+      issued_by_user_id: number
+      /**
+       * Issued At
+       * Format: date-time
+       */
+      issued_at: string
+      /** Voided By User Id */
+      voided_by_user_id: number | null
+      /** Voided At */
+      voided_at: string | null
+      /** Document */
+      document?: string | null
+    }
+    /**
+     * RedecisionRequest
+     * @description Where a rule already in force should point from now on.
+     *
+     *     It is not a revocation and it does not send anything back to the queue:
+     *     whoever projected the rule re-points what it had resolved. Confusing the
+     *     two is the classic mistake of 008 — revoking returns the products to
+     *     review, re-pointing reassigns them (RF-29 against RF-31).
+     */
+    RedecisionRequest: {
+      /**
+       * Decision
+       * @description The new decision. For instance {'category_id': 4}
+       */
+      decision: {
+        [key: string]: unknown
+      }
+    }
+    /**
+     * ResolutionRequest
+     * @description What a person decided about a case.
+     *
+     *     `decision` is free-form because the queue is generic: an unreadable row is
+     *     resolved with a price and a product, an unknown product with whether to
+     *     incorporate it, a missing one with whether it is discontinued.
+     */
+    ResolutionRequest: {
+      /**
+       * Decision
+       * @description What to do. For instance {'action': 'incorporate'} or {'price': '48210'}
+       */
+      decision: {
+        [key: string]: unknown
+      }
+      /**
+       * Remember
+       * @default true
+       */
+      remember: boolean
+    }
+    /**
+     * ReviewQueue
+     * @description What is waiting for a person: the repeated ones, and the broken ones.
+     */
+    ReviewQueue: {
+      /** Groups */
+      groups: components['schemas']['SaleGroup'][]
+      /** Broken */
+      broken: components['schemas']['SaleRead'][]
+      /** Pending Groups */
+      pending_groups: number
+      /** Held */
+      held: number
+    }
+    /**
+     * RouteRead
+     * @description Which role receives one kind of alert (RF-37 of 007).
+     */
+    RouteRead: {
+      kind: components['schemas']['AlertKind']
+      /** Role */
+      role: string
+      /** Updated By User Id */
+      updated_by_user_id?: number | null
+      /** Updated At */
+      updated_at?: string | null
+      /**
+       * Recipients
+       * @default 0
+       */
+      recipients: number
+    }
+    /**
+     * RouteWrite
+     * @description The role the owner wants a kind of alert to reach.
+     */
+    RouteWrite: {
+      /** Role */
+      role: string
+    }
+    /**
+     * RuleRead
+     * @description A rule that is being applied on its own (RF-36).
+     */
+    RuleRead: {
+      /** Id */
+      id: number
+      /** Kind */
+      kind: string
+      /** Matcher */
+      matcher: {
+        [key: string]: unknown
+      }
+      /** Decision */
+      decision: {
+        [key: string]: unknown
+      }
+      /** Created By User Id */
+      created_by_user_id: number | null
+      /** Created By Name */
+      created_by_name: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Revoked By User Id */
+      revoked_by_user_id: number | null
+      /** Revoked At */
+      revoked_at: string | null
+      /** Updated By User Id */
+      updated_by_user_id?: number | null
+      /** Updated At */
+      updated_at?: string | null
+    }
+    /**
+     * SaleCorrection
+     * @description A value of a held record, corrected or estimated (RF-38, RF-39 of 009).
+     */
+    SaleCorrection: {
+      /** Sold On */
+      sold_on?: string | null
+      /** Product Code */
+      product_code?: string | null
+      /** Quantity */
+      quantity?: number | null
+      /** Total */
+      total?: number | string | null
+      /**
+       * Is Estimated
+       * @default false
+       */
+      is_estimated: boolean
+    }
+    /**
+     * SaleGroup
+     * @description Two or more records that share a code, side by side (RF-30 of 009).
+     *
+     *     `differences` names the fields they disagree on, so the screen can mark them
+     *     instead of leaving a person to compare row by row.
+     */
+    SaleGroup: {
+      /** Code Key */
+      code_key: string
+      /** Versions */
+      versions: components['schemas']['SaleRead'][]
+      /** Differences */
+      differences: string[]
+    }
+    /**
+     * SaleList
+     * @description A page of sales records.
+     */
+    SaleList: {
+      /** Items */
+      items: components['schemas']['SaleRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * SaleRead
+     * @description One sales record, with why it is where it is.
+     */
+    SaleRead: {
+      /** Id */
+      id: number
+      /** Code */
+      code: string
+      /** Code Key */
+      code_key: string
+      /** Sold On */
+      sold_on: string | null
+      /** Product Code */
+      product_code: string | null
+      /** Quantity */
+      quantity: number | null
+      /** Total */
+      total: string | null
+      state: components['schemas']['SaleState']
+      /** Reason */
+      reason: string | null
+      /** Portal Values */
+      portal_values: {
+        [key: string]: unknown
+      } | null
+      /** Is Estimated */
+      is_estimated: boolean
+      /** Duplicate Of Sale Id */
+      duplicate_of_sale_id: number | null
+      /** Resolved By User Id */
+      resolved_by_user_id: number | null
+      /** Resolved At */
+      resolved_at: string | null
+    }
+    /**
+     * SaleResolution
+     * @description What somebody decided about a repeated sale (RF-31, RF-32 of 009).
+     */
+    SaleResolution: {
+      /** Action */
+      action: string
+      /** Sale Id */
+      sale_id?: number | null
+    }
+    /**
+     * SaleState
+     * @description Whether a sales record may be added up.
+     *
+     *     `HELD` is not an error state: it is a record waiting for a person, counted
+     *     and visible. `DISCARDED` is the copy of a record that was counted once —
+     *     kept, never deleted, and shown next to the one that was chosen (RF-34).
+     * @enum {string}
+     */
+    SaleState: 'COUNTED' | 'HELD' | 'DISCARDED'
+    /**
+     * SalesDashboard
+     * @description The commercial dashboard over one window (RF-03 to RF-07, RF-25 to RF-28).
+     */
+    SalesDashboard: {
+      /** Since */
+      since: string | null
+      /** Until */
+      until: string | null
+      invoiced: components['schemas']['Indicator']
+      /** By Month */
+      by_month: components['schemas']['MonthTotal'][]
+      /** Held Total */
+      held_total: number
+      /** Pending Groups */
+      pending_groups: number
+    }
+    /**
+     * Section
+     * @description The parts of the business a person can be let into.
+     * @enum {string}
+     */
+    Section:
+      | 'PRICES'
+      | 'CALENDAR'
+      | 'SUPPLIERS'
+      | 'PURCHASE_INVOICES'
+      | 'PAYMENTS'
+      | 'PURCHASE_ORDERS'
+      | 'RECEIPTS'
+      | 'SUPPLIER_MESSAGES'
+      | 'SALES'
+      | 'DASHBOARD'
+      | 'STOCK'
+      | 'PRODUCT_CATEGORIES'
+      | 'PRODUCT_CATALOG'
+      | 'ACCESS_ADMIN'
+      | 'ACCESS_LOG'
+      | 'SYSTEM_PARAMETERS'
+      | 'MANUAL_CORRECTIONS'
+    /**
+     * StockCut
+     * @description What one product had at the start and at the end of the window (RF-43).
+     */
+    StockCut: {
+      /** Product Id */
+      product_id: number
+      /** Code */
+      code: string
+      /** Description */
+      description: string
+      /** Opening */
+      opening: number | null
+      /** Closing */
+      closing: number | null
+      /**
+       * Ran Out
+       * @default false
+       */
+      ran_out: boolean
+    }
+    /**
+     * SupplierAliasRead
+     * @description One way a supplier's name arrives written (RF-10, RF-51 of 004).
+     */
+    SupplierAliasRead: {
+      /** Id */
+      id: number
+      /** Supplier Id */
+      supplier_id: number
+      /** Text Original */
+      text_original: string
+      /** Text Normalized */
+      text_normalized: string
+      source: components['schemas']['SupplierAliasSource']
+      /** Rule Id */
+      rule_id: number | null
+      /** Created By User Id */
+      created_by_user_id: number | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+    }
+    /**
+     * SupplierAliasSource
+     * @description Where a way of writing a supplier's name came from.
+     * @enum {string}
+     */
+    SupplierAliasSource: 'OBSERVED' | 'LEARNED'
+    /**
+     * SupplierContactWrite
+     * @description The contact details of a supplier, corrected by hand (RF-16 of 004).
+     */
+    SupplierContactWrite: {
+      /** Email */
+      email?: string | null
+      /** Phone */
+      phone?: string | null
+      /** Payment Term Days */
+      payment_term_days?: number | null
+      /** Reason Code */
+      reason_code: string
+      /** Reason Detail */
+      reason_detail?: string | null
+    }
+    /**
+     * SupplierList
+     * @description The register (RF-08, RF-24 of 004).
+     */
+    SupplierList: {
+      /** Items */
+      items: components['schemas']['SupplierRead'][]
+      /** Total */
+      total: number
+    }
+    /**
+     * SupplierRead
+     * @description A supplier of the register, with what is missing marked as missing.
+     *
+     *     `missing` is the list of fields the portal has not published for them, and
+     *     it is shown rather than filled in: RF-15 and RF-20 ask the screen to say
+     *     *falta*, and a blank looks like a value nobody bothered to read.
+     */
+    SupplierRead: {
+      /** Id */
+      id: number
+      /** Legal Name */
+      legal_name: string
+      /** Tax Id */
+      tax_id: string | null
+      /** Email */
+      email: string | null
+      /** Phone */
+      phone: string | null
+      /** Payment Term Days */
+      payment_term_days: number | null
+      /** Balance */
+      balance: string | null
+      /** Missing */
+      missing?: string[]
+      /** Aliases */
+      aliases?: components['schemas']['SupplierAliasRead'][]
+      /**
+       * Invoice Count
+       * @default 0
+       */
+      invoice_count: number
+    }
+    /**
+     * SupplierTotalsRead
+     * @description What a supplier was invoiced, what was paid, and what is still owed.
+     *
+     *     `excluded` is not a footnote: an invoice in review or flagged as
+     *     inconsistent is **left out** of the totals, and how many were left out
+     *     travels beside the number (RF-22, RF-23 of 004; RF-28 of 005).
+     */
+    SupplierTotalsRead: {
+      /** Supplier Id */
+      supplier_id: number
+      /** Invoiced */
+      invoiced: string
+      /** Paid */
+      paid: string
+      /** Owed */
+      owed: string
+      /** Invoices */
+      invoices: number
+      /** Excluded */
+      excluded: number
+      /** Aging */
+      aging: components['schemas']['AgingBucket'][]
+      /** Average Delay Days */
+      average_delay_days: string | null
+      /** Since */
+      since?: string | null
+      /** Until */
+      until?: string | null
+    }
+    /**
+     * TokenStatus
+     * @description Whether a single-use link still works.
+     */
+    TokenStatus: {
+      /** Usable */
+      usable: boolean
+    }
+    /**
+     * UnclassifiedList
+     * @description A page of the queue of products waiting for a rubro (RF-11, RF-12).
+     */
+    UnclassifiedList: {
+      /** Items */
+      items: components['schemas']['UnclassifiedProduct'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * UnclassifiedProduct
+     * @description A product with no rubro, with the proposal the system derived — or none.
+     *
+     *     `proposed_category_id` is computed on the way out and stored nowhere: while
+     *     nobody confirms it the product **is** «sin rubro», it counts as such and it
+     *     stays in this queue (RF-16).
+     */
+    UnclassifiedProduct: {
+      /** Product Id */
+      product_id: number
+      /** Code */
+      code: string
+      /** Description */
+      description: string
+      /** Category Raw */
+      category_raw: string | null
+      /** Subcategory Raw */
+      subcategory_raw: string | null
+      /** Proposed Category Id */
+      proposed_category_id?: number | null
+      /** Proposed Category Name */
+      proposed_category_name?: string | null
+    }
+    /**
+     * UserCreate
+     * @description Payload to create an access.
+     *
+     *     There is no password field, and that is the point: the owner hands out
+     *     accesses, not credentials. The person sets their own from the invitation.
+     */
+    UserCreate: {
+      /**
+       * Email
+       * Format: email
+       */
+      email: string
+      /** Name */
+      name: string
+      /** Last Name */
+      last_name?: string | null
+      /** Phone */
+      phone: string
+      /** @default SALES */
+      role: components['schemas']['UserRole']
+    }
+    /**
+     * UserList
+     * @description A page of accesses.
+     */
+    UserList: {
+      /** Items */
+      items: components['schemas']['UserRead'][]
+      /** Total */
+      total: number
+      /** Skip */
+      skip: number
+      /** Limit */
+      limit: number
+    }
+    /**
+     * UserRead
+     * @description An access as exposed by the API.
+     */
+    UserRead: {
+      /** Id */
+      id: number
+      /**
+       * Email
+       * Format: email
+       */
+      email: string
+      /** Name */
+      name: string
+      /** Last Name */
+      last_name: string | null
+      /** Phone */
+      phone: string
+      role: components['schemas']['UserRole']
+      /** Is Active */
+      is_active: boolean
+      /** Activated At */
+      activated_at: string | null
+      /** Locked Until */
+      locked_until: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+    }
+    /**
+     * UserRole
+     * @description The three roles the business actually has.
+     *
+     *     Taken from the client's own words: the owner, whoever handles purchasing,
+     *     and whoever handles sales. Authorisation is enforced per resource, not by
+     *     hiding links in a menu.
+     * @enum {string}
+     */
+    UserRole: 'OWNER' | 'PURCHASING' | 'SALES'
+    /**
+     * UserUpdate
+     * @description Payload to update an access. Every field is optional.
+     */
+    UserUpdate: {
+      /** Name */
+      name?: string | null
+      /** Last Name */
+      last_name?: string | null
+      /** Phone */
+      phone?: string | null
+      role?: components['schemas']['UserRole'] | null
+    }
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[]
+      /** Message */
+      msg: string
+      /** Error Type */
+      type: string
+      /** Input */
+      input?: unknown
+      /** Context */
+      ctx?: Record<string, never>
+    }
+  }
+  responses: never
+  parameters: never
+  requestBodies: never
+  headers: never
+  pathItems: never
 }
-export type $defs = Record<string, never>;
+export type $defs = Record<string, never>
 export interface operations {
-    health_api_v1_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthRead"];
-                };
-            };
-            /** @description A dependency is down */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    login_api_v1_auth_login_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LoginResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_current_user_api_v1_auth_me_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CurrentUser"];
-                };
-            };
-        };
-    };
-    logout_api_v1_auth_logout_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    change_password_api_v1_auth_password_change_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                Authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordChangeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    request_password_reset_api_v1_auth_password_reset_request_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordResetRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    check_reset_token_api_v1_auth_password_reset__token__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TokenStatus"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_password_reset_api_v1_auth_password_reset__token__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordSet"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    check_invitation_api_v1_auth_invitation__token__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TokenStatus"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    accept_invitation_api_v1_auth_invitation__token__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PasswordSet"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_users_api_v1_users_get: {
-        parameters: {
-            query?: {
-                /** @description Rows to skip */
-                skip?: number;
-                /** @description Rows per page */
-                limit?: number;
-                /** @description Match name or email */
-                q?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserList"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_user_api_v1_users_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_user_api_v1_users__user_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_user_api_v1_users__user_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    deactivate_user_api_v1_users__user_id__deactivate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reactivate_user_api_v1_users__user_id__reactivate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_access_events_api_v1_access_log_get: {
-        parameters: {
-            query?: {
-                /** @description Rows to skip */
-                skip?: number;
-                /** @description Rows per page */
-                limit?: number;
-                /** @description Filter by kind */
-                kind?: components["schemas"]["AccessEventKind"][] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AccessEventList"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_quality_api_v1_operations_quality_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Quality"] | null;
-                };
-            };
-        };
-    };
-    list_jobs_api_v1_operations_jobs_get: {
-        parameters: {
-            query?: {
-                /** @description Rows to skip */
-                skip?: number;
-                /** @description Rows per page */
-                limit?: number;
-                /** @description Filter by task */
-                task_name?: string | null;
-                /** @description Filter by run status */
-                status?: components["schemas"]["JobStatus"] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobRunList"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_parameters_api_v1_operations_parameters_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ParameterRead"][];
-                };
-            };
-        };
-    };
-    update_parameters_api_v1_operations_parameters_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ParameterUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ParameterRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_audit_api_v1_operations_audit_get: {
-        parameters: {
-            query?: {
-                /** @description Rows to skip */
-                skip?: number;
-                /** @description Rows per page */
-                limit?: number;
-                /** @description Filter by who made the change */
-                actor_user_id?: number | null;
-                /** @description Changes from this moment on */
-                since?: string | null;
-                /** @description Changes up to this moment */
-                until?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuditEntryList"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    audit_for_entity_api_v1_operations_audit__entity_type___entity_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The kind of datum */
-                entity_type: string;
-                /** @description Its identifier in its module */
-                entity_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuditEntryRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    correction_reasons_api_v1_operations_corrections_reasons_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CorrectionReasonRead"][];
-                };
-            };
-        };
-    };
-    price_update_status_api_v1_price_updates_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceUpdateStatusRead"];
-                };
-            };
-        };
-    };
-    request_price_update_api_v1_price_updates_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceUpdateRequested"];
-                };
-            };
-        };
-    };
-    read_price_update_settings_api_v1_price_updates_settings_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceUpdateSettingsRead"];
-                };
-            };
-        };
-    };
-    write_price_update_settings_api_v1_price_updates_settings_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PriceUpdateSettingsWrite"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceUpdateSettingsRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_price_update_api_v1_price_updates__job_run_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobRunRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_prices_api_v1_prices_get: {
-        parameters: {
-            query?: {
-                /** @description Rows to skip */
-                skip?: number;
-                /** @description Rows per page */
-                limit?: number;
-                /** @description Match code or description */
-                q?: string | null;
-                /** @description Only the rises above the threshold */
-                highlighted?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceList"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    price_history_api_v1_prices__product_id__history_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceHistoryRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    correct_product_api_v1_catalog_products__product_id__corrections_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CorrectionWrite"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CorrectionRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revert_correction_api_v1_catalog_corrections__correction_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                correction_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CorrectionRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_cases_api_v1_triage_cases_get: {
-        parameters: {
-            query?: {
-                /** @description Rows to skip */
-                skip?: number;
-                /** @description Rows per page */
-                limit?: number;
-                /** @description Filter by state */
-                status_filter?: components["schemas"]["CaseStatus"] | null;
-                /** @description Filter by kind of case */
-                kind?: string | null;
-                /** @description Only the cases of one run */
-                batch_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CaseList"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    resolve_case_api_v1_triage_cases__case_id__resolution_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                case_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResolutionRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CaseRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_rules_api_v1_triage_rules_get: {
-        parameters: {
-            query?: {
-                /** @description Also the ones already revoked */
-                include_revoked?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RuleRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_rule_api_v1_triage_rules__rule_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                rule_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
+  health_api_v1_health_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HealthRead']
+        }
+      }
+      /** @description A dependency is down */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  login_api_v1_auth_login_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LoginRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['LoginResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  read_current_user_api_v1_auth_me_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CurrentUser']
+        }
+      }
+    }
+  }
+  logout_api_v1_auth_logout_post: {
+    parameters: {
+      query?: never
+      header?: {
+        Authorization?: string | null
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  change_password_api_v1_auth_password_change_post: {
+    parameters: {
+      query?: never
+      header?: {
+        Authorization?: string | null
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordChangeRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  request_password_reset_api_v1_auth_password_reset_request_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordResetRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  check_reset_token_api_v1_auth_password_reset__token__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TokenStatus']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  confirm_password_reset_api_v1_auth_password_reset__token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordSet']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  check_invitation_api_v1_auth_invitation__token__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TokenStatus']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  accept_invitation_api_v1_auth_invitation__token__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        token: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordSet']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_users_api_v1_users_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Match name or email */
+        q?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_user_api_v1_users_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_user_api_v1_users__user_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        user_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  update_user_api_v1_users__user_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        user_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UserUpdate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  deactivate_user_api_v1_users__user_id__deactivate_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        user_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  reactivate_user_api_v1_users__user_id__reactivate_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        user_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UserRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_access_events_api_v1_access_log_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Filter by kind */
+        kind?: components['schemas']['AccessEventKind'][] | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AccessEventList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  read_quality_api_v1_operations_quality_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['Quality'] | null
+        }
+      }
+    }
+  }
+  list_jobs_api_v1_operations_jobs_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Filter by task */
+        task_name?: string | null
+        /** @description Filter by run status */
+        status?: components['schemas']['JobStatus'] | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['JobRunList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_parameters_api_v1_operations_parameters_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ParameterRead'][]
+        }
+      }
+    }
+  }
+  update_parameters_api_v1_operations_parameters_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ParameterUpdateRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ParameterRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_audit_api_v1_operations_audit_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Filter by who made the change */
+        actor_user_id?: number | null
+        /** @description Changes from this moment on */
+        since?: string | null
+        /** @description Changes up to this moment */
+        until?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuditEntryList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  audit_for_entity_api_v1_operations_audit__entity_type___entity_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The kind of datum */
+        entity_type: string
+        /** @description Its identifier in its module */
+        entity_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AuditEntryRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  correction_reasons_api_v1_operations_corrections_reasons_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CorrectionReasonRead'][]
+        }
+      }
+    }
+  }
+  price_update_status_api_v1_price_updates_status_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PriceUpdateStatusRead']
+        }
+      }
+    }
+  }
+  request_price_update_api_v1_price_updates_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PriceUpdateRequested']
+        }
+      }
+    }
+  }
+  read_price_update_settings_api_v1_price_updates_settings_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PriceUpdateSettingsRead']
+        }
+      }
+    }
+  }
+  write_price_update_settings_api_v1_price_updates_settings_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PriceUpdateSettingsWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PriceUpdateSettingsRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  read_price_update_api_v1_price_updates__job_run_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        job_run_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['JobRunRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_prices_api_v1_prices_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Match code or description */
+        q?: string | null
+        /** @description Only the rises above the threshold */
+        highlighted?: boolean
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PriceList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  price_history_api_v1_prices__product_id__history_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        product_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PriceHistoryRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  correct_product_api_v1_catalog_products__product_id__corrections_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        product_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CorrectionWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CorrectionRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  revert_correction_api_v1_catalog_corrections__correction_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        correction_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CorrectionRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_categories_api_v1_categories_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryList']
+        }
+      }
+    }
+  }
+  create_category_api_v1_categories_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CategoryWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_unclassified_api_v1_categories_unclassified_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UnclassifiedList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_aliases_api_v1_categories_aliases_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryAliasRead'][]
+        }
+      }
+    }
+  }
+  delete_category_api_v1_categories__category_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        category_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  rename_category_api_v1_categories__category_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        category_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CategoryWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  set_product_category_api_v1_products__product_id__category_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        product_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProductCategoryWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['UnclassifiedProduct']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_cases_api_v1_triage_cases_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Filter by state */
+        status_filter?: components['schemas']['CaseStatus'] | null
+        /** @description Filter by kind of case */
+        kind?: string | null
+        /** @description Only the cases of one run */
+        batch_id?: number | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CaseList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  resolve_case_api_v1_triage_cases__case_id__resolution_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        case_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResolutionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CaseRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_rules_api_v1_triage_rules_get: {
+    parameters: {
+      query?: {
+        /** @description Also the ones already revoked */
+        include_revoked?: boolean
+        /** @description Filter by kind of case */
+        kind?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RuleRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  revoke_rule_api_v1_triage_rules__rule_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        rule_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  redecide_rule_api_v1_triage_rules__rule_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        rule_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RedecisionRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RuleRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_invoices_api_v1_invoices_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Match number or supplier */
+        q?: string | null
+        /** @description Only this supplier's */
+        supplier_id?: number | null
+        /** @description By review */
+        review_state?: components['schemas']['InvoiceReviewState'] | null
+        /** @description SALDADA, PARCIAL, SIN_PAGOS */
+        payment_state?: string | null
+        /** @description Falling due from */
+        due_from?: string | null
+        /** @description Falling due up to */
+        due_to?: string | null
+        /** @description With or without receipt */
+        with_receipt?: boolean | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvoiceList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_invoice_api_v1_invoices__invoice_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvoiceRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  invoice_payments_api_v1_invoices__invoice_id__payments_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaymentRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  register_payment_api_v1_invoices__invoice_id__payments_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PaymentWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaymentRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_receipt_api_v1_invoices__invoice_id__receipt_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReceiptRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  issue_receipt_api_v1_invoices__invoice_id__receipt_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReceiptRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  invoice_file_api_v1_invoices__invoice_id__file_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_suppliers_api_v1_suppliers_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SupplierList']
+        }
+      }
+    }
+  }
+  get_supplier_api_v1_suppliers__supplier_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        supplier_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SupplierRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  correct_supplier_api_v1_suppliers__supplier_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        supplier_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SupplierContactWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SupplierRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  supplier_invoices_api_v1_suppliers__supplier_id__invoices_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+      }
+      header?: never
+      path: {
+        supplier_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvoiceList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  supplier_totals_api_v1_suppliers__supplier_id__totals_get: {
+    parameters: {
+      query?: {
+        /** @description From this date */
+        since?: string | null
+        /** @description Up to this date */
+        until?: string | null
+      }
+      header?: never
+      path: {
+        supplier_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SupplierTotalsRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  review_queue_api_v1_invoice_review_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvoiceList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  resolve_invoice_api_v1_invoice_review__invoice_id__resolve_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        invoice_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InvoiceReviewResolution']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvoiceRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_aliases_api_v1_supplier_aliases_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SupplierAliasRead'][]
+        }
+      }
+    }
+  }
+  save_alias_api_v1_supplier_aliases_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AliasWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AliasPreview']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  preview_alias_api_v1_supplier_aliases_preview_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AliasWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AliasPreview']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  drop_alias_api_v1_supplier_aliases__alias_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        alias_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  pending_payments_api_v1_payments_pending_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaymentRead'][]
+        }
+      }
+    }
+  }
+  split_payment_api_v1_payments__payment_id__split_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        payment_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PaymentSplitWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaymentRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  void_payment_api_v1_payments__payment_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        payment_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PaymentRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  void_receipt_api_v1_receipts__receipt_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        receipt_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReceiptRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_incidents_api_v1_receipt_incidents_get: {
+    parameters: {
+      query?: {
+        /** @description Also the ones already closed */
+        include_closed?: boolean
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IncidentRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  close_incident_api_v1_receipt_incidents__incident_id__close_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        incident_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IncidentClose']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IncidentRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  read_calendar_api_v1_calendar_get: {
+    parameters: {
+      query?: {
+        /** @description First day shown */
+        since?: string | null
+        /** @description Last day shown */
+        until?: string | null
+        /** @description Only what has no receipt */
+        without_receipt?: boolean
+        /** @description Hide what is already settled */
+        hide_settled?: boolean
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CalendarRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  add_due_date_api_v1_calendar_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DueDateWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DueDateRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  remove_due_date_api_v1_calendar__due_date_id__delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        due_date_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  edit_due_date_api_v1_calendar__due_date_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        due_date_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DueDateEdit']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DueDateRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  move_due_date_api_v1_calendar__due_date_id__date_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        due_date_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DueDateMove']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DueDateRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_orders_api_v1_purchase_orders_get: {
+    parameters: {
+      query?: {
+        /** @description Rows to skip */
+        skip?: number
+        /** @description Rows per page */
+        limit?: number
+        /** @description Only this state */
+        status_text?: string | null
+        /** @description Only this supplier's */
+        supplier_id?: number | null
+        /** @description Only the stalled ones */
+        only_stalled?: boolean
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  dismiss_repeat_api_v1_purchase_orders__order_id__repeat_flag_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        order_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PurchaseOrderRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_messages_api_v1_messages_get: {
+    parameters: {
+      query?: {
+        skip?: number
+        limit?: number
+        /** @description By kind */
+        kind?: components['schemas']['MessageKind'] | null
+        /** @description By state */
+        state?: components['schemas']['MessageState'] | null
+        supplier_name?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  resolve_message_api_v1_messages__message_id__resolution_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        message_id: number
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  assign_message_api_v1_messages__message_id__assignee_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        message_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MessageAssignment']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  annotate_message_api_v1_messages__message_id__note_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        message_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MessageNote']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MessageRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_routes_api_v1_alerts_routes_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RouteRead'][]
+        }
+      }
+    }
+  }
+  set_route_api_v1_alerts_routes__kind__put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        kind: components['schemas']['AlertKind']
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RouteWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RouteRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_sales_api_v1_sales_get: {
+    parameters: {
+      query?: {
+        skip?: number
+        limit?: number
+        /** @description By state */
+        state?: components['schemas']['SaleState'] | null
+        /** @description From this date */
+        since?: string | null
+        /** @description Up to this date */
+        until?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SaleList']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  review_queue_api_v1_sales_review_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReviewQueue']
+        }
+      }
+    }
+  }
+  resolve_group_api_v1_sales_groups__code_key__resolution_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        code_key: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaleResolution']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SaleRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  undo_resolution_api_v1_sales_groups__code_key__resolution_delete: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        code_key: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SaleRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  correct_sale_api_v1_sales__sale_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        sale_id: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaleCorrection']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SaleRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  sales_dashboard_api_v1_dashboard_sales_get: {
+    parameters: {
+      query?: {
+        /** @description From this date */
+        since?: string | null
+        /** @description Up to this date */
+        until?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SalesDashboard']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  catalog_dashboard_api_v1_dashboard_catalog_get: {
+    parameters: {
+      query?: {
+        /** @description From this date */
+        since?: string | null
+        /** @description Up to this date */
+        until?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CatalogDashboard']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
 }

@@ -275,4 +275,3 @@ flowchart TD
     S["Nunca da de alta un proveedor por su cuenta"] --- L
     T["Nunca completa un dato por suposición"] --- E
 ```
-

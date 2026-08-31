@@ -52,6 +52,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # El OCR de las facturas escaneadas necesita el binario y sus paquetes de
+      # idioma. Sin ellos `pytesseract` no explota: devuelve texto vacío, y el
+      # único test que lo cubre falla acá y sólo acá, porque en una laptop con
+      # Homebrew está instalado. Los mismos tres paquetes van en
+      # `backend/Dockerfile`, por la misma razón.
+      - name: Instalar tesseract
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng
+
       - name: Instalar uv
         uses: astral-sh/setup-uv@v5
         with:

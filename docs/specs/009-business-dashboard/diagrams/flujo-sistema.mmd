@@ -1,0 +1,36 @@
+---
+title: El sistema — qué hace con cada venta que llega del portal
+---
+flowchart TD
+    A["Con la frecuencia configurada, trae del portal los registros de ventas"] --> B["Conserva cada registro tal como llegó"]
+    B --> C{"¿Hay otra venta con el mismo código?"}
+    C -->|"Compara los códigos ignorando las diferencias de escritura que no cambian el código"| D{"¿Las versiones difieren en algún dato?"}
+
+    D -->|No difieren en nada| E["Las cuenta una sola vez, sin esperar a nadie"]
+    E --> F["Informa cuántas ventas repetidas unificó solo"]
+    D -->|Difieren| G["Las aparta enteras y las deja esperando una decisión"]
+    G --> H["Informa cuántos grupos de repetidas hay pendientes"]
+
+    C -->|Es la única con ese código| I{"¿El dato es utilizable?"}
+    F --> I
+    I -->|Sin fecha| J["La aparta con su motivo"]
+    I -->|"Con una fecha que no existe, como el 31 de febrero"| J
+    I -->|Sin total| J
+    I -->|Con una cantidad negativa| J
+    I -->|Apunta a un producto que no existe| J
+    I -->|"El total se aparta del promedio de ese producto más que la diferencia tolerada"| K["La aparta como monto atípico"]
+    K --> J
+    I -->|Está completo y es plausible| L["Entra al cálculo de los indicadores"]
+
+    J --> M["No suma en ningún indicador, y no se borra ni se completa por suposición"]
+    G --> M
+    M --> N["Queda en la pantalla de revisión, contada y con su motivo"]
+
+    L --> O["Calcula la facturación mes a mes desde 2023 y la cantidad de ventas del período"]
+    O --> P["Calcula los cortes de precios del proveedor, de stock y de altas de productos"]
+    P --> Q["Junto a cada indicador informa cuántos registros excluyó, incluso cuando no excluyó ninguno"]
+    Q --> R["Y avisa si alguno de los valores que lo componen es estimado"]
+
+    N --> S["Una persona resuelve el caso"]
+    S --> T["Recalcula los indicadores con lo que esa persona declaró válido"]
+    T --> Q

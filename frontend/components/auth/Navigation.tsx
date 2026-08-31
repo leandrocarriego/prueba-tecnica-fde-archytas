@@ -17,6 +17,13 @@ type UserRead = components['schemas']['UserRead']
 const ENTRIES: ReadonlyArray<{ href: string; label: string; section: Section }> = [
   { href: '/precios', label: 'Precios', section: 'PRICES' },
   { href: '/revision', label: 'Revisión', section: 'PRICES' },
+  { href: '/rubros', label: 'Rubros', section: 'PRODUCT_CATEGORIES' },
+  { href: '/facturas', label: 'Facturas', section: 'PURCHASE_INVOICES' },
+  { href: '/proveedores', label: 'Proveedores', section: 'SUPPLIERS' },
+  { href: '/calendario', label: 'Calendario', section: 'CALENDAR' },
+  { href: '/ordenes', label: 'Órdenes', section: 'PURCHASE_ORDERS' },
+  { href: '/mensajes', label: 'Mensajes', section: 'SUPPLIER_MESSAGES' },
+  { href: '/tablero', label: 'Tablero', section: 'DASHBOARD' },
   { href: '/accesos', label: 'Accesos', section: 'ACCESS_ADMIN' },
   { href: '/accesos/actividad', label: 'Actividad', section: 'ACCESS_LOG' },
   { href: '/configuracion', label: 'Parámetros', section: 'SYSTEM_PARAMETERS' },

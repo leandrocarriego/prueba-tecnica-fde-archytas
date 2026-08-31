@@ -15,6 +15,19 @@ export const FIELD_LABELS: Record<string, string> = {
   description: 'la descripción',
 }
 
+/**
+ * The same fields with no article, for the phrases that already carry one.
+ *
+ * Two maps and not one `.slice()` over the first: dropping the article by
+ * cutting the string works in Spanish until the day a field is named by two
+ * words, and a label the user reads is not the place to find that out.
+ */
+export const FIELD_NOUNS: Record<string, string> = {
+  price: 'precio',
+  currency: 'moneda',
+  description: 'descripción',
+}
+
 /** The correction standing on a field of this row, if there is one. */
 export function markFor(corrections: CorrectionMark[], field: string): CorrectionMark | undefined {
   return corrections.find(correction => correction.field === field)

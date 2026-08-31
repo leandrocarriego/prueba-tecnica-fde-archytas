@@ -47,10 +47,30 @@ class ParameterSpec:
     `label` and `effect` are in Spanish because a person reads them on the
     settings screen (Artículo VIII); everything else is code.
 
-    `consumed_by` names the functionality that actually reads the value, and is
-    empty while nothing does. The screen shows that plainly instead of offering
-    a knob that moves nothing: five of these are waiting for the feature that
-    will read them, and a panel that hid the difference would be lying.
+    `consumed_by` names the module that actually **reads** the value — the one
+    that would behave differently if the owner moved it — and is empty while no
+    module does. That is what `has_effect` reports to the screen, so a knob that
+    moves nothing looks different from one that moves something (RF-05).
+
+    It is settled by following the read, never by the key's prefix. The two
+    usually agree, which is what makes the exceptions expensive: every interval
+    that says how often an extraction runs is named after the data it brings —
+    `price_update`, `invoice_sync`, `message_sync`, `sales_sync` — and every one
+    of them is read by `operations`, whose heartbeat is the only thing that asks
+    whether a job is due. The module in the key is the beneficiary downstream,
+    and the beneficiary is not the reader. Every key below was followed to the
+    code that reads it when this note was written; a line added afterwards is on
+    whoever adds it.
+
+    No census is written here on purpose, and not only because it goes stale
+    the day a feature lands. The census that used to be written here was off by
+    one, and that is how `access.session_idle_minutes` went unexamined: the
+    field said `identity` from the first commit, so the declaration was right
+    all along — it was the prose beside it that counted the key among those
+    still waiting for a reader. Nobody went and looked at what that reader
+    obeyed, and it was obeying the row migration 0003 had seeded: the panel
+    promised 60 minutes while sessions went on closing at eight hours, until
+    `0008` removed the row from both tables.
     """
 
     key: str
@@ -176,7 +196,7 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=1,
         maximum=168,
         unit="horas",
-        consumed_by="catalog",
+        consumed_by="operations",
     ),
     ParameterSpec(
         key="price_update.highlight_threshold_pct",
@@ -210,6 +230,12 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=0,
         maximum=90,
         unit="días",
+        # The one key nothing reads. 003 expected the due-date calendar to take
+        # it; when 006 arrived, the notice it built was about the missing
+        # receipt and reads `receipt.notice_days`. It stays declared and marked
+        # as moving nothing, which is the whole point of RF-05: the panel may
+        # say "not yet", it may not name a consumer that does not exist.
+        consumed_by="",
     ),
     ParameterSpec(
         key="purchase_order.stalled_days",
@@ -220,6 +246,7 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=1,
         maximum=365,
         unit="días",
+        consumed_by="purchases",
     ),
     ParameterSpec(
         key="receipt.notice_days",
@@ -230,6 +257,7 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         minimum=0,
         maximum=90,
         unit="días",
+        consumed_by="purchases",
     ),
     ParameterSpec(
         key="daily_digest.time",
@@ -237,6 +265,101 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         effect="Cambia a qué hora del día el sistema manda el resumen de lo que pasó.",
         kind=ParameterKind.TIME_OF_DAY,
         initial="08:00",
+        consumed_by="notifications",
+    ),
+    ParameterSpec(
+        key="invoice_sync.interval_hours",
+        label="Cada cuántas horas se traen facturas, pagos y proveedores",
+        effect="Cambia cada cuánto el sistema le pide al portal las facturas, los comprobantes de "
+        "pago y el padrón de proveedores.",
+        kind=ParameterKind.INTEGER,
+        initial=12,
+        minimum=1,
+        maximum=168,
+        unit="horas",
+        # `operations` and not `purchases`: `due_for_sync` is what reads the
+        # number, off `SYNC_JOBS`. `purchases` receives the invoices the run
+        # brings and never asks how often it runs. The same holds for the two
+        # intervals below.
+        consumed_by="operations",
+    ),
+    ParameterSpec(
+        key="supplier_match.threshold_pct",
+        label="Parecido mínimo para dar por identificado a un proveedor",
+        effect="Cambia cuánto se tiene que parecer un nombre al del padrón para que el sistema lo "
+        "dé por identificado sin preguntarle a nadie. Más alto, pregunta más veces.",
+        kind=ParameterKind.INTEGER,
+        initial=92,
+        minimum=50,
+        maximum=100,
+        unit="%",
+        consumed_by="purchases",
+    ),
+    ParameterSpec(
+        key="purchase_order.repeat_window_days",
+        label="Ventana en la que dos pedidos iguales se marcan como repetidos",
+        effect="Cambia dentro de cuántos días dos órdenes del mismo producto al mismo proveedor "
+        "se señalan como posible pedido repetido.",
+        kind=ParameterKind.INTEGER,
+        initial=15,
+        minimum=1,
+        maximum=365,
+        unit="días",
+        consumed_by="purchases",
+    ),
+    ParameterSpec(
+        key="message_sync.interval_minutes",
+        label="Cada cuántos minutos se trae la bandeja de mensajes",
+        effect="Cambia cada cuánto el sistema entra a la bandeja del portal a buscar mensajes "
+        "nuevos. Un mensaje no puede tardar más de una hora en llegar.",
+        kind=ParameterKind.INTEGER,
+        initial=30,
+        minimum=5,
+        maximum=60,
+        unit="minutos",
+        consumed_by="operations",
+    ),
+    ParameterSpec(
+        key="alerts.window_start",
+        label="Hora desde la que se mandan avisos inmediatos",
+        effect="Cambia a partir de qué hora el sistema puede mandar un aviso al teléfono. Lo que "
+        "pase antes espera a esta hora.",
+        kind=ParameterKind.TIME_OF_DAY,
+        initial="08:00",
+        consumed_by="notifications",
+    ),
+    ParameterSpec(
+        key="alerts.window_end",
+        label="Hora hasta la que se mandan avisos inmediatos",
+        effect="Cambia hasta qué hora el sistema puede mandar un aviso al teléfono. Lo que pase "
+        "después espera a la franja siguiente.",
+        kind=ParameterKind.TIME_OF_DAY,
+        initial="18:00",
+        consumed_by="notifications",
+    ),
+    ParameterSpec(
+        key="sales_sync.interval_hours",
+        label="Cada cuántas horas se traen las ventas",
+        effect="Cambia cada cuánto el sistema le pide al portal los registros de ventas que "
+        "alimentan el tablero.",
+        kind=ParameterKind.INTEGER,
+        initial=24,
+        minimum=1,
+        maximum=168,
+        unit="horas",
+        consumed_by="operations",
+    ),
+    ParameterSpec(
+        key="sales.outlier_threshold_pct",
+        label="Diferencia a partir de la cual el total de una venta es atípico",
+        effect="Cambia cuánto se puede alejar el total de una venta de lo habitual para ese "
+        "producto antes de que el sistema la aparte en vez de sumarla.",
+        kind=ParameterKind.DECIMAL,
+        initial=Decimal("300"),
+        minimum=Decimal("10"),
+        maximum=Decimal("10000"),
+        unit="%",
+        consumed_by="sales",
     ),
 )
 

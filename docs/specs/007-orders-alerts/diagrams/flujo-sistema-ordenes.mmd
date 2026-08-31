@@ -1,0 +1,34 @@
+---
+title: El sistema — qué hace con cada orden de compra
+---
+flowchart TD
+    A["Con la frecuencia configurada, trae del portal las órdenes de compra"] --> B{"¿Se puede identificar con certeza al proveedor de la orden?"}
+    B -->|No| C["La aparta para revisión, sin asignarla al proveedor que más se le parece"]
+    B -->|Sí| D["La registra con su proveedor, su fecha, su monto y su estado"]
+
+    C --> C1["Queda en la lista con el nombre tal como llegó y señalada como sin identificar, y se cuenta aparte"]
+    C1 --> C2["El dueño o compras piden ver sólo las apartadas y le asignan uno de los ocho proveedores del padrón"]
+    C2 --> C3["Registra quién lo decidió y cuándo, la orden deja de figurar entre las apartadas y sigue el mismo camino que las demás"]
+    C2 --> C6["Guarda esa forma de escribir el nombre como criterio y resuelve con ella las otras órdenes que estaban apartadas escritas igual"]
+    C6 --> C3
+    C6 --> C7["De ahí en más, la orden que llegue escrita así se identifica sola y no vuelve a preguntarse"]
+    C3 --> D
+    C1 --> C4["Si es de alguien que no está en el padrón, el motivo lo dice: no se da de alta un proveedor desde la revisión"]
+
+    D --> E["Anota desde cuándo la viene viendo en ese estado"]
+    E --> F{"¿El portal la muestra ahora en otro estado?"}
+    F -->|Sí| G["Actualiza el estado, anota la fecha en que vio el cambio, y la antigüedad vuelve a cero"]
+    F -->|No| H{"¿Está antes de la recepción y lleva más días que el límite configurado?"}
+    G --> H
+    H -->|Sí| I["La señala como estancada, y la incluye en el resumen diario una vez por día"]
+    H -->|No| J["Queda en la lista, con su estado y sin señalar"]
+    I --> K["Deja de estar señalada cuando avanza de estado o cuando la mercadería llega"]
+
+    C1 --> C5["Mientras no se sepa de quién es, no se la señala como pedido repetido: no hay con qué compararla"]
+
+    D --> L{"¿Ese producto ya se le pidió al mismo proveedor dentro de la ventana configurada?"}
+    L -->|Sí| M["La señala como posible pedido repetido y muestra el pedido anterior"]
+    L -->|No| J
+    M --> N["El señalamiento no impide registrarla: quien decide si igual se pide es el negocio"]
+
+    O["Las órdenes anteriores a la puesta en marcha se listan mostrando cuántos días pasaron desde el pedido"] --> P["El primer día ninguna queda señalada como estancada: el reloj arranca cuando el sistema empieza a mirar"]

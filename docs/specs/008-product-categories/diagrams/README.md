@@ -233,4 +233,3 @@ flowchart TD
 
     P["Nunca inventa un rubro ni manda nada a un cajón de «otros»:<br/>lo que no conoce lo pregunta"]
 ```
-

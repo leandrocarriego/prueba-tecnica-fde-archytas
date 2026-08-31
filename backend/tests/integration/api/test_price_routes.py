@@ -297,8 +297,11 @@ class TestTheReviewScreen:
             json={"decision": {"action": "incorporate"}},
         )
 
-        # Act
-        response = await purchasing_client.get(f"{TRIAGE}/rules")
+        # Act — scoped by kind, because the platform ships with the table of
+        # category equivalences the client signed already seeded as rules (008).
+        response = await purchasing_client.get(
+            f"{TRIAGE}/rules", params={"kind": "unknown_product"}
+        )
 
         # Assert
         assert response.status_code == 200
@@ -320,14 +323,15 @@ class TestTheReviewScreen:
             f"{TRIAGE}/cases/{case['id']}/resolution",
             json={"decision": {"action": "incorporate"}},
         )
-        rule_id = (await purchasing_client.get(f"{TRIAGE}/rules")).json()[0]["id"]
+        learned = {"kind": "unknown_product"}
+        rule_id = (await purchasing_client.get(f"{TRIAGE}/rules", params=learned)).json()[0]["id"]
 
         # Act
         response = await purchasing_client.delete(f"{TRIAGE}/rules/{rule_id}")
 
         # Assert
         assert response.status_code == 204
-        assert (await purchasing_client.get(f"{TRIAGE}/rules")).json() == []
+        assert (await purchasing_client.get(f"{TRIAGE}/rules", params=learned)).json() == []
 
     async def test_sales_cannot_revoke_a_rule(self, sales_client: AsyncClient) -> None:
         """The screen is not sales', and neither is undoing what it taught."""

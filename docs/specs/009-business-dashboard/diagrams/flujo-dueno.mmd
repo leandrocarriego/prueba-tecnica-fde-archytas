@@ -1,0 +1,21 @@
+---
+title: El dueño — qué mira y qué decide
+---
+flowchart TD
+    A["El dueño quiere ver de un vistazo cómo viene el negocio desde 2023"] --> B["Abre el tablero completo"]
+    B --> C["Lee primero el total facturado y cuántos registros quedaron afuera"]
+    C --> D{"¿Puede confiar en el número?"}
+    D -->|Ninguna venta repetida se contó dos veces| E["Sabe cuántas unificó el sistema solo por ser idénticas"]
+    D -->|"Ninguna venta rota entró al total"| F["Las que faltan están contadas, visibles y con su motivo"]
+    D -->|Algún valor es estimado| G["El indicador lo declara: estimar no es saber"]
+
+    E --> H["Mira la facturación mes a mes, los precios, el stock y las altas"]
+    F --> H
+    G --> H
+
+    A --> I["Ve el tablero completo: sobre las ventas, los mismos números que ve Julián"]
+    I --> J["También resuelve ventas apartadas: elige entre las versiones de una repetida o corrige un dato roto"]
+    J --> K["Y puede deshacer la resolución de una repetida: el caso vuelve a pendiente y los números se recalculan"]
+
+    H --> L["El tablero se mira desde el primer día, aunque queden casos pendientes"]
+    L --> M["Sus números mejoran a medida que la revisión avanza"]

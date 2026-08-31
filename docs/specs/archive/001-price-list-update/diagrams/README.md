@@ -298,4 +298,3 @@ flowchart TD
     U --> V["Guardar la fecha y la hora de esta actualización exitosa"]
     V --> Z
 ```
-

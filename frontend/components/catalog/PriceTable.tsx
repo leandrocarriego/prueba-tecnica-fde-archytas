@@ -1,11 +1,28 @@
 import Link from 'next/link'
 
-import { isConflicted, markFor } from '@/lib/catalog/corrections'
+import { FIELD_NOUNS, isConflicted, markFor } from '@/lib/catalog/corrections'
 import { formatMoment, formatPrice, formatVariation, variationTone } from '@/lib/catalog/format'
 import type { Price } from '@/lib/catalog/types'
 
 interface PriceTableProps {
   items: Price[]
+}
+
+/**
+ * What a correction carries, narrowed to what `formatPrice` can read.
+ *
+ * The generated schema types these values `unknown`, and rightly: a correction
+ * row holds whatever the field it corrects held, and the same column serves a
+ * price, a currency and a description. `formatPrice` takes an amount, so the
+ * question gets asked instead of asserted — asserting `as string` would promise
+ * the compiler a shape nothing checked, and the day the API sends anything else
+ * the table writes «$ NaN» where a price should be: `Number.isNaN` does not
+ * coerce, so whatever arrived walks straight past the formatter's own guard and
+ * into `Intl`. Asked, it renders the «—» that guard reserves for a value it
+ * cannot read.
+ */
+function amount(value: unknown): string | number | null {
+  return typeof value === 'string' || typeof value === 'number' ? value : null
 }
 
 /**
@@ -51,6 +68,11 @@ export function PriceTable({ items }: PriceTableProps) {
         <tbody>
           {items.map(item => {
             const corrected = markFor(item.corrections, 'price')
+            // Every contradicted field, not just the price. The row carries the
+            // marks of all three correctable fields, and reading only one of
+            // them was how a contradicted **description** reached this screen
+            // saying nothing at all (RF-26, RF-28).
+            const contradicted = item.corrections.filter(isConflicted)
             return (
               <tr
                 key={item.product_id}
@@ -76,18 +98,33 @@ export function PriceTable({ items }: PriceTableProps) {
                       No vino en la última lista
                     </span>
                   )}
-                  {isConflicted(corrected) && (
-                    <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900">
-                      El portal informa {formatPrice(corrected?.conflict_value as string)}
+                  {/*
+                    Keyed by the field, and the row cannot carry two marks of
+                    one: the backend's `CORRECTABLE_FIELDS` maps each field to
+                    exactly one entity, and the database holds a partial unique
+                    index over `(entity_type, entity_id, field)` covering every
+                    correction that is not `REVERTED` — which is precisely the
+                    set `corrections_in_force` selects. A second mark for the
+                    same field is not something this list happens not to see: it
+                    is a row the database will not accept.
+                  */}
+                  {contradicted.map(mark => (
+                    <span
+                      className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-900"
+                      key={mark.field}
+                    >
+                      {mark.field === 'price'
+                        ? `El portal informa ${formatPrice(amount(mark.conflict_value))}`
+                        : `El portal informa otra ${FIELD_NOUNS[mark.field] ?? mark.field}`}
                     </span>
-                  )}
+                  ))}
                 </td>
                 <td className="p-3 text-right font-medium">
                   {formatPrice(item.price)}
                   {corrected && (
                     <span className="block text-xs font-normal text-muted-foreground">
                       Corregido a mano · el portal decía{' '}
-                      {formatPrice(corrected.portal_value as string)}
+                      {formatPrice(amount(corrected.portal_value))}
                     </span>
                   )}
                 </td>

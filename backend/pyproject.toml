@@ -50,6 +50,9 @@ dependencies = [
     # Reads the supplier's daily .xlsx. Chosen over pandas, which would drag
     # numpy and tens of megabytes in to read a hundred rows.
     "openpyxl==3.1.5",
+    "pypdf>=6.16.2",
+    "pytesseract>=0.3.13",
+    "pillow>=12.3.0",
 ]
 
 [dependency-groups]

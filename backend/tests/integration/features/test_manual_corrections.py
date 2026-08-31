@@ -8,22 +8,35 @@ The exhaustive edge cases belong to the `Tester` — tasks 26 and 30 of
 `tasks.md` name them one by one. What is here is the `Developer` checking that
 the engine they wrote runs, and it is deliberately one assertion per behaviour
 rather than a grid.
+
+The last class is of a different kind. Every test above shares its session with
+the request it makes, so it can only see *what* a correction wrote and never
+*whether the write survived the request* — which is how both write routes of
+this feature shipped without a commit. `TestTheWriteOutlivesTheRequest` is the
+one test that lets the application open and close its own session, and looks for
+the row from outside it.
 """
 
 from decimal import Decimal
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession, async_sessionmaker
 
+from app import database
+from app.database import get_session
+from app.main import app
 from app.modules.catalog.models import Product
 from app.modules.catalog.service import CatalogService
+from app.modules.identity import middleware as identity_middleware
+from app.modules.identity.models import User
 from app.modules.operations.service import OperationsService
 from app.shared.corrections import CorrectionReason
 from app.shared.errors import NotFoundError, ValidationError
 from app.shared.events import NormalizedPriceRow
-from tests.conftest import Queued
+from tests.conftest import API_PREFIX, BASE_URL, Queued, authorization_header
 from tests.factories.catalog_factory import ProductFactory
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
@@ -334,3 +347,169 @@ class TestTheLogStaysWritten:
         # Act / Assert
         with pytest.raises(DBAPIError):
             await session.execute(text("UPDATE operations.audit_entry SET entity_id = 'x'"))
+
+
+# --- The write outliving the request -------------------------------------
+
+
+class SessionThatNeverCommits(AsyncSession):
+    """A session whose `commit()` only flushes: the defect, put back on purpose.
+
+    Both write routes of this feature answered 200 and persisted nothing, and
+    the whole suite stayed green. Binding this class for one request reproduces
+    that state — the rows exist for as long as the session does and are gone
+    when it closes — so the test below can show that the harness added here
+    would have caught it. It is the same reason `test_module_boundaries.py`
+    keeps a violation of its own rule around: a check nobody has seen fail is a
+    check nobody has verified.
+    """
+
+    async def commit(self) -> None:
+        await self.flush()
+
+
+def let_the_app_open_its_own_session(
+    connection: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    session_class: type[AsyncSession] = AsyncSession,
+) -> None:
+    """Take the `get_session` override off and give the factory this connection.
+
+    Two things are true of `tests/conftest.py` and both matter here. It hands
+    the application the **test's** session through a `get_session` override,
+    and that session stays open for the whole test — so a request's writes are
+    visible to the test that made them whether anything committed or not. The
+    override is taken off here, so the real `get_session` runs, opens a session
+    of its own from `SessionFactory`, and closes it when the response is built.
+
+    Taken off and not merely omitted: `app` is one object for the whole run and
+    the role clients install the override without removing it, so by the time
+    this runs some earlier test has usually left one behind — pointing at a
+    session whose connection is long closed. `monkeypatch` puts back whatever
+    was there.
+
+    What is swapped is only what the factory binds to — the suite's connection
+    instead of the global engine, joining its transaction as a savepoint, which
+    is the same trick conftest uses for the test session. So a `commit()`
+    releases the savepoint and the row lives on in the connection's
+    transaction; a missing one is rolled back when the session closes. Nothing
+    reaches a real `COMMIT`, and the outer transaction still takes everything
+    away at the end of the test.
+    """
+    factory = async_sessionmaker(
+        bind=connection,
+        class_=session_class,
+        expire_on_commit=False,
+        autoflush=False,
+        join_transaction_mode="create_savepoint",
+    )
+    monkeypatch.delitem(app.dependency_overrides, get_session, raising=False)
+    monkeypatch.setattr(database, "SessionFactory", factory)
+    # The middleware that records refusals opens a session of its own and would
+    # otherwise reach the global engine and commit for real, outside anything
+    # this test can undo. Nothing here is refused, but a 403 arriving by
+    # surprise must not be how this file starts leaving rows behind.
+    monkeypatch.setattr(identity_middleware, "SessionFactory", factory)
+
+
+class TestTheWriteOutlivesTheRequest:
+    """The correction is still there once the session that wrote it is gone.
+
+    This is the one hole the review found in ~2.100 lines of correction tests:
+    the route flushed and never committed, and no test could tell, because
+    every test *is* the session the request writes into. What is asked here is
+    the only question that exposes it — after the response came back and the
+    request's session was closed, is the row there?
+
+    Only one test needs this: what it protects is `get_session` not committing,
+    which is a property of the harness and not of the route. The static check
+    in `tests/architecture/test_writes_are_committed.py` is what scales over
+    every writing route; this is the one place where the claim is executed.
+    """
+
+    async def test_a_correction_is_still_there_after_the_request_ends(
+        self,
+        session: AsyncSession,
+        connection: AsyncConnection,
+        owner: User,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """RF-09 and RF-25 are worth nothing if the row dies with the request."""
+        # Arrange
+        let_the_app_open_its_own_session(connection, monkeypatch)
+        product = await ProductFactory.create(session, price=1000)
+        headers = await authorization_header(session, owner)
+        assert get_session not in app.dependency_overrides, (
+            "the application would answer with the test's own session, and this "
+            "test would pass over a route that never commits."
+        )
+
+        # Act
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url=BASE_URL, headers=headers
+        ) as http_client:
+            response = await http_client.post(
+                f"{API_PREFIX}/catalog/products/{product.id}/corrections",
+                json={
+                    "field": "price",
+                    "value": "1200",
+                    "reason_code": REASON,
+                    "reason_detail": "la factura del proveedor dice 1200",
+                },
+            )
+
+        # Assert — read outside the session that wrote it, in SQL, so neither
+        # an identity map nor a lazy load can answer for the database.
+        assert response.status_code == 200
+        stored = await session.execute(
+            text(
+                "SELECT corrected_value #>> '{}', portal_value #>> '{}' "
+                "FROM core.correction WHERE entity_id = :entity_id"
+            ),
+            {"entity_id": str(product.id)},
+        )
+        assert stored.all() == [("1200", "1000.0000")]
+
+    async def test_a_route_that_did_not_commit_would_be_caught_by_it(
+        self,
+        session: AsyncSession,
+        connection: AsyncConnection,
+        owner: User,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The same request over a session that never commits leaves nothing.
+
+        Which is the shape of the bug, exactly: a 200 with an answer in it, and
+        an empty table behind it. Without this test the one above would be a
+        green light nobody had ever seen turn red.
+        """
+        # Arrange
+        let_the_app_open_its_own_session(
+            connection, monkeypatch, session_class=SessionThatNeverCommits
+        )
+        product = await ProductFactory.create(session, price=1000)
+        headers = await authorization_header(session, owner)
+
+        # Act
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url=BASE_URL, headers=headers
+        ) as http_client:
+            response = await http_client.post(
+                f"{API_PREFIX}/catalog/products/{product.id}/corrections",
+                json={
+                    "field": "price",
+                    "value": "1200",
+                    "reason_code": REASON,
+                    "reason_detail": None,
+                },
+            )
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json()["value"] == "1200"
+        stored = await session.scalar(
+            text("SELECT count(*) FROM core.correction WHERE entity_id = :entity_id"),
+            {"entity_id": str(product.id)},
+        )
+        assert stored == 0

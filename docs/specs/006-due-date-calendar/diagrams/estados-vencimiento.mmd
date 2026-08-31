@@ -1,0 +1,56 @@
+---
+title: La vida de un vencimiento en el calendario
+---
+stateDiagram-v2
+    state "Colocado por el sistema, desde una factura" as DesdeFactura
+    state "Cargado a mano por una persona" as AMano
+    state "En el calendario, por venir" as PorVenir
+    state "En el calendario, ya vencido" as Vencido
+    state "Reprogramado, con su fecha anterior guardada" as Reprogramado
+    state "Eliminado del calendario" as Eliminado
+
+    [*] --> DesdeFactura: se registra una factura con su vencimiento
+    [*] --> AMano: el dueño o compras carga un vencimiento propio
+    DesdeFactura --> PorVenir
+    AMano --> PorVenir
+    PorVenir --> PorVenir: si se cargó a mano, se corrige su descripción o su monto, y queda el valor anterior
+    PorVenir --> Vencido: llega su fecha y pasa
+    PorVenir --> Reprogramado: el dueño o compras lo mueve a otro día
+    Vencido --> Reprogramado: el dueño o compras lo mueve a otro día
+    Reprogramado --> Reprogramado: se lo vuelve a mover, y el historial suma otra fecha
+    Reprogramado --> PorVenir: la fecha nueva todavía no llegó
+    Reprogramado --> Vencido: la fecha nueva ya pasó
+    PorVenir --> Eliminado: sólo si es un vencimiento cargado a mano
+    Vencido --> Eliminado: sólo si es un vencimiento cargado a mano
+    Eliminado --> [*]
+
+    note right of DesdeFactura
+        En el calendario se distingue de los cargados a
+        mano. No se elimina: la factura existe y vence,
+        así que se puede reprogramar, no hacer
+        desaparecer. Su monto y su descripción se
+        corrigen en la factura
+    end note
+
+    note right of Reprogramado
+        Nunca se pierde la fecha original. Cada
+        movimiento guarda de dónde venía, quién lo movió,
+        cuándo, y el motivo si se escribió. Al abrirlo se
+        ven todas las fechas por las que pasó, y en el
+        calendario queda señalado como reprogramado
+    end note
+
+    note right of Vencido
+        Mover un vencimiento mueve la fecha, no la deuda:
+        el monto, el estado de pago y lo que se le debe al
+        proveedor quedan como estaban. Si la fecha nueva
+        ya pasó, el sistema pide confirmación antes de
+        aplicar el cambio
+    end note
+
+    note right of Eliminado
+        Si dos personas mueven el mismo vencimiento casi
+        a la vez, vale la última fecha y los dos
+        movimientos quedan registrados: el sistema no
+        elige cuál tenía razón, deja ver qué pasó
+    end note

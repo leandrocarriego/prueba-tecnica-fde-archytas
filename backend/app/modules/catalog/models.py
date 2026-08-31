@@ -13,12 +13,13 @@ would be reading its table — the import Artículo IV forbids.
 """
 
 import enum
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -95,6 +96,25 @@ class Product(Base):
         default=PriceSource.PORTAL,
         server_default=PriceSource.PORTAL.value,
     )
+    # --- The rubro of the product (008) ---
+    #
+    # **Null is «sin rubro»**, and there is no sentinel row standing for it: a
+    # category called "Sin rubro" would be deletable, renameable and countable
+    # like the others, and RF-07 would mean nothing over it. Every cut by rubro
+    # adds the group when it projects, which is what RF-09 asks for.
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey(f"{CORE_SCHEMA}.category.id", ondelete="RESTRICT"), default=None, index=True
+    )
+    # What the supplier wrote, uninterpreted. The subcategory is kept and shown
+    # and never grouped by (RF-08); it is also what a proposal is derived from.
+    category_raw: Mapped[str | None] = mapped_column(String(200), default=None)
+    subcategory_raw: Mapped[str | None] = mapped_column(String(200), default=None, index=True)
+    classified_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    classified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Which equivalence classified it. Precedent: `registered_by_rule_id`. It is
+    # what makes undoing exact — revoking an equivalence unclassifies what that
+    # equivalence had classified, and never what a person decided by hand.
+    classified_by_rule_id: Mapped[int | None] = mapped_column(Integer, default=None, index=True)
 
     def __repr__(self) -> str:
         return f"<Product id={self.id} code={self.code} status={self.status}>"
@@ -176,6 +196,100 @@ class PricePoint(Base):
         return f"<PricePoint product_id={self.product_id} at={self.changed_at} {self.price}>"
 
 
+class Category(Base):
+    """A rubro of the business: what the owner reads in their reports.
+
+    The name is unique because two rubros spelled the same are a loading
+    mistake, not a case of the business. Deleting one that still has products
+    is refused **in the service** and not only by the foreign key: the system
+    has to be able to say why (RF-07), and an integrity error of PostgreSQL is
+    not a sentence for a person.
+    """
+
+    __tablename__ = "category"
+    __table_args__ = {"schema": CORE_SCHEMA}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<Category id={self.id} name={self.name}>"
+
+
+class AliasSource(enum.StrEnum):
+    """Where an equivalence came from: the signed table, or a person deciding."""
+
+    SEED = "SEED"
+    LEARNED = "LEARNED"
+
+
+class CategoryAlias(Base):
+    """One written form of a category, pointing at the rubro it means.
+
+    It is the **local projection** of a rule of `triage`, not a table this
+    module owns the truth of: the decision lives there, with who took it, and
+    this module cannot read it (Artículo IV). `rule_id` is always present —
+    the eighteen forms the client signed are seeded as rules too, so there are
+    never two classes of equivalence, one correctable and one not.
+
+    The normalisation behind `text_normalized` is deliberately dumb: strip,
+    collapse inner whitespace, casefold. It joins the pairs that differ only in
+    case and nothing else. `Ferreteria Gral.` and `Ferreteria General` stay two
+    rows pointing at the same rubro, which is exactly what a table of
+    equivalences is for.
+    """
+
+    __tablename__ = "category_alias"
+    __table_args__ = {"schema": CORE_SCHEMA}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CORE_SCHEMA}.category.id", ondelete="RESTRICT"), index=True
+    )
+    text_normalized: Mapped[str] = mapped_column(String(200), unique=True)
+    # The form exactly as it arrived, which is what RF-03 and RF-23 show.
+    text_original: Mapped[str] = mapped_column(String(200))
+    rule_id: Mapped[int | None] = mapped_column(Integer, default=None, index=True)
+    source: Mapped[AliasSource] = mapped_column(
+        Enum(AliasSource, name="alias_source", schema=CORE_SCHEMA),
+        default=AliasSource.LEARNED,
+        server_default=AliasSource.LEARNED.value,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    def __repr__(self) -> str:
+        return f"<CategoryAlias {self.text_original!r} -> {self.category_id}>"
+
+
+class StockPoint(Base):
+    """The stock of a product on the day the list published it.
+
+    One row per product and per day, so the stock cut of the dashboard can
+    compare the photograph at the start of a period with the one at the end
+    (RF-43 of 009). The uniqueness of `(product_id, observed_on)` is what makes
+    re-running a day's list idempotent instead of doubling the history.
+    """
+
+    __tablename__ = "stock_point"
+    __table_args__ = (
+        UniqueConstraint("product_id", "observed_on", name="uq_stock_point_product_day"),
+        Index("ix_stock_point_observed_on", "observed_on"),
+        {"schema": CORE_SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{CORE_SCHEMA}.product.id", ondelete="CASCADE"), index=True
+    )
+    quantity: Mapped[int] = mapped_column(Integer)
+    observed_on: Mapped[date] = mapped_column(Date)
+    batch_id: Mapped[int | None] = mapped_column(Integer, default=None)
+
+    def __repr__(self) -> str:
+        return f"<StockPoint product_id={self.product_id} on={self.observed_on} {self.quantity}>"
+
+
 class CatalogSetting(Base):
     """The business parameters this module needs, as **its own** projection.
 
@@ -234,6 +348,9 @@ class Correction(Base, CorrectionColumns):
 # `models.py` for it.
 __all__ = [
     "CORE_SCHEMA",
+    "AliasSource",
+    "Category",
+    "CategoryAlias",
     "CatalogSetting",
     "Correction",
     "CorrectionStatus",
@@ -242,4 +359,5 @@ __all__ = [
     "Product",
     "ProductPrice",
     "ProductStatus",
+    "StockPoint",
 ]

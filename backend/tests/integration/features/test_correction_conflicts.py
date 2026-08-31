@@ -28,13 +28,16 @@ list overwrote, the two conflicts that reached the owner as the same message,
 the null that emptied a text field, and a 404 answered in English.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from decimal import Decimal
 from typing import Any, NamedTuple
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import ORMExecuteState
 
 from app.modules.catalog.models import Correction, CorrectionStatus, Product
 from app.modules.catalog.schemas import CorrectionRead
@@ -91,6 +94,34 @@ async def a_list_arrives(
         seen_codes=(CODE,),
     )
     await session.commit()
+
+
+class CorrectionReads:
+    """How many times a block went to the corrections table."""
+
+    def __init__(self) -> None:
+        self.count = 0
+
+
+@contextmanager
+def correction_reads(session: AsyncSession) -> Iterator[CorrectionReads]:
+    """Count the `SELECT`s against `core.correction` issued inside the block.
+
+    Counted at the ORM's own door rather than by patching the repository: what
+    the test is about is how many times the database is asked, and a name in
+    `app/` is free to change without that number changing.
+    """
+    reads = CorrectionReads()
+
+    def counted(state: ORMExecuteState) -> None:
+        if state.is_select and "core.correction" in str(state.statement):
+            reads.count += 1
+
+    event.listen(session.sync_session, "do_orm_execute", counted)
+    try:
+        yield reads
+    finally:
+        event.remove(session.sync_session, "do_orm_execute", counted)
 
 
 async def the_row(session: AsyncSession, correction_id: int) -> Correction:
@@ -644,7 +675,7 @@ class TestAFieldThatIsNotAnAmount:
         assert history.price == Decimal("1400")
         assert queued_alerts.count == 0
 
-    async def test_the_next_list_spelling_it_otherwise_still_leaves_the_correction(
+    async def test_the_next_list_spelling_it_otherwise_is_flagged_for_review(
         self, session: AsyncSession, queued_alerts: Queued
     ) -> None:
         """The same crossing as above, with the antecedent RF-28 is written about.
@@ -652,17 +683,20 @@ class TestAFieldThatIsNotAnAmount:
         The test before it fixes what happens when the list repeats the
         description it always had — no contradiction, so no case. Here the list
         brings a **different** one over a corrected description, which is the
-        antecedent of the requirement, and the answer today is neither of the
-        two outcomes it names: the correction is not overwritten, and it is not
-        flagged either, because a batch never writes a known product's
-        description at all.
+        antecedent of the requirement, so both halves of the consequent have to
+        hold at once: the correction is not overwritten **and** it is flagged
+        for review (RF-28), with the owner told without having to be looking
+        (RF-29).
 
-        Pinned as it stands rather than as a defect: whether a value the portal
-        reported and the pipeline never applied counts as *"una actualización
-        posterior que trae un valor distinto"* is a question for the
-        `Solution-Designer`, not for the suite to answer on its own. What the
-        suite can do is stop the answer from being an accident — the day a run
-        starts rewriting descriptions, this is the test that says so.
+        This test used to pin the opposite, and on purpose: a run never rewrote
+        a known product's description, so nothing ever compared one, and the
+        `Tester` fixed that silence rather than accommodate it. The question it
+        left open — whether a value the portal reports and the pipeline never
+        applies counts as *"una actualización posterior que trae un valor
+        distinto"* — belonged to the `Solution-Designer`, and the human answered
+        it on 2026-08-30: it does. Left as it was, the one field the pipeline
+        cannot overwrite would also have been the one field nobody was ever
+        warned about.
         """
         # Arrange
         product = await ProductFactory.create(
@@ -679,9 +713,154 @@ class TestAFieldThatIsNotAnAmount:
         assert history.price == Decimal("1400")
         mark = history.corrections[0]
         assert mark.field == "description"
+        assert mark.status is CorrectionStatus.CONFLICTED
+        assert mark.conflict_value == "TORNILLO HEX. 8 MM"
+        assert queued_alerts.count == 1
+
+    async def test_the_owner_hears_which_words_the_portal_now_uses(
+        self, session: AsyncSession, queued_alerts: Queued
+    ) -> None:
+        """RF-29 for a text: the alert carries the same three values a price does.
+
+        Read off the message rather than off the correction row, because the
+        owner reads this at night and away from any screen: the three texts are
+        the whole of what they have to decide with.
+        """
+        # Arrange
+        product = await ProductFactory.create(
+            session, code=CODE, price=1000, description="Tornllo hexagonl"
+        )
+        await correct(session, product.id, field="description", value="Tornillo hexagonal")
+
+        # Act
+        await a_list_arrives(session, 1400, run=1, description="Bulón hexagonal")
+
+        # Assert
+        message = queued_alerts.calls[0]["args"][0]
+        assert "descripción" in message
+        assert "Tornllo hexagonl" in message
+        assert "Tornillo hexagonal" in message
+        assert "Bulón hexagonal" in message
+        assert f"/precios/{product.id}" in message
+
+    async def test_the_same_words_written_another_way_are_not_a_contradiction(
+        self, session: AsyncSession, queued_alerts: Queued
+    ) -> None:
+        """Case, accents and spacing are not the portal changing its mind.
+
+        A text has borders a number does not, and they are the ones a list
+        crosses every morning: the portal shouts a description one day and
+        title-cases it the next. Flagged as a conflict, that would put the owner
+        in front of a case with nothing to decide (RF-28, RF-29) — which is how
+        an alert stops being read. The comparison is `app.shared.text.normalize`,
+        the platform's one answer to *is this the same text*.
+        """
+        # Arrange — the correction leaves the description written one way
+        product = await ProductFactory.create(
+            session, code=CODE, price=1000, description="Tornillo hexagonal"
+        )
+        await correct(session, product.id, field="description", value="Tornillo hex. 8mm")
+
+        # Act — the portal keeps saying what it always said, in another hand
+        await a_list_arrives(session, 1400, run=1, description="  TORNÍLLO   HEXAGONAL  ")
+
+        # Assert
+        history = await CatalogService(session).price_history(product.id)
+        assert history.corrections[0].status is CorrectionStatus.ACTIVE
+        assert history.corrections[0].conflict_value is None
+        assert queued_alerts.count == 0
+
+    async def test_a_list_that_says_nothing_about_the_text_contradicts_nothing(
+        self, session: AsyncSession, queued_alerts: Queued
+    ) -> None:
+        """An empty description is the portal not saying, not the portal disagreeing."""
+        # Arrange
+        product = await ProductFactory.create(
+            session, code=CODE, price=1000, description="Tornllo hexagonl"
+        )
+        await correct(session, product.id, field="description", value="Tornillo hexagonal")
+
+        # Act
+        await a_list_arrives(session, 1400, run=1, description="   ")
+
+        # Assert
+        history = await CatalogService(session).price_history(product.id)
+        assert history.description == "Tornillo hexagonal"
+        assert history.corrections[0].status is CorrectionStatus.ACTIVE
+        assert queued_alerts.count == 0
+
+    async def test_the_same_new_words_two_mornings_running_warn_once(
+        self, session: AsyncSession, queued_alerts: Queued
+    ) -> None:
+        """A text conflict is as quiet on repetition as an amount's is.
+
+        The daily list carries the same description every morning, so a conflict
+        that warned on each run would send the owner the same message until
+        somebody settled it — the fastest way to teach them to ignore it.
+        """
+        # Arrange
+        product = await ProductFactory.create(
+            session, code=CODE, price=1000, description="Tornllo hexagonl"
+        )
+        await correct(session, product.id, field="description", value="Tornillo hexagonal")
+
+        # Act
+        await a_list_arrives(session, 1400, run=1, description="Bulón hexagonal")
+        await a_list_arrives(session, 1500, run=2, description="Bulón hexagonal")
+
+        # Assert
+        history = await CatalogService(session).price_history(product.id)
+        assert history.corrections[0].conflict_value == "Bulón hexagonal"
+        assert history.price == Decimal("1500")
+        assert queued_alerts.count == 1
+
+    async def test_correcting_the_text_again_closes_its_conflict(
+        self, session: AsyncSession, queued_alerts: Queued
+    ) -> None:
+        """The case is settled where the datum lives, exactly as an amount's is."""
+        # Arrange
+        product = await ProductFactory.create(
+            session, code=CODE, price=1000, description="Tornllo hexagonl"
+        )
+        await correct(session, product.id, field="description", value="Tornillo hexagonal")
+        await a_list_arrives(session, 1400, run=1, description="Bulón hexagonal")
+
+        # Act
+        await correct(session, product.id, field="description", value="Bulón hexagonal 8mm")
+
+        # Assert
+        history = await CatalogService(session).price_history(product.id)
+        assert history.description == "Bulón hexagonal 8mm"
+        mark = history.corrections[0]
         assert mark.status is CorrectionStatus.ACTIVE
         assert mark.conflict_value is None
-        assert queued_alerts.count == 0
+        assert mark.portal_value == "Tornllo hexagonl"
+        assert queued_alerts.count == 1
+
+    async def test_a_whole_list_asks_for_the_standing_corrections_once(
+        self, session: AsyncSession
+    ) -> None:
+        """The check costs one query for the run, not one per row.
+
+        A list carries the whole catalogue and the corrections it could
+        contradict are a handful, so reading them per row turns the cheapest
+        part of a nightly run into a query per product. Counted rather than
+        argued: the `SELECT` against `core.correction` is the one thing that
+        would grow with the list.
+        """
+        # Arrange
+        for index in range(5):
+            await ProductFactory.create(session, code=f"{CODE}-{index}", price=1000)
+        await session.commit()
+        rows = tuple(portal_row(1400, row_id=index, code=f"{CODE}-{index}") for index in range(5))
+
+        # Act
+        with correction_reads(session) as reads:
+            await CatalogService(session).apply_price_batch(batch_id=1, rows=rows)
+            await session.commit()
+
+        # Assert
+        assert reads.count == 1
 
     async def test_text_cannot_be_corrected_into_nothing(self, session: AsyncSession) -> None:
         """Emptying a field is not correcting it, and whitespace is emptying it."""

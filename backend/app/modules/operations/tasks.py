@@ -14,7 +14,7 @@ from typing import Any
 
 from app.database import SessionFactory
 from app.logging import get_logger
-from app.modules.operations.service import OperationsService
+from app.modules.operations.service import SYNC_JOBS, OperationsService
 from app.shared.errors import ConflictError
 from app.worker.bridge import async_task
 from app.worker.celery_app import celery_app
@@ -56,5 +56,36 @@ async def tick_price_update() -> dict[str, Any]:
 # not know about the modules, and adding one never means editing it.
 celery_app.conf.beat_schedule["price-update-tick"] = {
     "task": "operations.tick_price_update",
+    "schedule": timedelta(minutes=TICK_MINUTES),
+}
+
+
+@celery_app.task(name="operations.tick_extractions")
+@async_task
+async def tick_extractions() -> dict[str, Any]:
+    """Ask the portal for whatever section is due, by its own parameter.
+
+    One heartbeat for the five scheduled extractions of 004, 007 and 009,
+    rather than five schedules to keep in step with the settings panel. Each
+    one is decided independently and skipped in silence when it is not due or
+    when one of its kind is already running.
+    """
+    requested: dict[str, int] = {}
+    async with SessionFactory() as session:
+        service = OperationsService(session)
+        for job in SYNC_JOBS:
+            if not await service.due_for_sync(job):
+                continue
+            job_run_id = await service.request_sync(job)
+            if job_run_id is not None:
+                requested[job.key] = job_run_id
+
+    if requested:
+        logger.info("Scheduled extractions requested", extra={"jobs": sorted(requested)})
+    return {"requested": requested}
+
+
+celery_app.conf.beat_schedule["extraction-tick"] = {
+    "task": "operations.tick_extractions",
     "schedule": timedelta(minutes=TICK_MINUTES),
 }

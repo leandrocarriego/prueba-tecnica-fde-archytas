@@ -1,0 +1,39 @@
+---
+title: El camino de un mensaje de la bandeja
+---
+stateDiagram-v2
+    state "Traído de la bandeja del portal" as Traido
+    state "Clasificado por tipo" as Clasificado
+    state "Sin clasificar" as SinClasificar
+    state "Pendiente" as Pendiente
+    state "Pendiente, con responsable" as ConResponsable
+    state "Resuelto" as Resuelto
+
+    [*] --> Traido: el sistema lo trae antes de que pase una hora desde que apareció
+    Traido --> Clasificado: es un reclamo de pago, un vencimiento próximo o un stock bajo
+    Traido --> SinClasificar: su tipo no se puede determinar, y aun así se muestra
+    Clasificado --> Pendiente
+    SinClasificar --> Pendiente
+    Pendiente --> ConResponsable: se le asigna el dueño o alguien de compras
+    Pendiente --> Resuelto: una persona lo marca resuelto
+    ConResponsable --> Resuelto: una persona lo marca resuelto
+    Resuelto --> [*]
+
+    note right of Traido
+        Si el remitente no coincide con ningún proveedor
+        del padrón, el mensaje se muestra igual, señalando
+        que quedó sin identificar. Nada se descarta
+    end note
+
+    note right of Pendiente
+        Mientras siga pendiente se cuenta en la pantalla
+        y entra en el resumen diario. Los que ya estaban
+        en la bandeja al ponerse en marcha nacen acá, sin
+        que se avise por ellos
+    end note
+
+    note right of Resuelto
+        Queda registrado quién lo resolvió y cuándo, con
+        las notas que se hayan dejado, y deja de aparecer
+        en el resumen diario
+    end note

@@ -1,25 +1,46 @@
 """Catalog business logic: what the business knows, and what it refuses to guess.
 
-Three decisions live here, and all three come straight from the spec:
+Every decision here is the same refusal wearing a different hat: the module
+does not invent an answer nobody gave it.
 
-* **The first list establishes the catalog** (RF-02). Before it there are no
-  products, so every row of that list becomes one.
-* **After that, an unknown product is never created** (RF-07). It is reported so
-  a person can decide, because the assumption that the list only changes prices
-  is exactly that — an assumption, and one the client has not confirmed.
-* **A known product that stops appearing keeps its last price** (RF-08). It is
-  flagged, not deleted, and never estimated.
+* **The first list establishes the catalog, and no later one grows it**
+  (RF-02, RF-07 of 001). Before the first there are no products, so every row
+  becomes one; after it, a code nobody knows is reported so a person decides,
+  because "the list only changes prices" is an assumption the client never
+  confirmed. A known product that stops appearing keeps its last registered
+  price, flagged rather than deleted, and never estimated (RF-08 of 001).
+* **A written form of a category nobody has decided about gets no rubro**
+  (RF-21, RF-22 of 008). Classifying is a lookup against equivalences somebody
+  approved (RF-02, RF-25 of 008); a subcategory that would fit two rubros
+  proposes neither, because breaking the tie would be the system deciding.
+* **A value corrected by hand sits on top of what the portal said, never
+  instead of it** (RF-25 of 003). The original stays on the correction row,
+  which is what a reversal gives back (RF-31) and what turns a later list that
+  disagrees into a conflict the owner is told about instead of an overwrite
+  (RF-28, RF-29).
+* **Who wrote a row travels with the row** (`source`). It separates the portal
+  reporting an amount from this platform writing one on somebody's decision:
+  only the portal can contradict a correction, and only a value it reported
+  offers a way back (RF-33 of 003).
+
+The reads at the end — the prices screen, the history of one product and the
+cuts of the dashboard that are about the catalog (009) — assemble what these
+decisions left behind, and where one of them decides something itself it is the
+same refusal: a cut reports the products it left out instead of counting a
+stock nobody photographed as a zero (RF-46, RF-27 of 009).
 """
 
 from collections import defaultdict
-from datetime import UTC, datetime
+from collections.abc import Iterable
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, NamedTuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.catalog.models import (
+    Category,
     Correction,
     CorrectionStatus,
     PriceSource,
@@ -29,15 +50,24 @@ from app.modules.catalog.models import (
 )
 from app.modules.catalog.repository import CatalogRepository
 from app.modules.catalog.schemas import (
+    CatalogDashboard,
+    CategoryAliasRead,
+    CategoryList,
+    CategoryRead,
     CorrectionMark,
     CorrectionRead,
+    NewProductRead,
+    PriceCurvePoint,
     PriceHistoryRead,
     PriceList,
     PricePointRead,
     PriceRead,
+    StockCut,
+    UnclassifiedList,
+    UnclassifiedProduct,
 )
 from app.shared.corrections import CorrectionReason
-from app.shared.errors import NotFoundError, ValidationError
+from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
     AuditAction,
     CorrectionConflicted,
@@ -49,18 +79,29 @@ from app.shared.events import (
     ProductPricesUpdated,
     ProductsRegistered,
     RegisteredProduct,
+    UnknownCategory,
+    UnknownCategoryObserved,
     UnknownProduct,
     UnknownProductsObserved,
     events,
 )
+from app.shared.parameters import initial_value
 from app.shared.sections import BusinessSection
+from app.shared.text import collapse_written_form, normalize
+from app.shared.time import BUSINESS_TIME_ZONE
 
 logger = get_logger(__name__)
 
 HIGHLIGHT_THRESHOLD_KEY = "price_update.highlight_threshold_pct"
 # What the platform highlights while nobody has changed it (RF-20). The owner
 # moves it from the settings screen, and the new value arrives as an event.
-DEFAULT_HIGHLIGHT_THRESHOLD = Decimal("10")
+#
+# The starting value is read from the catalog that declares it, never written
+# again here: a second copy is a second answer to the same question, and the
+# day somebody moves the catalog the installation nobody configured would go on
+# highlighting by the old number — which is the very duplication this feature
+# removed from `operations`.
+DEFAULT_HIGHLIGHT_THRESHOLD = Decimal(str(initial_value(HIGHLIGHT_THRESHOLD_KEY)))
 
 HUNDRED = Decimal("100")
 
@@ -69,6 +110,21 @@ HUNDRED = Decimal("100")
 UNREADABLE_ROW = "unreadable_row"
 UNKNOWN_PRODUCT = "unknown_product"
 MISSING_PRODUCT = "missing_product"
+# The kind 008 adds to the same generic queue. A written form of a category
+# nobody has decided about is a case, exactly like a product nobody knows.
+UNKNOWN_CATEGORY = "unknown_category"
+
+CATEGORY_ENTITY = "catalog.product_category"
+CATEGORY_FIELD = "category_id"
+
+NO_SUCH_CATEGORY = "No encontramos ese rubro"
+CATEGORY_ALREADY_EXISTS = "Ya hay un rubro con ese nombre"
+CATEGORY_HAS_PRODUCTS = "El rubro tiene productos asignados y por eso no se puede eliminar"
+
+# How many unclassified products one decision reaches in a single pass. The
+# catalog is a hundred products today and the whole queue fits well inside
+# this; the bound is here so a decision can never turn into an unbounded scan.
+MAX_RECLASSIFIED = 5000
 
 # --- Correcting a value by hand -------------------------------------------
 #
@@ -82,18 +138,49 @@ PRICE_FIELD = "price"
 CURRENCY_FIELD = "currency"
 DESCRIPTION_FIELD = "description"
 
-# Which fields a person may correct, and where each one lives. RF-23 asks for
-# *any* field of a datum brought from the portal, not only the amounts — which
-# is why the description is here beside the price.
+
+class CorrectableField(NamedTuple):
+    """One field a person may correct: where it lives, and what it is called.
+
+    `label` is the Spanish word for the field, and it rides in this table
+    rather than in a second map beside it. A field added without its word
+    would be a refusal that reaches the screen naming a database column, and
+    two tables that have to agree only find out they stopped agreeing on the
+    morning somebody reads the message.
+
+    **The vocabulary is this module's own, and duplicated on purpose.** The
+    browser says these same three words and so does the nightly alert, each
+    from its own copy. Moving them to `shared/` would put the column names of
+    `catalog` in the kernel, which is where no module's schema belongs
+    (`GEN-03`), and reading somebody else's copy is the import the boundary
+    forbids (`GEN-02`). What has to agree between the three is the word — and
+    the word for a column of `catalog` is `catalog`'s to say.
+
+    Today the three say the same three words, and nothing checks that they
+    still will: the drift argued against one paragraph up is exactly the one
+    left open here. The check belongs beside the static frontend rules already
+    in `backend/tests/architecture/`; until it is written, the agreement holds
+    by eye.
+    """
+
+    entity_type: str
+    numeric: bool
+    label: str
+
+
+# Which fields a person may correct, where each one lives, and what it is
+# called in Spanish. RF-23 asks for *any* field of a datum brought from the
+# portal, not only the amounts — which is why the description is here beside
+# the price.
 #
 # `code` is deliberately absent. It is the supplier's own identifier, the key
 # the daily list is matched by: "correcting" it would silently detach the
 # product from every list that follows, which is not a correction but a
 # different product.
-CORRECTABLE_FIELDS: dict[str, tuple[str, bool]] = {
-    DESCRIPTION_FIELD: (PRODUCT_ENTITY, False),
-    PRICE_FIELD: (PRICE_ENTITY, True),
-    CURRENCY_FIELD: (PRICE_ENTITY, False),
+CORRECTABLE_FIELDS: dict[str, CorrectableField] = {
+    DESCRIPTION_FIELD: CorrectableField(PRODUCT_ENTITY, False, "descripción"),
+    PRICE_FIELD: CorrectableField(PRICE_ENTITY, True, "precio"),
+    CURRENCY_FIELD: CorrectableField(PRICE_ENTITY, False, "moneda"),
 }
 
 # Prices and the product catalog belong to sales in the map of roles, so that
@@ -106,6 +193,13 @@ NO_PRICE_YET = "El producto todavía no tiene un precio para corregir"
 # (RF-22). In Spanish like every other refusal of this module: the envelope in
 # `main.py` serves this string straight to the screen (Artículo VIII).
 NO_SUCH_PRODUCT = "No encontramos ese producto"
+# An amount below zero is not a price. The daily list is already turned away
+# with this sentence when it brings one, and a correction is the other door
+# into the same column: the two doors cannot disagree about what a price is.
+# The sentence is written again instead of imported because the pipeline that
+# owns it is another module (`GEN-02`); what has to agree is the rule, and a
+# rule this module states about its own column is this module's to state.
+NEGATIVE_AMOUNT = "El precio no puede ser negativo"
 
 
 class CatalogService:
@@ -134,7 +228,21 @@ class CatalogService:
         known = await self.catalog.products_by_code([row.product_code for row in rows])
         registered: list[RegisteredProduct] = []
         unknown: list[UnknownProduct] = []
+        # Classifying a batch is a lookup against the table of equivalences,
+        # not a call to anybody: the rules belong to `triage` and this module
+        # reads its own projection of them (Artículo IV).
+        equivalences = {
+            alias.text_normalized: (alias.category_id, alias.rule_id)
+            for alias in await self.catalog.aliases()
+        }
+        unresolved: dict[str, list[str]] = defaultdict(list)
+        observed_on = now.astimezone(BUSINESS_TIME_ZONE).date()
         updated = unchanged = highlighted = 0
+        # Every correction the list could contradict, read once. A product the
+        # catalog does not know yet cannot have one, so only what came back
+        # from `products_by_code` is asked about — and asking per row turned
+        # the cheapest part of a run into a query per product of the catalogue.
+        standing = await self._standing_corrections(product.id for product in known.values())
 
         for row in rows:
             product = known.get(row.product_code)
@@ -159,6 +267,29 @@ class CatalogService:
                     RegisteredProduct(product_id=product.id, product_code=product.code)
                 )
 
+            corrections = standing.get(product.id, {})
+            corrected_description = corrections.get(DESCRIPTION_FIELD)
+            if corrected_description is not None and row.description.strip():
+                # RF-28 is written about *a datum corrected by hand*, and the
+                # description is one of the three (RF-23). It is checked here
+                # and not inside `_register_price` because a run never rewrites
+                # a known product's description: without this line the one
+                # field the pipeline cannot overwrite would also be the one
+                # that never gets flagged, and the owner would never hear that
+                # the portal started calling the product something else.
+                #
+                # A row that carries no description at all is not the portal
+                # calling the product something else, it is the portal not
+                # saying — and a conflict raised over it would put the owner in
+                # front of a case with nothing to decide (RF-29), which is how
+                # an alert stops being read.
+                await self._check_conflict(
+                    corrected_description,
+                    incoming=row.description,
+                    against=corrected_description.portal_value,
+                    moment=now,
+                )
+
             changed, was_highlighted = await self._register_price(
                 product=product,
                 price=row.price,
@@ -167,10 +298,20 @@ class CatalogService:
                 threshold=threshold,
                 batch_id=batch_id,
                 source=PriceSource.PORTAL,
+                corrections=corrections,
             )
             updated += int(changed)
             unchanged += int(not changed)
             highlighted += int(was_highlighted)
+
+            self._classify(product, row, equivalences, unresolved)
+            if row.stock is not None:
+                await self.catalog.add_stock_point(
+                    product_id=product.id,
+                    quantity=row.stock,
+                    observed_on=observed_on,
+                    batch_id=batch_id,
+                )
 
         # Everything the file carried, not only what could be read: a product
         # whose row was unreadable is already a case, and reporting it a second
@@ -205,6 +346,19 @@ class CatalogService:
             await events.publish(
                 KnownProductsMissing(batch_id=batch_id, products=tuple(missing)), self.session
             )
+        if unresolved:
+            # One case per written form, never one per product: a hundred rows
+            # spelled the same way are one question (RF-21, RF-22 of 008).
+            await events.publish(
+                UnknownCategoryObserved(
+                    batch_id=batch_id,
+                    cases=tuple(
+                        UnknownCategory(category_text=text, product_codes=tuple(codes))
+                        for text, codes in sorted(unresolved.items())
+                    ),
+                ),
+                self.session,
+            )
 
         logger.info(
             "Price batch applied",
@@ -216,6 +370,7 @@ class CatalogService:
                 "registered": len(registered),
                 "unknown": len(unknown),
                 "missing": len(missing),
+                "unresolved_categories": len(unresolved),
             },
         )
 
@@ -259,8 +414,17 @@ class CatalogService:
         currency: str = "ARS",
         rule_id: int | None = None,
         batch_id: int = 0,
+        actor_user_id: int | None = None,
+        decided_at: datetime | None = None,
     ) -> None:
-        """Add a product a person decided to incorporate (RF-30)."""
+        """Add a product a person decided to incorporate (RF-30).
+
+        `actor_user_id` and `decided_at` are who asked for it and when, and
+        they are what turns this into a line of the log: incorporating a
+        product from the review queue is the platform's one way of **loading**
+        a datum by hand, and RF-09 covers loading with the same words it covers
+        modifying.
+        """
         if await self.catalog.get_by_code(product_code) is not None:
             return
         now = datetime.now(UTC)
@@ -299,7 +463,42 @@ class CatalogService:
                 threshold=await self.highlight_threshold(),
                 batch_id=None,
                 source=price_source,
+                # Empty and not looked up: a product that did not exist a line
+                # ago cannot carry a correction against it.
+                corrections={},
             )
+        # **One decision, one line.** The line names the **product**, and its
+        # description, because that is the datum a person loaded: the product
+        # page links its history by `catalog.product` and the product's id
+        # (RF-15), so this is where somebody asking "who put this here?" is
+        # already looking. `old_value` stays empty, and truthfully — there was
+        # no product to say anything about before this one. The amount
+        # underneath is the row's own number as often as the person's, and
+        # `source` on the price row is what says which.
+        #
+        # The asymmetry that leaves, written down so the next reader finds it
+        # instead of rediscovering it: when the amount is the person's
+        # (`price_source is PriceSource.SYSTEM`), the same act through the
+        # other door — `set_price_by_code`, for a row nobody could read — does
+        # leave a second line under `catalog.product_price`, and this one does
+        # not. So the product page's «Historial de cambios del precio» comes
+        # back empty for a product loaded here. It is deliberate: there the
+        # price is the only datum that came into being, and here it arrives
+        # inside the birth of the product, which is the datum the person
+        # actually decided about. Two lines for one decision would say twice
+        # what happened once, and the second would be filed under a screen
+        # nobody reached that morning. If RF-09's «sin excepciones» is ever
+        # read as covering the amount on its own, this is the line to add —
+        # the fact needed to decide it is already on the row (`source`).
+        await self._record_manual_load(
+            entity_type=PRODUCT_ENTITY,
+            entity_id=str(product.id),
+            field=DESCRIPTION_FIELD,
+            old_value=None,
+            new_value=description,
+            actor_user_id=actor_user_id,
+            moment=decided_at,
+        )
         await events.publish(
             ProductsRegistered(
                 batch_id=batch_id,
@@ -310,12 +509,41 @@ class CatalogService:
         logger.info("Product incorporated", extra={"product_code": product_code})
 
     async def set_price_by_code(
-        self, *, product_code: str, price: Decimal, currency: str = "ARS"
+        self,
+        *,
+        product_code: str,
+        price: Decimal,
+        currency: str = "ARS",
+        actor_user_id: int | None = None,
+        decided_at: datetime | None = None,
     ) -> None:
-        """Register the price a person indicated for a known product (RF-29)."""
+        """Register the price a person indicated for a known product (RF-29).
+
+        The second way a datum gets loaded by hand, and so the second one that
+        leaves a line behind (RF-09): the portal's row could not be read, and
+        the amount in force from here on is one a person typed.
+
+        There is one amount this does not register, and it does not register it
+        by **refusing**: one that contradicts a standing correction.
+        `_register_price` raises there, so nothing below this call runs and the
+        caller — the handler of `QuarantineCaseResolved` — takes the refusal up
+        to `triage`, which never reaches its commit. The person is told, and the
+        case stays in the queue where the amount they typed still belongs.
+
+        The amount that *equals* a standing correction is the other side of
+        that, and it is the case's way out: nothing is written, because the
+        value is already the one in force, and the line below still says who
+        confirmed it and when. Without it the queue would hold a row no decision
+        could ever close.
+        """
         product = await self.catalog.get_by_code(product_code)
         if product is None:
             raise NotFoundError(NO_SUCH_PRODUCT, details={"product_code": product_code})
+        current = await self.catalog.get_price(product.id)
+        previous = None if current is None else current.price
+        # Read here and handed down rather than looked up again inside: the
+        # write is what decides whether this amount may land at all.
+        standing = (await self._standing_corrections([product.id])).get(product.id, {})
         await self._register_price(
             product=product,
             price=price,
@@ -326,6 +554,28 @@ class CatalogService:
             # The number a person wrote while resolving an unreadable row:
             # `triage` takes it from their decision, never from the portal.
             source=PriceSource.SYSTEM,
+            corrections=standing,
+        )
+        # Recorded whether or not the number moved: somebody confirming the
+        # amount already in force took a manual decision like any other, and it
+        # is recorded like any other (RF-09) — the same answer `apply_correction`
+        # gives to a correction back to the value a datum already had.
+        #
+        # Unconditional, and that is the point. The case that used to leave no
+        # line — a standing correction holding the amount back — splits in two
+        # now, and neither half wants a guard here: the amount that contradicts
+        # the correction never reaches this line, because the write refused it,
+        # and the amount that equals it is somebody confirming the price the
+        # screen shows, which is the paragraph above. Guarding this call was how
+        # the write and the log agreed to stay quiet together.
+        await self._record_manual_load(
+            entity_type=PRICE_ENTITY,
+            entity_id=str(product.id),
+            field=PRICE_FIELD,
+            old_value=previous,
+            new_value=price,
+            actor_user_id=actor_user_id,
+            moment=decided_at,
         )
 
     async def discontinue(self, product_id: int) -> None:
@@ -362,6 +612,400 @@ class CatalogService:
     async def remember_setting(self, key: str, value: object) -> None:
         """Keep the business parameter this module reads while it applies a batch."""
         await self.catalog.put_setting(key, value)
+
+    async def _record_manual_load(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+        field: str,
+        old_value: Any,
+        new_value: Any,
+        actor_user_id: int | None,
+        moment: datetime | None,
+    ) -> None:
+        """Send a datum somebody loaded by hand to the one log of the platform (RF-09).
+
+        `CREATED` and not `CORRECTED`: nobody is disagreeing with the portal
+        here. The portal reported nothing — that is exactly why a person had to
+        type it — so there is no original for the value to be measured against
+        and no correction row underneath it (RF-33).
+
+        **No reason is asked for, and that is deliberate.** RF-11 demands one
+        when somebody modifies a datum *that already existed*; a load brings
+        into being a datum that did not, and there is nothing for the reason to
+        be about. Verified against the signed text on 2026-08-30.
+
+        The moment is the one the decision carried and not `now()`: what the
+        history has to say is when the person decided, and the two differ by
+        however long the queue behind them took.
+        """
+        if actor_user_id is None:
+            # Nothing manual happened, so there is nothing to record about who
+            # did it. Inventing an author would put a name on the platform's
+            # own work, which is worse than the silence.
+            return
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                field=field,
+                action=AuditAction.CREATED,
+                actor_user_id=actor_user_id,
+                section=CATALOG_SECTION,
+                old_value=self._jsonable(old_value),
+                new_value=self._jsonable(new_value),
+                occurred_at=moment or datetime.now(UTC),
+            ),
+            self.session,
+        )
+
+    # --- The rubros of the catalog (008) ----------------------------------
+
+    @staticmethod
+    def _classify(
+        product: Product,
+        row: NormalizedPriceRow,
+        equivalences: dict[str, tuple[int, int | None]],
+        unresolved: dict[str, list[str]],
+    ) -> None:
+        """Give a product its rubro, or leave it for a person. Never guess.
+
+        Three outcomes, and they are the whole of H4 of the spec:
+
+        * the written form has an equivalence → the rubro of that equivalence,
+          stamped with the rule that decided it (RF-02, RF-25);
+        * it has none → the product stays «sin rubro» and the written form is
+          collected so one case is opened for it (RF-21, RF-22);
+        * the row brought no category at all → «sin rubro», and it waits in the
+          queue of unclassified with the proposal derived from its subcategory
+          (RF-09 to RF-12).
+
+        What somebody decided by hand is never overwritten by an equivalence: a
+        product with `classified_by_user_id` is a decision, not a match.
+        """
+        product.category_raw = row.category_raw
+        product.subcategory_raw = row.subcategory_raw
+        if row.category_raw is None or not row.category_raw.strip():
+            return
+        if product.classified_by_user_id is not None:
+            return
+
+        found = equivalences.get(collapse_written_form(row.category_raw))
+        if found is None:
+            unresolved[row.category_raw.strip()].append(product.code)
+            return
+        category_id, rule_id = found
+        product.category_id = category_id
+        product.classified_by_rule_id = rule_id
+
+    async def list_categories(self) -> CategoryList:
+        """The rubros with their count and their written forms (RF-01, RF-03, RF-04).
+
+        «Sin rubro» travels beside the list rather than inside it, because it
+        is not a row of `core.category` — but it is reported, so the cuts add
+        up to the total the screen shows (RF-09, RF-10, RF-11).
+        """
+        categories = await self.catalog.list_categories()
+        counts = await self.catalog.products_per_category()
+        aliases: dict[int, list[CategoryAliasRead]] = defaultdict(list)
+        for alias in await self.catalog.aliases():
+            aliases[alias.category_id].append(CategoryAliasRead.model_validate(alias))
+        return CategoryList(
+            items=[
+                CategoryRead(
+                    id=category.id,
+                    name=category.name,
+                    product_count=counts.get(category.id, 0),
+                    aliases=aliases.get(category.id, []),
+                )
+                for category in categories
+            ],
+            unclassified_count=counts.get(None, 0),
+            total_products=sum(counts.values()),
+        )
+
+    async def create_category(self, *, name: str, actor_user_id: int) -> CategoryRead:
+        """Add a rubro to the list (RF-05)."""
+        clean = name.strip()
+        if await self.catalog.category_named(clean) is not None:
+            raise ConflictError(CATEGORY_ALREADY_EXISTS, details={"name": clean})
+        category = await self.catalog.add_category(clean)
+        await self._record_category_change(
+            category, AuditAction.CREATED, actor_user_id, old_value=None, new_value=clean
+        )
+        await self.session.commit()
+        logger.info("Category created", extra={"category_id": category.id})
+        return CategoryRead(id=category.id, name=category.name, product_count=0, aliases=[])
+
+    async def rename_category(
+        self, category_id: int, *, name: str, actor_user_id: int
+    ) -> CategoryRead:
+        """Change the name of a rubro (RF-06)."""
+        category = await self._require_category(category_id)
+        clean = name.strip()
+        existing = await self.catalog.category_named(clean)
+        if existing is not None and existing.id != category.id:
+            raise ConflictError(CATEGORY_ALREADY_EXISTS, details={"name": clean})
+        previous, category.name = category.name, clean
+        await self.session.flush()
+        await self._record_category_change(
+            category, AuditAction.UPDATED, actor_user_id, old_value=previous, new_value=clean
+        )
+        await self.session.commit()
+        counts = await self.catalog.products_per_category()
+        return CategoryRead(
+            id=category.id,
+            name=category.name,
+            product_count=counts.get(category.id, 0),
+            aliases=[
+                CategoryAliasRead.model_validate(alias)
+                for alias in await self.catalog.aliases()
+                if alias.category_id == category.id
+            ],
+        )
+
+    async def delete_category(self, category_id: int, *, actor_user_id: int) -> None:
+        """Remove a rubro, unless something still points at it (RF-07).
+
+        The check is here and not left to the foreign key on purpose: the
+        system has to be able to say *why* it refuses, and an integrity error
+        of PostgreSQL is not a sentence a person reads.
+        """
+        category = await self._require_category(category_id)
+        counts = await self.catalog.products_per_category()
+        in_use = counts.get(category.id, 0)
+        if in_use:
+            raise ConflictError(
+                CATEGORY_HAS_PRODUCTS, details={"category_id": category_id, "products": in_use}
+            )
+        aliases = [
+            alias for alias in await self.catalog.aliases() if alias.category_id == category.id
+        ]
+        if aliases:
+            raise ConflictError(
+                "El rubro todavía tiene formas escritas asignadas",
+                details={"category_id": category_id, "aliases": len(aliases)},
+            )
+        name = category.name
+        await self._record_category_change(
+            category, AuditAction.UPDATED, actor_user_id, old_value=name, new_value=None
+        )
+        await self.catalog.delete_category(category)
+        await self.session.commit()
+        logger.info("Category deleted", extra={"category_id": category_id})
+
+    async def unclassified(self, *, skip: int = 0, limit: int = 50) -> UnclassifiedList:
+        """The queue of products with no rubro, each with its proposal or none.
+
+        The proposal is derived here and stored nowhere (RF-16). A subcategory
+        that resolves to **exactly one** rubro among what is already classified
+        proposes it (RF-14); zero or more than one proposes nothing (RF-17) —
+        breaking a tie would be the system deciding, which is the one thing
+        this feature does not do.
+        """
+        products = await self.catalog.unclassified(skip=skip, limit=limit)
+        total = await self.catalog.count_unclassified()
+        by_subcategory = await self.catalog.rubro_of_subcategory()
+        names = {category.id: category.name for category in await self.catalog.list_categories()}
+
+        items: list[UnclassifiedProduct] = []
+        for product in products:
+            rubros = by_subcategory.get(product.subcategory_raw or "", set())
+            proposed = next(iter(rubros)) if len(rubros) == 1 else None
+            items.append(
+                UnclassifiedProduct(
+                    product_id=product.id,
+                    code=product.code,
+                    description=product.description,
+                    category_raw=product.category_raw,
+                    subcategory_raw=product.subcategory_raw,
+                    proposed_category_id=proposed,
+                    proposed_category_name=names.get(proposed) if proposed else None,
+                )
+            )
+        return UnclassifiedList(items=items, total=total, skip=skip, limit=limit)
+
+    async def set_product_category(
+        self, product_id: int, *, category_id: int, actor_user_id: int
+    ) -> UnclassifiedProduct:
+        """Assign — or change — the rubro of a product (RF-13, RF-15, RF-20).
+
+        Confirming a proposal and correcting it are the same write: only the
+        rubro that travels differs, and the system has no reason to tell them
+        apart. Who decided and when is recorded on the product (RF-18) and
+        published as a manual change, so it reaches the one log of the platform
+        without this module learning that the log exists.
+        """
+        product = await self.catalog.get_product(product_id)
+        if product is None:
+            raise NotFoundError(NO_SUCH_PRODUCT, details={"product_id": product_id})
+        category = await self._require_category(category_id)
+
+        previous = product.category_id
+        product.category_id = category.id
+        product.classified_by_user_id = actor_user_id
+        product.classified_at = datetime.now(UTC)
+        # A decision by hand does not belong to any equivalence: revoking one
+        # must not take this product with it.
+        product.classified_by_rule_id = None
+        await self.session.flush()
+
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=PRODUCT_ENTITY,
+                entity_id=str(product.id),
+                action=AuditAction.UPDATED,
+                actor_user_id=actor_user_id,
+                section=CATALOG_SECTION,
+                field=CATEGORY_FIELD,
+                old_value=previous,
+                new_value=category.id,
+            ),
+            self.session,
+        )
+        await self.session.commit()
+        logger.info(
+            "Product classified", extra={"product_id": product.id, "category_id": category.id}
+        )
+        return UnclassifiedProduct(
+            product_id=product.id,
+            code=product.code,
+            description=product.description,
+            category_raw=product.category_raw,
+            subcategory_raw=product.subcategory_raw,
+            proposed_category_id=category.id,
+            proposed_category_name=category.name,
+        )
+
+    async def list_aliases(self) -> list[CategoryAliasRead]:
+        """Every equivalence in force (RF-27).
+
+        Who decided each one and when lives in `triage`, with the rule: the
+        screen reads both and joins them by `rule_id`, and this module never
+        touches somebody else's table to say a name.
+        """
+        return [CategoryAliasRead.model_validate(alias) for alias in await self.catalog.aliases()]
+
+    async def learn_category_alias(
+        self, *, rule_id: int | None, category_text: str, category_id: int
+    ) -> None:
+        """Project a decision about a written form, and apply it (RF-24, RF-25).
+
+        Applying it here and not waiting for the next list is what makes the
+        decision retroactive: the products that were left «sin rubro» by that
+        written form get their rubro the moment somebody decides.
+        """
+        if await self.catalog.get_category(category_id) is None:
+            logger.warning(
+                "A decision named a rubro that does not exist", extra={"rule_id": rule_id}
+            )
+            return
+        normalized = collapse_written_form(category_text)
+        await self.catalog.put_alias(
+            text_normalized=normalized,
+            text_original=category_text.strip(),
+            category_id=category_id,
+            rule_id=rule_id,
+        )
+        classified = 0
+        for product in await self.catalog.unclassified(limit=MAX_RECLASSIFIED):
+            if product.category_raw and collapse_written_form(product.category_raw) == normalized:
+                product.category_id = category_id
+                product.classified_by_rule_id = rule_id
+                classified += 1
+        await self.session.flush()
+        logger.info(
+            "Category equivalence learned",
+            extra={"rule_id": rule_id, "category_id": category_id, "classified": classified},
+        )
+
+    async def repoint_category_alias(self, *, rule_id: int, category_id: int) -> None:
+        """Point an equivalence at another rubro and move what it had classified.
+
+        RF-28 and RF-29, and the line that separates them from revoking:
+        **nothing goes back to the queue**. The scope is exact —
+        `classified_by_rule_id = rule_id` — so a product somebody classified by
+        hand does not move, because it never depended on this equivalence.
+        """
+        alias = await self.catalog.alias_by_rule(rule_id)
+        if alias is None or await self.catalog.get_category(category_id) is None:
+            return
+        alias.category_id = category_id
+        moved = await self.catalog.products_classified_by(rule_id)
+        for product in moved:
+            product.category_id = category_id
+        await self.session.flush()
+        logger.info(
+            "Category equivalence re-pointed",
+            extra={"rule_id": rule_id, "category_id": category_id, "products": len(moved)},
+        )
+
+    async def forget_category_alias(self, rule_id: int) -> None:
+        """Drop an equivalence and send back what it was resolving (RF-30, RF-31).
+
+        The products are unclassified and go through the **same** step a batch
+        goes through, so they end up as an `UnknownCategoryObserved` and the
+        queue opens their case: one path, not a special branch for revocation.
+        """
+        alias = await self.catalog.alias_by_rule(rule_id)
+        if alias is None:
+            return
+        affected = await self.catalog.products_classified_by(rule_id)
+        text = alias.text_original
+        await self.catalog.drop_alias_by_rule(rule_id)
+        for product in affected:
+            product.category_id = None
+            product.classified_by_rule_id = None
+        await self.session.flush()
+        if affected:
+            await events.publish(
+                UnknownCategoryObserved(
+                    batch_id=0,
+                    cases=(
+                        UnknownCategory(
+                            category_text=text,
+                            product_codes=tuple(product.code for product in affected),
+                        ),
+                    ),
+                ),
+                self.session,
+            )
+        logger.info(
+            "Category equivalence forgotten",
+            extra={"rule_id": rule_id, "products": len(affected)},
+        )
+
+    async def _require_category(self, category_id: int) -> Category:
+        """Return the rubro, or say plainly that it is not there."""
+        category = await self.catalog.get_category(category_id)
+        if category is None:
+            raise NotFoundError(NO_SUCH_CATEGORY, details={"category_id": category_id})
+        return category
+
+    async def _record_category_change(
+        self,
+        category: Category,
+        action: AuditAction,
+        actor_user_id: int,
+        *,
+        old_value: Any,
+        new_value: Any,
+    ) -> None:
+        """Send a change of the rubro list to the one log of the platform."""
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=CATEGORY_ENTITY,
+                entity_id=str(category.id),
+                action=action,
+                actor_user_id=actor_user_id,
+                section=CATALOG_SECTION,
+                field="name",
+                old_value=old_value,
+                new_value=new_value,
+            ),
+            self.session,
+        )
 
     # --- Correcting a value by hand ---------------------------------------
 
@@ -446,6 +1090,10 @@ class CatalogService:
             ),
             self.session,
         )
+        # After the handlers, never before: a log line that could not be written
+        # has to take the correction down with it (`GEN-09`), and committing
+        # first would leave the value changed and the reason for it lost.
+        await self.session.commit()
         logger.info(
             "Value corrected by hand",
             extra={
@@ -528,6 +1176,7 @@ class CatalogService:
             ),
             self.session,
         )
+        await self.session.commit()
         logger.info(
             "Correction reverted",
             extra={"correction_id": correction.id, "actor_user_id": actor_user_id},
@@ -604,17 +1253,25 @@ class CatalogService:
         await self.session.flush()
         return correction
 
-    async def _corrections_on_the_price(self, product_id: int) -> dict[str, Correction]:
-        """The corrections standing on a product's price row, by field.
+    async def _standing_corrections(
+        self, product_ids: Iterable[int]
+    ) -> dict[int, dict[str, Correction]]:
+        """The corrections in force on these products, by product and by field.
 
-        One query for the whole row rather than one per correctable field: a
-        daily list walks this once per product it carries.
+        One query for a whole daily list rather than one per row: the list
+        carries the entire catalogue, and the corrections it could contradict
+        are a handful.
+
+        Keyed by field and not by entity because a field belongs to exactly one
+        entity — `CORRECTABLE_FIELDS` is what says so — and both entities are
+        filed under the same `entity_id`, the product's. A product and its
+        price in force cannot collide as long as they share no field name.
         """
-        return {
-            correction.field: correction
-            for correction in await self.catalog.corrections_in_force([str(product_id)])
-            if correction.entity_type == PRICE_ENTITY
-        }
+        by_product: dict[int, dict[str, Correction]] = defaultdict(dict)
+        entity_ids = [str(product_id) for product_id in product_ids]
+        for correction in await self.catalog.corrections_in_force(entity_ids):
+            by_product[int(correction.entity_id)][correction.field] = correction
+        return by_product
 
     async def _check_conflict(
         self, correction: Correction, *, incoming: Any, against: Any, moment: datetime
@@ -675,14 +1332,38 @@ class CatalogService:
 
     @staticmethod
     def _correctable(field: str) -> tuple[str, bool]:
-        """Where a field lives and whether it holds a number, or refuse it."""
+        """Where a field lives and whether it holds a number, or refuse it.
+
+        This is the one refusal that echoes the name it was handed: a field
+        the module does not have has no word in its vocabulary to answer with.
+        What it can do is name, in Spanish, the fields it does have — the list
+        was only in `details` before, which no one reading the sentence ever
+        sees (`ERR-02`). The words come out sorted rather than in the table's
+        order, so the list a person reads does not quietly rearrange itself the
+        day somebody moves a row of `CORRECTABLE_FIELDS`.
+        """
         target = CORRECTABLE_FIELDS.get(field)
         if target is None:
+            offered = ", ".join(sorted(entry.label for entry in CORRECTABLE_FIELDS.values()))
             raise ValidationError(
-                f"«{field}» no es un campo que se pueda corregir.",
+                f"«{field}» no es un campo que se pueda corregir. Se pueden corregir: {offered}.",
                 details={"field": field, "correctable": sorted(CORRECTABLE_FIELDS)},
             )
-        return target
+        return target.entity_type, target.numeric
+
+    @staticmethod
+    def _field_label(field: str) -> str:
+        """The word a person reads for a field, or the field's own name.
+
+        A refusal names the datum it is about, and the person who typed the
+        value knows «precio», not `price` (Artículo VIII). The fallback to the
+        code is unreachable through the correction path — everything that gets
+        this far went through `_correctable` first — and it is there so a
+        future caller gets a sentence naming the wrong word rather than a
+        `KeyError` naming nothing.
+        """
+        entry = CORRECTABLE_FIELDS.get(field)
+        return field if entry is None else entry.label
 
     @staticmethod
     def _reason(reason_code: str) -> CorrectionReason:
@@ -697,13 +1378,117 @@ class CatalogService:
 
     @staticmethod
     def _as_number(value: Any, field: str) -> Decimal:
-        """Read a value as the number its field holds."""
+        """Read a value as the number its field holds, or refuse it.
+
+        `nan`, `snan` and every spelling of infinity spell themselves as a
+        `Decimal` without complaining and only detonate later, one screen away
+        from whoever typed them: a NaN written into a price is equal to
+        nothing, not even to itself, so every list that follows contradicts it
+        and the owner is warned about the same conflict every morning, forever
+        (RF-28). They are refused right here, beside the text that never
+        parsed, because this is where the correction path decides what a number
+        is — the same guard `ParameterSpec._as_number` already keeps over the
+        value the owner types on the settings screen.
+
+        A **negative** amount is refused for a different reason: the rule is not
+        this method's invention, it is the one the daily list already obeys —
+        `ingestion` sends a row with a price below zero to quarantine instead of
+        writing it. Every numeric field a person may correct is an amount
+        (today, only `price`), so a correction that got past this would put in
+        by hand the number the pipeline is not allowed to bring.
+        """
         try:
-            return Decimal(str(value))
+            number = Decimal(str(value))
         except (InvalidOperation, ArithmeticError, ValueError) as error:
-            raise ValidationError(
-                f"«{field}» tiene que ser un número.", details={"field": field}
-            ) from error
+            raise CatalogService._not_a_number_error(field) from error
+        if not number.is_finite():
+            raise CatalogService._not_a_number_error(field)
+        if number < 0:
+            raise ValidationError(NEGATIVE_AMOUNT, details={"field": field})
+        return number
+
+    @staticmethod
+    def _not_a_number_error(field: str) -> ValidationError:
+        """Build the refusal for a value that is no number at all.
+
+        It returns the error instead of raising it because two paths reach it —
+        the text that never parsed and the text that parsed into something not
+        finite — and each wants its own `from`.
+        """
+        return ValidationError(
+            f"«{CatalogService._field_label(field)}» tiene que ser un número.",
+            details={"field": field},
+        )
+
+    @staticmethod
+    def _held_back_by_a_correction(
+        *, product: Product, correction: Correction, rejected: Decimal
+    ) -> ConflictError:
+        """Build the refusal for an amount a standing correction does not let through.
+
+        A `ConflictError` and not a `ValidationError`: the number is a number,
+        the product is there and the permission was granted. What stands in the
+        way is the state of the row — which is what a 409 says and what a 422
+        would deny.
+
+        Three sentences, and each one earns its place (`ERR-02`): what happened
+        and what the price says instead, that the case did **not** leave the
+        queue, and the two ways out — either of which actually empties it. This
+        refusal reaches somebody who, until it existed, was told «Caso
+        resuelto»; a message that only said «rechazado» would leave them
+        exactly as lost, one word later, and one that named a remedy leaving
+        the case stuck forever would be the same lie with more steps.
+
+        Both ways out are real, and that is checked, not assumed. Typing the
+        amount already in force gets through this very method — an equal number
+        contradicts nothing — and closes the case. Changing the correction
+        moves what «in force» means, so the amount that was refused becomes the
+        amount that goes through on the second try. What does **not** work is
+        undoing the correction and stopping there, and that is why the sentence
+        ends «y volver a cargarlo acá».
+
+        It says *what has to be done*, never *«podés hacerlo»*, with one
+        exception it is entitled to: «cargá ese mismo importe» is addressed to
+        somebody who by definition just loaded one, on the screen that let
+        them. Changing the correction stays impersonal — emptying the queue is
+        `PRICES` in writing and correcting is `PRODUCT_CATALOG` in writing, and
+        those are not the same set of people: purchasing resolves these cases
+        and may not touch a correction. The screen knows who is reading and
+        says whose door it is; this module cannot see the role.
+
+        The date is read on the shop's clock, not on UTC: a correction made at
+        nine at night in Buenos Aires belongs to that day and not to the next
+        one. The amount goes out raw, the way `_jsonable` stored it: no error
+        message of this backend formats money, and a `$1.200` written here
+        would be a second money format nobody ever compares with the browser's.
+        The exact values travel in `details` so a screen can rewrite the whole
+        sentence with its own formatter if it ever wants to.
+
+        `corrected_by_user_id` travels too, and unresolved: naming the person
+        would take reading `identity` from here, which is the import the
+        Artículo IV forbids. `triage/routes.py` resolves it at the HTTP edge,
+        where the one file of `identity` that may be crossed lives; this module
+        says the id and stops.
+        """
+        when = correction.corrected_at.astimezone(BUSINESS_TIME_ZONE).strftime("%d/%m/%Y")
+        return ConflictError(
+            f"El precio de este producto está corregido a mano desde el {when} y dice "
+            f"{correction.corrected_value}, así que no se guardó el importe que cargaste "
+            "y el caso sigue en la cola. Si ese es el precio correcto, cargá ese mismo "
+            "importe y el caso se cierra sin tocar la corrección. Si no lo es, hay que "
+            "cambiar la corrección, con un motivo, en la ficha del producto, y volver "
+            "a cargarlo acá.",
+            details={
+                "product_id": product.id,
+                "product_code": product.code,
+                "field": PRICE_FIELD,
+                "correction_id": correction.id,
+                "corrected_value": correction.corrected_value,
+                "corrected_at": correction.corrected_at,
+                "corrected_by_user_id": correction.corrected_by_user_id,
+                "rejected_value": CatalogService._jsonable(rejected),
+            },
+        )
 
     @staticmethod
     def _as_text(value: Any, field: str, *, limit: int | None = None) -> str:
@@ -722,7 +1507,10 @@ class CatalogService:
         as a 500 (ERR-06).
         """
         if not isinstance(value, str):
-            raise ValidationError(f"«{field}» tiene que ser texto.", details={"field": field})
+            raise ValidationError(
+                f"«{CatalogService._field_label(field)}» tiene que ser texto.",
+                details={"field": field},
+            )
         text = value.strip()
         if not text:
             raise ValidationError(
@@ -730,7 +1518,7 @@ class CatalogService:
             )
         if limit is not None and len(text) > limit:
             raise ValidationError(
-                f"«{field}» no puede superar los {limit} caracteres.",
+                f"«{CatalogService._field_label(field)}» no puede superar los {limit} caracteres.",
                 details={"field": field, "max_length": limit},
             )
         return text
@@ -753,11 +1541,23 @@ class CatalogService:
         Amounts are compared as numbers and not as text: `portal_value` keeps a
         price as «1000.0000» and a list brings `Decimal("1000")`, which is one
         number written twice.
+
+        Text is compared normalised, for the same reason one step further out:
+        «TORNILLO HEX.» and «Tornillo hex.» are one description written twice,
+        and a list that changed the shift key is not the portal contradicting
+        anybody. Flagging that as a conflict would put the owner in front of a
+        case with nothing to decide (RF-28, RF-29), which is how an alert stops
+        being read.
+
+        `normalize` and not a comparison written here: it is the platform's one
+        answer to "is this the same text?", the same one entity resolution
+        asks, and two ways of comparing the same text in one repository is a
+        disagreement waiting for the morning nobody remembers both.
         """
         _, numeric = cls._correctable(field)
         if numeric:
             return cls._as_number(left, field) == cls._as_number(right, field)
-        return str(left) == str(right)
+        return normalize(str(left)) == normalize(str(right))
 
     @staticmethod
     def _jsonable(value: Any) -> Any:
@@ -872,8 +1672,22 @@ class CatalogService:
         threshold: Decimal,
         batch_id: int | None,
         source: PriceSource,
+        corrections: dict[str, Correction],
     ) -> tuple[bool, bool]:
         """Write the price in force. Returns (it changed, it is highlighted).
+
+        Or **raises**, in the one case where it cannot write and nobody should
+        be told otherwise: an amount somebody typed that **disagrees** with a
+        price a correction already holds. An amount equal to the one in force
+        contradicts nothing, so it goes through and writes nothing — that is
+        what keeps a case whose price is corrected from being unclosable, since
+        `triage` has no other road to `RESOLVED` than a decision that gets past
+        here. The refusal lives here and not in the caller because this is where
+        the skip actually happens and where the compiler makes the choice
+        explicit — the branch that writes from the portal is right beside it. A
+        caller-side check would leave this method's `else` mute again, and the
+        next non-portal writer would inherit the silence without being told,
+        which is exactly how the defect was born.
 
         A price that did not change adds no point to the history (RF-22) and
         keeps the date on which it was registered: that date is what the screen
@@ -883,6 +1697,18 @@ class CatalogService:
         platform on somebody's decision. It is stamped on the row even when the
         amount did not move, because a list repeating a number a person typed
         is still the portal reporting that number (RF-33).
+
+        `corrections` is what already stands on this product, by field, and
+        the caller always brings it already read: a whole list reads the lot in
+        one query, a price written onto a known product reads that product's,
+        and a product being created passes `{}` because a product that did not
+        exist a line ago cannot be contradicting anything.
+
+        There is no default and no lookup down here on purpose. The query
+        belongs where the caller can amortise it — re-asking from in here is
+        what put one query per row into a run that carries the whole
+        catalogue — and a required argument is what keeps the next caller from
+        getting the cheap-looking version by saying nothing.
         """
         product.last_seen_at = moment
 
@@ -891,7 +1717,7 @@ class CatalogService:
         # fields of this row (RF-23), so a correction on either has to hold.
         # The comparison is local — the corrections live in this module
         # precisely so that these lines do not have to ask anybody anything.
-        standing = await self._corrections_on_the_price(product.id)
+        standing = corrections
         corrected_price = standing.get(PRICE_FIELD)
         corrected_currency = standing.get(CURRENCY_FIELD)
         # Only the portal can contradict a correction. This same method writes
@@ -924,16 +1750,37 @@ class CatalogService:
                     against=corrected_price.portal_value,
                     moment=moment,
                 )
-            else:
+            elif not self._same(PRICE_FIELD, price, corrected_price.corrected_value):
                 # A person's number arriving through the review queue instead
-                # of through the corrections door. It is not applied — the
-                # correction is what the screen shows, and moving it takes a
-                # reason (RF-11) — and it is said out loud instead of dropped
-                # in silence (Artículo II).
-                logger.info(
-                    "A manual price was held back by a standing correction",
+                # of through the corrections door, and **disagreeing** with what
+                # the correction says. It is not applied — the correction is
+                # what the screen shows, and moving it takes a reason (RF-11) —
+                # and the person is **refused**, not informed afterwards: this
+                # used to log the fact and carry on, so the screen said «Caso
+                # resuelto» over an amount that was never written and never
+                # logged. That is the silent loss the Artículo II forbids, and
+                # the refusal is what makes it impossible: a handler that raises
+                # aborts the transaction of whoever published (`GEN-09`), so the
+                # case `triage` was resolving stays pending along with it.
+                logger.warning(
+                    "A manual price was refused by a standing correction",
                     extra={"product_id": product.id, "correction_id": corrected_price.id},
                 )
+                raise self._held_back_by_a_correction(
+                    product=product, correction=corrected_price, rejected=price
+                )
+            # The same number is not a contradiction, and refusing it was
+            # leaving the queue with a case nobody could ever empty: the only
+            # road to `RESOLVED` is a decision that gets past this line, so a
+            # row whose price a correction holds would have stayed pending
+            # forever, counted every morning, whatever anybody did about it.
+            # Confirming the amount already in force is a decision like any
+            # other — `apply_correction` answers a correction back to the value
+            # a datum already had exactly this way — and nothing is overwritten
+            # by writing nothing. The line `set_price_by_code` leaves afterwards
+            # reads «cargó 1200» over a screen that says 1200, which is the
+            # agreement between the log and the screen the old silence was
+            # protecting by staying quiet about both.
             # A correction on the amount freezes the whole row, currency
             # included, and that is deliberate: the unit belongs to the number,
             # and pinning a new one onto an amount the portal never reported
@@ -1067,4 +1914,66 @@ class CatalogService:
                 None if price is None else price.price, previous_month
             ),
             corrections=self._marks(corrections),
+        )
+
+    # --- The cuts of the dashboard that come from the catalog (009) -------
+
+    async def dashboard(
+        self, *, since: date | None = None, until: date | None = None
+    ) -> CatalogDashboard:
+        """What the supplier charged, what the stock did, and what is new.
+
+        Three cuts of 009 that are about the catalog rather than about sales,
+        and they live here for the reason the boundary exists: the prices, the
+        stock and the products are this module's, and the dashboard reads them
+        through its own endpoint rather than by another module reaching in.
+
+        Each cut reports what it left out, **including when it left out
+        nothing** (RF-46, RF-27): a product with no photograph at one end of the
+        window is not counted as a zero, it is counted as excluded.
+        """
+        curve = await self.catalog.price_curve(since=since, until=until)
+        opening = {} if since is None else await self.catalog.stock_at(since, latest=False)
+        closing = {} if until is None else await self.catalog.stock_at(until, latest=True)
+        products = await self.catalog.active_products()
+
+        cuts: list[StockCut] = []
+        excluded = 0
+        for product in products:
+            first, last = opening.get(product.id), closing.get(product.id)
+            if first is None and last is None:
+                # No photograph at either end: this product cannot be part of
+                # this cut, and saying zero would be inventing a stock.
+                excluded += 1
+                continue
+            cuts.append(
+                StockCut(
+                    product_id=product.id,
+                    code=product.code,
+                    description=product.description,
+                    opening=first,
+                    closing=last,
+                    ran_out=last == 0,
+                )
+            )
+
+        return CatalogDashboard(
+            since=since,
+            until=until,
+            price_curve=[
+                PriceCurvePoint(month=month, average_price=average, changes=changes)
+                for month, average, changes in curve
+            ],
+            price_curve_excluded=0,
+            stock=cuts,
+            stock_excluded=excluded,
+            new_products=[
+                NewProductRead(
+                    product_id=product.id,
+                    code=product.code,
+                    description=product.description,
+                    first_seen_at=product.first_seen_at,
+                )
+                for product in await self.catalog.products_first_seen_between(since, until)
+            ],
         )

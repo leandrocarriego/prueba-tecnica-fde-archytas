@@ -1,0 +1,64 @@
+---
+title: Tablero del negocio — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Sistema as El sistema
+    participant Portal as Portal del proveedor
+    actor Julian as Julián, ventas
+    actor Duenio as El dueño
+    actor Marcela as Marcela, compras
+
+    loop Con la frecuencia configurada
+        Sistema->>Portal: Entra por su cuenta y pide los registros de ventas
+        Portal-->>Sistema: Los registros de ventas
+        Sistema->>Sistema: Conserva cada registro tal como llegó
+        Sistema->>Sistema: Compara los códigos ignorando las diferencias de escritura que no cambian el código
+
+        alt Las que comparten código no difieren en ningún dato
+            Sistema->>Sistema: Las cuenta una sola vez y anota cuántas unificó solo
+        else Difieren en algún dato
+            Sistema->>Sistema: Las aparta enteras, esperando una decisión
+        end
+
+        opt La venta llega sin fecha, con una fecha que no existe, sin total, con cantidad negativa, apuntando a un producto que no existe o con un total que se aparta del promedio de su producto más que la diferencia tolerada
+            Sistema->>Sistema: La aparta con su motivo, sin frenar a las demás
+            Note over Sistema: Ninguna se borra y ningún dato faltante<br/>se completa por suposición
+        end
+
+        Sistema->>Sistema: Calcula los indicadores sólo con las ventas que no están apartadas
+    end
+
+    Julian->>Sistema: Abre el tablero
+    Sistema-->>Julian: Primero el total facturado del período y cuántos registros dejó afuera
+    Sistema-->>Julian: La facturación mes a mes desde 2023, cuántas ventas hubo, y los cortes de precios, stock y altas
+    Note over Julian,Sistema: Cada corte elige su propio período,<br/>y cada indicador dice cuántos registros excluyó
+
+    Julian->>Sistema: Desde un indicador, pide ver los registros que excluyó
+    Sistema-->>Julian: La lista, cada uno con el motivo por el que se apartó
+
+    Julian->>Sistema: Abre un caso de venta repetida con datos en conflicto
+    Sistema-->>Julian: Las versiones enfrentadas, con las diferencias señaladas
+    Julian->>Sistema: Elige cuál vale, o declara que son ventas distintas
+    Sistema->>Sistema: Incluye lo declarado válido, recalcula los indicadores y registra qué se decidió, quién y cuándo
+    Sistema-->>Julian: El caso sale de pendientes y la versión descartada se sigue viendo
+
+    opt La decisión estuvo equivocada
+        Julian->>Sistema: Deshace la resolución
+        Sistema->>Sistema: El caso vuelve a pendiente y los indicadores se recalculan
+    end
+
+    Julian->>Sistema: Corrige la fecha, el total, la cantidad o el producto de una venta apartada
+    alt El dato correcto se puede conocer
+        Sistema->>Sistema: La venta entra a los indicadores
+    else No hay forma de conocerlo
+        Julian->>Sistema: Carga el valor que estima
+        Sistema->>Sistema: Marca el valor como estimado y lo avisa en todo indicador que lo use
+    end
+    Note over Sistema: Lo que informó el portal se conserva siempre,<br/>y la corrección se muestra encima
+
+    Duenio->>Sistema: Abre el tablero completo y resuelve ventas apartadas
+    Sistema-->>Duenio: Los mismos números y las mismas decisiones que ve ventas
+
+    Marcela->>Sistema: Intenta abrir el tablero comercial o las ventas
+    Sistema-->>Marcela: No tiene permiso, ni siquiera conociendo la dirección de la pantalla

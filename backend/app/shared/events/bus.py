@@ -57,6 +57,20 @@ class EventBus:
 
         return register
 
+    def unsubscribe(self, event_type: type[DomainEvent], handler: Handler) -> None:
+        """Drop one registration.
+
+        The counterpart of a **temporary** subscription, and the only kind there
+        is a reason for: a caller that publishes a question and needs the
+        answers of this one run — the daily digest asks every module what to put
+        in it — subscribes an accumulator of its own and takes it off again. A
+        module-level handler is never unsubscribed; it is the module's standing
+        reaction to a fact.
+        """
+        handlers = self._handlers.get(event_type)
+        if handlers and handler in handlers:
+            handlers.remove(handler)
+
     async def publish(self, event: DomainEvent, session: AsyncSession) -> None:
         """Run every handler subscribed to this event, in registration order.
 

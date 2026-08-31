@@ -19,7 +19,7 @@ Rules for an event:
 
 import enum
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -54,11 +54,18 @@ class DomainEvent:
 
 @dataclass(frozen=True, slots=True)
 class UserRegistered(DomainEvent):
-    """A user account was created."""
+    """A user account was created.
+
+    It carries the phone because that is where an alert is delivered (RF-44 of
+    007), and whoever delivers one cannot ask `identity` for it without
+    importing it. Like `UserInvited`, this is an in-process event that is never
+    persisted; unlike it, it carries no credential.
+    """
 
     user_id: int
     email: str
     role: str
+    phone: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +84,11 @@ class UserReactivated(DomainEvent):
 
 @dataclass(frozen=True, slots=True)
 class UserRoleChanged(DomainEvent):
-    """A user's role changed, so what they may reach changed with it."""
+    """A user's role changed, so what they may reach changed with it.
+
+    And with it, which alerts are theirs: the routing of 007 is by role, so
+    whoever keeps a list of recipients has to hear about this.
+    """
 
     user_id: int
     previous_role: str
@@ -155,13 +166,26 @@ class JobRunSucceeded(DomainEvent):
 
 @dataclass(frozen=True, slots=True)
 class NormalizedPriceRow:
-    """One row of the daily list that could be interpreted."""
+    """One row of the daily list that could be interpreted.
+
+    The last three fields carry what the list has always said and nobody read
+    yet: the category the supplier wrote, its subcategory, and the stock of the
+    day. They arrive with a default so every caller that already builds this
+    event keeps compiling — the price update of `001` never mentions them.
+    """
 
     staging_row_id: int
     product_code: str
     description: str
     price: Decimal
     currency: str
+    # Exactly as the supplier wrote them. Interpreting them is `008`, and the
+    # catalog does it against a table of equivalences, never by guessing.
+    category_raw: str | None = None
+    subcategory_raw: str | None = None
+    # The photograph of the day, which is what the stock cut of `009` compares
+    # between the start and the end of a period.
+    stock: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -440,3 +464,540 @@ class CorrectionConflicted(DomainEvent):
     original_value: Any
     corrected_value: Any
     incoming_value: Any
+
+
+# ── the categories of the catalog (008) ──────────────────────────────────────
+#
+# The written form of a category is resolved against a table of equivalences,
+# never by a normaliser that guesses. What is not in the table is a case for a
+# person, and that is the whole feature.
+
+
+@dataclass(frozen=True, slots=True)
+class UnknownCategory:
+    """A written form of a category no equivalence resolves.
+
+    It carries the products it affects and not one product: a hundred rows of
+    the same list written the same way are **one** question, and asking it a
+    hundred times would be the queue failing at its own job.
+    """
+
+    category_text: str
+    product_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class UnknownCategoryObserved(DomainEvent):
+    """The list brought written forms of a category the catalog cannot resolve.
+
+    Symmetric to `UnknownProductsObserved`: the catalog says what it could not
+    place, and whoever runs the review queue decides whether to open a case.
+    """
+
+    batch_id: int
+    cases: tuple[UnknownCategory, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantineRuleRedecided(DomainEvent):
+    """A rule in force was pointed at a different decision, and stays in force.
+
+    It is **not** a revocation: nothing goes back to the queue. Whoever
+    projected the rule re-points what it had resolved (RF-28, RF-29 of 008),
+    and the record keeps both who created it and who corrected it.
+    """
+
+    rule_id: int
+    kind: str
+    matcher: dict[str, Any]
+    decision: dict[str, Any]
+    previous_decision: dict[str, Any]
+    decided_by_user_id: int
+
+
+# ── purchases: invoices and the supplier register (004) ──────────────────────
+#
+# The same one-way pipeline as the price list, with two more sections of the
+# portal plugged into it:
+#
+#   portal ──InvoiceListExtracted──► ingestion ──InvoicesNormalized──► purchases
+#      │                                  │                                │
+#      ├──InvoiceFileExtracted────────────┤                    InvoicesNeedingReview
+#      └──SupplierLedgerExtracted─────────┴──SuppliersNormalized──────────►│
+#                                                                         ▼
+#                                                                      triage
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceListExtracted(DomainEvent):
+    """The invoices screen was read and stored verbatim in `raw`."""
+
+    raw_document_id: int
+    content: bytes
+    fetched_at: datetime
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceFileExtracted(DomainEvent):
+    """One invoice document was downloaded and stored verbatim in `raw`.
+
+    `file_kind` is what the table said it is — `PDF`, `PDF (escaneado)`,
+    `Excel` — and it decides which reader gets to try first. It travels because
+    the reader cannot ask the portal a second time (Artículo I).
+    """
+
+    raw_document_id: int
+    invoice_number: str
+    content: bytes
+    content_type: str
+    file_kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class SupplierLedgerExtracted(DomainEvent):
+    """The current-account screen was read, with every supplier already expanded.
+
+    It is the only screen of the portal that publishes the register: eight rows,
+    and behind each one the tax id, the email, the phone and the payment term.
+    """
+
+    raw_document_id: int
+    content: bytes
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedSupplier:
+    """One card of the supplier register, as far as it could be read."""
+
+    legal_name: str
+    tax_id: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    # `45 dias` on the screen. It is what the due date of an invoice is
+    # calculated from (RF-26 of 005), and never a date the document carries.
+    payment_term_days: int | None = None
+    balance: Decimal | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SuppliersNormalized(DomainEvent):
+    """The supplier register, typed. It is the padrón: nothing outside it exists."""
+
+    suppliers: tuple[NormalizedSupplier, ...]
+    raw_document_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedInvoice:
+    """One row of the invoices screen, typed.
+
+    Everything the table publishes travels, including what `005` reads —
+    `paid`, `balance`, `portal_payment_status`, `receipt_issued` — because the
+    screen is read once and interpreting it twice would be two truths.
+    """
+
+    staging_row_id: int
+    number: str
+    supplier_text: str
+    issued_on: date
+    total: Decimal
+    due_on: date | None = None
+    receipt_issued: bool = False
+    paid: Decimal = Decimal(0)
+    balance: Decimal | None = None
+    # What the portal *says* the payment state is. It is kept and shown, and it
+    # never decides: the state comes from the payments imputed (RF-45 of 005).
+    portal_payment_status: str | None = None
+    file_kind: str | None = None
+    product_code: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoicesNormalized(DomainEvent):
+    """The rows of the invoices screen that could be typed, as one batch."""
+
+    batch_id: int
+    raw_document_id: int
+    invoices: tuple[NormalizedInvoice, ...]
+    quarantined: int = 0
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceRowsQuarantined(DomainEvent):
+    """Rows of the invoices screen that could not be typed."""
+
+    batch_id: int
+    cases: tuple[QuarantinedRow, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceFileRead(DomainEvent):
+    """What the document itself said, field by field, next to what the table said.
+
+    `agrees` is the signal the whole feature rests on: when the document and the
+    table say the same thing the invoice is certainty, and when they disagree —
+    or the document could not be read at all — it goes to a person with the
+    excerpt in view (RF-27, RF-29, RF-30 of 004).
+    """
+
+    invoice_number: str
+    raw_document_id: int
+    readable: bool
+    agrees: bool
+    excerpt: str
+    reason: str | None = None
+    number: str | None = None
+    issued_on: date | None = None
+    total: Decimal | None = None
+    supplier_text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceReviewCase:
+    """An invoice held back because nobody can responsibly decide it alone."""
+
+    invoice_id: int
+    number: str
+    reason: str
+    supplier_text: str
+    excerpt: str = ""
+    # What the resolution has to match on, when the decision is about a way of
+    # writing a supplier's name rather than about this one invoice.
+    supplier_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoicesNeedingReview(DomainEvent):
+    """Invoices whose supplier is ambiguous, outside the register, or duplicated."""
+
+    cases: tuple[InvoiceReviewCase, ...]
+    batch_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredInvoice:
+    """An invoice the platform started to know, with its supplier resolved."""
+
+    invoice_id: int
+    supplier_id: int
+    number: str
+    issued_on: date
+    total: Decimal
+    due_on: date | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoicesRegistered(DomainEvent):
+    """Invoices that entered the business model with a supplier of the register."""
+
+    invoices: tuple[RegisteredInvoice, ...]
+    batch_id: int | None = None
+
+
+# ── payments and receipts (005) ──────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedPayment:
+    """One movement of the current account that is a payment, typed.
+
+    `references` is a tuple because one voucher can name more than one invoice,
+    and that is precisely the case the system refuses to split on its own
+    (RF-12 of 005).
+    """
+
+    staging_row_id: int
+    supplier_text: str
+    references: tuple[str, ...]
+    paid_on: date
+    amount: Decimal
+    external_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentsNormalized(DomainEvent):
+    """The payment vouchers the current account publishes, typed."""
+
+    batch_id: int
+    raw_document_id: int
+    payments: tuple[NormalizedPayment, ...]
+    quarantined: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentReviewCase:
+    """A voucher that cannot be imputed without somebody deciding first."""
+
+    payment_id: int
+    reason: str
+    reference: str
+    supplier_text: str
+    amount: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentsNeedingReview(DomainEvent):
+    """Vouchers held back: unknown invoice, several invoices, or a possible twin."""
+
+    cases: tuple[PaymentReviewCase, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ReceiptIssued(DomainEvent):
+    """A reception receipt was issued for an invoice, with its own number."""
+
+    receipt_id: int
+    invoice_id: int
+    number: str
+    issued_by_user_id: int
+    issued_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ReceiptVoided(DomainEvent):
+    """A reception receipt was annulled, and the invoice is without one again."""
+
+    receipt_id: int
+    invoice_id: int
+    voided_by_user_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceDueSoon(DomainEvent):
+    """An invoice with no receipt is about to reach its due date (RF-38 of 005).
+
+    Published once per due date: whoever holds the invoice is the only one that
+    can tell a new deadline from the same one already announced (RF-39).
+    """
+
+    invoice_id: int
+    number: str
+    supplier_name: str
+    due_on: date
+    days_ahead: int
+    total: Decimal
+
+
+# ── the calendar of due dates (006) ──────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class DueDateChanged(DomainEvent):
+    """Something on the calendar changed, and other screens are looking at it.
+
+    One event for the four verbs — added, moved, corrected, removed — because
+    what the screens do about it is the same: refresh the day it touched, and
+    say who did it (RF-31, RF-33 of 006).
+    """
+
+    due_date_id: int
+    action: str
+    actor_user_id: int
+    actor_name: str
+    on_date: date | None = None
+    previous_date: date | None = None
+    invoice_id: int | None = None
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class InvoiceDueDateRescheduled(DomainEvent):
+    """The due date of an invoice moved, and the deadline to issue its receipt with it.
+
+    Only when it moved **before** falling due: an invoice already overdue keeps
+    its original date for everything that matters — the receipt stays refused
+    and the supplier's delay is still measured against it (RF-28, RF-29 of 006).
+    """
+
+    invoice_id: int
+    previous_due_on: date | None
+    due_on: date
+    was_overdue: bool
+    actor_user_id: int
+
+
+# ── purchase orders and the supplier inbox (007) ─────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class PurchaseOrdersExtracted(DomainEvent):
+    """The purchase orders screen was read and stored verbatim in `raw`."""
+
+    raw_document_id: int
+    content: bytes
+    fetched_at: datetime
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedPurchaseOrder:
+    """One row of the purchase orders screen, typed."""
+
+    staging_row_id: int
+    number: str
+    ordered_on: date
+    supplier_text: str
+    product_code: str | None
+    product_text: str
+    quantity: int | None
+    amount: Decimal | None
+    status_text: str
+
+
+@dataclass(frozen=True, slots=True)
+class PurchaseOrdersNormalized(DomainEvent):
+    """The purchase orders that could be typed, as one batch."""
+
+    batch_id: int
+    raw_document_id: int
+    orders: tuple[NormalizedPurchaseOrder, ...]
+    quarantined: int = 0
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PurchaseOrderRowsQuarantined(DomainEvent):
+    """Rows of the purchase orders screen that could not be typed."""
+
+    batch_id: int
+    cases: tuple[QuarantinedRow, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PurchaseOrdersStalled(DomainEvent):
+    """Orders that have been observed in the same state for too long (RF-10 of 007)."""
+
+    order_ids: tuple[int, ...]
+    days: int
+
+
+@dataclass(frozen=True, slots=True)
+class SupplierMessagesExtracted(DomainEvent):
+    """The portal inbox was read and stored verbatim in `raw`."""
+
+    raw_document_id: int
+    content: bytes
+    fetched_at: datetime
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedMessage:
+    """One message of the portal inbox, typed."""
+
+    staging_row_id: int
+    external_id: str
+    received_at: datetime
+    sender_text: str
+    kind_text: str
+    subject: str
+    body: str
+    already_read: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SupplierMessagesNormalized(DomainEvent):
+    """The messages of the inbox that could be typed, as one batch."""
+
+    batch_id: int
+    raw_document_id: int
+    messages: tuple[NormalizedMessage, ...]
+    # True on the run that finds the inbox already full at start-up: those
+    # messages are registered as pending and nobody is woken up for them
+    # (RF-47 of 007).
+    first_run: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SupplierMessageReceived(DomainEvent):
+    """A message worth waking somebody up for just arrived (RF-33, RF-34 of 007)."""
+
+    message_id: int
+    kind: str
+    supplier_name: str
+    subject: str
+    body: str
+    received_at: datetime
+
+
+# ── sales, and the numbers the owner reads (009) ─────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class SalesExtracted(DomainEvent):
+    """The sales screen was read and stored verbatim in `raw`."""
+
+    raw_document_id: int
+    content: bytes
+    fetched_at: datetime
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NormalizedSale:
+    """One sales record, typed."""
+
+    staging_row_id: int
+    code: str
+    # The code with its spelling differences removed, which is what says two
+    # records are the same sale (RF-10 of 009).
+    code_key: str
+    sold_on: date
+    product_code: str | None
+    quantity: int | None
+    total: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class SalesNormalized(DomainEvent):
+    """The sales records that could be typed, as one batch."""
+
+    batch_id: int
+    raw_document_id: int
+    sales: tuple[NormalizedSale, ...]
+    quarantined: int = 0
+    job_run_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SaleRowsQuarantined(DomainEvent):
+    """Sales records that could not be typed, or that no indicator may add up."""
+
+    batch_id: int
+    cases: tuple[QuarantinedRow, ...]
+
+
+# ── the daily digest, assembled across modules (007) ─────────────────────────
+#
+# The digest is one message about two modules' business — the messages still
+# open and the orders that have not moved — and neither of them may read the
+# other, nor may whoever sends it read either.
+#
+# So it is assembled the way everything else here is: whoever is going to send
+# it **asks**, in public, and whoever has something to say answers. The bus is
+# in-process and synchronous, so by the time `publish` returns, every module
+# that had a line has contributed one.
+
+
+@dataclass(frozen=True, slots=True)
+class DailyDigestRequested(DomainEvent):
+    """Somebody is about to send the daily digest and is asking what to put in it."""
+
+    on_date: date
+
+
+@dataclass(frozen=True, slots=True)
+class DailyDigestContribution(DomainEvent):
+    """What one module has to say in the digest of the day.
+
+    `pending` is the number that goes in the header, and `lines` are the few
+    sentences under it. A module with nothing to report answers with zero and no
+    lines — which is a fact worth sending, and different from not answering.
+    """
+
+    source: str
+    pending: int
+    lines: tuple[str, ...] = ()

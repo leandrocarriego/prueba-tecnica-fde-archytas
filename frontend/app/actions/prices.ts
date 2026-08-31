@@ -1,64 +1,45 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { cookies } from 'next/headers'
 
+import { callApi, type ActionResult as ApiActionResult } from '@/lib/api/write'
 import type { JobRun } from '@/lib/catalog/types'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const API_PREFIX = '/api/v1'
-
-/** What every one of these actions answers: it worked, or why it did not. */
-export type ActionResult<T> = { ok: true; data: T } | { ok: false; message: string }
-
-/** The envelope every failing endpoint returns: see `app.main` in the backend. */
-interface ApiErrorBody {
-  error?: { type?: string; message?: string; details?: Record<string, unknown> }
-}
-
-const UNREACHABLE = 'No se pudo contactar al servidor'
-const NO_SESSION = 'La sesión expiró. Iniciá sesión de nuevo'
-
-async function call<T>(path: string, init: RequestInit): Promise<ActionResult<T>> {
-  const token = (await cookies()).get('access_token')?.value
-  if (!token) return { ok: false, message: NO_SESSION }
-
-  try {
-    const response = await fetch(`${API_URL}${API_PREFIX}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(init.headers ?? {}),
-      },
-      cache: 'no-store',
-    })
-
-    if (response.status === 204) return { ok: true, data: undefined as T }
-
-    const body = (await response.json()) as T & ApiErrorBody
-    if (!response.ok) {
-      return { ok: false, message: body.error?.message ?? UNREACHABLE }
-    }
-    return { ok: true, data: body }
-  } catch {
-    return { ok: false, message: UNREACHABLE }
-  }
-}
+/**
+ * The answer shape, pointed at and no longer spelled out again.
+ *
+ * This file held the first copy of it, from before `lib/api/write` existed,
+ * and five other action files import the name from here. An alias keeps that
+ * import working while there is one description of the shape: two identical
+ * type aliases are structurally compatible, so nothing would ever have told us
+ * the day they stopped being identical.
+ */
+export type ActionResult<T> = ApiActionResult<T>
 
 /**
  * Ask the portal for the list right now (RF-14).
  *
  * A 409 is not an error to hide: it means somebody else's update is already
  * running, and RF-15 says the person is told instead of a second one starting.
+ * `callApi` brings back the sentence the backend wrote, which is the one the
+ * button then shows.
  */
 export async function requestPriceUpdate(): Promise<ActionResult<{ job_run_id: number }>> {
-  const result = await call<{ job_run_id: number }>('/price-updates', { method: 'POST' })
+  const result = await callApi<{ job_run_id: number }>('/price-updates', { method: 'POST' })
   if (result.ok) revalidatePath('/precios')
   return result
 }
 
-/** How that run ended, so whoever asked finds out either way (RF-16). */
+/**
+ * How that run ended, so whoever asked finds out either way (RF-16).
+ *
+ * A read, and still through `callApi` and not through the reader in
+ * `lib/api/server` — which is a choice here, unlike in the POST above, because
+ * the reader only does GETs and this is one. It answers a failure with a
+ * reason of its own, three words a page can render, and drops whatever the
+ * backend said. But this run is followed until it ends and the button shows
+ * what comes back, so the backend's own sentence has to survive the trip.
+ */
 export async function readPriceUpdate(jobRunId: number): Promise<ActionResult<JobRun>> {
-  return call<JobRun>(`/price-updates/${jobRunId}`, { method: 'GET' })
+  return callApi<JobRun>(`/price-updates/${jobRunId}`, { method: 'GET' })
 }
