@@ -17,6 +17,16 @@ So three rules, in order of how much they matter:
    suite just did, so a stale snapshot fails the build instead of reaching the
    page. That check is what makes the other two worth anything.
 
+   The test count has to match exactly; the coverage figure has `TOLERANCE`
+   percentage points of slack, and only for this reason: the same commit
+   measured 89.13% on macOS and 89.1% in CI. A couple of lines run on one
+   platform and not the other, so exact equality on that float makes the gate
+   unpassable from a laptop — and the way somebody passes an unpassable gate is
+   by typing CI's number into the file, which is rule 1 broken by the check that
+   exists to protect it. Two hundredths of a point is not the failure this
+   guards against: it guards against a page saying 546 while the suite has 500,
+   and that shows up as percentage points.
+
     uv run python scripts/quality_snapshot.py           # write it
     uv run python scripts/quality_snapshot.py --check   # verify it (CI)
 """
@@ -31,6 +41,11 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 BACKEND = REPOSITORY_ROOT / "backend"
+
+# Percentage points the committed coverage may differ from the measured one.
+# Wide enough for the platform difference above, far narrower than any real
+# regression: the suite covers ~7400 statements, so this is about 37 lines.
+TOLERANCE = 0.5
 
 COVERAGE = BACKEND / "coverage.xml"
 JUNIT = BACKEND / ".pytest-report.xml"
@@ -111,11 +126,15 @@ def main() -> int:
         return 0
 
     if not SNAPSHOT.exists():
-        print(f"error: falta {SNAPSHOT.relative_to(REPOSITORY_ROOT)}. {REGENERATE}", file=sys.stderr)
+        print(
+            f"error: falta {SNAPSHOT.relative_to(REPOSITORY_ROOT)}. {REGENERATE}", file=sys.stderr
+        )
         return 1
 
     committed = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
-    if committed != measured:
+    same_tests = committed.get("tests") == measured["tests"]
+    close_enough = abs(float(committed.get("coverage", -1)) - measured["coverage"]) <= TOLERANCE
+    if not (same_tests and close_enough):
         print(
             "error: la foto commiteada no coincide con lo que hizo la suite.\n"
             f"  commiteado: {committed}\n"
