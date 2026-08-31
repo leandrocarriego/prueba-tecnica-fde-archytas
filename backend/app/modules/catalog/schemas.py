@@ -257,4 +257,3 @@ class CatalogDashboard(BaseModel):
     stock: list[StockCut]
     stock_excluded: int
     new_products: list[NewProductRead]
-    new_products_excluded: int = 0
