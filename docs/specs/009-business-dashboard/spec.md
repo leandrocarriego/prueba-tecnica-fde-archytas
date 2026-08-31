@@ -7,9 +7,8 @@
   Las notas como esta no salen en el PDF: el exportador las descarta.
 -->
 
-**Estado:** Borrador · **Feature:** 009-business-dashboard · **Fecha:** 2026-08-28
-
-<!-- `/approve-spec` completa Aprobada por y Fecha de aprobación, y pasa Estado a Aprobado. -->
+**Estado:** Aprobado · **Feature:** 009-business-dashboard · **Fecha:** 2026-08-28
+**Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-31
 
 ## Problema
 

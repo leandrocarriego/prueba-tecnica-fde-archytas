@@ -4,7 +4,7 @@
   ARTEFACTO INTERNO. No se exporta al cliente.
 -->
 
-**Feature:** 009-business-dashboard · **Estado de la spec:** Borrador · **Fecha:** 2026-08-30
+**Feature:** 009-business-dashboard · **Spec aprobada el:** 2026-08-31 · **Fecha:** 2026-08-30
 **Rol:** `Backend-Architect` · `Frontend-Architect`
 
 ## Constitution Check
@@ -15,11 +15,31 @@
 | II — Nada se descarta | Sí | **Es la feature entera.** Una venta repetida, rota o con un monto fuera de lo habitual no se suma y no se borra: queda apartada con su motivo, y cada indicador informa cuántos registros dejó afuera |
 | III — Flujo unidireccional, `raw` inmutable | Sí | `raw` → `staging.sale_row` → `core.sale`. Lo que informó el portal queda en `portal_values` aunque alguien corrija el registro (RF-41) |
 | IV — Las fronteras entre módulos son reales | Sí | `sales` contesta "ese producto no existe" contra **su propia proyección** de los códigos del catálogo, alimentada por `ProductsRegistered`. Los cortes de precios y stock los sirve `catalog`, que es su dueño, por su propio endpoint |
-| **V — Spec primero, y con firma** | **NO** | **Excepción, la misma que la 006: ver `006-due-date-calendar/plan.md`** |
+| **V — Spec primero, y con firma** | **Fuera de orden** | Firmada el 2026-08-31, después de construir. Ver abajo |
 | VI — Lo que no está tipado y testeado no está terminado | Parcial | 13 tests de integración y 5 unitarios del parser. **El fixture de `/ventas` es derivado, no capturado** |
 | VII — Las credenciales de terceros viven sólo en el entorno | Sí | Se reusa el cliente de `portal` |
 | VIII — Un idioma para cada audiencia | Sí | |
 | IX — Las dependencias entran por la puerta | Sí | Cero dependencias nuevas |
+
+### Excepción al Artículo V, y quién la aprobó
+
+El Artículo V dice que ninguna feature pasa a planificación técnica sin firma, y que una excepción
+**la aprueba el humano y queda registrada en el plan**. Pasó en dos momentos, como en la 006.
+
+**Al construir, el 2026-08-30.** El humano pidió implementar las seis specs pendientes y, consultado
+sobre las tres que estaban en borrador, respondió *"Las seis, igual"*.
+
+**Al firmar, el 2026-08-31.** Antes de la firma, una auditoría recorrió la spec contra el paso 1 de
+`approve_spec.md` y encontró bloqueos reales, que se cerraron escribiendo lo que ya estaba acordado
+en el brief, en otra spec firmada o en el código —nunca con una decisión de producto nueva—. Cada
+elección quedó listada en la sección **«Para confirmar al firmar»** de `spec.md`.
+
+Al firmar no creció el alcance: RF-21 y RF-22 se reescribieron en su lugar para decir lo que el sistema ya hace —el promedio de las ventas contadas de ese producto, sin ventana; diferencia porcentual; tolerancia inicial de 300 % en el panel—. El requisito estaba vago, el código no.
+
+Queda dicho, porque el orden importa y este documento es donde consta: **se firmó sobre código ya
+construido**. Para esta feature el gate del Artículo V es un registro, no un filtro — no hubo un
+momento en que el acuerdo pudiera haber cambiado lo que se construía. Lo que el gate sí puede hacer
+todavía es `/converge`.
 
 ## Enfoque
 

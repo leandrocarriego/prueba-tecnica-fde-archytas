@@ -171,12 +171,12 @@ no cuando está escrita.
 |----|--------|---------|
 | P1 · Precios | Resuelto | 001-price-list-update |
 | P2 · Facturas | En desarrollo | 004-invoices-suppliers |
-| P3 · No ver nada | Pendiente | — |
+| P3 · No ver nada | En desarrollo | 009-business-dashboard |
 | P4 · Proveedores | En desarrollo | 004-invoices-suppliers |
 | P5 · Pagos a medias | En desarrollo | 005-payments-receipts |
-| P6 · Compras que se pierden | Pendiente | — |
+| P6 · Compras que se pierden | En desarrollo | 007-orders-alerts |
 | P7 · Rubros | En desarrollo | 008-product-categories |
-| P8 · Avisos | Pendiente | — |
+| P8 · Avisos | En desarrollo | 007-orders-alerts |
 | P9 · Control propio | En desarrollo | 003-system-control |
 | P10 · Accesos | Resuelto | 002-access-control |
 | P11 · Fechas | En desarrollo | 006-due-date-calendar |
