@@ -159,6 +159,16 @@ async def _run_section(
             raise task.retry(exc=error, countdown=RETRY_COUNTDOWN_SECONDS) from error
         await _report_failure(job_run_id, task_name, error.message)
         raise
+    except Exception as error:
+        # Anything that is not the portal refusing: a parser that broke, a
+        # column the migration never created, a bug. It is not retried —
+        # retrying a defect just repeats it — but it **is** recorded, because a
+        # run that dies without saying so stays `RUNNING` for ever, and
+        # `request_sync` skips a section that has one of those open. Five
+        # sections of this platform were wedged that way for twelve hours,
+        # silently, which is exactly what the Artículo II forbids.
+        await _report_failure(job_run_id, task_name, f"{type(error).__name__}: {error}")
+        raise
 
     await _report_success(job_run_id, task_name)
     return {"raw_document_id": document_id, "reprocessed": document_id is not None}

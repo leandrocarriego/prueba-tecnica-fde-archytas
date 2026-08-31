@@ -9,7 +9,11 @@ and this is where that becomes a row somebody can read tomorrow morning.
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
-from app.modules.operations.service import PRICE_UPDATE_TASK, OperationsService
+from app.modules.operations.service import (
+    PRICE_UPDATE_TASK,
+    SYNC_TASK_NAMES,
+    OperationsService,
+)
 from app.shared.events import (
     JobRunFailed,
     JobRunSucceeded,
@@ -23,7 +27,23 @@ logger = get_logger(__name__)
 
 @events.subscribe(JobRunSucceeded)
 async def close_successful_run(event: JobRunSucceeded, session: AsyncSession) -> None:
-    """Record that a run finished well, and notice if it had been interrupted."""
+    """Record that a run finished well, and notice if it had been interrupted.
+
+    The five scheduled sections of 004, 007 and 009 are closed too, and used not
+    to be: this handler returned early for anything that was not the price
+    update, so an extraction of invoices that went perfectly left its run
+    `RUNNING` for ever — and `request_sync` refuses to open a run while one of
+    the same kind is open, so that section was never asked for again. The
+    consequence in production was five sections wedged from their first run,
+    with nothing failing anywhere.
+
+    What they do **not** get is the stall warning: it counts consecutive
+    failures of the price update to warn the owner (RF-12, RF-13 of 001), and
+    the sections have their own alerts.
+    """
+    if event.job_name in SYNC_TASK_NAMES:
+        await OperationsService(session).record_sync_success(event.job_run_id)
+        return
     if event.job_name != PRICE_UPDATE_TASK:
         return
     await OperationsService(session).record_price_update_success(event.job_run_id)
@@ -31,7 +51,14 @@ async def close_successful_run(event: JobRunSucceeded, session: AsyncSession) ->
 
 @events.subscribe(JobRunFailed)
 async def close_failed_run(event: JobRunFailed, session: AsyncSession) -> None:
-    """Record a failed run with its reason (RF-10), and warn once (RF-12, RF-13)."""
+    """Record a failed run with its reason (RF-10), and warn once (RF-12, RF-13).
+
+    A failed section is closed with its reason for the same reason the
+    successful one is: a run nobody closes blocks its section for ever.
+    """
+    if event.job_name in SYNC_TASK_NAMES:
+        await OperationsService(session).fail_run(event.job_run_id, event.message)
+        return
     if event.job_name != PRICE_UPDATE_TASK:
         return
     await OperationsService(session).record_price_update_failure(event.job_run_id, event.message)

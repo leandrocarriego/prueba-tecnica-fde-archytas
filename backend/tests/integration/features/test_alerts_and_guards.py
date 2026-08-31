@@ -25,10 +25,19 @@ from app.modules.notifications import tasks as notification_tasks
 from app.modules.notifications.client import NOT_CONFIGURED, Delivery, WhatsAppChannel
 from app.modules.notifications.service import NotificationService
 from app.modules.operations.models import JobStatus
-from app.modules.operations.service import PRICE_UPDATE_TASK, OperationsService
+from app.modules.operations.service import (
+    PRICE_UPDATE_TASK,
+    SYNC_TASK_NAMES,
+    OperationsService,
+)
 from app.modules.portal.client import UNREADABLE, PortalClient
 from app.shared.events import JobRunFailed, JobRunSucceeded, events
 from tests.conftest import Queued
+
+# Una task que no es de `operations`: ni la actualización de precios ni ninguna
+# de las cinco secciones programadas. El ejemplo anterior —`extract_invoices`—
+# dejó de serlo el día que la 004 la construyó.
+A_FOREIGN_TASK = "billing.close_month"
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
 
@@ -212,7 +221,22 @@ class TestTheSendingTask:
 
 
 class TestOperationsOnlyClosesItsOwnRuns:
-    """A module that reacts to every job run would close other people's work."""
+    """A module that reacts to every job run would close other people's work.
+
+    **El ejemplo de estos dos tests envejeció una vez y por eso lleva guarda.**
+    Se escribieron con `extract_invoices` como «la task de otro», cuando la
+    extracción de facturas todavía no existía. Cuando la 004 la construyó, pasó
+    a ser una de las cinco corridas programadas que `operations` **sí** posee, y
+    entonces estos tests fijaban lo contrario de lo que querían decir: que una
+    sección propia no se cerrara nunca. El invariante no cambió — cambió qué
+    nombre es ajeno de verdad, y `test_the_example_is_still_a_foreign_task` lo
+    verifica en vez de confiar en que alguien se acuerde.
+    """
+
+    def test_the_example_is_still_a_foreign_task(self) -> None:
+        """Si `A_FOREIGN_TASK` deja de ser ajena, los dos de abajo mienten."""
+        assert A_FOREIGN_TASK != PRICE_UPDATE_TASK
+        assert A_FOREIGN_TASK not in SYNC_TASK_NAMES
 
     async def test_a_success_of_another_task_is_ignored(self, session: AsyncSession) -> None:
         """`JobRunSucceeded` is shared vocabulary: P2 will publish it too."""
@@ -222,7 +246,7 @@ class TestOperationsOnlyClosesItsOwnRuns:
 
         # Act
         await events.publish(
-            JobRunSucceeded(job_run_id=requested.job_run_id, job_name="extract_invoices"), session
+            JobRunSucceeded(job_run_id=requested.job_run_id, job_name=A_FOREIGN_TASK), session
         )
 
         # Assert
@@ -237,9 +261,7 @@ class TestOperationsOnlyClosesItsOwnRuns:
 
         # Act
         await events.publish(
-            JobRunFailed(
-                job_run_id=requested.job_run_id, job_name="extract_invoices", message="boom"
-            ),
+            JobRunFailed(job_run_id=requested.job_run_id, job_name=A_FOREIGN_TASK, message="boom"),
             session,
         )
 
