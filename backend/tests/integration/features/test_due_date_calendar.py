@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.identity.models import User
 from app.modules.purchases.models import DueDateOrigin
 from app.modules.purchases.service import PurchasesService, today_here
-from app.shared.events import DueDateChanged, events
 from app.shared.errors import ConflictError
+from app.shared.events import DueDateChanged, ManualChangeRecorded, events
 from tests.factories.purchases_factory import InvoiceFactory, SupplierFactory
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
@@ -320,9 +320,7 @@ class TestTheLiveChannel:
                 actor_user_id=owner.id,
                 actor_name="Marcela",
             )
-            await service.remove_due_date(
-                entry.id, actor_user_id=owner.id, actor_name="Marcela"
-            )
+            await service.remove_due_date(entry.id, actor_user_id=owner.id, actor_name="Marcela")
         finally:
             events.unsubscribe(DueDateChanged, escuchar)
 
@@ -396,3 +394,99 @@ class TestTheLiveChannel:
         card = next(item for item in cards if item.id == entry.id)
         assert card.on_date == soon(20)
         assert [change.previous_date for change in card.changes] == [soon(5), soon(10)]
+
+
+class TestWhoDidWhat:
+    """RF-13, RF-16, RF-21: lo que se guarda tiene que poder leerse."""
+
+    async def test_adding_one_records_who_and_when(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-13: el criterio firmado dice «figura con el nombre y la fecha»."""
+        # Arrange / Act
+        service = PurchasesService(session)
+        entry = await service.add_due_date(
+            on_date=soon(5), description="Alquiler", amount=None, actor_user_id=owner.id
+        )
+
+        # Assert — el id viaja; el nombre lo pone la ruta con el directorio.
+        card = next(item for item in await calendar(session) if item.id == entry.id)
+        assert card.created_by_user_id == owner.id
+        assert card.created_at is not None
+
+    async def test_correcting_one_leaves_what_it_said_before(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-16: quién, cuándo y **el valor anterior**, que es lo que faltaba."""
+        # Arrange
+        service = PurchasesService(session)
+        entry = await service.add_due_date(
+            on_date=soon(5), description="Alquiler", amount=Decimal(1000), actor_user_id=owner.id
+        )
+        registrados: list[tuple[str, str | None, str | None]] = []
+
+        async def escuchar(event: ManualChangeRecorded, _session: AsyncSession) -> None:
+            registrados.append((event.field or "", event.old_value, event.new_value))
+
+        events.subscribe(ManualChangeRecorded)(escuchar)
+        try:
+            # Act
+            await service.edit_due_date(
+                entry.id,
+                description="Alquiler del depósito",
+                amount=Decimal(1500),
+                actor_user_id=owner.id,
+            )
+        finally:
+            events.unsubscribe(ManualChangeRecorded, escuchar)
+
+        # Assert — el monto se compara como número y no como texto: lo que la
+        # columna devuelve trae su escala, y fijar «1000.0000» sería fijar un
+        # detalle de la base en un test que habla de otra cosa.
+        assert ("description", "Alquiler", "Alquiler del depósito") in registrados
+        montos = [(old, new) for field, old, new in registrados if field == "amount"]
+        assert [(Decimal(old or "0"), Decimal(new or "0")) for old, new in montos] == [
+            (Decimal(1000), Decimal(1500))
+        ]
+
+    async def test_a_move_carries_who_made_it(self, session: AsyncSession, owner: User) -> None:
+        """RF-21: el historial de una tarjeta dice quién la movió."""
+        # Arrange
+        service = PurchasesService(session)
+        entry = await service.add_due_date(
+            on_date=soon(5), description="Seguro", amount=None, actor_user_id=owner.id
+        )
+
+        # Act
+        await service.move_due_date(
+            entry.id, on_date=soon(12), reason="Se acordó otra fecha", actor_user_id=owner.id
+        )
+
+        # Assert
+        card = next(item for item in await calendar(session) if item.id == entry.id)
+        assert [change.actor_user_id for change in card.changes] == [owner.id]
+        assert card.changes[0].reason == "Se acordó otra fecha"
+
+
+class TestWhatTheFiltersDoWithAHandMadeEntry:
+    """H7: los filtros se pensaron para facturas, y una entrada a mano no lo es."""
+
+    async def test_a_hand_made_entry_survives_both_filters(self, session: AsyncSession) -> None:
+        """Queda fijado lo que hoy hace, que es lo razonable.
+
+        Una entrada cargada a mano no tiene recibo posible ni estado de pago, y
+        pasa los dos filtros. Esconderla con «sólo sin recibo» sería mentir —no
+        es una factura sin recibo, es otra cosa— y esconderla con «esconder las
+        saldadas» sería esconder algo que nadie pagó. El test existe para que si
+        alguna vez se decide lo contrario, sea una decisión y no un descuido.
+        """
+        # Arrange
+        service = PurchasesService(session)
+        entry = await service.add_due_date(
+            on_date=soon(3), description="Impuestos", amount=Decimal(500), actor_user_id=1
+        )
+
+        # Act / Assert
+        for filtros in ({"without_receipt": True}, {"hide_settled": True}):
+            cards = await calendar(session, **filtros)
+            assert entry.id in {item.id for item in cards}, filtros

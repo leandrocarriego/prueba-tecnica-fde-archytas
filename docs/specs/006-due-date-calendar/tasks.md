@@ -15,14 +15,16 @@ la 004 a la 009, la spec se firmó el 2026-08-30 **sobre código ya escrito**, y
 existía. Lo que sigue no es un plan de trabajo por hacer y ya: es el desglose que le faltaba al plan,
 reconstruido contra el código y contra las doce derivas `D0`–`D11` que el plan dejó registradas.
 
-- ✅ **25 de 45** implementadas y verificadas por la suite (el 2026-08-31 se cerró la deriva D1, con su test).
-- ⬜ **20 pendientes**, y ninguna es alcance nuevo: **cada una nace de una deriva `Dn` de `plan.md`**
+- ✅ **41 de 45** implementadas y verificadas por la suite. El 2026-08-31 se cerró **la H5 entera**
+  —el canal en vivo, que era un tercio de la spec firmada— más todo el frontend pendiente: el
+  arrastre, el selector de fecha, el control de mes, el recorte por día, el botón de corregir, y
+  quién cargó y quién movió cada vencimiento.
+- ⬜ **4 pendientes**, y ninguna es alcance nuevo: **cada una nace de una deriva `Dn` de `plan.md`**
   o de un `RF` sin test. La columna *Deriva* dice cuál.
-- 🔴 **Una historia entera sin construir**: **H5 —RF-31 a RF-36, el canal en vivo—**. Dos personas
-  mirando el mismo calendario deciden sobre fotos distintas, que es exactamente el problema que la
-  feature venía a resolver. **Desde el 2026-08-31 ya no le falta el plan, le falta el código**: el
-  humano decidió construirla y su diseño está cerrado en `plan.md` → *La H5: el canal en vivo*.
-  RF-34 es la excepción: está cumplido y **no depende de la H5**.
+- ✅ **La H5 está construida** (2026-08-31): SSE sobre `GET /calendar/stream`, `LISTEN`/`NOTIFY` de
+  Postgres para cruzar los dos workers de uvicorn, y un Route Handler de Next que pone el `Bearer`
+  desde la cookie. Cero dependencias nuevas. `GEN-09` se cumple sin acoplar nada, y hay un test que
+  lo sostiene: **un movimiento rechazado no anuncia nada**.
 - ❌ **Dos tareas de la H5 desaparecieron y otras dos ocuparon su lugar.** Se fue la que pedía
   cerrar el plan —el plan ya está cerrado— y se fue el cartel provisorio de «esta pantalla no se
   actualiza sola», que era superficie que el cliente no firmó: el humano decidió no construirlo
@@ -72,9 +74,9 @@ migración → backend → frontend → tests.
 | ✅ 4 | `GET /calendar` con su autorización declarada y **el mes en curso por defecto**, decidido en el backend sobre `today_here()` (Buenos Aires, no UTC). Ocho líneas, cero dependencias nuevas. | `add_backend_feature` | Developer | RF-04 | — |
 | ✅ 5 | Pantalla `(private)/calendario` y `CalendarGrid`: los vencimientos con su descripción, su monto y su proveedor, los pasados distinguidos de los que vienen, y el enlace a la factura que lo originó. | `add_frontend_feature` | Developer | RF-01, RF-02, RF-06, RF-07 | — |
 | ✅ 6 | Test: una factura registrada aparece sola en el calendario, en su fecha. | `add_tests` | Tester | RF-02, RF-03 | — |
-| ⬜ 7 | 🔴 **La pantalla no es un calendario**: es una lista de días agrupados, y sólo aparecen los días que tienen algo. Falta la grilla del mes y, con ella, el recorte por día que RF-08 necesita para decir «y N más» — hoy RF-08 no tiene implementación porque no hay recorte que lo dispare. | `add_frontend_feature` | Developer | RF-01, RF-08 | D6 |
-| ⬜ 8 | **No hay control para avanzar ni retroceder de mes.** La ventana se cambia editando la URL a mano; los tres enlaces de la pantalla son «Este mes», «Sólo sin recibo» y «Esconder las saldadas». | `add_frontend_feature` | Developer | RF-05 | D5 |
-| ⬜ 9 | Tests de H1: la ventana por defecto es el mes en curso; el mes anterior y el siguiente traen lo suyo; un vencimiento pasado y uno futuro se distinguen; y un día con más de los que entran informa cuántos hay. **Ventana relativa a hoy, nunca un mes fijo**: un test con un mes concreto empieza a fallar solo el día que ese mes queda en el pasado. | `add_tests` | Tester | RF-01, RF-04, RF-05, RF-06, RF-07, RF-08 | D5, D6 |
+| ✅ 7 | **Hecho el 2026-08-31.** Cada día recorta a cuatro entradas y ofrece «y N más», que es RF-08: el recorte existe para que un día cargado no empuje los demás fuera de la pantalla. Lo que había antes:: es una lista de días agrupados, y sólo aparecen los días que tienen algo. Falta la grilla del mes y, con ella, el recorte por día que RF-08 necesita para decir «y N más» — hoy RF-08 no tiene implementación porque no hay recorte que lo dispare. | `add_frontend_feature` | Developer | RF-01, RF-08 | D6 |
+| ✅ 8 | **Hecho el 2026-08-31**: «Mes anterior» y «Mes siguiente», calculados sobre la ventana que devolvió el backend y conservando los filtros puestos. Lo que había antes: La ventana se cambia editando la URL a mano; los tres enlaces de la pantalla son «Este mes», «Sólo sin recibo» y «Esconder las saldadas». | `add_frontend_feature` | Developer | RF-05 | D5 |
+| 🟡 9 | **A medias**: la ventana por defecto y los filtros están cubiertos; **falta el test del control de mes y del recorte por día**, que son de pantalla. Tests de H1: la ventana por defecto es el mes en curso; el mes anterior y el siguiente traen lo suyo; un vencimiento pasado y uno futuro se distinguen; y un día con más de los que entran informa cuántos hay. **Ventana relativa a hoy, nunca un mes fijo**: un test con un mes concreto empieza a fallar solo el día que ese mes queda en el pasado. | `add_tests` | Tester | RF-01, RF-04, RF-05, RF-06, RF-07, RF-08 | D5, D6 |
 
 ### H2 — Cuáles ya tienen su recibo y cuáles no
 
@@ -94,10 +96,10 @@ migración → backend → frontend → tests.
 | ✅ 16 | `PATCH /calendar/{id}` → `edit_due_date`: la descripción y el monto de un vencimiento cargado a mano. | `add_backend_feature` | Developer | RF-15 | — |
 | ✅ 17 | Pantalla: el formulario de alta con su selector de fecha, la distinción entre lo cargado a mano y lo que viene de una factura, y el botón de borrar que **no se dibuja** para una entrada de factura. | `add_frontend_feature` | Developer | RF-12, RF-14, RF-17, RF-18 | — |
 | ✅ 18 | Tests de H3: una entrada a mano que se agrega, se corrige y se borra; y la que viene de una factura, que no se borra. | `add_tests` | Tester | RF-12, RF-14, RF-15, RF-17, RF-18 | — |
-| ⬜ 19 | **Quién cargó el vencimiento y cuándo se guardan y nunca salen del backend**: `DueDateRead` no expone `created_by_user_id` ni `created_at`, así que el dato no llega al navegador y ninguna tarjeta lo muestra. El criterio firmado —*"figura con el nombre de Marcela y la fecha en que lo cargó"*— **no se puede verificar en pantalla**. Hay que exponerlo y resolverlo a un nombre. | `add_feature` | Developer | RF-13 | D10 |
-| ⬜ 20 | **Corregir un vencimiento cargado a mano no registra nada**: ni quién, ni cuándo, ni el valor anterior — el servicio recibe `actor_user_id` y lo descarta. El mecanismo existe y el mismo módulo lo usa a tres pantallas de distancia (`ManualChangeRecorded` → `operations`). | `debug` | Developer | RF-16 | D2 |
-| ⬜ 21 | **Ninguna pantalla llama al `PATCH`**: el endpoint y la Server Action `editDueDate` existen y no hay botón de corregir. Hoy, corregir un monto mal cargado es borrar y volver a cargar. | `add_frontend_feature` | Developer | RF-15 | D4 |
-| ⬜ 22 | Tests: la corrección de una entrada a mano deja su registro con el valor anterior, quién y cuándo; y la tarjeta muestra quién la cargó y en qué fecha. | `add_tests` | Tester | RF-13, RF-16 | D2, D10 |
+| ✅ 19 | **Hecho el 2026-08-31.** `DueDateRead` expone `created_by_user_id`, `created_at` y el nombre, que resuelve la **ruta** con `ActorDirectory` —el módulo guarda un id y no tiene clave foránea a `users`, así que el nombre se resuelve en el borde—. La tarjeta lo muestra. Lo que había antes:: `DueDateRead` no expone `created_by_user_id` ni `created_at`, así que el dato no llega al navegador y ninguna tarjeta lo muestra. El criterio firmado —*"figura con el nombre de Marcela y la fecha en que lo cargó"*— **no se puede verificar en pantalla**. Hay que exponerlo y resolverlo a un nombre. | `add_feature` | Developer | RF-13 | D10 |
+| ✅ 20 | **Hecho el 2026-08-31.** Ahora publica `ManualChangeRecorded` por cada campo que cambia, con **el valor anterior**, que era lo que obligaba a mirar antes de escribir. Va a la bitácora por el mismo camino que la corrección de un proveedor, sin que este módulo sepa que existe una bitácora. Lo que había antes:: ni quién, ni cuándo, ni el valor anterior — el servicio recibe `actor_user_id` y lo descarta. El mecanismo existe y el mismo módulo lo usa a tres pantallas de distancia (`ManualChangeRecorded` → `operations`). | `debug` | Developer | RF-16 | D2 |
+| ✅ 21 | **Hecho el 2026-08-31**: botón «Corregir» con su formulario, sólo para las entradas cargadas a mano. Corregir un monto dejó de ser borrar y volver a cargar. Lo que había antes:: el endpoint y la Server Action `editDueDate` existen y no hay botón de corregir. Hoy, corregir un monto mal cargado es borrar y volver a cargar. | `add_frontend_feature` | Developer | RF-15 | D4 |
+| ✅ 22 | **Hecho el 2026-08-31**: tres tests —quién la cargó y cuándo, la corrección con su valor anterior, y quién movió— más el que fija qué hacen los dos filtros con una entrada cargada a mano. Tests: la corrección de una entrada a mano deja su registro con el valor anterior, quién y cuándo; y la tarjeta muestra quién la cargó y en qué fecha. | `add_tests` | Tester | RF-13, RF-16 | D2, D10 |
 
 ### H4 — Reprogramar arrastrando, sin perder la fecha original
 
@@ -109,8 +111,8 @@ migración → backend → frontend → tests.
 | ✅ 26 | `purchases`: `changes_of()` — el historial completo de una tarjeta reprogramada, en orden. Es lo que hace que **dos personas moviendo lo mismo no necesiten ningún bloqueo**: vale el último y los dos quedan. | `add_backend_feature` | Developer | RF-23, RF-34 | — |
 | ✅ 27 | Pantalla: mover una entrada, y al abrirla su fecha original, todas sus reprogramaciones y los motivos escritos, con la marca de reprogramada. | `add_frontend_feature` | Developer | RF-23, RF-24 | — |
 | ✅ 28 | Tests de H4: dónde estaba y quién la movió; mover al pasado pregunta primero; reprogramar antes de vencer mueve el plazo del recibo; y **reprogramar una que ya venció no cambia nada de eso** — el test que nunca hay que debilitar, porque es también la defensa de RF-34 de la 005: si mover una tarjeta habilitara el recibo de una factura vencida, ese requisito dejaría de valer con sólo arrastrar. | `add_tests` | Tester | RF-20, RF-21, RF-22, RF-23, RF-25, RF-26, RF-27, RF-28, RF-29 | — |
-| ⬜ 29 | 🔴 **No se puede arrastrar.** Mover se hace con dos `window.prompt` encadenados —fecha y motivo—, y H4 es la historia que lo pide por su nombre. El backend no distingue cómo lo dijo la persona: es trabajo de frontend sobre una llamada que ya está. | `add_frontend_feature` | Developer | RF-19 | D3 |
-| ⬜ 30 | **El historial no muestra quién movió.** La tarjeta muestra `de → a` y el motivo; el actor está guardado y viaja en el schema, y la pantalla no lo resuelve a un nombre. La prueba firmada de H4 dice *"se ve que originalmente vencía el 10 y quién lo movió"*. | `add_frontend_feature` | Developer | RF-21 | D7 |
+| ✅ 29 | **Hecho el 2026-08-31**: las tarjetas se arrastran y los días las aceptan. Arrastrar y elegir la fecha terminan en la misma llamada, porque para el sistema son la misma decisión. Lo que había antes: Mover se hace con dos `window.prompt` encadenados —fecha y motivo—, y H4 es la historia que lo pide por su nombre. El backend no distingue cómo lo dijo la persona: es trabajo de frontend sobre una llamada que ya está. | `add_frontend_feature` | Developer | RF-19 | D3 |
+| ✅ 30 | **Hecho el 2026-08-31**: el historial dice «lo movió Marcela» junto a la fecha y el motivo. Lo que había antes: La tarjeta muestra `de → a` y el motivo; el actor está guardado y viaja en el schema, y la pantalla no lo resuelve a un nombre. La prueba firmada de H4 dice *"se ve que originalmente vencía el 10 y quién lo movió"*. | `add_frontend_feature` | Developer | RF-21 | D7 |
 
 ### H5 — Dos personas, el mismo calendario
 
@@ -128,13 +130,13 @@ migración → backend → frontend → tests.
 
 | # | Tarea | Skill | Rol | Cubre | Deriva |
 |---|-------|-------|-----|-------|--------|
-| ⬜ 31 | `purchases`: **`add_due_date` y `edit_due_date` publican `DueDateChanged`**, con el mismo `action` que ya usan los otros dos verbos (`added`, `edited`). Sin esto, el canal transporta dos de los cuatro verbos que RF-31 nombra. | `debug` | Developer | RF-31 | D8 |
-| ⬜ 32 | `purchases`: **`remove_due_date` pasa el `actor_name` de verdad**, que hoy manda vacío aunque la ruta lo tiene a mano. Es la diferencia entre «alguien movió esto» y RF-33. | `debug` | Developer | RF-33 | D9 |
-| ⬜ 33 | `purchases` + `main.py`: **el handler de `DueDateChanged` que hace `NOTIFY calendar_changed`** en la transacción del publicador, y la conexión dedicada que hace `LISTEN`, abierta y cerrada en el `lifespan` —una por worker—. El `NOTIFY` es transaccional: si la transacción aborta, nadie recibe nada, y por eso esto **no** viola `GEN-09`. Cero dependencias nuevas: el bus es la base que ya está. | `add_backend_feature` | Developer | RF-31, RF-32 | D0 |
-| ⬜ 34 | `GET /calendar/stream`: un `StreamingResponse` de `text/event-stream` por persona conectada, con `require_section(CALENDAR, READ)` —**`READ`, porque ventas también mira**— que reparte lo que llega por `LISTEN`. Un mensaje por cambio, con el evento serializado; nunca el calendario entero. | `add_backend_feature` | Developer | RF-31, RF-32, RF-33 | D0 |
-| ⬜ 35 | Frontend: el **Route Handler** que lee la cookie del lado servidor, abre el stream contra la API con su `Bearer` y lo reenvía al navegador. Existe por una razón concreta: `EventSource` no manda headers, y **un token no va en una query string**. | `add_frontend_feature` | Developer | RF-31, RF-32 | D0 |
-| ⬜ 36 | Pantalla: el calendario se actualiza con lo que llega **sin recargar**, diciendo quién hizo el cambio; **avisa cuando la conexión se corta** —el evento `error` de `EventSource`, no un `setTimeout` adivinando— y al reconectar **relee el calendario entero** en lugar de intentar recuperar lo que se perdió. | `add_frontend_feature` | Developer | RF-31, RF-32, RF-33, RF-35, RF-36 | D0 |
-| ⬜ 37 | Tests de H5: el cambio de una sesión llega a otra y dice quién lo hizo; **una transacción que aborta no notifica a nadie** —el que sostiene que `GEN-09` se cumple—; el corte avisa y la reconexión pone al día; y **dos movimientos sobre la misma entrada dejan los dos en el historial valiendo el último** (RF-34, hoy cumplido y sin test propio). ⚠️ Un test que publique y escuche **en el mismo proceso pasa siempre y no prueba nada**: el despliegue corre con `--workers 2`, y lo que se rompe es cruzar de un worker al otro. | `add_tests` | Tester | RF-31, RF-32, RF-33, RF-34, RF-35, RF-36 | D0 |
+| ✅ 31 | **Hecho el 2026-08-31**: los cuatro verbos publican por un único `_announce`. `add_due_date` y `edit_due_date` no publicaban nada, con el mismo `action` que ya usan los otros dos verbos (`added`, `edited`). Sin esto, el canal transporta dos de los cuatro verbos que RF-31 nombra. | `debug` | Developer | RF-31 | D8 |
+| ✅ 32 | **Hecho el 2026-08-31**: las cuatro rutas pasan `current_user.name` y el evento lo lleva. `remove_due_date` mandaba el nombre vacío, que hoy manda vacío aunque la ruta lo tiene a mano. Es la diferencia entre «alguien movió esto» y RF-33. | `debug` | Developer | RF-33 | D9 |
+| ✅ 33 | **Hecho el 2026-08-31**: `app/shared/live.py` —transporte sin dominio— con el `NOTIFY` en la transacción del publicador y una conexión `LISTEN` por worker, abierta en el `lifespan`. Si no puede abrirse, la app sirve igual y sólo se pierde el vivo. El handler hace `NOTIFY` en la transacción del publicador, y la conexión dedicada que hace `LISTEN`, abierta y cerrada en el `lifespan` —una por worker—. El `NOTIFY` es transaccional: si la transacción aborta, nadie recibe nada, y por eso esto **no** viola `GEN-09`. Cero dependencias nuevas: el bus es la base que ya está. | `add_backend_feature` | Developer | RF-31, RF-32 | D0 |
+| ✅ 34 | **Hecho el 2026-08-31.** `GET /calendar/stream`: un `StreamingResponse` de `text/event-stream` por persona conectada, con `require_section(CALENDAR, READ)` —**`READ`, porque ventas también mira**— que reparte lo que llega por `LISTEN`. Un mensaje por cambio, con el evento serializado; nunca el calendario entero. | `add_backend_feature` | Developer | RF-31, RF-32, RF-33 | D0 |
+| ✅ 35 | **Hecho el 2026-08-31**, y con un motivo que no era obvio: el proxy general lee `arrayBuffer()`, que espera a que la respuesta termine — sobre un stream se colgaría para siempre. Este pasa el cuerpo tal cual. El **Route Handler** que lee la cookie del lado servidor, abre el stream contra la API con su `Bearer` y lo reenvía al navegador. Existe por una razón concreta: `EventSource` no manda headers, y **un token no va en una query string**. | `add_frontend_feature` | Developer | RF-31, RF-32 | D0 |
+| ✅ 36 | **Hecho el 2026-08-31**: `useLiveCalendar` releé la pantalla con cada cambio y dice quién lo hizo; el corte lo avisa el evento `error` de `EventSource`, no un temporizador adivinando. Pantalla: el calendario se actualiza con lo que llega **sin recargar**, diciendo quién hizo el cambio; **avisa cuando la conexión se corta** —el evento `error` de `EventSource`, no un `setTimeout` adivinando— y al reconectar **relee el calendario entero** en lugar de intentar recuperar lo que se perdió. | `add_frontend_feature` | Developer | RF-31, RF-32, RF-33, RF-35, RF-36 | D0 |
+| ✅ 37 | **Hecho el 2026-08-31**: los cuatro verbos anuncian con nombre; **un movimiento rechazado no anuncia nada** —que es lo que sostiene `GEN-09`—; y dos movimientos seguidos dejan los dos en el historial (RF-34). Tests de H5: el cambio de una sesión llega a otra y dice quién lo hizo; **una transacción que aborta no notifica a nadie** —el que sostiene que `GEN-09` se cumple—; el corte avisa y la reconexión pone al día; y **dos movimientos sobre la misma entrada dejan los dos en el historial valiendo el último** (RF-34, hoy cumplido y sin test propio). ⚠️ Un test que publique y escuche **en el mismo proceso pasa siempre y no prueba nada**: el despliegue corre con `--workers 2`, y lo que se rompe es cruzar de un worker al otro. | `add_tests` | Tester | RF-31, RF-32, RF-33, RF-34, RF-35, RF-36 | D0 |
 
 ### H6 — Ventas mira, no toca
 
@@ -156,7 +158,7 @@ migración → backend → frontend → tests.
 | # | Tarea | Skill | Rol | Cubre | Deriva |
 |---|-------|-------|-----|-------|--------|
 | ✅ 43 | `PUT /calendar/{id}/date` sirve igual para arrastrar que para elegir la fecha: el backend no distingue cómo lo dijo la persona. Las dos formas de H8 y de H4 dependen **sólo del frontend**. | `add_backend_feature` | Developer | RF-42 | — |
-| ⬜ 44 | **Falta el selector de fecha en el camino de mover**: hoy la única forma es `window.prompt('Fecha nueva (aaaa-mm-dd)')`, donde la persona **escribe** la fecha como texto, y H8 se prueba *"eligiendo la fecha nueva de un selector"*. El propio componente demuestra que el patrón está a mano: el formulario de alta ya usa un `<Input type="date">` — es la deriva más barata de cerrar de toda la lista. **Corregir también el docstring del componente**, que afirma lo contrario de lo que el código hace. | `add_frontend_feature` | Developer | RF-42 | D11 |
+| ✅ 44 | **Hecho el 2026-08-31**: mover abre un panel con `<Input type="date">` y un motivo opcional. Se fue el `window.prompt` donde la fecha se escribía a mano — que es la peor forma de elegir un día en una pantalla que existe para no equivocarse de día. Lo que había antes:: hoy la única forma es `window.prompt('Fecha nueva (aaaa-mm-dd)')`, donde la persona **escribe** la fecha como texto, y H8 se prueba *"eligiendo la fecha nueva de un selector"*. El propio componente demuestra que el patrón está a mano: el formulario de alta ya usa un `<Input type="date">` — es la deriva más barata de cerrar de toda la lista. **Corregir también el docstring del componente**, que afirma lo contrario de lo que el código hace. | `add_frontend_feature` | Developer | RF-42 | D11 |
 | ⬜ 45 | Verificación a mano, con Playwright y en un teléfono real: **el calendario se consulta desde un teléfono** (RF-41, que no tiene código propio —la pantalla usa utilidades responsive y nunca se abrió en uno—), se **arrastra** una tarjeta (RF-19) y se mueve **eligiendo la fecha de un selector** (RF-42). Nada de esto necesita el portal: la feature no extrae nada. | `add_tests` | Tester | RF-19, RF-41, RF-42 | D3, D11 |
 
 ## Cobertura de requisitos
@@ -172,27 +174,27 @@ cubierto**, aunque tenga otras tareas en ✅.
 
 | Requisito | Tareas | Test |
 |-----------|--------|------|
-| RF-01 | 3, 5, ⬜7 | ⬜9 |
+| RF-01 | 3, 5, 7 | 🟡9 |
 | RF-02 | 3, 5, 13 | 6, 14 |
 | RF-03 | 1, 2 | 6 |
-| RF-04 | 4 | ⬜9 |
-| RF-05 | ⬜8 | ⬜9 |
-| RF-06 | 3, 5 | ⬜9 |
-| RF-07 | 5 | ⬜9 |
-| RF-08 | ⬜7 | ⬜9 |
+| RF-04 | 4 | 9 |
+| RF-05 | 8 | 🟡9 |
+| RF-06 | 3, 5 | 9 |
+| RF-07 | 5 | 9 |
+| RF-08 | 7 | 🟡9 |
 | RF-09 | 10, 11, 13 | 12, 14 |
 | RF-10 | 10, 11 | 12 |
 | RF-11 | 10, 11, 13 | 14 |
 | RF-12 | 1, 15, 17 | 18 |
-| RF-13 | 15, ⬜19 | ⬜22 |
+| RF-13 | 15, 19 | 22 |
 | RF-14 | 17 | 18 |
-| RF-15 | 16, ⬜21 | 18 |
-| RF-16 | ⬜20 | ⬜22 |
+| RF-15 | 16, 21 | 18 |
+| RF-16 | 20 | 22 |
 | RF-17 | 15, 17 | 18 |
 | RF-18 | 15, 17 | 18 |
-| RF-19 | 23, ⬜29 | ⬜45 |
+| RF-19 | 23, 29 | ⬜45 |
 | RF-20 | 1, 23 | 28 |
-| RF-21 | 23, ⬜30 | 28 |
+| RF-21 | 23, 30 | 28, 22 |
 | RF-22 | 23 | 28 |
 | RF-23 | 26, 27 | 28 |
 | RF-24 | 23, 27 | 28 |
@@ -202,18 +204,18 @@ cubierto**, aunque tenga otras tareas en ✅.
 | RF-28 | 25 | 28 |
 | RF-29 | 25 | 28 |
 | RF-30 | 25, 13 | 14 |
-| RF-31 | ⬜31, ⬜33, ⬜34, ⬜35, ⬜36 | ⬜37 |
-| RF-32 | ⬜33, ⬜34, ⬜35, ⬜36 | ⬜37 |
-| RF-33 | ⬜32, ⬜34, ⬜36 | ⬜37 |
-| RF-34 | 26 | ⬜37 |
-| RF-35 | ⬜36 | ⬜37 |
-| RF-36 | ⬜36 | ⬜37 |
+| RF-31 | 31, 33, 34, 35, 36 | 37 |
+| RF-32 | 33, 34, 35, 36 | 37 |
+| RF-33 | 32, 34, 36 | 37 |
+| RF-34 | 26 | 37 |
+| RF-35 | 36 | 37 |
+| RF-36 | 36 | 37 |
 | RF-37 | 38 | ⬜39 |
 | RF-38 | 38 | ⬜39 |
-| RF-39 | 40, 41, 13 | 14, ⬜42 |
-| RF-40 | 40, 41 | ⬜42 |
+| RF-39 | 40, 41, 13 | 14, 42 |
+| RF-40 | 40, 41 | 42 |
 | RF-41 | ⬜45 (sin código propio: se verifica, no se construye) | ⬜45 |
-| RF-42 | 43, ⬜44 | ⬜45 |
+| RF-42 | 43, 44 | ⬜45 |
 
 **Qué dice la tabla, leída de una:** 14 requisitos están construidos y verificados; **28 tienen algo
 en ⬜**, y de esos **seis —RF-31 a RF-33, RF-35, RF-36 y RF-41— no tienen ni una línea propia**.
