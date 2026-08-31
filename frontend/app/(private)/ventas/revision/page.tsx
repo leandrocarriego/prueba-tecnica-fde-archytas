@@ -5,7 +5,7 @@ import { NoPermission } from '@/components/common/NoPermission'
 import { SalesReview } from '@/components/sales/SalesReview'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
-import type { ReviewQueue } from '@/lib/sales/types'
+import type { ReviewQueue, SaleList } from '@/lib/sales/types'
 
 export const metadata = {
   title: 'Ventas apartadas — Plataforma Cordillera',
@@ -18,8 +18,13 @@ export const metadata = {
  * se sumen como si fueran válidas"*.
  */
 export default async function SalesReviewPage() {
-  const [queue, session] = await Promise.all([
+  // Lo descartado se pide aparte y a propósito: **no está en la cola**, porque
+  // no espera ninguna decisión. Pero es la mitad de lo que los indicadores
+  // excluyen, y RF-26 pide poder ver los registros que un número dejó afuera —
+  // hasta acá, la mitad unificada no se veía desde ningún lado.
+  const [queue, discarded, session] = await Promise.all([
     fetchFromApi<ReviewQueue>('/sales/review'),
+    fetchFromApi<SaleList>('/sales?state=DISCARDED&limit=200'),
     getSession(),
   ])
 
@@ -41,7 +46,11 @@ export default async function SalesReviewPage() {
         </p>
       </header>
 
-      <SalesReview queue={queue} canEdit={canEdit(session?.permissions ?? {}, 'SALES')} />
+      <SalesReview
+        queue={queue}
+        discarded={discarded?.items ?? []}
+        canEdit={canEdit(session?.permissions ?? {}, 'SALES')}
+      />
     </main>
   )
 }

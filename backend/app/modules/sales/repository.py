@@ -105,6 +105,22 @@ class SalesRepository:
         row = result.one()
         return Decimal(row[0]), int(row[1])
 
+    async def count_merged(self, *, since: date | None, until: date | None) -> int:
+        """How many records the platform unified on its own (RF-12 of 009).
+
+        A discarded record with no `decision` is one nobody decided about: it
+        repeated another with nothing different and was counted once. One *with*
+        a decision was set aside by a person choosing another version, and that
+        is a different fact — which is why the two are counted apart even though
+        both sit in `DISCARDED`.
+        """
+        result = await self.session.execute(
+            self._filtered(
+                select(func.count()).select_from(Sale), SaleState.DISCARDED, since, until
+            ).where(Sale.decision.is_(None))
+        )
+        return int(result.scalar_one())
+
     async def has_estimates(self, *, since: date | None, until: date | None) -> bool:
         """Whether any record behind an indicator carries an estimated value (RF-40)."""
         result = await self.session.execute(

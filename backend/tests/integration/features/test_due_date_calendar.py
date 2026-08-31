@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.identity.models import User
 from app.modules.purchases.models import DueDateOrigin
 from app.modules.purchases.service import PurchasesService, today_here
+from app.shared.events import DueDateChanged, events
 from app.shared.errors import ConflictError
 from tests.factories.purchases_factory import InvoiceFactory, SupplierFactory
 
@@ -230,3 +231,168 @@ class TestMovingAVencimiento:
         assert read.is_overdue_without_receipt is True
         with pytest.raises(ConflictError):
             await service.issue_receipt(stored.id, actor_user_id=owner.id)
+
+
+class TestAnOverdueOneMovedToAnotherMonth:
+    """La tarjeta se muestra donde está, con lo que la factura dice de sí misma."""
+
+    async def test_it_keeps_everything_it_says_about_the_invoice(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-30, y de refilón RF-02, RF-09 y RF-39.
+
+        El cruce entre la entrada y su factura se hacía **por fecha** —las
+        facturas que vencen en la ventana pedida— y no por la factura que la
+        entrada nombra. Una vencida reprogramada a otro mes tiene la tarjeta en
+        una ventana y su `due_on` en otra, así que volvía sin proveedor, sin
+        estado de pago y **sin la marca de vencida sin recibo**, que es
+        exactamente lo que RF-30 promete que se sigue viendo.
+
+        El ejemplo del criterio firmado —vence el 10, se reprograma el 12 para
+        el 20— cae entero dentro de un mes y por eso pasaba igual. Este test
+        cruza el borde a propósito.
+        """
+        # Arrange — vencida hace cinco días, reprogramada a 40 días de hoy.
+        supplier = await SupplierFactory.create(session, legal_name="Aceros Belgrano SA")
+        service = PurchasesService(session)
+        stored = await InvoiceFactory.create(
+            session, supplier=supplier, due_on=today_here() - timedelta(days=5), total=10_000
+        )
+        await service._sync_due_date(stored)  # noqa: SLF001
+        entry = await service.purchases.due_date_of_invoice(stored.id)
+        assert entry is not None
+        moved_to = soon(40)
+        await service.move_due_date(entry.id, on_date=moved_to, reason=None, actor_user_id=owner.id)
+
+        # Act — la ventana donde ahora está la tarjeta, y no donde vence la factura.
+        read = await service.calendar(
+            since=moved_to - timedelta(days=2), until=moved_to + timedelta(days=2)
+        )
+
+        # Assert
+        card = next(item for item in read.items if item.invoice_id == stored.id)
+        assert card.supplier_name == "Aceros Belgrano SA"
+        assert card.payment_state == "SIN_PAGOS"
+        assert card.receipt_issued is False
+        assert card.is_overdue_without_receipt is True
+
+
+class TestTheLiveChannel:
+    """H5: lo que una persona hace llega a la pantalla de la otra."""
+
+    async def test_a_change_that_commits_is_announced_with_who_made_it(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-31, RF-33: el evento sale, con el nombre de quien lo hizo.
+
+        Se verifica sobre el evento de dominio y no sobre el socket: lo que la
+        feature promete es que el cambio **se anuncia**, y por dónde viaja es
+        una decisión del plan que puede cambiar sin que la promesa cambie.
+        """
+        # Arrange
+        service = PurchasesService(session)
+        anunciados: list[tuple[str, str]] = []
+
+        async def escuchar(event: DueDateChanged, _session: AsyncSession) -> None:
+            anunciados.append((event.action, event.actor_name))
+
+        events.subscribe(DueDateChanged)(escuchar)
+        try:
+            # Act — los cuatro verbos, que es lo que RF-31 nombra.
+            entry = await service.add_due_date(
+                on_date=soon(5),
+                description="Alquiler",
+                amount=Decimal(1000),
+                actor_user_id=owner.id,
+                actor_name="Marcela",
+            )
+            await service.edit_due_date(
+                entry.id,
+                description="Alquiler del depósito",
+                amount=None,
+                actor_user_id=owner.id,
+                actor_name="Marcela",
+            )
+            await service.move_due_date(
+                entry.id,
+                on_date=soon(9),
+                reason=None,
+                actor_user_id=owner.id,
+                actor_name="Marcela",
+            )
+            await service.remove_due_date(
+                entry.id, actor_user_id=owner.id, actor_name="Marcela"
+            )
+        finally:
+            events.unsubscribe(DueDateChanged, escuchar)
+
+        # Assert — los cuatro, y ninguno anónimo.
+        assert [action for action, _ in anunciados] == ["added", "edited", "moved", "removed"]
+        assert {name for _, name in anunciados} == {"Marcela"}
+
+    async def test_a_refused_move_announces_nothing(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """`GEN-09`: lo que no llegó a pasar no se anuncia.
+
+        Es el test que sostiene la decisión de transporte del plan. Se anuncia
+        con `NOTIFY`, que Postgres entrega **al commitear**, justamente para que
+        una caída del canal de una persona no pueda abortar el cambio de otra.
+        Si alguna vez esto se cambia por un empujón a un socket dentro de la
+        transacción, este test sigue pasando y el acoplamiento vuelve — así que
+        lo que se fija acá es lo observable: un movimiento rechazado no le
+        cuenta nada a nadie.
+        """
+        # Arrange
+        service = PurchasesService(session)
+        entry = await service.add_due_date(
+            on_date=soon(5), description="Seguro", amount=None, actor_user_id=owner.id
+        )
+        anunciados: list[str] = []
+
+        async def escuchar(event: DueDateChanged, _session: AsyncSession) -> None:
+            anunciados.append(event.action)
+
+        events.subscribe(DueDateChanged)(escuchar)
+        try:
+            # Act — mover al pasado sin confirmar se rechaza (RF-25).
+            with pytest.raises(ConflictError):
+                await service.move_due_date(
+                    entry.id,
+                    on_date=today_here() - timedelta(days=1),
+                    reason=None,
+                    actor_user_id=owner.id,
+                )
+        finally:
+            events.unsubscribe(DueDateChanged, escuchar)
+
+        # Assert
+        assert anunciados == []
+
+    async def test_two_people_moving_the_same_entry_keep_both_moves(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-34: vale el último y los dos quedan en el historial.
+
+        Está cumplido **sin** canal en vivo —lo resuelve la tabla de
+        movimientos— y por eso no se va con la H5 si algún día se difiere.
+        """
+        # Arrange
+        service = PurchasesService(session)
+        entry = await service.add_due_date(
+            on_date=soon(5), description="Impuestos", amount=None, actor_user_id=owner.id
+        )
+
+        # Act — dos movimientos seguidos sobre la misma entrada.
+        await service.move_due_date(
+            entry.id, on_date=soon(10), reason="Lo pidió el proveedor", actor_user_id=owner.id
+        )
+        await service.move_due_date(
+            entry.id, on_date=soon(20), reason="Se acordó otra fecha", actor_user_id=owner.id
+        )
+
+        # Assert
+        cards = await calendar(session)
+        card = next(item for item in cards if item.id == entry.id)
+        assert card.on_date == soon(20)
+        assert [change.previous_date for change in card.changes] == [soon(5), soon(10)]

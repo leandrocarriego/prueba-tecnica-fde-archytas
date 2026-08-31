@@ -100,6 +100,11 @@ class Indicator(BaseModel):
     value: Decimal
     sales: int
     excluded: int
+    # How many of the excluded were unified by the platform on its own, because
+    # they repeated another record with nothing different about them (RF-12).
+    # The rest of `excluded` is what a person set aside or what is still waiting
+    # for one, and lumping the two together answers neither question.
+    merged: int = 0
     has_estimates: bool = False
 
 

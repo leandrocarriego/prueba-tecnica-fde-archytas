@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { formatMoment, formatPrice } from '@/lib/catalog/format'
+import type { Category } from '@/lib/catalog/types'
 import { caseKindLabel, type Case } from '@/lib/triage/types'
 
 interface CaseCardProps {
@@ -23,6 +24,12 @@ interface CaseCardProps {
    * an instruction with nobody attached to it.
    */
   mayCorrect: boolean
+  /**
+   * Los rubros con los que se resuelve un caso `unknown_category` (RF-14 de
+   * 010). Los pasa la pantalla: esta tarjeta es de `triage` y pedirlos ella
+   * misma la ataría al catálogo, que es de otro módulo y de otro dominio.
+   */
+  categories: Category[]
 }
 
 function payloadText(item: Case, key: string): string {
@@ -80,10 +87,11 @@ function refusedByCorrection(
  * its own state. That confirmation is announced to the toaster in the root
  * layout, which is the only thing still on screen once the card is gone.
  */
-export function CaseCard({ item, mayCorrect }: CaseCardProps) {
+export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
   const router = useRouter()
   const { addToast } = useToast()
   const [price, setPrice] = useState(payloadText(item, 'price'))
+  const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Kept beside the message and not folded into it: a refusal about a
@@ -143,6 +151,12 @@ export function CaseCard({ item, mayCorrect }: CaseCardProps) {
             <dd className="inline">{formatPrice(payloadText(item, 'price'))}</dd>
           </div>
         )}
+        {payloadText(item, 'category_text') && (
+          <div>
+            <dt className="inline text-muted-foreground">Forma escrita: </dt>
+            <dd className="inline font-mono">{payloadText(item, 'category_text')}</dd>
+          </div>
+        )}
         {payloadText(item, 'excerpt') && (
           <div className="sm:col-span-2">
             <dt className="text-muted-foreground">Lo que decía la fila:</dt>
@@ -199,9 +213,70 @@ export function CaseCard({ item, mayCorrect }: CaseCardProps) {
           </>
         )}
 
+        {item.kind === 'unknown_category' && (
+          /*
+            RF-14 de la 010: la forma escrita que nadie decidió se resuelve
+            **acá**, en la misma pantalla donde compras ya resuelve todo lo que
+            la actualización aparta. Hasta ahora el caso llegaba a esta cola y
+            la tarjeta no sabía dibujarlo: se veía el `kind` crudo, sin la forma
+            escrita y sin ningún control para asignarle un rubro.
+
+            `remember: true` va fijo y no es un detalle: es lo que convierte la
+            decisión en una equivalencia guardada, y con eso la misma forma
+            escrita no se vuelve a preguntar y los productos que la esperaban
+            quedan clasificados (RF-24 y RF-25 de la 008).
+          */
+          <>
+            <select
+              className="rounded border px-2 py-1 text-sm"
+              value={categoryId}
+              onChange={event => setCategoryId(event.target.value)}
+            >
+              <option value="">Elegí un rubro…</option>
+              {categories.map(category => (
+                <option key={category.id} value={String(category.id)}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              disabled={saving || categoryId === ''}
+              onClick={() => decide({ category_id: Number(categoryId) })}
+            >
+              Asignar este rubro
+            </Button>
+          </>
+        )}
+
         {item.kind === 'unreadable_history' && (
           <Button disabled={saving} onClick={() => decide({ action: 'ignore' })}>
             Dar el historial por revisado
+          </Button>
+        )}
+
+        {/*
+          Una fila de `/facturas` que no se pudo interpretar. Lo único que se
+          puede hacer es verla y darla por revisada: una factura nace de una
+          fila que el portal publicó, y cargarla a mano desde acá sería
+          exactamente lo que la spec firmada dejó fuera de alcance. Lo que la
+          cola aporta es que **exista**: hasta ahora se perdía en silencio.
+        */}
+        {item.kind === 'unreadable_invoice_row' && (
+          <Button disabled={saving} onClick={() => decide({ action: 'ignore' })}>
+            Dar la fila por revisada
+          </Button>
+        )}
+
+        {/*
+          Lo mismo, en la pantalla de órdenes de compra. Una orden nace de una
+          fila que el portal publicó, así que cargarla a mano desde acá sería
+          cargar un pedido a mano y ningún requisito lo pide. Lo que la cola
+          aporta es que el pedido perdido **exista**, que es literalmente el
+          problema por el que la 007 se firmó.
+        */}
+        {item.kind === 'unreadable_order_row' && (
+          <Button disabled={saving} onClick={() => decide({ action: 'ignore' })}>
+            Dar la fila por revisada
           </Button>
         )}
       </div>
@@ -221,11 +296,11 @@ export function CaseCard({ item, mayCorrect }: CaseCardProps) {
       */}
       {error && (
         <div className="space-y-2 text-sm">
-          <p className="text-red-700">{error}</p>
+          <p className="text-danger">{error}</p>
           {refused !== null && (
             <>
               {refused.correctedBy !== null && (
-                <p className="text-red-700">La corrección la hizo {refused.correctedBy}.</p>
+                <p className="text-danger">La corrección la hizo {refused.correctedBy}.</p>
               )}
               <p className="flex flex-wrap gap-4">
                 <Link className="underline" href={`/precios/${refused.productId}`}>

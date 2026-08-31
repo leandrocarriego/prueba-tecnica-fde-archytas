@@ -16,6 +16,11 @@ export const metadata = {
  *
  * «Sin rubro» aparece como un grupo más y entra en el total: es lo que hace que
  * el corte cierre sin que nadie tenga que sumar aparte.
+ *
+ * **Los mantiene compras, y ventas los consulta** (010). No hay ningún rol
+ * escrito acá: las acciones se ofrecen según lo que la matriz de permisos diga
+ * de esta sección, que es el mismo lugar donde el backend decide el 403.
+ * Esconder un botón nunca fue el mecanismo — es una comodidad sobre él.
  */
 export default async function CategoriesPage() {
   const [listing, session] = await Promise.all([

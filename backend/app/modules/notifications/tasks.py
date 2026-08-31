@@ -23,7 +23,12 @@ from app.modules.notifications.service import (
     NotificationService,
     daily_digest_message,
 )
-from app.shared.events import DailyDigestContribution, DailyDigestRequested, events
+from app.shared.events import (
+    AlertDeliveryFailed,
+    DailyDigestContribution,
+    DailyDigestRequested,
+    events,
+)
 from app.shared.time import BUSINESS_TIME_ZONE
 from app.worker.bridge import async_task
 from app.worker.celery_app import celery_app
@@ -68,19 +73,52 @@ async def send_access_link(self: Task, phone: str, message: str) -> dict[str, An
 
 @celery_app.task(name="notifications.send_alert", bind=True, max_retries=MAX_RETRIES)
 @async_task
-async def send_alert(self: Task, phone: str, message: str) -> dict[str, Any]:
+async def send_alert(
+    self: Task, phone: str, message: str, kind: str = "", message_id: int | None = None
+) -> dict[str, Any]:
     """Deliver one alert to one person's own number (RF-44 of 007).
 
     The same channel as everything else here and a different name on purpose:
     an alert is not an access link, it carries no credential, and reading a log
     line should say which of the two went out.
+
+    **A delivery that does not happen says so** (RF-38). The screen already drew
+    the notice and nothing ever wrote it: the failure ended as a log line and a
+    failed job, and the one place the news did not arrive — the phone — was also
+    the one place nobody could tell. So the task publishes the fact and
+    `messaging` records it; this module may not call that one (Artículo IV).
+
+    **Only once the retries are spent.** Publishing on the first attempt would
+    mark as failed an alert the second attempt delivers, and a screen that says
+    something failed when it did not is worse than one that says nothing.
     """
     delivery = await NotificationService().notify_person(phone, message)
     if not delivery.sent and delivery.detail != NOT_CONFIGURED:
         attempts = int(getattr(self.request, "retries", 0) or 0)
         if attempts < MAX_RETRIES:
             raise self.retry(countdown=RETRY_COUNTDOWN_SECONDS)
+    if not delivery.sent:
+        await _report_delivery_failure(kind, delivery.detail, message_id)
     return {"sent": delivery.sent, "detail": delivery.detail}
+
+
+async def _report_delivery_failure(kind: str, reason: str | None, message_id: int | None) -> None:
+    """Announce that an alert did not get through (RF-38 of 007).
+
+    A session of its own, like `daily_digest` opens one: this runs in the worker
+    and there is no request behind it.
+    """
+    async with SessionFactory() as session:
+        await events.publish(
+            AlertDeliveryFailed(
+                kind=kind, reason=reason or "No se pudo entregar", message_id=message_id
+            ),
+            session,
+        )
+        await session.commit()
+    logger.warning(
+        "Alert delivery failed", extra={"kind": kind, "message_id": message_id, "reason": reason}
+    )
 
 
 @celery_app.task(name="notifications.daily_digest")

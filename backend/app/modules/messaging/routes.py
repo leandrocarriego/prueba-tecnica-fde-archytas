@@ -10,7 +10,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.modules.identity.dependencies import CurrentUser, Level, Section, require_section
+from app.modules.identity.dependencies import (
+    ActorDirectoryDep,
+    Assignee,
+    CurrentUser,
+    Level,
+    Section,
+    require_section,
+)
 from app.modules.messaging.models import MessageKind, MessageState
 from app.modules.messaging.schemas import (
     MessageAssignment,
@@ -19,6 +26,11 @@ from app.modules.messaging.schemas import (
     MessageRead,
 )
 from app.modules.messaging.service import MessagingService
+from app.shared.errors import ValidationError
+
+# What somebody reads when a message is handed to a person who does not work on
+# them (RF-30). In Spanish, like every refusal that reaches a screen.
+NOT_ASSIGNABLE = "Esa persona no trabaja sobre los mensajes de proveedores"
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -55,6 +67,38 @@ async def list_messages(
     )
 
 
+@router.get(
+    "/senders",
+    dependencies=[require_section(Section.SUPPLIER_MESSAGES, Level.READ)],
+    summary="The suppliers the inbox can be filtered by",
+)
+async def list_senders(service: MessagingDep) -> list[str]:
+    """The owner and purchasing (RF-26 of 007).
+
+    What the filter offers is the register as **this** module keeps it, which is
+    the same set of values `supplier_name` matches: a list taken from anywhere
+    else would offer names that filter nothing.
+    """
+    return await service.senders()
+
+
+@router.get(
+    "/assignees",
+    dependencies=[require_section(Section.SUPPLIER_MESSAGES, Level.WRITE)],
+    summary="Who a message can be handed to",
+)
+async def list_assignees(directory: ActorDirectoryDep) -> list[Assignee]:
+    """The owner and purchasing (RF-30 of 007).
+
+    Derived from the permission matrix and not from a list of roles written
+    here: whoever reaches this section in writing is exactly whoever can be
+    made responsible for one of its messages, and keeping the two in one place
+    is what stops them from drifting apart. Sales does not reach it, so Julián
+    does not appear among the assignable.
+    """
+    return await directory.who_reaches(Section.SUPPLIER_MESSAGES)
+
+
 @router.post(
     "/{message_id}/resolution",
     dependencies=[require_section(Section.SUPPLIER_MESSAGES, Level.WRITE)],
@@ -76,9 +120,25 @@ async def resolve_message(
     summary="Say who is responsible for a message",
 )
 async def assign_message(
-    message_id: int, payload: MessageAssignment, service: MessagingDep
+    message_id: int,
+    payload: MessageAssignment,
+    directory: ActorDirectoryDep,
+    service: MessagingDep,
 ) -> MessageRead:
-    """The owner and purchasing (RF-30 of 007)."""
+    """The owner and purchasing (RF-30 of 007).
+
+    **Who may be named is checked, and it used to not be.** The route took any
+    `user_id` at all, so a supplier's claim could be handed to whoever does not
+    work on suppliers — and the signed acceptance criterion says in as many
+    words that Julián is not among the assignable.
+    """
+    assignable = {
+        person.user_id for person in await directory.who_reaches(Section.SUPPLIER_MESSAGES)
+    }
+    if payload.assignee_user_id is not None and payload.assignee_user_id not in assignable:
+        raise ValidationError(
+            NOT_ASSIGNABLE, details={"assignee_user_id": payload.assignee_user_id}
+        )
     return await service.assign(message_id, assignee_user_id=payload.assignee_user_id)
 
 

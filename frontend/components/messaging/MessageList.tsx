@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { annotateMessage, resolveMessage } from '@/app/actions/messaging'
+import { annotateMessage, assignMessage, resolveMessage } from '@/app/actions/messaging'
 import { Button } from '@/components/ui/button'
 import { formatMoment } from '@/lib/catalog/format'
-import type { Message } from '@/lib/messaging/types'
+import type { Assignee, Message } from '@/lib/messaging/types'
 
 const KINDS: Record<string, string> = {
   PAYMENT_CLAIM: 'Reclamo de pago',
@@ -23,7 +23,20 @@ const KINDS: Record<string, string> = {
  * diciéndolo (RF-24). Las dos cosas son lo mismo: se ve lo que hay, y se ve
  * hasta dónde se sabe.
  */
-export function MessageList({ messages, canEdit }: { messages: Message[]; canEdit: boolean }) {
+export function MessageList({
+  messages,
+  assignees,
+  canEdit,
+}: {
+  messages: Message[]
+  /**
+   * Quiénes pueden hacerse cargo de un mensaje (RF-30). Los pasa la pantalla y
+   * salen de la matriz: **cada pendiente tiene un dueño**, porque un mensaje sin
+   * responsable es un mensaje que nadie va a resolver.
+   */
+  assignees: Assignee[]
+  canEdit: boolean
+}) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -51,7 +64,9 @@ export function MessageList({ messages, canEdit }: { messages: Message[]; canEdi
   return (
     <div className="space-y-3">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       {messages.map(message => (
@@ -71,7 +86,7 @@ export function MessageList({ messages, canEdit }: { messages: Message[]; canEdi
 
           <p className="text-sm">
             {message.sender_unidentified ? (
-              <span className="text-amber-800">
+              <span className="text-warn">
                 {message.sender_text} · no pudimos identificar al remitente en el padrón
               </span>
             ) : (
@@ -82,17 +97,24 @@ export function MessageList({ messages, canEdit }: { messages: Message[]; canEdi
           {message.body && <p className="text-sm text-muted-foreground">{message.body}</p>}
 
           {message.alert_failure && (
-            <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            <p className="rounded border border-warn-border bg-warn-surface p-2 text-xs text-warn">
               El aviso por este mensaje no se pudo entregar: {message.alert_failure}
             </p>
           )}
 
-          {message.note && <p className="rounded bg-gray-50 p-2 text-sm">Nota: {message.note}</p>}
+          {message.note && <p className="rounded bg-muted p-2 text-sm">Nota: {message.note}</p>}
 
           <footer className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">
               {message.state === 'RESOLVED' ? 'Resuelto' : 'Pendiente'}
             </span>
+            {message.assignee_user_id !== null && (
+              <span className="text-muted-foreground">
+                A cargo de{' '}
+                {assignees.find(person => person.user_id === message.assignee_user_id)?.name ??
+                  `#${message.assignee_user_id}`}
+              </span>
+            )}
             {canEdit && message.state !== 'RESOLVED' && (
               <>
                 <Button
@@ -102,6 +124,26 @@ export function MessageList({ messages, canEdit }: { messages: Message[]; canEdi
                 >
                   Marcar resuelto
                 </Button>
+                <select
+                  className="rounded border px-2 py-1 text-sm"
+                  value={message.assignee_user_id === null ? '' : String(message.assignee_user_id)}
+                  disabled={busy}
+                  onChange={event =>
+                    void run(() =>
+                      assignMessage(
+                        message.id,
+                        event.target.value === '' ? null : Number(event.target.value)
+                      )
+                    )
+                  }
+                >
+                  <option value="">Sin responsable</option>
+                  {assignees.map(person => (
+                    <option key={person.user_id} value={String(person.user_id)}>
+                      {person.name}
+                    </option>
+                  ))}
+                </select>
                 <Button
                   type="button"
                   variant="outline"

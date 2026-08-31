@@ -168,12 +168,20 @@ async def revert_correction(
     return await service.revert_correction(correction_id, actor_user_id=current_user.id)
 
 
-# --- The rubros of the catalog (008) --------------------------------------
+# --- The rubros of the catalog (008, amended by 010) -----------------------
 #
-# Reading is for the three roles, writing is sales alone. That is the business
-# rule of the signed spec, and it lines up with what `002` fixed for the
-# product catalog. The literal paths are declared **before** `/{category_id}`
-# so `/unclassified` is never read as an id.
+# **Writing is the owner's and purchasing's**, and reading is for the three
+# roles. That is the correction the 010 makes to the 008: a rubro is the
+# category something is bought under, so whoever sees the goods arrive is who
+# decides it. Sales keeps the consultation and loses the change (RF-10, RF-11).
+#
+# None of the `require_section` below changed when that moved: they already ask
+# for `PRODUCT_CATEGORIES`, and **who reaches it is decided in one place**, the
+# matrix of `identity`. A feature that had to edit nine routes to move a
+# permission would be a matrix that is not doing its job.
+#
+# The literal paths are declared **before** `/{category_id}` so `/unclassified`
+# is never read as an id.
 
 categories_router = APIRouter(prefix="/categories", tags=["Categories"])
 products_router = APIRouter(prefix="/products", tags=["Categories"])
@@ -181,33 +189,33 @@ products_router = APIRouter(prefix="/products", tags=["Categories"])
 
 @categories_router.get(
     "",
-    dependencies=[Depends(get_current_user)],
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.READ)],
     summary="The rubros, with their count and their written forms",
 )
 async def list_categories(service: CatalogDep) -> CategoryList:
-    """Every authenticated role (RF-01, RF-03, RF-04, RF-09 to RF-11)."""
+    """The three roles, sales included (RF-10 of 010)."""
     return await service.list_categories()
 
 
 @categories_router.get(
     "/unclassified",
-    dependencies=[Depends(get_current_user)],
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.READ)],
     summary="The products waiting for a rubro",
 )
 async def list_unclassified(
     service: CatalogDep, skip: SkipParam = 0, limit: LimitParam = DEFAULT_PAGE_SIZE
 ) -> UnclassifiedList:
-    """Every authenticated role. Each product carries its proposal, or none."""
+    """The three roles. Each product carries its proposal, or none (RF-13 of 010)."""
     return await service.unclassified(skip=skip, limit=limit)
 
 
 @categories_router.get(
     "/aliases",
-    dependencies=[Depends(get_current_user)],
+    dependencies=[require_section(Section.PRODUCT_CATEGORIES, Level.READ)],
     summary="The equivalences in force",
 )
 async def list_aliases(service: CatalogDep) -> list[CategoryAliasRead]:
-    """Every authenticated role (RF-27)."""
+    """The three roles (RF-27 of 008, RF-10 of 010)."""
     return await service.list_aliases()
 
 
@@ -220,7 +228,7 @@ async def list_aliases(service: CatalogDep) -> list[CategoryAliasRead]:
 async def create_category(
     payload: CategoryWrite, current_user: CurrentUser, service: CatalogDep
 ) -> CategoryRead:
-    """The owner and sales (RF-05)."""
+    """The owner and purchasing (RF-01 of 010, which replaces RF-05 of 008)."""
     return await service.create_category(name=payload.name, actor_user_id=current_user.id)
 
 
@@ -232,7 +240,7 @@ async def create_category(
 async def rename_category(
     category_id: int, payload: CategoryWrite, current_user: CurrentUser, service: CatalogDep
 ) -> CategoryRead:
-    """The owner and sales (RF-06)."""
+    """The owner and purchasing (RF-02 of 010, which replaces RF-06 of 008)."""
     return await service.rename_category(
         category_id, name=payload.name, actor_user_id=current_user.id
     )
@@ -245,7 +253,7 @@ async def rename_category(
     summary="Remove a rubro",
 )
 async def delete_category(category_id: int, current_user: CurrentUser, service: CatalogDep) -> None:
-    """The owner and sales. Refused, with the reason, if anything points at it (RF-07)."""
+    """The owner and purchasing. Refused, with the reason, if anything points at it (RF-03)."""
     await service.delete_category(category_id, actor_user_id=current_user.id)
 
 
@@ -260,10 +268,10 @@ async def set_product_category(
     current_user: CurrentUser,
     service: CatalogDep,
 ) -> UnclassifiedProduct:
-    """The owner and sales.
+    """The owner and purchasing (RF-04, RF-05 and RF-13 of 010).
 
-    Confirming the proposal and correcting it are this same call (RF-13, RF-15,
-    RF-20). Who decided comes from the token, never from the body (RF-18).
+    Confirming the proposal and correcting it are this same call. Who decided
+    comes from the token, never from the body (RF-18 of 008).
     """
     return await service.set_product_category(
         product_id, category_id=payload.category_id, actor_user_id=current_user.id

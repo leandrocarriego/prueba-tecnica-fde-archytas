@@ -5,6 +5,7 @@ import { CaseCard } from '@/components/triage/CaseCard'
 import { RuleList } from '@/components/triage/RuleList'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
+import type { CategoryList } from '@/lib/catalog/types'
 import type { CaseList, Rule } from '@/lib/triage/types'
 
 export const metadata = {
@@ -20,10 +21,14 @@ export const metadata = {
  * instead of growing.
  */
 export default async function ReviewPage() {
-  const [session, cases, rules] = await Promise.all([
+  const [session, cases, rules, categories] = await Promise.all([
     getSession(),
     fetchFromApi<CaseList>('/triage/cases?limit=100'),
     fetchFromApi<Rule[]>('/triage/rules'),
+    // Los rubros, para que un caso de forma escrita nueva se pueda resolver acá
+    // mismo (RF-14 de 010). Los pide la pantalla y no la tarjeta: `CaseCard` es
+    // de `triage` y no tiene por qué saber que existe un catálogo.
+    fetchFromApi<CategoryList>('/categories'),
   ])
   // Asked here so a card can offer the second door when a load is refused by a
   // correction in force. It is not the permission that opens this screen:
@@ -37,7 +42,7 @@ export default async function ReviewPage() {
     return (
       <main className="mx-auto max-w-4xl space-y-4 p-8">
         <h1 className="text-2xl font-bold">Revisión</h1>
-        <p className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
           Esta pantalla es de compras y del dueño. Si necesitás resolver un caso, pedíselo a quien
           maneja compras.
         </p>
@@ -67,7 +72,14 @@ export default async function ReviewPage() {
             motivo.
           </p>
         ) : (
-          cases.items.map(item => <CaseCard key={item.id} item={item} mayCorrect={mayCorrect} />)
+          cases.items.map(item => (
+            <CaseCard
+              key={item.id}
+              item={item}
+              mayCorrect={mayCorrect}
+              categories={categories?.items ?? []}
+            />
+          ))
         )}
       </section>
 

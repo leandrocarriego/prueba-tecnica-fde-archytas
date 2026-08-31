@@ -47,7 +47,7 @@ export function RuleList({ rules }: RuleListProps) {
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       {rules.map(rule => (
         <article
           key={rule.id}

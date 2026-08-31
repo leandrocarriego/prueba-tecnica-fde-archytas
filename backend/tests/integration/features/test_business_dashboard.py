@@ -14,14 +14,18 @@ son, no que se sumen como si fueran válidas"*— y estos tests la fijan:
 
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.models import User
+from app.modules.ingestion.service import IngestionService
 from app.modules.sales.models import SaleState
 from app.modules.sales.service import SalesService
 from app.shared.events import NormalizedSale
+
+FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "portal"
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
 
@@ -321,3 +325,219 @@ class TestTheIndicators:
         # Assert
         assert january.invoiced.value == Decimal(10_000)
         assert (await service.dashboard()).invoiced.value == Decimal(30_000)
+
+
+class TestBrokenRecordsReachTheQueue:
+    """H3, la mitad que faltaba: lo que se aparta en `staging` llega a la pantalla.
+
+    Los cinco tests del parser verifican que una venta rota se aparta **en
+    `staging`**, que es exactamente donde se quedaba: el publicador filtraba las
+    filas en cuarentena y nadie escuchaba `SaleRowsQuarantined`, así que doce de
+    los 588 registros medidos no se veían, no se contaban entre lo excluido y no
+    se podían corregir. Estos tests son los que fijan que eso ya no pasa.
+    """
+
+    async def test_the_twelve_broken_records_reach_the_review_queue(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-16 a RF-19, RF-23: cada una apartada, con el motivo del parser."""
+        # Arrange — la pantalla entera, tal como la publica el origen.
+        content = (FIXTURES / "sales-page-2026-08-29.html").read_bytes()
+
+        # Act
+        await IngestionService(session).normalize_sales(raw_document_id=1, content=content)
+
+        # Assert — los cuatro motivos del parser, con el reparto que midió el
+        # relevamiento. El resto de lo apartado es de este módulo —producto
+        # inexistente, monto atípico— y se cuenta aparte a propósito.
+        queue = await SalesService(session).review_queue()
+        reasons = [record.reason for record in queue.broken]
+        assert reasons.count("La fila no trae fecha") == 3
+        assert reasons.count("La fecha no corresponde a un día que exista") == 3
+        assert reasons.count("La fila no trae monto") == 3
+        assert reasons.count("La cantidad no puede ser negativa") == 3
+
+    async def test_a_record_without_a_code_is_held_on_its_own(self, session: AsyncSession) -> None:
+        """El caso borde que abre dejarlas entrar: sin código no hay con qué agrupar.
+
+        Todas las filas sin código comparten `code_key` vacío. Si se las
+        agrupara como al resto, serían **un solo grupo repetido** con versiones
+        que no tienen nada que ver entre sí, y la pantalla le pediría a una
+        persona que eligiera cuál de todas «vale».
+        """
+        # Arrange
+        await known(session, "COR-0001")
+        service = SalesService(session)
+        sin_codigo = NormalizedSale(
+            staging_row_id=0,
+            code="",
+            code_key="",
+            sold_on=date(2026, 3, 15),
+            product_code="COR-0001",
+            quantity=5,
+            total=Decimal(100_000),
+            reason="El registro no trae código de venta",
+        )
+
+        # Act — dos, para que agruparlas sería lo natural y sin embargo no pasa.
+        await service.register_sales(batch_id=1, sales=(sin_codigo, sin_codigo))
+
+        # Assert
+        queue = await service.review_queue()
+        assert queue.groups == []
+        assert len(queue.broken) == 2
+        assert queue.held == 2
+
+    async def test_a_broken_record_counts_among_what_the_indicator_left_out(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-25, RF-28: el tablero deja de decir que excluyó menos de lo que excluyó."""
+        # Arrange
+        await known(session, "COR-0001")
+        service = SalesService(session)
+        rota = NormalizedSale(
+            staging_row_id=0,
+            code="V-00040",
+            code_key="v00040",
+            sold_on=None,
+            product_code="COR-0001",
+            quantity=5,
+            total=None,
+            reason="La fila no trae fecha",
+        )
+
+        # Act
+        await service.register_sales(batch_id=1, sales=(sale("V-00041"), rota))
+
+        # Assert
+        board = await service.dashboard()
+        assert board.invoiced.sales == 1
+        assert board.held_total == 1
+        assert board.invoiced.excluded == 1
+
+    async def test_correcting_a_broken_record_makes_it_count(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-38: cargar la fecha que faltaba y que la venta entre a los indicadores.
+
+        Antes de que la fila llegara a `core.sale` esto no se podía ni intentar:
+        no había registro que corregir.
+        """
+        # Arrange
+        await known(session, "COR-0001")
+        service = SalesService(session)
+        await service.register_sales(
+            batch_id=1,
+            sales=(
+                NormalizedSale(
+                    staging_row_id=0,
+                    code="V-00050",
+                    code_key="v00050",
+                    sold_on=None,
+                    product_code="COR-0001",
+                    quantity=5,
+                    total=Decimal(80_000),
+                    reason="La fila no trae fecha",
+                ),
+            ),
+        )
+        held = (await service.list_sales(state=SaleState.HELD)).items[0]
+
+        # Act
+        corrected = await service.correct_sale(
+            held.id,
+            values={
+                "sold_on": date(2026, 3, 20),
+                "product_code": None,
+                "quantity": None,
+                "total": None,
+            },
+            is_estimated=True,
+            actor_user_id=owner.id,
+        )
+
+        # Assert — cuenta, dice que uno de sus valores es estimado (RF-40), y
+        # lo que informó el portal sigue diciendo que no traía fecha (RF-41).
+        assert corrected.state is SaleState.COUNTED
+        assert corrected.is_estimated is True
+        assert corrected.portal_values["sold_on"] is None
+        board = await service.dashboard()
+        assert board.invoiced.sales == 1
+        assert board.invoiced.has_estimates is True
+
+
+class TestWhatTheSystemUnifiedOnItsOwn:
+    """RF-12: cuántas unificó solo, aparte de lo que descartó una persona."""
+
+    async def test_it_reports_how_many_it_merged_without_asking(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-12: dos idénticas se cuentan una vez, y el tablero dice que fue una."""
+        # Arrange
+        await known(session, "COR-0001")
+        service = SalesService(session)
+
+        # Act
+        await service.register_sales(batch_id=1, sales=(sale("V-00060"), sale("V-00060")))
+
+        # Assert
+        board = await service.dashboard()
+        assert board.invoiced.sales == 1
+        assert board.invoiced.excluded == 1
+        assert board.invoiced.merged == 1
+
+    async def test_a_version_a_person_discarded_is_not_counted_as_merged(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """RF-12: lo que decidió una persona no es lo que el sistema unificó solo.
+
+        Las dos cosas viven en `DISCARDED` y son hechos distintos: nadie decidió
+        sobre las unificadas, y alguien decidió sobre cada una de las otras.
+        """
+        # Arrange — dos con el mismo código y cantidades distintas: nadie suma
+        # hasta que una persona elija.
+        await known(session, "COR-0001")
+        service = SalesService(session)
+        await service.register_sales(
+            batch_id=1, sales=(sale("V-00070", quantity=5), sale("V-00070", quantity=9))
+        )
+        group = (await service.review_queue()).groups[0]
+
+        # Act
+        await service.resolve_group(
+            group.code_key,
+            action="keep",
+            sale_id=group.versions[0].id,
+            actor_user_id=owner.id,
+        )
+
+        # Assert
+        board = await service.dashboard()
+        assert board.invoiced.sales == 1
+        assert board.invoiced.excluded == 1
+        assert board.invoiced.merged == 0
+
+    async def test_the_discarded_version_says_why_it_was_discarded(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Decirle «repetida idéntica» a algo que una persona eligió descartar es falso."""
+        # Arrange
+        await known(session, "COR-0001")
+        service = SalesService(session)
+        await service.register_sales(
+            batch_id=1, sales=(sale("V-00080", quantity=5), sale("V-00080", quantity=9))
+        )
+        group = (await service.review_queue()).groups[0]
+
+        # Act
+        versions = await service.resolve_group(
+            group.code_key,
+            action="keep",
+            sale_id=group.versions[0].id,
+            actor_user_id=owner.id,
+        )
+
+        # Assert
+        discarded = [version for version in versions if version.state is SaleState.DISCARDED]
+        assert len(discarded) == 1
+        assert discarded[0].reason == "Se descartó al elegir otra versión de esta venta"

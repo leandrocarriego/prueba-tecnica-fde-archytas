@@ -1,6 +1,7 @@
 """Notifications schemas: who the owner wants each kind of alert to reach."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -23,6 +24,18 @@ class RouteRead(BaseModel):
 
 
 class RouteWrite(BaseModel):
-    """The role the owner wants a kind of alert to reach."""
+    """The role the owner wants a kind of alert to reach.
 
-    role: str
+    **The two roles that may receive one, and not any string.** It used to take
+    whatever it was given, which nobody could reach while the route had no
+    screen; now that the owner picks from a control, a typo would point a kind
+    of alert at a role nobody holds, and sales would be offerable — and RF-46
+    says in as many words that sales does not reach the supplier inbox these
+    alerts are about.
+
+    Spelled as a `Literal` and not as the `UserRole` of `identity`, because a
+    module never imports another (Artículo IV): what travels between them are
+    the role strings the `UserRoleChanged` events already carry.
+    """
+
+    role: Literal["OWNER", "PURCHASING"]

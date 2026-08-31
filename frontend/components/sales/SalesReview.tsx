@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { correctSale, resolveSaleGroup, undoSaleResolution } from '@/app/actions/sales'
+import { SaleCorrection } from '@/components/sales/SaleCorrection'
 import { Button } from '@/components/ui/button'
 import { count, day, money } from '@/lib/format'
-import type { ReviewQueue } from '@/lib/sales/types'
+import type { ReviewQueue, Sale } from '@/lib/sales/types'
 
 const FIELDS: Record<string, string> = {
   sold_on: 'la fecha',
@@ -22,7 +23,15 @@ const FIELDS: Record<string, string> = {
  * campos en que difieren señalados** (RF-30), que es lo que convierte "estas dos
  * no son iguales" en una decisión que se toma en un segundo.
  */
-export function SalesReview({ queue, canEdit }: { queue: ReviewQueue; canEdit: boolean }) {
+export function SalesReview({
+  queue,
+  discarded,
+  canEdit,
+}: {
+  queue: ReviewQueue
+  discarded: Sale[]
+  canEdit: boolean
+}) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -42,7 +51,9 @@ export function SalesReview({ queue, canEdit }: { queue: ReviewQueue; canEdit: b
   return (
     <div className="space-y-8">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</p>
+        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+          {error}
+        </p>
       )}
 
       <section className="space-y-3">
@@ -54,7 +65,7 @@ export function SalesReview({ queue, canEdit }: { queue: ReviewQueue; canEdit: b
             <article key={group.code_key} className="space-y-3 rounded border p-4">
               <header>
                 <h3 className="font-medium">Código {group.versions[0]?.code}</h3>
-                <p className="text-sm text-amber-800">
+                <p className="text-sm text-warn">
                   Difieren en{' '}
                   {(group.differences ?? []).map(field => FIELDS[field] ?? field).join(', ')}.
                   Ninguna suma mientras tanto.
@@ -147,27 +158,53 @@ export function SalesReview({ queue, canEdit }: { queue: ReviewQueue; canEdit: b
                   <td className="py-2">{day(sale.sold_on)}</td>
                   <td className="py-2">{sale.product_code ?? '—'}</td>
                   <td className="py-2 text-right">{money(sale.total)}</td>
-                  <td className="py-2 text-amber-800">{sale.reason}</td>
+                  <td className="py-2 text-warn">{sale.reason}</td>
                   {canEdit && (
                     <td className="py-2 text-right">
-                      <Button
-                        type="button"
-                        variant="outline"
+                      <SaleCorrection
+                        sale={sale}
                         disabled={busy}
-                        onClick={() => {
-                          const code = window.prompt(
-                            'Código de producto correcto',
-                            sale.product_code ?? ''
-                          )
-                          if (code) {
-                            void run(() => correctSale(sale.id, { product_code: code }, false))
-                          }
-                        }}
-                      >
-                        Corregir
-                      </Button>
+                        onSubmit={(values, isEstimated) =>
+                          void run(() => correctSale(sale.id, values, isEstimated))
+                        }
+                      />
                     </td>
                   )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Ventas que no suman ({discarded.length})</h2>
+        <p className="text-sm text-muted-foreground">
+          No esperan una decisión: o el sistema las unificó solo por ser idénticas a otra, o alguien
+          eligió otra versión. Están acá porque forman parte de lo que cada indicador excluyó, y un
+          número que dice cuánto dejó afuera tiene que dejar ver qué dejó afuera.
+        </p>
+        {discarded.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Ninguna.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="border-b text-left text-muted-foreground">
+              <tr>
+                <th className="py-2">Código</th>
+                <th className="py-2">Fecha</th>
+                <th className="py-2">Producto</th>
+                <th className="py-2 text-right">Total</th>
+                <th className="py-2">Por qué no suma</th>
+              </tr>
+            </thead>
+            <tbody>
+              {discarded.map(sale => (
+                <tr key={sale.id} className="border-b align-top">
+                  <td className="py-2">{sale.code}</td>
+                  <td className="py-2">{day(sale.sold_on)}</td>
+                  <td className="py-2">{sale.product_code ?? '—'}</td>
+                  <td className="py-2 text-right">{money(sale.total)}</td>
+                  <td className="py-2 text-muted-foreground">{sale.reason}</td>
                 </tr>
               ))}
             </tbody>
