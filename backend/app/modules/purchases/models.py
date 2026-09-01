@@ -347,6 +347,19 @@ class InvoiceDocument(Base):
     content_type: Mapped[str | None] = mapped_column(String(120), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    @property
+    def has_file(self) -> bool:
+        """Si hay un original que se pueda mostrar o descargar.
+
+        Distinto de `readable`, que dice si se pudo **leer** lo que decía. Un
+        escaneo torcido tiene archivo y no tiene texto; una fila que el portal
+        publicó sin adjunto tiene texto de la tabla y no tiene archivo. La
+        pantalla necesita las dos por separado para no ofrecer la vista previa
+        de la nada ni esconder el original justo cuando es lo único que queda
+        para decidir.
+        """
+        return bool(self.content)
+
     def __repr__(self) -> str:
         return f"<InvoiceDocument invoice_id={self.invoice_id} agrees={self.agrees}>"
 

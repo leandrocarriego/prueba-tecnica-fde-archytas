@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation'
 
 import { getSession } from '@/app/actions/auth'
 import { NoPermission } from '@/components/common/NoPermission'
+import { DocumentPreview } from '@/components/purchases/DocumentPreview'
 import { InvoicePanel } from '@/components/purchases/InvoicePanel'
-import { Code, Day, Money } from '@/components/ui/amount'
+import { Day, Money } from '@/components/ui/amount'
 import { Badge } from '@/components/ui/badge'
 import { Notice } from '@/components/ui/notice'
 import { ErrorState } from '@/components/ui/state'
@@ -173,31 +174,16 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
           </div>
         </section>
 
+        {/*
+          El original, **mostrado** y no sólo enlazado, que es lo que la guía
+          dibuja en `3g`. Lo que se decide en esta pantalla es si el número de la
+          tabla y el del papel son el mismo, y hasta acá eso obligaba a abrir el
+          archivo en otra pestaña, mirarlo, volver y acordarse: comparar dos
+          cosas que no están a la vista al mismo tiempo es comparar de memoria.
+        */}
         <section className="space-y-3 rounded-xl border border-border bg-card p-5">
           <h2 className="section-label">Documento original</h2>
-          {invoice.document ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                {invoice.document.agrees
-                  ? 'Coincide con lo que informa el portal.'
-                  : (invoice.document.reason ?? 'No coincide con lo que informa el portal.')}
-                {invoice.document.read_supplier_tax_id && (
-                  <>
-                    {' El archivo trae el CUIT '}
-                    <Code value={invoice.document.read_supplier_tax_id} />.
-                  </>
-                )}
-              </p>
-              <pre className="max-h-56 overflow-auto rounded-lg border border-border bg-muted p-3 text-xs">
-                {invoice.document.excerpt || 'Sin contenido legible.'}
-              </pre>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              El portal no publicó un archivo para esta factura. Lo que se ve arriba es lo que
-              informó su tabla.
-            </p>
-          )}
+          <DocumentPreview invoiceId={invoice.id} document={invoice.document} />
         </section>
       </div>
 

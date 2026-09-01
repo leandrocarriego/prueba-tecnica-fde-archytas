@@ -4,11 +4,15 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+import { requestRecovery, setPasswordWithToken } from '@/app/actions/access'
 import { Button } from '@/components/ui/button'
 import { Notice } from '@/components/ui/notice'
 import { cn } from '@/lib/utils'
 import { AuthField } from './AuthField'
 import { useBranding } from './AuthBrandingProvider'
+
+/** Lo que se dice cuando no se pudo ni siquiera preguntar. */
+const UNREACHABLE = 'No pudimos contactar al servidor. Probá de nuevo en un momento.'
 
 interface ResetPasswordFormProps {
   className?: string
@@ -52,6 +56,24 @@ function SubmitButton({ label, loading }: { label: string; loading: boolean }) {
  *
  * Cuál de las dos caras se muestra lo decide el token de la URL, y no cambia
  * mientras el formulario está montado.
+ *
+ * **Las dos caras pasan por un Server Action, y ésa es la corrección.** Las dos
+ * llamaban a la API con un `fetch` desde el navegador, contra
+ * `NEXT_PUBLIC_API_URL` con `http://localhost:8000` de reserva. En una máquina
+ * de desarrollo eso funciona y por eso nadie lo vio; en el servidor **el
+ * backend no se publica** —sólo el frontend pasa por Traefik—, así que el
+ * navegador pedía a su propia `localhost` y la pantalla contestaba «Failed to
+ * fetch». Recuperar el acceso no funcionó nunca en producción.
+ *
+ * Los dos Server Actions que hacían falta ya existían en `app/actions/access.ts`
+ * y no los llamaba nadie. El de pedir el enlace, además, **contesta lo mismo
+ * exista o no la dirección**: la versión que había acá mostraba el detalle del
+ * backend, lo que convertía este formulario en una forma de averiguar quién
+ * tiene cuenta.
+ *
+ * La contracara honesta: sin fetch del navegador no hay forma de que esta
+ * pantalla toque la API salvo a través del servidor de Next, que es la única
+ * puerta que existe hacia afuera.
  */
 export function ResetPasswordForm({ className, onSuccess }: ResetPasswordFormProps) {
   const branding = useBranding()
@@ -73,25 +95,18 @@ export function ResetPasswordForm({ className, onSuccess }: ResetPasswordFormPro
     setLoading(true)
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/password-reset/request`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email }),
-        }
-      )
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Error al solicitar reseteo')
-      }
-
-      setSuccess(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al solicitar reseteo')
+      const form = new FormData()
+      form.set('email', email)
+      // El Server Action contesta lo mismo exista o no la dirección, a
+      // propósito: decirle a alguien que un correo no está registrado convierte
+      // este formulario en una forma de averiguar quién tiene cuenta.
+      const result = await requestRecovery(form)
+      if (result.ok) setSuccess(true)
+      else setError(result.message)
+    } catch {
+      // El Server Action llegó a tirar: el servidor de Next no pudo hablar con
+      // la API. No hay detalle que dar que sirva de algo.
+      setError(UNREACHABLE)
     } finally {
       setLoading(false)
     }
@@ -119,24 +134,19 @@ export function ResetPasswordForm({ className, onSuccess }: ResetPasswordFormPro
     setLoading(true)
 
     try {
-      // The token travels in the path now, not in the body: it identifies the
-      // link, and a link is a resource. The canonical screen for this step is
-      // /recuperar/[token], which is where the WhatsApp message points; this
-      // branch stays for anybody who arrives here with ?token=.
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/password-reset/${encodeURIComponent(token)}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ new_password: newPassword }),
-        }
-      )
+      // El token viaja en la ruta y no en el cuerpo: identifica al enlace, y un
+      // enlace es un recurso. La pantalla canónica de este paso es
+      // `/recuperar/[token]`, que es adonde apunta el WhatsApp; esta rama queda
+      // para quien llegue acá con `?token=`, y usa el **mismo** Server Action
+      // que aquélla para que las dos no puedan divergir.
+      const form = new FormData()
+      form.set('new_password', newPassword)
+      form.set('repeat_password', confirmPassword)
+      const result = await setPasswordWithToken('recuperar', token, form)
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Error al restablecer contraseña')
+      if (!result.ok) {
+        setError(result.message)
+        return
       }
 
       setSuccess(true)
@@ -144,8 +154,8 @@ export function ResetPasswordForm({ className, onSuccess }: ResetPasswordFormPro
       setTimeout(() => {
         router.push('/login')
       }, 2000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al restablecer contraseña')
+    } catch {
+      setError(UNREACHABLE)
     } finally {
       setLoading(false)
     }
