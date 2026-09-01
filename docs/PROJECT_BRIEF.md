@@ -174,9 +174,9 @@ no cuando está escrita.
 | P3 · No ver nada | En desarrollo | 009-business-dashboard |
 | P4 · Proveedores | Resuelto | 004-invoices-suppliers |
 | P5 · Pagos a medias | En desarrollo | 005-payments-receipts |
-| P6 · Compras que se pierden | En desarrollo | 007-orders-alerts |
+| P6 · Compras que se pierden | Resuelto | 007-orders-alerts |
 | P7 · Rubros | En desarrollo | 008-product-categories |
-| P8 · Avisos | En desarrollo | 007-orders-alerts |
+| P8 · Avisos | Resuelto | 007-orders-alerts |
 | P9 · Control propio | Resuelto | 003-system-control |
 | P10 · Accesos | Resuelto | 002-access-control |
 | P11 · Fechas | En desarrollo | 006-due-date-calendar |
