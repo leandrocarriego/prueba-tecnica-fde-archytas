@@ -147,7 +147,11 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
         recorta por permisos.
       */}
       {(mayReadRules || mayResolveSales) && (
-        <SavedDecisions rules={rules ?? []} sales={decidedSales ?? []} />
+        <SavedDecisions
+          rules={rules ?? []}
+          sales={decidedSales ?? []}
+          categories={categories?.items ?? []}
+        />
       )}
     </div>
   )
