@@ -7,7 +7,7 @@
  *
  * `jsdom` y no un navegador: acá se prueba lo que la pantalla decide, no cómo
  * se ve. Lo que sólo se puede ver —la pantalla en un teléfono, RF-41— se
- * verifica a mano, y está dicho en `docs/specs/006-due-date-calendar/`.
+ * verifica a mano, y está dicho en `docs/specs/archive/006-due-date-calendar/`.
  */
 import { fileURLToPath } from 'node:url'
 
