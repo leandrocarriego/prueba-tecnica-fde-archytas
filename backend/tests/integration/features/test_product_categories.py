@@ -700,7 +700,10 @@ class TestDecidingOneFromTheScreen:
         # signed table does not have.
         await apply(
             session,
-            [row("CAT-0800", category="Bulones Varios"), row("CAT-0801", category="Bulones Varios")],
+            [
+                row("CAT-0800", category="Bulones Varios"),
+                row("CAT-0801", category="Bulones Varios"),
+            ],
         )
         await session.commit()
 
