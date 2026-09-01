@@ -4,6 +4,7 @@ import { getSession } from '@/app/actions/auth'
 import { CalendarGrid } from '@/components/purchases/CalendarGrid'
 import { NoPermission } from '@/components/common/NoPermission'
 import { readFromApi } from '@/lib/api/server'
+import { windowFor } from '@/lib/purchases/calendar'
 import { canEdit } from '@/lib/auth/permissions'
 import { day } from '@/lib/format'
 import type { Calendar } from '@/lib/purchases/types'
@@ -23,10 +24,9 @@ interface PageProps {
  * ventana (RF-04)— y avanzar o retroceder es cambiar la ventana en la URL, así
  * que una pantalla vista se comparte tal como se está viendo.
  *
- * **Lo que esta pantalla no hace todavía**: los cambios de otra persona no
- * aparecen solos (RF-31 a RF-36). Está anotado en el traspaso de la feature: el
- * canal en vivo es lo que queda de la H5, y hasta que exista, quien mira ve el
- * estado del momento en que cargó la pantalla.
+ * **Se actualiza sola** (RF-31 a RF-36): lo que otra persona cambia llega por
+ * el canal en vivo que abre `CalendarGrid`, y la pantalla se vuelve a pedir al
+ * servidor.
  */
 export default async function CalendarPage({ searchParams }: PageProps) {
   const filters = await searchParams
@@ -96,16 +96,4 @@ export default async function CalendarPage({ searchParams }: PageProps) {
       <CalendarGrid calendar={calendar} canEdit={canEdit(session?.permissions ?? {}, 'CALENDAR')} />
     </main>
   )
-}
-
-/** La URL del mes anterior o el siguiente, conservando los filtros puestos. */
-function windowFor(since: string, offset: number, filters: Record<string, string | undefined>) {
-  const [year, month] = since.split('-').map(Number)
-  const first = new Date(Date.UTC(year, month - 1 + offset, 1))
-  const last = new Date(Date.UTC(year, month + offset, 0))
-  const iso = (date: Date) => date.toISOString().slice(0, 10)
-  const query = new URLSearchParams({ since: iso(first), until: iso(last) })
-  if (filters.sin_recibo) query.set('sin_recibo', filters.sin_recibo)
-  if (filters.saldadas) query.set('saldadas', filters.saldadas)
-  return `/calendario?${query.toString()}`
 }

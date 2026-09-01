@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.models import User
@@ -17,6 +18,7 @@ from app.modules.purchases.models import DueDateOrigin
 from app.modules.purchases.service import PurchasesService, today_here
 from app.shared.errors import ConflictError
 from app.shared.events import DueDateChanged, ManualChangeRecorded, events
+from tests.conftest import API_PREFIX
 from tests.factories.purchases_factory import InvoiceFactory, SupplierFactory
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
@@ -490,3 +492,50 @@ class TestWhatTheFiltersDoWithAHandMadeEntry:
         for filtros in ({"without_receipt": True}, {"hide_settled": True}):
             cards = await calendar(session, **filtros)
             assert entry.id in {item.id for item in cards}, filtros
+
+
+class TestSalesLooksAndDoesNotTouch:
+    """H6, por comportamiento: una request real como ventas contra las cinco rutas.
+
+    RF-38 ya estaba probado *por construcción* —la matriz de `identity` y el test
+    de arquitectura que exige la autorización declarada en cada ruta—, y eso
+    demuestra que el permiso está escrito, no que el servidor lo aplique. Un
+    `dependencies=[...]` puesto en el decorador equivocado pasa las dos pruebas
+    de construcción y deja la escritura abierta. Acá se llama a las rutas.
+
+    Las cuatro escrituras se prueban con cuerpos válidos y sobre un id que no
+    existe: si la autorización fallara, la respuesta sería 404 o 422, nunca 403,
+    así que el test no puede pasar por la razón equivocada.
+    """
+
+    async def test_sales_can_read_the_calendar(self, sales_client: AsyncClient) -> None:
+        """RF-37: ventas consulta el calendario, y por defecto el mes en curso."""
+        # Act
+        response = await sales_client.get(f"{API_PREFIX}/calendar")
+
+        # Assert
+        assert response.status_code == 200
+
+    @pytest.mark.parametrize(
+        ("method", "path", "payload"),
+        [
+            ("POST", "", {"on_date": str(soon(3)), "description": "Alquiler", "amount": "1000"}),
+            ("PATCH", "/1", {"description": "Otra cosa"}),
+            ("PUT", "/1/date", {"on_date": str(soon(10))}),
+            ("DELETE", "/1", None),
+        ],
+        ids=["agregar", "corregir", "mover", "eliminar"],
+    )
+    async def test_sales_is_refused_on_every_write(
+        self,
+        sales_client: AsyncClient,
+        method: str,
+        path: str,
+        payload: dict[str, str] | None,
+    ) -> None:
+        """RF-38: las cuatro escrituras del calendario devuelven 403 para ventas."""
+        # Act
+        response = await sales_client.request(method, f"{API_PREFIX}/calendar{path}", json=payload)
+
+        # Assert
+        assert response.status_code == 403

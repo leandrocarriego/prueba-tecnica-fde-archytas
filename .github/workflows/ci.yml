@@ -146,6 +146,12 @@ jobs:
         working-directory: frontend
         run: npm run type-check
 
+      # Lo que ningún test de backend puede demostrar: el control de mes y el
+      # recorte por día del calendario (RF-05, RF-08 de la 006).
+      - name: Tests de pantalla
+        working-directory: frontend
+        run: npm test
+
       - name: Build
         working-directory: frontend
         run: npm run build

@@ -15,12 +15,17 @@ la 004 a la 009, la spec se firmó el 2026-08-30 **sobre código ya escrito**, y
 existía. Lo que sigue no es un plan de trabajo por hacer y ya: es el desglose que le faltaba al plan,
 reconstruido contra el código y contra las doce derivas `D0`–`D11` que el plan dejó registradas.
 
-- ✅ **41 de 45** implementadas y verificadas por la suite. El 2026-08-31 se cerró **la H5 entera**
-  —el canal en vivo, que era un tercio de la spec firmada— más todo el frontend pendiente: el
-  arrastre, el selector de fecha, el control de mes, el recorte por día, el botón de corregir, y
-  quién cargó y quién movió cada vencimiento.
-- ⬜ **4 pendientes**, y ninguna es alcance nuevo: **cada una nace de una deriva `Dn` de `plan.md`**
-  o de un `RF` sin test. La columna *Deriva* dice cuál.
+- ✅ **44 de 45** implementadas y verificadas. El 2026-08-31 se cerró **la H5 entera** —el canal en
+  vivo, que era un tercio de la spec firmada—, todo el frontend pendiente —el arrastre, el selector
+  de fecha, el control de mes, el recorte por día, el botón de corregir, y quién cargó y quién movió
+  cada vencimiento— y, ese mismo día, **las cuatro tareas de verificación que quedaban**: los
+  permisos de ventas por comportamiento (39), los dos tests de pantalla (9), los filtros sobre una
+  entrada a mano (42, que ya estaba escrita) y la verificación a mano en un teléfono (45).
+- ✅ **Las 45 están cerradas.** La verificación a mano encontró dos cosas que ningún test veía, y
+  las dos se corrigieron el mismo día con aprobación del humano: **la barra lateral se pliega** en
+  pantallas angostas —pasó de 832px a 76px de alto, y con eso RF-41 se cumple— y **la pantalla es
+  una grilla del mes**, no una lista de los días con algo (RF-01). El acta de las dos corridas
+  está en `evidence/README.md`.
 - ✅ **La H5 está construida** (2026-08-31): SSE sobre `GET /calendar/stream`, `LISTEN`/`NOTIFY` de
   Postgres para cruzar los dos workers de uvicorn, y un Route Handler de Next que pone el `Bearer`
   desde la cookie. Cero dependencias nuevas. `GEN-09` se cumple sin acoplar nada, y hay un test que
@@ -30,17 +35,20 @@ reconstruido contra el código y contra las doce derivas `D0`–`D11` que el pla
   actualiza sola», que era superficie que el cliente no firmó: el humano decidió no construirlo
   (2026-08-31) y el riesgo se acepta durante la ventana en que se construye el canal. En su lugar
   entraron el stream y su Route Handler, que antes viajaban escondidos en una sola tarea.
-- 🔴 **La pantalla no es un calendario**: es una lista de los días que tienen algo (D6), sin control
-  de mes (D5), y mover una tarjeta son dos `window.prompt` encadenados (D3, D11).
+- ✅ **Las doce derivas `D0`–`D11` están cerradas**: la pantalla es una grilla del mes con control
+  de mes y recorte por día (D5, D6), y mover una tarjeta es arrastrarla o elegir la fecha en un
+  selector con motivo opcional, no dos `window.prompt` encadenados (D3, D11).
 
-Suite de la feature al cierre: **8 tests de integración** en
-`backend/tests/integration/features/test_due_date_calendar.py`, todos de servicio. **Ni un test de
-ruta, ni uno de permisos de calendario por comportamiento, ni uno de frontend.**
+Suite de la feature al cierre: **13 tests de integración** en
+`backend/tests/integration/features/test_due_date_calendar.py` —ocho de servicio y cinco de ruta,
+que son los permisos de ventas por comportamiento— y **21 tests de pantalla** en `frontend/tests/`:
+el control de mes y la grilla, el recorte por día en las dos vistas, y la barra plegable. Los de
+pantalla obligaron a darle al frontend el runner que no tenía: vitest sobre jsdom, corriendo en
+`make test` y en el job Frontend del CI.
 
-> **Dónde queda la cadena.** Con la H5 sin construir y once derivas abiertas, la feature **no está
-> lista para `/converge`**. Las ocho historias son severables: si el humano decide diferir el canal en
-> vivo, se saca la H5 con sus seis requisitos —RF-34 se queda— y el resto de la spec se sostiene sin
-> reescritura. Esa decisión es del humano, no de este documento (Artículo V).
+> **Dónde queda la cadena.** `/converge` se corrió el 2026-08-31 (`converge.md`), volvió **deriva
+> mayor** por RF-41, el humano decidió construir la barra plegable, y la segunda corrida cierra los
+> cinco hallazgos. La feature pasa al `Code-Reviewer`.
 
 > **El módulo es compartido.** De esta feature son `DueDate`, `DueDateChange`, `DueDateOrigin`, el
 > bloque de calendario del repositorio y del servicio, los seis schemas `DueDate*`/`CalendarRead`, el
@@ -74,9 +82,9 @@ migración → backend → frontend → tests.
 | ✅ 4 | `GET /calendar` con su autorización declarada y **el mes en curso por defecto**, decidido en el backend sobre `today_here()` (Buenos Aires, no UTC). Ocho líneas, cero dependencias nuevas. | `add_backend_feature` | Developer | RF-04 | — |
 | ✅ 5 | Pantalla `(private)/calendario` y `CalendarGrid`: los vencimientos con su descripción, su monto y su proveedor, los pasados distinguidos de los que vienen, y el enlace a la factura que lo originó. | `add_frontend_feature` | Developer | RF-01, RF-02, RF-06, RF-07 | — |
 | ✅ 6 | Test: una factura registrada aparece sola en el calendario, en su fecha. | `add_tests` | Tester | RF-02, RF-03 | — |
-| ✅ 7 | **Hecho el 2026-08-31.** Cada día recorta a cuatro entradas y ofrece «y N más», que es RF-08: el recorte existe para que un día cargado no empuje los demás fuera de la pantalla. Lo que había antes:: es una lista de días agrupados, y sólo aparecen los días que tienen algo. Falta la grilla del mes y, con ella, el recorte por día que RF-08 necesita para decir «y N más» — hoy RF-08 no tiene implementación porque no hay recorte que lo dispare. | `add_frontend_feature` | Developer | RF-01, RF-08 | D6 |
+| ✅ 7 | **Cerrada el 2026-08-31, en dos pasos.** Primero el recorte —cada día muestra cuatro y ofrece «y N más» (RF-08)—; después, cuando `/converge` señaló que RF-01 seguía a medias, **la grilla del mes**: semanas de lunes a domingo, y un día sin vencimientos que existe igual, vacío, que es lo que una lista de días agrupados no puede mostrar. Elegir un día abre su tarjeta entera debajo de la grilla: una celda de siete columnas no da para un formulario. En un teléfono no hay grilla y siguen los días uno debajo del otro, porque siete columnas en 390px no se leen (RF-41). Lo que había antes: una lista de los días con algo, sin recorte y sin grilla. | `add_frontend_feature` | Developer | RF-01, RF-08 | D6 |
 | ✅ 8 | **Hecho el 2026-08-31**: «Mes anterior» y «Mes siguiente», calculados sobre la ventana que devolvió el backend y conservando los filtros puestos. Lo que había antes: La ventana se cambia editando la URL a mano; los tres enlaces de la pantalla son «Este mes», «Sólo sin recibo» y «Esconder las saldadas». | `add_frontend_feature` | Developer | RF-05 | D5 |
-| 🟡 9 | **A medias**: la ventana por defecto y los filtros están cubiertos; **falta el test del control de mes y del recorte por día**, que son de pantalla. Tests de H1: la ventana por defecto es el mes en curso; el mes anterior y el siguiente traen lo suyo; un vencimiento pasado y uno futuro se distinguen; y un día con más de los que entran informa cuántos hay. **Ventana relativa a hoy, nunca un mes fijo**: un test con un mes concreto empieza a fallar solo el día que ese mes queda en el pasado. | `add_tests` | Tester | RF-01, RF-04, RF-05, RF-06, RF-07, RF-08 | D5, D6 |
+| ✅ 9 | **Cerrada el 2026-08-31**: los dos tests de pantalla que faltaban existen. Para escribirlos hubo que darle al frontend el runner que no tenía —vitest sobre jsdom, con testing-library—, y sacar `windowFor` y `PER_DAY` de la pantalla a `lib/purchases/calendar.ts`. `tests/calendar-month-control.test.ts` fija el control de mes (mes entero en las dos direcciones, calculado sobre la ventana mirada y no sobre hoy, cruce de fin de año, y los filtros que sobreviven al cambio); `tests/calendar-day-trim.test.tsx` monta `CalendarGrid` de verdad y fija el recorte (ocho en un día muestran cuatro y «y 4 más», abrir y cerrar, un día que entra entero no ofrece nada, y el recorte es de cada día y no de la pantalla). Corren en `make test` y en el job Frontend del CI. Tests de H1: la ventana por defecto es el mes en curso; el mes anterior y el siguiente traen lo suyo; un vencimiento pasado y uno futuro se distinguen; y un día con más de los que entran informa cuántos hay. **Ventana relativa a hoy, nunca un mes fijo**: un test con un mes concreto empieza a fallar solo el día que ese mes queda en el pasado. | `add_tests` | Tester | RF-01, RF-04, RF-05, RF-06, RF-07, RF-08 | D5, D6 |
 
 ### H2 — Cuáles ya tienen su recibo y cuáles no
 
@@ -143,7 +151,7 @@ migración → backend → frontend → tests.
 | # | Tarea | Skill | Rol | Cubre | Deriva |
 |---|-------|-------|-----|-------|--------|
 | ✅ 38 | Las cinco rutas con su autorización declarada: `READ` sobre `CALENDAR` para el `GET`, `WRITE` para las cuatro escrituras. **RF-37 y RF-38 no se implementan acá: se declaran** — la matriz de `identity` ya le da a ventas `READ` sobre el calendario desde la 002. El calendario es la única superficie de `purchases` que ventas alcanza, y está dicho en el docstring del archivo de rutas para que la próxima ruta no herede la excepción por descuido. | `add_backend_feature` | Developer | RF-37, RF-38 | — |
-| ⬜ 39 | Test de comportamiento: **una request real como ventas** contra las cuatro escrituras devuelve `403`, y el `GET` devuelve `200`. Hoy RF-38 está probado por construcción —la matriz y el test de arquitectura— y no por comportamiento. | `add_tests` | Tester | RF-37, RF-38 | — |
+| ✅ 39 | **Cerrada el 2026-08-31**: `TestSalesLooksAndDoesNotTouch` llama a las cinco rutas con una sesión de ventas — el `GET` devuelve `200` y las cuatro escrituras `403`, parametrizadas una por una. Las escrituras van con cuerpos válidos sobre un id que no existe, así que un permiso que no se aplicara daría `404` o `422` y el test no puede pasar por la razón equivocada: se comprobó que la misma request como compras devuelve `404`. Antes RF-38 estaba probado **por construcción** —la matriz y el test de arquitectura—, que demuestra que el permiso está escrito, no que el servidor lo aplique. | `add_tests` | Tester | RF-37, RF-38 | — |
 
 ### H7 — Qué falta pagar, sin salir del calendario
 
@@ -151,7 +159,7 @@ migración → backend → frontend → tests.
 |---|-------|-------|-----|-------|--------|
 | ✅ 40 | `purchases`: el estado de pago de cada tarjeta que viene de una factura, calculado con `_read_invoices`, y el filtro `hide_settled`. | `add_backend_feature` | Developer | RF-39, RF-40 | — |
 | ✅ 41 | Pantalla: el estado de pago en la tarjeta y el enlace que esconde las saldadas. | `add_frontend_feature` | Developer | RF-39, RF-40 | — |
-| ⬜ 42 | Tests de H7: esconder las saldadas las esconde y deja el resto; y **qué hacen los dos filtros con una entrada cargada a mano** —sin recibo posible y sin estado de pago—, que hoy pasa los dos sin que ningún test lo fije. **Decidir con el Lead si eso es lo que la spec quiere antes de escribir el assert**: puede ser un defecto o puede ser lo correcto, y el test lo va a congelar. | `add_tests` | Tester | RF-39, RF-40 | — |
+| ✅ 42 | **Ya estaba hecha**: `TestWhatTheFiltersDoWithAHandMadeEntry` fija que una entrada cargada a mano pasa los dos filtros, con el razonamiento escrito de por qué eso es lo correcto y no un descuido. Tests de H7: esconder las saldadas las esconde y deja el resto; y **qué hacen los dos filtros con una entrada cargada a mano** —sin recibo posible y sin estado de pago—, que hoy pasa los dos sin que ningún test lo fije. **Decidir con el Lead si eso es lo que la spec quiere antes de escribir el assert**: puede ser un defecto o puede ser lo correcto, y el test lo va a congelar. | `add_tests` | Tester | RF-39, RF-40 | — |
 
 ### H8 — El calendario en el teléfono
 
@@ -159,7 +167,7 @@ migración → backend → frontend → tests.
 |---|-------|-------|-----|-------|--------|
 | ✅ 43 | `PUT /calendar/{id}/date` sirve igual para arrastrar que para elegir la fecha: el backend no distingue cómo lo dijo la persona. Las dos formas de H8 y de H4 dependen **sólo del frontend**. | `add_backend_feature` | Developer | RF-42 | — |
 | ✅ 44 | **Hecho el 2026-08-31**: mover abre un panel con `<Input type="date">` y un motivo opcional. Se fue el `window.prompt` donde la fecha se escribía a mano — que es la peor forma de elegir un día en una pantalla que existe para no equivocarse de día. Lo que había antes:: hoy la única forma es `window.prompt('Fecha nueva (aaaa-mm-dd)')`, donde la persona **escribe** la fecha como texto, y H8 se prueba *"eligiendo la fecha nueva de un selector"*. El propio componente demuestra que el patrón está a mano: el formulario de alta ya usa un `<Input type="date">` — es la deriva más barata de cerrar de toda la lista. **Corregir también el docstring del componente**, que afirma lo contrario de lo que el código hace. | `add_frontend_feature` | Developer | RF-42 | D11 |
-| ⬜ 45 | Verificación a mano, con Playwright y en un teléfono real: **el calendario se consulta desde un teléfono** (RF-41, que no tiene código propio —la pantalla usa utilidades responsive y nunca se abrió en uno—), se **arrastra** una tarjeta (RF-19) y se mueve **eligiendo la fecha de un selector** (RF-42). Nada de esto necesita el portal: la feature no extrae nada. | `add_tests` | Tester | RF-19, RF-41, RF-42 | D3, D11 |
+| ✅ 45 | **Corrida dos veces el 2026-08-31**, contra el stack local y sobre un iPhone 13 emulado. Acta y capturas en `evidence/`. **RF-19 y RF-42 cumplen**: se arrastró una tarjeta del 26 al 30 —preguntando antes, porque el 30 ya pasó, y sin respuesta no movió nada (RF-25)— y se movió otra desde el teléfono eligiendo la fecha en el `<input type="date">`, con motivo; las dos guardaron la fecha original, quién y cuándo. **RF-41 no cumplía en la primera corrida**, y el defecto no era del calendario: la barra lateral del shell medía 832px de alto sobre un viewport de 664px, así que la primera pantalla entera era el menú y el calendario empezaba en y=864px. **El humano aprobó plegarla** (2026-08-31) y se construyó: la barra pasó a 76px y el calendario arranca en y=108px. Falta la palabra final sobre un teléfono de verdad, que un emulador no puede dar. | `add_tests` | Tester | RF-19, RF-41, RF-42 | D3, D11 |
 
 ## Cobertura de requisitos
 
@@ -174,14 +182,14 @@ cubierto**, aunque tenga otras tareas en ✅.
 
 | Requisito | Tareas | Test |
 |-----------|--------|------|
-| RF-01 | 3, 5, 7 | 🟡9 |
+| RF-01 | 3, 5, 7 (la grilla del mes) | ✅9 |
 | RF-02 | 3, 5, 13 | 6, 14 |
 | RF-03 | 1, 2 | 6 |
 | RF-04 | 4 | 9 |
-| RF-05 | 8 | 🟡9 |
+| RF-05 | 8 | ✅9 |
 | RF-06 | 3, 5 | 9 |
 | RF-07 | 5 | 9 |
-| RF-08 | 7 | 🟡9 |
+| RF-08 | 7 | ✅9 |
 | RF-09 | 10, 11, 13 | 12, 14 |
 | RF-10 | 10, 11 | 12 |
 | RF-11 | 10, 11, 13 | 14 |
@@ -192,7 +200,7 @@ cubierto**, aunque tenga otras tareas en ✅.
 | RF-16 | 20 | 22 |
 | RF-17 | 15, 17 | 18 |
 | RF-18 | 15, 17 | 18 |
-| RF-19 | 23, 29 | ⬜45 |
+| RF-19 | 23, 29 | ✅45 |
 | RF-20 | 1, 23 | 28 |
 | RF-21 | 23, 30 | 28, 22 |
 | RF-22 | 23 | 28 |
@@ -210,17 +218,18 @@ cubierto**, aunque tenga otras tareas en ✅.
 | RF-34 | 26 | 37 |
 | RF-35 | 36 | 37 |
 | RF-36 | 36 | 37 |
-| RF-37 | 38 | ⬜39 |
-| RF-38 | 38 | ⬜39 |
+| RF-37 | 38 | ✅39 |
+| RF-38 | 38 | ✅39 |
 | RF-39 | 40, 41, 13 | 14, 42 |
 | RF-40 | 40, 41 | 42 |
-| RF-41 | ⬜45 (sin código propio: se verifica, no se construye) | ⬜45 |
-| RF-42 | 43, 44 | ⬜45 |
+| RF-41 | 45 · la barra plegable de `Navigation.tsx` | ✅45 |
+| RF-42 | 43, 44 | ✅45 |
 
-**Qué dice la tabla, leída de una:** 14 requisitos están construidos y verificados; **28 tienen algo
-en ⬜**, y de esos **seis —RF-31 a RF-33, RF-35, RF-36 y RF-41— no tienen ni una línea propia**.
-RF-41 es un caso aparte: no es que falte código, es que **nunca se probó en un teléfono**, y no hay
-manera de demostrarlo sin abrirlo en uno.
+**Qué dice la tabla, leída de una:** los 42 requisitos firmados tienen tarea, tienen verificación y
+**se cumplen**. **RF-41** fue el último en caer, y sigue siendo el caso aparte: nunca fue falta de
+código —no tiene código propio— sino falta de haberlo abierto en un teléfono. Se abrió, la
+respuesta fue que no, y lo que estorbaba era el menú del shell. El detalle, con capturas y medidas
+de antes y después, en `evidence/README.md`.
 
 ## Decisiones tomadas el 2026-08-31
 
