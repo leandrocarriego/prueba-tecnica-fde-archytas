@@ -121,9 +121,7 @@ class CatalogRepository:
         """
         statement = self._prices_query(query, highlighted, changed, category_id)
         result = await self.session.execute(
-            statement.order_by(ProductPrice.price.is_(None), Product.code)
-            .offset(skip)
-            .limit(limit)
+            statement.order_by(ProductPrice.price.is_(None), Product.code).offset(skip).limit(limit)
         )
         return [(row[0], row[1], row[2]) for row in result.all()]
 
@@ -155,11 +153,7 @@ class CatalogRepository:
             & ProductPrice.previous_price.isnot(None)
             & (ProductPrice.previous_price != 0)
         )
-        pct = (
-            (ProductPrice.price - ProductPrice.previous_price)
-            / ProductPrice.previous_price
-            * 100
-        )
+        pct = (ProductPrice.price - ProductPrice.previous_price) / ProductPrice.previous_price * 100
         result = await self.session.execute(
             select(
                 func.count().filter(moved & (ProductPrice.price > ProductPrice.previous_price)),
@@ -177,9 +171,7 @@ class CatalogRepository:
     async def count_stale(self) -> int:
         """Products that stopped coming in the list and keep their last price (RF-08)."""
         result = await self.session.execute(
-            select(func.count())
-            .select_from(ProductPrice)
-            .where(ProductPrice.is_stale.is_(True))
+            select(func.count()).select_from(ProductPrice).where(ProductPrice.is_stale.is_(True))
         )
         return int(result.scalar_one())
 
@@ -384,9 +376,7 @@ class CatalogRepository:
         )
         return {row[0]: int(row[1]) for row in result.all()}
 
-    async def record_order_spend(
-        self, lines: list[tuple[int, str | None, Decimal]]
-    ) -> None:
+    async def record_order_spend(self, lines: list[tuple[int, str | None, Decimal]]) -> None:
         """Write what a batch of purchase-order lines spent, idempotently.
 
         One row per staging line: reading the same order twice has to leave the

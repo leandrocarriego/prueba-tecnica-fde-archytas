@@ -1,0 +1,46 @@
+feat(triage,purchases): rebuild the review queue, and let it fix what it shows
+
+The queue screen had the right content in a shape nobody signed: a stack of
+cards with every case expanded, which with twelve of them is twelve screens of
+scrolling to reach the one you came for. It is now the master/detail of the
+high-fidelity guide (`3d`) — a narrow list on the left, one case open on the
+right — with a header that states how many are unresolved, how many were
+resolved today and that pending work stays out of every total, the area filter
+as a segmented control, and a sort that sorts. It is also no longer called
+«Revisar esto»: it is «Para decidir», which says what is expected of the person
+rather than what the system did.
+
+Deciding is a three-step assistant, as the guide draws it: look at what the
+portal brought, choose what to do, and confirm with the consequences stated.
+Nothing in step three is estimated — the figures come from the case's payload
+or from what the person just typed. No orange anywhere on this screen (RF-21).
+
+The second half is what the queue could not do: **fix** an unreadable row.
+Until now a row the portal published broken could only be given for reviewed,
+so the invoice never entered any total nor the due-date calendar — warning
+without allowing a repair is half a promise (Artículo II). Invoices and orders
+can now be typed by hand from the case itself, and they enter marked as
+MANUAL, because a datum a person typed is never shown as something the portal
+published (Artículo I). Giving the row for reviewed is still there, for when
+the paper is not at hand.
+
+When the portal later publishes that same row, readable and different, neither
+side wins on its own: the record is set aside — out of every total, like any
+doubtful datum — and the difference is asked as a new case with both values
+side by side. Answering it in favour of what was typed remembers the rejected
+values, because the portal republishes its row twice a day and a question that
+comes back after being answered teaches people to ignore the queue.
+
+Backend: `origin` and `rejected_portal_values` on invoices and orders
+(migration 0022), the `ManualEntryDisputed` event, the decision handler in
+`purchases`, and `CaseList.resolved_today` counted on the shop's clock and not
+on UTC's.
+
+Frontend: ReviewHeader, CaseQueue and CaseDetail; the sidebar carries how many
+cases are waiting and shows nothing at zero; Ventas moved into «Catálogo y
+datos», above «Catálogo y precios».
+
+Tests: six integration cases for the manual load and the dispute — including
+that a number already registered leaves the case pending instead of closing it
+with nothing entered — and three screen suites for the queue, the manual load
+and the sidebar.

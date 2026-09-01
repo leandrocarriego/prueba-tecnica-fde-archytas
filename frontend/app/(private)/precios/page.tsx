@@ -3,12 +3,7 @@ import { PriceHeader } from '@/components/catalog/PriceHeader'
 import { PriceSummaryCards } from '@/components/catalog/PriceSummaryCards'
 import { PriceTable } from '@/components/catalog/PriceTable'
 import { fetchFromApi } from '@/lib/api/server'
-import type {
-  CategoryList,
-  PriceList,
-  PriceSummary,
-  PriceUpdateStatus,
-} from '@/lib/catalog/types'
+import type { CategoryList, PriceList, PriceSummary, PriceUpdateStatus } from '@/lib/catalog/types'
 import { ErrorState } from '@/components/ui/state'
 import { Notice } from '@/components/ui/notice'
 

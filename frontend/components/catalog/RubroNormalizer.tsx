@@ -197,7 +197,11 @@ export function RubroNormalizer({ listing, canEdit }: RubroNormalizerProps) {
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-sm font-semibold text-warn">Sin rubro</span>
-                <Money value={listing.spend_unclassified} as="span" className="text-sm font-medium text-warn" />
+                <Money
+                  value={listing.spend_unclassified}
+                  as="span"
+                  className="text-sm font-medium text-warn"
+                />
               </div>
               <div className="mt-0.5 text-xs text-muted-foreground">
                 {countLabel(listing.unclassified_count, 'producto', 'productos')}
@@ -360,8 +364,8 @@ function UnclassifiedPanel({ count, pendingReview }: { count: number; pendingRev
       </p>
       {pendingReview > 0 && (
         <p className="text-sm text-muted-foreground">
-          {countLabel(pendingReview, 'forma escrita espera', 'formas escritas esperan')} una decisión
-          en{' '}
+          {countLabel(pendingReview, 'forma escrita espera', 'formas escritas esperan')} una
+          decisión en{' '}
           <Link className="text-link hover:underline" href="/revision">
             revisión
           </Link>
@@ -380,7 +384,9 @@ function UnclassifiedPanel({ count, pendingReview }: { count: number; pendingRev
 function Figure({ value, label, tone }: { value: string; label: string; tone?: 'ok' }) {
   return (
     <div>
-      <div className={`amount text-lg ${tone === 'ok' ? 'text-ok' : 'text-foreground'}`}>{value}</div>
+      <div className={`amount text-lg ${tone === 'ok' ? 'text-ok' : 'text-foreground'}`}>
+        {value}
+      </div>
       <div className="mt-1 text-xs text-muted-foreground">{label}</div>
     </div>
   )

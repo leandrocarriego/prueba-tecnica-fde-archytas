@@ -74,7 +74,10 @@ function Card({ label, value, sub, accent, action }: CardProps) {
       <div className="amount mt-2 text-2xl font-medium text-foreground">{value}</div>
       {sub && <div className="mt-2 text-xs text-muted-foreground">{sub}</div>}
       {action && (
-        <Link className="mt-2 block text-xs font-medium text-link hover:underline" href={action.href}>
+        <Link
+          className="mt-2 block text-xs font-medium text-link hover:underline"
+          href={action.href}
+        >
           {action.label}
         </Link>
       )}
