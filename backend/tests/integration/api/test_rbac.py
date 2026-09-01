@@ -325,6 +325,16 @@ class TestTheCommercialDashboardIsNotForPurchasing:
         # Assert
         assert response.status_code == 403
 
+    async def test_purchasing_cannot_reach_the_resolved_cases(
+        self, purchasing_client: AsyncClient
+    ) -> None:
+        """RF-29: los casos ya decididos son la misma cola, y se deshacen desde ahí."""
+        # Act
+        response = await purchasing_client.get(f"{API_PREFIX}/sales/resolved")
+
+        # Assert
+        assert response.status_code == 403
+
     async def test_purchasing_cannot_correct_a_sale(self, purchasing_client: AsyncClient) -> None:
         """RF-29: y la escritura también, no sólo la lectura de la cola."""
         # Act
@@ -340,10 +350,15 @@ class TestTheCommercialDashboardIsNotForPurchasing:
         # Act
         board = await sales_client.get(f"{API_PREFIX}/dashboard/sales")
         queue = await sales_client.get(f"{API_PREFIX}/sales/review")
+        resolved = await sales_client.get(f"{API_PREFIX}/sales/resolved")
 
         # Assert
         assert board.status_code == 200
         assert queue.status_code == 200
+        assert resolved.status_code == 200
+        # RF-36 pide un nombre, y el nombre lo pone la ruta: sin casos que
+        # decidir la lista viene vacía, y eso es una respuesta, no un error.
+        assert resolved.json() == []
 
     async def test_the_owner_reaches_them_too(self, owner_client: AsyncClient) -> None:
         """El dueño ve todo, y esta sección no es la excepción."""

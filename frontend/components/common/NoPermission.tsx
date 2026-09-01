@@ -16,18 +16,43 @@ import { ErrorState } from '@/components/ui/state'
  * lo ve tiene que leerlo entero para entender de cuál de los dos se trata
  * (`RF-19`).
  */
-export function NoPermission({ what }: { what?: string }) {
+/**
+ * `a` + `el` es `al`, y en castellano no es opcional.
+ *
+ * Las trece pantallas pasan el nombre de su sección con artículo —«el tablero
+ * del negocio», «las ventas»—, así que la preposición se contrae acá, una vez,
+ * en lugar de pedirle a cada llamador que la escriba ya contraída: eso sería
+ * pedirle a trece lugares que se acuerden de una regla de gramática.
+ */
+function reaching(what: string): string {
+  return what.startsWith('el ') ? `al ${what.slice(3)}` : `a ${what}`
+}
+
+/**
+ * `isHome` existe porque el tablero también se puede negar.
+ *
+ * Ofrecerle «Volver al tablero» a quien acaba de rebotar contra el tablero
+ * —que es lo que le pasa a compras apenas entra— es un lazo: el único botón de
+ * la pantalla lleva a la pantalla que lo echó. Cuando la sección negada es el
+ * propio tablero, la negativa se queda sin acción antes que con una que no
+ * lleva a ninguna parte.
+ */
+export function NoPermission({ what, isHome = false }: { what?: string; isHome?: boolean }) {
   return (
     <ErrorState
       title="No tenés permiso"
       action={
-        <Button asChild variant="outline">
-          <Link href="/tablero">Volver al tablero</Link>
-        </Button>
+        isHome ? undefined : (
+          <Button asChild variant="outline">
+            <Link href="/tablero">Volver al tablero</Link>
+          </Button>
+        )
       }
     >
-      {what ? `Tu acceso no llega a ${what}.` : 'Tu acceso no llega a esta parte del sistema.'} Si
-      creés que debería, pedíselo al dueño.
+      {what
+        ? `Tu acceso no llega ${reaching(what)}.`
+        : 'Tu acceso no llega a esta parte del sistema.'}{' '}
+      Si creés que debería, pedíselo al dueño.
     </ErrorState>
   )
 }

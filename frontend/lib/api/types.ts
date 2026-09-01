@@ -1744,6 +1744,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/sales/resolved': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The repeated sales somebody already decided about
+     * @description The owner and sales (RF-34, RF-35, RF-36 of 009).
+     *
+     *     Behind `WRITE` and not `READ`, like the queue it belongs to: this is where
+     *     a decision gets undone, and showing somebody a case they cannot act on
+     *     would be an invitation to a button they do not have.
+     */
+    get: operations['resolved_groups_api_v1_sales_resolved_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/sales/groups/{code_key}/resolution': {
     parameters: {
       query?: never
@@ -3545,6 +3569,35 @@ export interface components {
        * @default true
        */
       remember: boolean
+    }
+    /**
+     * ResolvedGroup
+     * @description A repeated sale somebody already decided about (RF-34, RF-35, RF-36).
+     *
+     *     The three requirements are one screen: the discarded version stays visible
+     *     beside the chosen one (RF-34), the case says what was decided, by whom and
+     *     when (RF-36), and from there the decision can be undone (RF-35).
+     *
+     *     `resolved_by_name` is filled at the edge, by the route, never here: this
+     *     module stores an id and cannot name a person without importing `identity`
+     *     (Artículo IV). Writing "el usuario 3" would not meet RF-36, it would
+     *     simulate meeting it.
+     */
+    ResolvedGroup: {
+      /** Code Key */
+      code_key: string
+      /** Versions */
+      versions: components['schemas']['SaleRead'][]
+      /** Action */
+      action: string
+      /** Kept Sale Id */
+      kept_sale_id: number | null
+      /** Resolved At */
+      resolved_at: string | null
+      /** Resolved By User Id */
+      resolved_by_user_id: number | null
+      /** Resolved By Name */
+      resolved_by_name?: string | null
     }
     /**
      * ReviewQueue
@@ -6889,6 +6942,37 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ReviewQueue']
+        }
+      }
+    }
+  }
+  resolved_groups_api_v1_sales_resolved_get: {
+    parameters: {
+      query?: {
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResolvedGroup'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

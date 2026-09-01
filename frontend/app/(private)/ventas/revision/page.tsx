@@ -5,7 +5,7 @@ import { NoPermission } from '@/components/common/NoPermission'
 import { SalesReview } from '@/components/sales/SalesReview'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
-import type { ReviewQueue, SaleList } from '@/lib/sales/types'
+import type { ResolvedGroup, ReviewQueue, SaleList } from '@/lib/sales/types'
 
 export const metadata = {
   title: 'Ventas apartadas — Plataforma Cordillera',
@@ -22,8 +22,14 @@ export default async function SalesReviewPage() {
   // no espera ninguna decisión. Pero es la mitad de lo que los indicadores
   // excluyen, y RF-26 pide poder ver los registros que un número dejó afuera —
   // hasta acá, la mitad unificada no se veía desde ningún lado.
-  const [queue, discarded, session] = await Promise.all([
+  //
+  // Y los casos ya decididos se piden aparte por lo mismo: tampoco están en la
+  // cola —RF-37 quiere que se vayan de los pendientes— y sin embargo RF-34,
+  // RF-35 y RF-36 son sobre ellos. Mientras no se pidieron, esos tres
+  // requisitos no tenían pantalla donde ocurrir.
+  const [queue, resolved, discarded, session] = await Promise.all([
     fetchFromApi<ReviewQueue>('/sales/review'),
+    fetchFromApi<ResolvedGroup[]>('/sales/resolved?limit=50'),
     fetchFromApi<SaleList>('/sales?state=DISCARDED&limit=200'),
     getSession(),
   ])
@@ -48,6 +54,7 @@ export default async function SalesReviewPage() {
 
       <SalesReview
         queue={queue}
+        resolved={resolved ?? []}
         discarded={discarded?.items ?? []}
         canEdit={canEdit(session?.permissions ?? {}, 'SALES')}
       />

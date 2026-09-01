@@ -212,10 +212,10 @@ que es exactamente lo que RF-05 pide.
 | `portal` | Una lectura: `extract_sales` (`service.py:221-236`) y su task (`tasks.py:196-199`) | No |
 | `ingestion` | `staging.sale_row` (`models.py:378-...`), `parse_sales` y `sale_code_key` (`parsers.py:1015-1092`), y `normalize_sales` (`service.py:706-761`) | No |
 | `operations` | Una entrada en `SYNC_JOBS` —`sales`, cada 24 h— y el parámetro de la tolerancia | No |
-| `sales` | **Todo lo comercial**: registros, deduplicación, apartados, resolución, corrección e indicadores. Tres tablas, cinco rutas | **Sí** |
+| `sales` | **Todo lo comercial**: registros, deduplicación, apartados, resolución, corrección e indicadores. Tres tablas, seis rutas | **Sí** |
 | `catalog` | `core.stock_point`, su escritura al aplicar la lista, los tres cortes (`service.py:1874-1932`) y `GET /dashboard/catalog` | No |
-| `identity` | **Nada propio.** `Section.SALES` y `Section.DASHBOARD` los fija la 002, y esta feature los consume | No |
-| Frontend | Dos pantallas (`/tablero`, `/ventas/revision`), un componente (`SalesReview.tsx`), `app/actions/sales.ts` y la entrada «Tablero» del menú | No |
+| `identity` | **Nada propio.** `Section.SALES` y `Section.DASHBOARD` los fija la 002, y esta feature los consume; `ActorDirectory` es de la 004 y acá se usa para nombrar a quien decidió | No |
+| Frontend | Dos pantallas (`/tablero`, `/ventas/revision`), dos componentes (`SalesReview.tsx`, `SaleCorrection.tsx`), `PeriodPicker.tsx`, `app/actions/sales.ts` y la entrada «Tablero» del menú. El cierre de D-10 tocó además `common/NoPermission.tsx`, que es de las trece pantallas y no de ésta | No |
 
 **`sales` es un módulo nuevo y está justificado.** Una venta tiene lenguaje propio —el código, el
 grupo repetido, la versión descartada, el valor estimado— que no es el de un producto ni el de una
@@ -271,13 +271,14 @@ migraciones compartidas está en *Riesgos*.
 
 ## Contratos
 
-Seis endpoints, todos con su autorización declarada (`PY-09`). **El detalle —query, cuerpos, errores
+Ocho endpoints, todos con su autorización declarada (`PY-09`). **El detalle —query, cuerpos, errores
 y códigos— está en [`contracts/sales-and-dashboard.md`](./contracts/sales-and-dashboard.md).**
 
 | Método · ruta | Sección · nivel | Quién | RF |
 |---|---|---|---|
 | `GET /sales` | `SALES` · `READ` | dueño · ventas | RF-04, RF-15 |
 | `GET /sales/review` | `SALES` · `WRITE` | dueño · ventas | RF-13, RF-14, RF-23, RF-26, RF-28, RF-30 |
+| `GET /sales/resolved` | `SALES` · `WRITE` | dueño · ventas | RF-34, RF-35, RF-36 |
 | `POST /sales/groups/{code_key}/resolution` | `SALES` · `WRITE` | dueño · ventas | RF-29, RF-31 a RF-34, RF-36, RF-37 |
 | `DELETE /sales/groups/{code_key}/resolution` | `SALES` · `WRITE` | dueño · ventas | RF-35 |
 | `PATCH /sales/{sale_id}` | `SALES` · `WRITE` | dueño · ventas | RF-38, RF-39, RF-41 |
@@ -292,10 +293,19 @@ RF-29: la cola de revisión es donde se decide, y quien no puede decidir no tien
 de lo que otro tiene que decidir. Nadie fuera de dueño y ventas alcanza `WRITE` sobre `SALES`, así que
 la diferencia no cambia el resultado hoy; cambia lo que la ruta **declara**, y ese es su trabajo.
 
+**`GET /sales/resolved` pide `WRITE` por lo mismo, y con una razón más**: es desde donde se deshace
+una decisión. Mostrarle a alguien un caso sobre el que no puede actuar sería ofrecerle un botón que no
+tiene. Es el endpoint que cerró D-9, y **el que nombra a quien decidió**: el nombre lo resuelve la
+ruta con `ActorDirectory`, nunca el servicio, porque `sales` guarda un id y no puede nombrar a nadie
+sin importar `identity` (Artículo IV). Escribir «el usuario 3» no cumpliría RF-36, lo simularía.
+
 ## Mapa de requisitos
 
-Los 46 firmados. **`✗` significa que no hay implementación**; **`~` que está a medias**. Cada uno de
-esos tiene su entrada en *Lo que falta* o en *Deriva*.
+Los 46 firmados. **Al 2026-09-01 no queda ninguno en `✗` ni en `~`**: las siete filas que lo estaban cuando
+se escribió este plan se cerraron entre el 2026-08-31 y el 2026-09-01, y cada fila dice cuándo y con
+qué se verificó. La convención se deja escrita porque la tabla la va a volver a necesitar: **`✗`
+significa que no hay implementación**; **`~`, que está a medias**, y cada uno de esos tiene que tener
+su entrada en *Lo que falta* o en *Deriva*.
 
 | RF | Dónde vive |
 |---|---|
@@ -303,44 +313,44 @@ esos tiene su entrada en *Lo que falta* o en *Deriva*.
 | RF-02 | Tres capas: `raw` (inmutable), `staging.sale_row`, y `core.sale.portal_values` (`sales/service.py:127-132`) |
 | RF-03 | `monthly_totals` con `date_trunc('month')` sobre las `COUNTED` (`repository.py:80-93`). El «desde 2023» sale de los datos, no de una constante |
 | RF-04 | `_filtered(..., SaleState.COUNTED, ...)`, compartido por las tres agregaciones (`repository.py:68-77`) |
-| RF-05 | Dos endpoints con su propia ventana. **`~` en la pantalla**: `/tablero` le manda el **mismo** `desde`/`hasta` a los dos y no ofrece ningún control para cambiarlo (D-2) |
+| RF-05 | Dos endpoints con su propia ventana, y un `PeriodPicker` por corte que no mueve el del otro. D-2 cerrada el 2026-08-31; verificado a mano el 2026-09-01 |
 | RF-06 | `Indicator.sales`, de `totals()` |
 | RF-07 | `SalesDashboard.invoiced`, primera sección de la pantalla (`tablero/page.tsx:52-70`) |
 | RF-08 | `permissions.py:83-84`, `_PURCHASING: Level.NONE` en las dos secciones |
 | RF-09 | `with_code_key(code_key)` (`repository.py:29-34`) |
 | RF-10 | `sale_code_key` (`parsers.py:1022-1027`), guardado en las dos tablas |
 | RF-11 | `_identical_among` compara los cuatro campos de `COMPARED`; la copia se guarda `DISCARDED` (`service.py:81-87`) |
-| RF-12 | ✗ **`merged` se cuenta y sólo se loguea** (`service.py:107-110`). Ningún schema lo expone, y `excluded` lo mezcla con las descartadas por decisión humana (D-3) |
+| RF-12 | `Indicator.merged`, separado de `excluded`. D-3 cerrada el 2026-08-31; verificado a mano el 2026-09-01 («21 de ellos los unificó el sistema solo») |
 | RF-13 | `siblings and reason is None` → todas a `HELD` con `DUPLICATE_WITH_DIFFERENCES` (`service.py:90-97`) |
 | RF-14 | `ReviewQueue.pending_groups` |
 | RF-15 | Sale de RF-04: `HELD` no entra en ninguna agregación |
-| RF-16 a RF-19 | ✗ **Se apartan en `staging` y no llegan a ninguna pantalla.** Ver *Lo que falta* |
+| RF-16 a RF-19 | Entran a `core.sale` como apartadas, con el motivo del parser. D-1 cerrada el 2026-08-31; verificado a mano el 2026-09-01: las doce anomalías del fixture llegan a `/ventas/revision` |
 | RF-20 | `_why_not_countable` contra `known_products()`, la proyección (`service.py:146`) |
 | RF-21 | `average_total_for` + `drift > threshold` (`service.py:148-153`) |
 | RF-22 | `sales.outlier_threshold_pct`, inicial `300` (`parameters.py:353-359`), proyectado por `BusinessParameterChanged` |
 | RF-23 | `sale.reason`, mostrado en la tabla de rotas (`SalesReview.tsx:149`). **Alcanza sólo a las que llegaron a `core.sale`** |
 | RF-24 | El parser nunca completa: cada dato ausente vuelve como `None` con su `reason` |
 | RF-25, RF-27 | `Indicator` con `excluded` siempre presente; la pantalla dice «no se excluyó ningún registro» cuando es cero (`tablero/page.tsx:56-62`) |
-| RF-26 | `~` El enlace a `/ventas/revision`, **y sólo cuando `held_total > 0`**. Las `DISCARDED` no están en esa cola: no hay forma de ver qué excluyó por unificación (D-3) |
+| RF-26 | El aviso de lo excluido lleva a `/ventas/revision`, que además pide las `DISCARDED` aparte y las muestra en «Ventas que no suman». D-3 cerrada el 2026-08-31; verificado a mano el 2026-09-01 |
 | RF-28 | `SalesDashboard.held_total`, sin ventana. **No cuenta las doce de `staging`** |
-| RF-29 | `require_section(Section.SALES, Level.WRITE)` en las cuatro rutas de decisión |
+| RF-29 | `require_section(Section.SALES, Level.WRITE)` en las cinco rutas de decisión |
 | RF-30 | `SaleGroup.versions` + `differences`, de `_differences_among` (`service.py:227-231`) |
 | RF-31 | `POST .../resolution` con `action="keep"` y `sale_id` |
 | RF-32 | El mismo, con `action="distinct"`: todas pasan a `COUNTED` |
 | RF-33 | Sale de RF-04: cambiar el estado cambia lo que suman las agregaciones, sin recalcular nada |
-| RF-34 | La descartada queda con `duplicate_of_sale_id` y se sigue devolviendo en el grupo |
-| RF-35 | `DELETE .../resolution` → `undo_resolution`; `409` si no hay decisión que deshacer |
-| RF-36 | `sale.decision` (JSONB), `resolved_by_user_id`, `resolved_at`, con el usuario del token |
+| RF-34 | La descartada queda con `duplicate_of_sale_id`, y la sección «Casos resueltos» la muestra al lado de la elegida (`GET /sales/resolved`) |
+| RF-35 | `DELETE .../resolution` → `undo_resolution`; `409` si no hay decisión que deshacer. El botón vive en «Casos resueltos», que es la única lista donde siempre hay una |
+| RF-36 | `sale.decision` (JSONB), `resolved_by_user_id`, `resolved_at`, con el usuario del token; el **nombre** lo resuelve la ruta con `ActorDirectory` |
 | RF-37 | Sale de RF-13 al revés: `held_groups()` sólo devuelve `HELD` |
-| RF-38 | `~` `PATCH /sales/{id}` acepta los cuatro campos; **la pantalla sólo ofrece corregir el producto**, con un `window.prompt` (D-5) |
-| RF-39 | `~` `sale.is_estimated` existe y viaja; **ninguna pantalla lo pone en `true`**: la única llamada manda `false` fijo (D-5) |
+| RF-38 | `PATCH /sales/{id}` acepta los cuatro campos y `SaleCorrection` los ofrece a los cuatro. D-5 cerrada el 2026-08-31; verificado a mano el 2026-09-01 completando una fecha que faltaba |
+| RF-39 | `sale.is_estimated`, con su casilla en la pantalla de corrección. D-5 cerrada el 2026-08-31; verificado a mano el 2026-09-01: la venta corregida quedó estimada y el mes lo avisó |
 | RF-40 | `Indicator.has_estimates`, de `has_estimates()`, y la pantalla lo dice. Verdadero, y hoy **nunca puede ser `true`** por D-5 |
 | RF-41 | `portal_values` se escribe al registrar y **nunca se toca al corregir** (`service.py:118-134`) |
 | RF-42 | `price_curve` sobre `core.price_point` (`catalog/repository.py:432-449`) |
-| RF-43 | `stock_at(since, latest=False)` contra `stock_at(until, latest=True)` |
+| RF-43 | `stock_at(since, latest=False)` contra `stock_at(until, latest=True)`. Excluye al que **no tiene ninguna** foto, y la pantalla lo dice así desde el 2026-09-01 |
 | RF-44 | `StockCut.ran_out = (closing == 0)`, listado aparte en la pantalla |
 | RF-45 | `products_first_seen_between` sobre `Product.first_seen_at` |
-| RF-46 | `~` `price_curve_excluded` (fijo en `0`) y `stock_excluded` existen; **el corte de altas no tiene `excluded`** ni en el schema ni en la pantalla (D-6) |
+| RF-46 | Los tres cortes informan lo que excluyeron: `price_curve_excluded` **calculado**, `stock_excluded` y `new_products_excluded`. D-6 cerrada el 2026-08-31; verificado a mano el 2026-09-01 |
 
 ## Alternativas descartadas
 
@@ -373,7 +383,7 @@ esos tiene su entrada en *Lo que falta* o en *Deriva*.
 | **La deduplicación es lo que falla en silencio.** Si una repetida con datos distintos se contara, el tablero daría un número más alto y nadie lo notaría hasta que el cliente lo verifique a mano | Alto | Tres tests de integración lo fijan (`test_business_dashboard.py:61-107`). Es el bloque que nunca hay que debilitar |
 | **El promedio de RF-21 se mueve solo.** `average_total_for` promedia las `COUNTED` de ese producto: cada venta que entra cambia el umbral para la siguiente, y resolver un grupo también | Medio | Es deliberado y está firmado. El efecto raro a conocer: **el orden en que llegan las ventas puede cambiar cuáles se apartan**, y ningún test lo fija |
 | **El fixture de `/ventas` es derivado.** Las columnas son una deducción | Medio | El parser levanta `ExtractionError` si faltan. Recapturar en cuanto se pueda entrar al portal |
-| **`stock_at` toma la foto *más cercana*, no la del día exacto.** Sin `since` no hay foto de apertura y **todos** los productos quedan excluidos del corte (`catalog/service.py:1889-1890`) | Medio | Es correcto —la lista se publica los días que se publica— y es sorprendente: abrir el tablero sin período muestra el corte de stock vacío con «N quedaron afuera». La pantalla no explica por qué |
+| **`stock_at` toma la foto *más cercana*, no la del día exacto.** Sin `since` no hay foto de apertura y **todos** los productos quedan excluidos del corte (`catalog/service.py:1889-1890`) | Medio | Es correcto —la lista se publica los días que se publica— y es sorprendente: abrir el tablero sin período muestra el corte de stock vacío con «N quedaron afuera». **La pantalla ya lo explica** —«Sin fecha de inicio el corte de stock no tiene con qué comparar»—, verificado a mano el 2026-09-01 |
 | **Tres migraciones compartidas.** `core.stock_point` viaja en la `0010`, que es de la 008 | Medio | Se acepta: las seis se entregan juntas. Un rollback de la 009 sola no existe |
 | **`TEST-05` mide 80 % sobre `app/` entera**, así que esta feature puede quedar floja sin que el umbral se entere | Medio | Está en la lista del Tester, con los casos concretos |
 
@@ -382,6 +392,12 @@ esos tiene su entrada en *Lo que falta* o en *Deriva*.
 **Esto no es alcance nuevo ni una lista de tareas: es lo que no cierra entre el código y lo que se
 firmó.** Se anota, no se arregla acá: qué corregir —el código o el acuerdo— lo decide el humano
 (Artículo V).
+
+**Estado al 2026-09-01: nueve de los diez están cerrados.** D-1, D-2, D-3, D-5, D-6 y D-7 se cerraron
+el 2026-08-31; D-8, D-9 y D-10 los encontró la **pasada manual del `Tester`** el 2026-09-01 —los tres
+son sobre lo que una persona lee o puede alcanzar, que es lo único que ningún test automático mira— y
+se cerraron el mismo día. **El único abierto es D-4**, y lo está a propósito: la propia spec firmada
+lo declara sin cerrar, y qué se corrige —el sistema o el acuerdo— es del humano.
 
 | # | RF | Qué no cierra | Dónde |
 |---|---|---|---|
@@ -392,6 +408,9 @@ firmó.** Se anota, no se arregla acá: qué corregir —el código o el acuerdo
 | **D-5** | RF-38, RF-39, RF-40 | La pantalla ofrece corregir **sólo el código de producto**, con un `window.prompt`, y manda `is_estimated: false` fijo. La fecha, el total y la cantidad **no se pueden corregir desde ninguna pantalla** aunque el endpoint las acepte, y **no hay forma de marcar un valor como estimado**, con lo que `has_estimates` nunca puede ser `true` y RF-40 está cumplido sobre algo que no puede ocurrir | `frontend/components/sales/SalesReview.tsx:153-168` |
 | **D-6** | RF-46 | El corte de **altas** no informa cuántos registros excluyó: `CatalogDashboard` lleva `price_curve_excluded` y `stock_excluded` y no un `new_products_excluded`. Además `price_curve_excluded` está **fijo en `0`** (`catalog/service.py:1920`), no calculado: dice «cero excluidos» sin haber contado | `catalog/schemas.py:230-244`, `service.py:1913-1932` |
 | **D-7** | RF-36 | Al resolver un grupo eligiendo una versión, las descartadas quedan con `reason = DUPLICATE_IDENTICAL` —«Repetida idéntica: se cuenta una sola vez»—, que **es falso**: se descartaron porque una persona eligió otra, no por ser idénticas. Lo decidido está bien guardado en `decision`; el texto que lee la persona miente | `sales/service.py:290` |
+| **D-8** | RF-43, RF-46 | **El texto del corte de stock decía lo contrario del código.** La pantalla informaba que quedaban afuera los productos «sin foto en **alguno** de los dos extremos»; lo que el corte excluye es al que **no tiene ninguna** foto que comparar, y el que tiene una sola entra. Es la regla que el 2026-08-31 se corrigió en este plan y en `data-model.md` y que quedó sin corregir en la copia de la pantalla. **Cerrado el 2026-09-01** (tarea 46) | `frontend/app/(private)/tablero/page.tsx` |
+| **D-9** | RF-34, RF-35, RF-36 | **Tres requisitos construidos y sin pantalla donde ocurrir.** Un caso resuelto sale de `held_groups()` —RF-37 lo pide— y salía también de la pantalla: no quedaba dónde ver la descartada al lado de la elegida (RF-34), ni qué se decidió, quién y cuándo (RF-36). El botón de deshacer se dibujaba sobre los grupos **pendientes**, donde por definición no hay resolución que revertir: sólo podía contestar 409, y el endpoint —que funciona— no tenía ningún camino desde la UI. **Cerrado el 2026-09-01** (tarea 45), ampliando alcance con autorización del humano | `sales/repository.py`, `routes.py`; `frontend/components/sales/SalesReview.tsx` |
+| **D-10** | RF-08, RF-29 | **Lo que ve quien no tiene permiso.** «Tu acceso no llega a **el** tablero del negocio», y como única acción «Volver al tablero» — que para compras es la pantalla que acaba de rechazarlo, y es lo primero que ve al entrar. Transversal: la misma negativa la usan trece pantallas. **Cerrado el 2026-09-01** (tarea 44) | `frontend/components/common/NoPermission.tsx` |
 
 ### Código sin requisito firmado
 
@@ -410,6 +429,11 @@ requisito la pide.
   que RF-41 usa. Las otras dos son el Artículo III.
 
 ## Contexto de traspaso
+
+> **Al 2026-09-01 este traspaso ya se ejecutó entero.** Las 46 tareas están hechas, la pasada manual
+> del `Tester` se hizo, y de los diez puntos de deriva sólo queda abierto D-4. Lo que sigue vale como
+> lo que es: el registro de por dónde se entró y, sobre todo, **la lista de lo que no hay que tocar**,
+> que no caduca.
 
 **Para el Developer** — Empezá por **D-1**, que es lo único que rompe la promesa central de la
 feature, y arrancá por el lugar más chico: el filtro de `ingestion/service.py:743-750`. `core.sale` ya
@@ -431,6 +455,23 @@ Lo que **no** hay que tocar, porque es una decisión tomada y testeada:
 - **`portal_values` se escribe una vez y nunca se toca.** Es RF-41 y es la evidencia.
 - **`_filtered` es el único lugar donde vive «sólo lo contado».** Si un indicador nuevo no lo usa,
   RF-04 deja de valer para ese indicador y para ningún otro, que es la forma más difícil de notarlo.
+
+Y lo que agregó el cierre de D-9, el 2026-09-01:
+
+- **`resolved_groups()` filtra por `decision`, no por `resolved_at` ni por el estado.** Es la misma
+  columna que exige `undo_resolution`, y por eso la lista contiene exactamente los casos que el botón
+  puede deshacer. Cambiar ese filtro devuelve el defecto que D-9 corrigió: lo que el sistema unificó
+  solo y las correcciones manuales estampan `resolved_at` y **no** dejan `decision`, así que
+  aparecerían con un botón que sólo puede contestar 409. Dos tests lo fijan.
+
+- **`decision = None` sobre una columna JSONB no escribe un NULL de SQL**, escribe el valor JSON
+  `null`. Vuelve a Python como `None` —por eso `undo_resolution` acierta— pero en SQL esa fila sigue
+  teniendo valor: cualquier consulta nueva sobre `decision` tiene que usar `jsonb_typeof(...)`, no
+  `IS NOT NULL`. Costó un test en rojo descubrirlo, y está escrito al lado de la consulta.
+
+- **El nombre de quien decidió lo pone la ruta, no el servicio.** `_name_whoever_decided` usa
+  `ActorDirectory`, que es el único archivo de `identity` que otro módulo puede importar. Resolverlo
+  en el servicio sería cruzar la frontera, y devolver el id crudo sería incumplir RF-36 en silencio.
 
 **Para el Tester** — Hay 13 tests de integración (`test_business_dashboard.py`) y 5 de parser. Los de
 parser **están verdes por la razón equivocada**: verifican que una venta rota se aparta en `staging`,

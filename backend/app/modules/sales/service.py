@@ -27,6 +27,7 @@ from app.modules.sales.repository import SalesRepository
 from app.modules.sales.schemas import (
     Indicator,
     MonthTotal,
+    ResolvedGroup,
     ReviewQueue,
     SaleGroup,
     SaleList,
@@ -267,6 +268,40 @@ class SalesService:
             pending_groups=len(groups),
             held=sum(len(records) for records in grouped.values()),
         )
+
+    async def resolved_groups(self, *, limit: int = 50) -> list[ResolvedGroup]:
+        """The cases a person already decided (RF-34, RF-35, RF-36 of 009).
+
+        The counterpart of `review_queue`, and it exists because that one
+        answers a different question. A decided case leaves the queue on
+        purpose — RF-37 asks for one less pending — and until now it left the
+        screen with it, taking three signed requirements along: nobody could see
+        the discarded version beside the chosen one, nobody could read what was
+        decided and by whom, and the undo RF-35 promises had no place to be
+        offered.
+        """
+        grouped = await self.sales.resolved_groups(limit=limit)
+        resolved: list[ResolvedGroup] = []
+        for code_key, records in grouped.items():
+            # Every version of a group carries the same decision: `resolve_group`
+            # stamps all of them, so any one of them can be asked.
+            decision = next((sale.decision for sale in records if sale.decision), {})
+            resolved.append(
+                ResolvedGroup(
+                    code_key=code_key,
+                    versions=[SaleRead.model_validate(sale) for sale in records],
+                    action=str(decision.get("action", "")),
+                    kept_sale_id=decision.get("sale_id"),
+                    resolved_at=next(
+                        (sale.resolved_at for sale in records if sale.resolved_at), None
+                    ),
+                    resolved_by_user_id=next(
+                        (sale.resolved_by_user_id for sale in records if sale.resolved_by_user_id),
+                        None,
+                    ),
+                )
+            )
+        return resolved
 
     @staticmethod
     def _differences_among(records: list[Sale]) -> list[str]:

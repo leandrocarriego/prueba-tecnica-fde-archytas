@@ -6,7 +6,7 @@
   corresponde al proyecto, o falta la skill: preguntá antes de inventarla.
 -->
 
-**Feature:** 009-business-dashboard · **Plan:** `plan.md` · **Tareas:** 43
+**Feature:** 009-business-dashboard · **Plan:** `plan.md` · **Tareas:** 46
 
 ## Estado
 
@@ -17,7 +17,11 @@ desglosara. El desglose de abajo es el que `plan.md` implica; las marcas dicen q
 
 - ✅ **43 de 43**, al 2026-08-31. Las 29 que estaban construidas, más las 14 que faltaban: la mitad
   de la H3, los cuatro huecos de pantalla y los cuatro grupos de tests que no existían.
-- **La suite queda en 1459 tests y 90,80 % de cobertura**, contra 1443 y 89,70 % antes de esta pasada.
+- ✅ **46 de 46**, al 2026-09-01. Las tres nuevas —44, 45 y 46— salieron de la **pasada manual del
+  `Tester`**, no de un test: son cosas que sólo se ven abriendo la pantalla.
+- **La suite queda en 1662 tests y 93,12 % de cobertura.** El salto contra los 1459 del 2026-08-31 no
+  es todo de esta feature: entre medio se mergearon la 011 y la 012, y la medición sobre `main` antes
+  de esta pasada era 1652 y 93,09 %.
 
 > **Un defecto lo encontró un test escrito a propósito antes que el código.** La tarea 24 se escribió
 > primero, en rojo, y al pasar a verde destapó que **todas las ventas sin código compartían el
@@ -32,14 +36,40 @@ desglosara. El desglose de abajo es el que `plan.md` implica; las marcas dicen q
 > Los dos documentos quedaron corregidos y el comportamiento quedó fijado por
 > `test_a_single_observation_is_reported_at_both_ends`, con la pregunta que abre anotada ahí mismo.
 
-> **La suite corrió entera y está en verde**: 1459 tests, 8 skips, 0 fallas, 90,80 % de cobertura.
-> Lo que sigue faltando son las **pruebas de sistema del `Tester`** —abrir las pantallas a mano—, que
-> ningún test automático reemplaza.
+> **La suite corrió entera y está en verde**: 1662 tests, 9 skips, 0 fallas, 93,12 % de cobertura
+> (2026-09-01).
+
+> **Las pruebas de sistema del `Tester` se hicieron el 2026-09-01**, con Playwright sobre las dos
+> pantallas, sembrando la base de desarrollo por el camino real —el mismo `normalize_sales` sobre el
+> mismo HTML fijado— para que hubiera 588 filas y no dos. Quedaron verificados en pantalla RF-03,
+> RF-05, RF-06, RF-07, RF-08, RF-24, RF-25, RF-26, RF-27, RF-29, RF-31, RF-32, RF-38, RF-39, RF-40 y
+> RF-41, sin un error de consola ni una respuesta ≥ 400.
+>
+> **Encontró tres defectos que ningún test automático podía encontrar**, porque los tres son sobre lo
+> que una persona lee o puede alcanzar, no sobre lo que el código calcula: el texto del corte de stock
+> decía lo contrario del código (tarea 46), el deshacer de RF-35 no tenía ningún camino desde la UI
+> (tarea 45), y la negativa de permiso decía «no llega a el tablero» y ofrecía como única salida
+> volver a la pantalla que acababa de rechazar (tarea 44). Los tres están corregidos.
+>
+> Dos cosas que **no** son defectos y conviene que no se vuelvan a levantar: el formato `mm/dd/yyyy`
+> del selector de fechas es el idioma de la interfaz del navegador de prueba —el `<input type="date">`
+> nativo no sigue el locale de la página, así que hay que mirarlo en el navegador del cliente antes de
+> llamarlo defecto—, y el círculo que tapaba «Cerrar sesión» en la barra lateral es el indicador de
+> desarrollo de Next.js, que no existe en producción.
 
 > **`/analyze` dio consistente** el 2026-08-31: los 46 RF tienen lugar en el plan y fila acá, las seis
 > historias tienen tareas, y los 46 criterios de aceptación corresponden a un requisito. **Falta
-> `/converge` y falta `/review-feature`**: los siete puntos de *Deriva* de `plan.md` son de `/converge`,
-> y seis de ellos —D-1, D-2, D-3, D-5, D-6 y D-7— quedaron cerrados en esta pasada.
+> `/converge` y falta `/review-feature`**: los puntos de *Deriva* de `plan.md` son de `/converge`.
+> De los siete originales quedaron cerrados seis —D-1, D-2, D-3, D-5, D-6 y D-7— el 2026-08-31, y
+> **D-4 sigue abierto a propósito**, porque corregirlo o no es del humano. La pasada manual del
+> 2026-09-01 sumó tres, **D-8, D-9 y D-10**, y los tres quedaron cerrados en el acto.
+
+> **Decisión del humano (2026-09-01): la tarea 45 amplía alcance, y con autorización.** El endpoint
+> `GET /sales/resolved` y la sección «Casos resueltos» no estaban en este documento. Se construyeron
+> porque sacar el botón falso y nada más habría dejado **tres requisitos firmados sin pantalla**
+> —RF-34, RF-35 y RF-36—, que es un defecto peor que el que se estaba corrigiendo. La alternativa
+> —sacar el botón y anotar el hueco para `/converge`— se ofreció y se descartó. No es deriva: es
+> alcance aprobado, y se anota acá para que `/converge` lo lea como tal.
 
 > **Decisión del humano (2026-08-31): las ventas rotas entran a `core.sale` como apartadas.** Es la
 > tarea 18 y la 19, y es lo que hace verdaderos de una sola vez ocho requisitos firmados. Antes de esa
@@ -73,6 +103,7 @@ migración → backend → frontend → tests.
 | ✅ 7 | Rutas `GET /sales` y `GET /dashboard/sales`, más las secciones `SALES` y `DASHBOARD` en la matriz de `identity` con `_PURCHASING: NONE` en las dos. RF-08 es la matriz, no una comprobación en la ruta. | `add_backend_feature` | Developer | RF-03, RF-04, RF-05, RF-06, RF-07, RF-08 |
 | ✅ 8 | Pantalla `(private)/tablero`: el facturado como **primer contenido**, con cuántas ventas sumó y cuántos registros excluyó, y la facturación mes a mes. | `add_frontend_feature` | Developer | RF-03, RF-06, RF-07 |
 | ✅ 9 | **RF-05 en la pantalla.** Hoy `/tablero` le manda el **mismo** `desde`/`hasta` a los dos endpoints y no ofrece ningún control: el período se cambia editando la URL. El backend ya son dos endpoints con ventana independiente; falta el selector por corte, y que la leyenda «cada corte elige su propio período» deje de ser falsa. Es la deriva **D-2**. | `add_frontend_feature` | Developer | RF-05 |
+| ✅ 44 | **Lo que ve quien no tiene permiso.** La negativa decía «Tu acceso no llega a **el** tablero del negocio» —la contracción se resuelve ahora una vez en `NoPermission`, y no en trece llamadores— y ofrecía como única acción «Volver al tablero», que para compras es la pantalla que acaba de rechazarlo: un lazo, y lo primero que ve al entrar. Es transversal: la misma negativa la usan trece pantallas, así que toca también «el calendario» y «el padrón de proveedores». Es la deriva **D-10**. | `add_frontend_feature` | Developer | RF-08, RF-29 |
 | ✅ 10 | **Tests de permisos por comportamiento.** Hoy RF-08 y RF-29 están probados por construcción: no hay ni una request real como compras contra `/dashboard/sales` o `/sales` que espere 403, ni una como compras contra `/sales/review`. Sumar también que el job de ventas se dispara por su parámetro (RF-01) y que mover el período de un corte no mueve el del otro **desde la pantalla** (RF-05). | `add_tests` | Tester | RF-01, RF-05, RF-08, RF-29 |
 
 ### H2 — Las repetidas no se suman
@@ -126,6 +157,7 @@ migración → backend → frontend → tests.
 | ✅ 36 | **El motivo de una descartada por decisión humana dice otra cosa.** `resolve_group` deja `reason = "Repetida idéntica: se cuenta una sola vez"` en las versiones que una persona descartó, lo cual es falso: se descartaron porque alguien eligió otra. Lo decidido está bien guardado en `decision`; el texto que lee la persona miente. Es la deriva **D-7**. | `add_backend_feature` | Developer | RF-36 |
 | ✅ 37 | Tests de H5: los cuatro casos de `TestRepeatedSales` que cubren elegir, declarar distintas y deshacer, más el de `TestBrokenRecords` que verifica que lo que informó el portal se conserva al corregir. | `add_tests` | Tester | RF-30, RF-31, RF-32, RF-33, RF-34, RF-35, RF-36, RF-37, RF-41 |
 | ✅ 38 | Tests de RF-38 a RF-40 desde la pantalla: corregir una fecha y que la venta entre a los indicadores; cargar un total **estimado** y que el mes que la incluye avise que uno de sus valores lo es. Hoy el segundo no puede pasar de rojo a verde sin la tarea 35. | `add_tests` | Tester | RF-38, RF-39, RF-40 |
+| ✅ 45 | **La sección «Casos resueltos», que no existía.** Un caso decidido se va de la cola —RF-37 lo pide— y se iba también de la pantalla: no quedaba dónde ver la versión descartada al lado de la elegida (RF-34), ni qué se decidió, quién y cuándo (RF-36), ni desde dónde deshacerlo (RF-35). El botón de deshacer vivía sobre los grupos **pendientes**, donde por definición no hay resolución que revertir y sólo podía contestar 409. Backend: `resolved_groups()` en repositorio y servicio, `ResolvedGroup`, y `GET /sales/resolved` con `require_section(SALES, WRITE)`, que nombra al que decidió con `ActorDirectory` —`sales` guarda el id y no puede nombrar a nadie sin importar `identity` (Artículo IV)—. Frontend: la sección, y el botón falso fuera de los pendientes. Es la deriva **D-9**. | `add_feature` | Developer | RF-34, RF-35, RF-36 |
 
 ### H6 — Cómo se movieron los precios, el stock y las altas
 
@@ -136,6 +168,7 @@ migración → backend → frontend → tests.
 | ✅ 41 | `GET /dashboard/catalog` con su propia ventana, y los tres cortes en la pantalla del tablero. Que sean dos endpoints y no uno es lo que hace posible RF-05. | `add_backend_feature` | Developer | RF-42, RF-43, RF-44, RF-45, RF-46 |
 | ✅ 42 | **RF-46 completo.** El corte de **altas** no informa cuántos registros excluyó —no existe `new_products_excluded` ni en el schema ni en la pantalla— y `price_curve_excluded` está **fijo en `0`**, no calculado: dice «cero excluidos» sin haber contado. Es la deriva **D-6**. | `add_backend_feature` | Developer | RF-46 |
 | ✅ 43 | **Tests de H6 — hoy no hay ninguno.** Ni uno solo toca `price_curve`, `stock_at`, `products_first_seen_between` ni `GET /dashboard/catalog`. Lo que hay que fijar: que el stock compare la foto de apertura con la de cierre; que un producto sin foto en un extremo quede **excluido y no en cero**; que los que terminaron en cero salgan señalados; y el caso que sorprende — **sin `since` no hay apertura y el corte sale vacío con todos excluidos**. | `add_tests` | Tester | RF-42, RF-43, RF-44, RF-45, RF-46 |
+| ✅ 46 | **El texto del corte de stock decía lo contrario del código.** La pantalla informaba que quedaban afuera los productos «sin foto en **alguno** de los dos extremos»; lo que el corte excluye es al que no tiene **ninguna** foto que comparar, y el que tiene una sola entra, leyéndose como «no se movió». Es la misma regla que ya se había corregido en `plan.md` y en `data-model.md` el 2026-08-31 y que quedó sin corregir en la copia de la pantalla. Lo encontró la pasada manual del `Tester`, no un test: ningún test automático lee el texto. Es la deriva **D-8**. | `add_frontend_feature` | Developer | RF-43, RF-46 |
 
 ## Cobertura de requisitos
 
@@ -148,7 +181,7 @@ migración → backend → frontend → tests.
 | RF-05 | 7, **9** | 28, **10** |
 | RF-06 | 6, 7, 8 | 28 |
 | RF-07 | 7, 8 | 28 |
-| RF-08 | 7 | **10** |
+| RF-08 | 7, 44 | **10** |
 | RF-09 | 3, 11, 12 | 16 |
 | RF-10 | 4, 11 | 4, 16 |
 | RF-11 | 12 | 16 |
@@ -169,27 +202,28 @@ migración → backend → frontend → tests.
 | RF-26 | **27** | **29** |
 | RF-27 | 25 | 28 |
 | RF-28 | **19**, 26 | 28, **24** |
-| RF-29 | 34 | **10** |
+| RF-29 | 34, 44 | **10**, 45 |
 | RF-30 | 30, 34 | 37 |
 | RF-31 | 31, 34 | 37 |
 | RF-32 | 31, 34 | 37 |
 | RF-33 | 6, 31 | 37 |
-| RF-34 | 31, 34 | 37 |
-| RF-35 | 32, 34 | 37 |
-| RF-36 | 31, **36** | 37 |
+| RF-34 | 31, 34, 45 | 37, 45 |
+| RF-35 | 32, 34, 45 | 37, 45 |
+| RF-36 | 31, **36**, 45 | 37, 45 |
 | RF-37 | 30, 32 | 37 |
 | RF-38 | 33, **35** | **38** |
 | RF-39 | 33, **35** | **38** |
 | RF-40 | 25, **35** | **38** |
 | RF-41 | 33 | 37 |
 | RF-42 | 40, 41 | **43** |
-| RF-43 | 39, 40, 41 | **43** |
+| RF-43 | 39, 40, 41, 46 | **43** |
 | RF-44 | 40, 41 | **43** |
 | RF-45 | 40, 41 | **43** |
-| RF-46 | **42** | **43** |
+| RF-46 | **42**, 46 | **43** |
 
-En negrita, lo pendiente. **Los 46 requisitos tienen tarea y tienen test**, pero conviene leer la
-tabla por dónde está la negrita:
+En negrita, lo que estaba pendiente al escribir este documento el 2026-08-31; **hoy no queda nada
+en ese estado**, y la negrita se deja porque dice de dónde vino cada cosa. **Los 46 requisitos tienen
+tarea y tienen test.** Conviene leer la tabla por dónde está la negrita:
 
 - **Cuatro requisitos no tienen hoy ni una línea construida**: RF-12, RF-26, RF-46 y el tramo
   RF-16 a RF-19 en su mitad de producto. Los cierran las tareas 15, 27, 42, 18 y 19.
@@ -202,9 +236,26 @@ tabla por dónde está la negrita:
 
 ## Notas para `/converge`
 
-**La lista completa de deriva vive en `plan.md` → *Deriva contra la spec firmada*, y son siete
-puntos.** Acá van las cuatro cosas que se ven desde este documento y conviene que el converge
-encuentre ya escritas:
+**La lista completa de deriva vive en `plan.md` → *Deriva contra la spec firmada*, y son diez
+puntos**: los siete originales más D-8, D-9 y D-10, que salieron de la pasada manual del 2026-09-01.
+Nueve están cerrados; el único abierto es **D-4**, y lo está a propósito. Acá van las cosas que se ven
+desde este documento y conviene que el converge encuentre ya escritas:
+
+- **D-9 se cerró ampliando alcance, con autorización del humano.** El endpoint `GET /sales/resolved`
+  y la sección «Casos resueltos» no estaban en este documento. Un converge que los encuentre y no lea
+  esto los va a marcar como código sin requisito: no lo son —son RF-34, RF-35 y RF-36, que estaban
+  construidos en el backend y no tenían pantalla—, y la decisión está fechada arriba.
+
+- **La consulta de casos resueltos filtra por `decision`, y eso es una restricción, no un detalle.**
+  Es la misma columna que exige `undo_resolution`. Filtrar por `resolved_at` o por estado vuelve a
+  poner en la lista casos donde el botón sólo puede contestar 409 —lo unificado solo, y las
+  correcciones manuales—, que es exactamente el defecto que D-9 corrigió. Hay dos tests que lo fijan.
+
+- **Un bug real apareció al escribir esos tests**: `decision = None` sobre una columna JSONB **no
+  escribe un NULL de SQL**, escribe el valor JSON `null`. Del lado de Python vuelve como `None` y por
+  eso todo lo demás acertaba, pero un `IS NOT NULL` devolvía como decididos los casos recién
+  deshechos. Está resuelto con `jsonb_typeof(...) = 'object'` y fijado por
+  `test_undoing_takes_the_case_out_of_the_resolved_list`.
 
 - **D-1 tiene tarea desde el 2026-08-31 y antes no podía tenerla.** Había dos salidas incompatibles
   —traer las filas a `core.sale`, o abrirles un caso en `triage`— y elegir entre ellas es del humano,

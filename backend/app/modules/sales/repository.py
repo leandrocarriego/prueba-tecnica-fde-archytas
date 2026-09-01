@@ -157,6 +157,60 @@ class SalesRepository:
             grouped.setdefault(sale.code_key, []).append(sale)
         return grouped
 
+    async def resolved_groups(self, *, limit: int = 50) -> dict[str, list[Sale]]:
+        """The cases a person already decided, grouped, newest decision first.
+
+        `held_groups` cannot answer this: the moment somebody decides, not one
+        version of the group is `HELD` any more — the chosen one is `COUNTED`
+        and the others `DISCARDED` — so a resolved case leaves that query
+        entirely. That is right for RF-37, which asks the queue to have one less
+        pending, and it is what left RF-34, RF-35 and RF-36 with nowhere to
+        happen: the screen showed no decided case, so there was nothing to see
+        the discarded version beside the chosen one, nothing saying who decided
+        and when, and no way to undo.
+
+        What defines a resolved case is **`decision`**, not the state and not
+        `resolved_at`. Two other things stamp `resolved_at` and are not group
+        resolutions: a manual correction of a broken record, and — before it —
+        nothing else. Neither carries a `decision`, and `undo_resolution`
+        refuses exactly what has none. Filtering on the same column the undo
+        checks is what keeps this section from offering a button that can only
+        fail, which is how it got here in the first place.
+
+        A version the system merged on its own for being identical also has no
+        `decision`, and the signature is explicit that it has no resolution to
+        revert.
+
+        `limit` counts **cases, not rows**, because a page of decisions is what
+        the screen shows and a group whose tail got cut off would ask somebody
+        to choose between versions they cannot all see.
+        """
+        # `jsonb_typeof(...) = 'object'` y no `IS NOT NULL`, y la diferencia no
+        # es cosmética: al deshacer, `decision = None` sobre una columna JSONB
+        # **no** escribe un NULL de SQL, escribe el valor JSON `null`. Del lado
+        # de Python vuelve como `None` y todo lo demás sigue funcionando —por eso
+        # `undo_resolution` acierta—, pero para SQL esa fila sigue teniendo
+        # valor, y un `IS NOT NULL` devolvía los casos recién deshechos como si
+        # todavía estuvieran decididos. Lo encontró
+        # `test_undoing_takes_the_case_out_of_the_resolved_list`.
+        recent = (
+            select(Sale.code_key, func.max(Sale.resolved_at).label("decided_at"))
+            .where(func.jsonb_typeof(Sale.decision) == "object")
+            .group_by(Sale.code_key)
+            .order_by(func.max(Sale.resolved_at).desc())
+            .limit(limit)
+            .subquery()
+        )
+        result = await self.session.execute(
+            select(Sale)
+            .join(recent, Sale.code_key == recent.c.code_key)
+            .order_by(recent.c.decided_at.desc(), Sale.code_key, Sale.id)
+        )
+        grouped: dict[str, list[Sale]] = {}
+        for sale in result.scalars().all():
+            grouped.setdefault(sale.code_key, []).append(sale)
+        return grouped
+
     # --- The projections ---------------------------------------------------
 
     async def known_products(self) -> set[str]:

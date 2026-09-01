@@ -12,9 +12,17 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.modules.identity.dependencies import CurrentUser, Level, Section, require_section
+from app.modules.identity.dependencies import (
+    ActorDirectory,
+    ActorDirectoryDep,
+    CurrentUser,
+    Level,
+    Section,
+    require_section,
+)
 from app.modules.sales.models import SaleState
 from app.modules.sales.schemas import (
+    ResolvedGroup,
     ReviewQueue,
     SaleCorrection,
     SaleList,
@@ -66,6 +74,44 @@ async def list_sales(
 async def review_queue(service: SalesDep) -> ReviewQueue:
     """The owner and sales (RF-13, RF-14, RF-23, RF-26, RF-28, RF-30 of 009)."""
     return await service.review_queue()
+
+
+@router.get(
+    "/resolved",
+    dependencies=[require_section(Section.SALES, Level.WRITE)],
+    summary="The repeated sales somebody already decided about",
+)
+async def resolved_groups(
+    service: SalesDep,
+    directory: ActorDirectoryDep,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+) -> list[ResolvedGroup]:
+    """The owner and sales (RF-34, RF-35, RF-36 of 009).
+
+    Behind `WRITE` and not `READ`, like the queue it belongs to: this is where
+    a decision gets undone, and showing somebody a case they cannot act on
+    would be an invitation to a button they do not have.
+    """
+    groups = await service.resolved_groups(limit=limit)
+    await _name_whoever_decided(groups, directory)
+    return groups
+
+
+async def _name_whoever_decided(groups: list[ResolvedGroup], directory: ActorDirectory) -> None:
+    """Put a name next to the id of whoever decided (RF-36 of 009).
+
+    At the edge, like `purchases` does with the invoice somebody resolved: this
+    module keeps an id and holds no foreign key to `users`, because two modules'
+    schemas do not get to depend on each other (Artículo IV). The name is a
+    rendering concern, and `identity.dependencies` is the one file another
+    module may import.
+    """
+    names = await directory.names_for(
+        {group.resolved_by_user_id for group in groups if group.resolved_by_user_id}
+    )
+    for group in groups:
+        if group.resolved_by_user_id is not None:
+            group.resolved_by_name = names.get(group.resolved_by_user_id)
 
 
 @router.post(

@@ -98,7 +98,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   ])
 
   if (sales === null) {
-    return <NoPermission what="el tablero del negocio" />
+    return <NoPermission what="el tablero del negocio" isHome />
   }
 
   const ranOut = (catalog?.stock ?? []).filter(cut => cut.ran_out)
@@ -236,16 +236,30 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Stock</h2>
 
+            {/*
+              Lo que excluye el corte es **no tener ninguna foto** que comparar
+              —ni una desde el inicio del período, ni una hasta el final—, no que
+              falte en uno de los dos extremos: con una sola observación la misma
+              foto es la de apertura y la de cierre, y el producto entra al corte
+              leyéndose como «no se movió» (`catalog/service.py`, y
+              `data-model.md` → *Cómo se arma el corte*). El texto decía lo
+              contrario y le atribuía al sistema una exclusión que no hace.
+            */}
             <Excluded howMany={catalog.stock_excluded}>
-              Quedaron afuera por no tener foto en alguno de los dos extremos del período.
+              Quedaron afuera porque no hay ninguna foto de su stock con que comparar en este
+              período. No se cuentan como cero: decir cero sería inventar un stock.
             </Excluded>
 
             <p className="text-sm text-muted-foreground">
-              {count(catalog.stock.length)} productos con foto al principio y al final del período ·{' '}
+              {count(catalog.stock.length)} productos con stock comparable en el período ·{' '}
               {catalog.stock_excluded === 0
                 ? 'ninguno quedó afuera'
-                : `${count(catalog.stock_excluded)} quedaron afuera por no tener foto en algún extremo`}
-              .{ranOut.length > 0 && ` ${ranOut.length} quedaron sin stock al final.`}
+                : `${count(catalog.stock_excluded)} quedaron afuera por no tener ninguna foto`}
+              .
+              {ranOut.length > 0 &&
+                (ranOut.length === 1
+                  ? ' 1 quedó sin stock al final.'
+                  : ` ${count(ranOut.length)} quedaron sin stock al final.`)}
             </p>
             {ranOut.length > 0 && (
               <ul className="text-sm">

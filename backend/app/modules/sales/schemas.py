@@ -60,6 +60,28 @@ class ReviewQueue(BaseModel):
     held: int
 
 
+class ResolvedGroup(BaseModel):
+    """A repeated sale somebody already decided about (RF-34, RF-35, RF-36).
+
+    The three requirements are one screen: the discarded version stays visible
+    beside the chosen one (RF-34), the case says what was decided, by whom and
+    when (RF-36), and from there the decision can be undone (RF-35).
+
+    `resolved_by_name` is filled at the edge, by the route, never here: this
+    module stores an id and cannot name a person without importing `identity`
+    (Artículo IV). Writing "el usuario 3" would not meet RF-36, it would
+    simulate meeting it.
+    """
+
+    code_key: str
+    versions: list[SaleRead]
+    action: str
+    kept_sale_id: int | None
+    resolved_at: datetime | None
+    resolved_by_user_id: int | None
+    resolved_by_name: str | None = None
+
+
 class SaleResolution(BaseModel):
     """What somebody decided about a repeated sale (RF-31, RF-32 of 009)."""
 
