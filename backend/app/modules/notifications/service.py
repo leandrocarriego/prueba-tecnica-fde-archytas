@@ -7,6 +7,7 @@ user-facing string (Artículo VIII).
 
 from datetime import datetime
 from typing import NamedTuple
+from urllib.parse import urlencode
 
 from app.config import settings
 from app.logging import get_logger
@@ -88,6 +89,37 @@ def _where_to_look(entity_type: str | None, entity_id: str | None) -> str:
     return f"Revisala acá: {settings.FRONTEND_URL}/{entity.screen}/{entity_id}"
 
 
+# --- Dónde se mira cada cosa que un aviso nombra --------------------------
+#
+# La **dirección**, no el nombre de la pantalla. El dueño lee esto de noche, en
+# el teléfono y lejos del sistema: «miralo en la pantalla de facturas» no es una
+# manera de entrar, y `https://…/facturas/312` sí. Es la misma razón por la que
+# la invitación y la recuperación llevan su enlace, y por la que
+# `_where_to_look` ya lo hacía para el dato de una corrección; lo que faltaba
+# era que lo llevaran los cuatro avisos que se mandan solos.
+INVOICES_SCREEN = "facturas"
+INBOX_SCREEN = "mensajes"
+ORDERS_SCREEN = "ordenes"
+PRICE_LOG_SCREEN = "precios/historial"
+
+
+def _link(screen: str, entity_id: object = None, **query: str) -> str:
+    """La dirección de una pantalla, o la del dato adentro de ella.
+
+    `query` es para las pantallas que no tienen una ruta por fila y sí un filtro
+    que las recorta: la bandeja del portal no direcciona un mensaje, pero
+    `?proveedor=…` deja al dueño frente a los de ese proveedor y no frente a
+    cuarenta. Un filtro es peor que una ruta y mucho mejor que un listado
+    entero.
+    """
+    address = f"{settings.FRONTEND_URL}/{screen}"
+    if entity_id is not None:
+        address = f"{address}/{entity_id}"
+    if query:
+        address = f"{address}?{urlencode(query)}"
+    return address
+
+
 def invitation_message(*, name: str, link: str, reason: str) -> str:
     """The message that lets somebody set the password of their own access."""
     if reason == "REACTIVATION":
@@ -118,7 +150,8 @@ def stalled_message(*, consecutive_failures: int, last_success_at: datetime | No
         "⚠️ Cordillera: la actualización de precios dejó de funcionar.\n"
         f"Intentos fallidos seguidos: {consecutive_failures}.\n"
         f"Última actualización exitosa: {_moment(last_success_at)}.\n"
-        "Los precios que muestra el sistema pueden estar desactualizados."
+        "Los precios que muestra el sistema pueden estar desactualizados.\n"
+        f"Mirá qué pasó en cada corrida: {_link(PRICE_LOG_SCREEN)}"
     )
 
 
@@ -204,21 +237,52 @@ DIGEST_TIME_KEY = "daily_digest.time"
 WORKING_DAYS = frozenset({0, 1, 2, 3, 4})
 
 
-def due_soon_message(*, number: str, supplier: str, due_on: object, days_ahead: int) -> str:
-    """The alert for an invoice that is about to fall due with no receipt (RF-38)."""
+def due_soon_message(
+    *,
+    number: str,
+    supplier: str,
+    due_on: object,
+    days_ahead: int,
+    invoice_id: int | None = None,
+) -> str:
+    """The alert for an invoice that is about to fall due with no receipt (RF-38).
+
+    El enlace lleva a **esa** factura y no a la lista: el aviso dice que todavía
+    se le puede emitir el recibo, y el enlace es lo que hace que eso sea una
+    acción y no una tarea que hay que ir a buscar entre cuatrocientas filas.
+
+    `invoice_id` es opcional porque un aviso sin referencia sigue siendo un
+    aviso: sin él se manda el mismo mensaje, sin la línea del enlace. Prometer
+    una dirección que apunte a `/facturas/None` sería peor que no prometerla.
+    """
     when = "hoy" if days_ahead == 0 else f"en {days_ahead} día{'s' if days_ahead != 1 else ''}"
+    where = "" if invoice_id is None else f"\nEmitilo acá: {_link(INVOICES_SCREEN, invoice_id)}"
     return (
         "📄 Cordillera: una factura vence sin recibo de recepción.\n"
         f"Factura {number}, de {supplier}.\n"
         f"Vence {when} ({due_on}).\n"
-        "Todavía se le puede emitir el recibo."
+        f"Todavía se le puede emitir el recibo.{where}"
     )
+
+
+def _inbox_of(supplier: str) -> str:
+    """La bandeja recortada a los mensajes de un proveedor.
+
+    La pantalla filtra por nombre —es lo que `RF-26` de la 007 firmó—, así que
+    el nombre que ya viaja en el aviso alcanza para dejar al dueño frente a los
+    mensajes de ese proveedor. No hay ruta por mensaje; el día que la haya, esto
+    es una línea.
+    """
+    return _link(INBOX_SCREEN, proveedor=supplier)
 
 
 def payment_claim_message(*, supplier: str, subject: str, body: str) -> str:
     """The alert for a supplier claiming a payment (RF-33 of 007)."""
     return (
-        f"📣 Cordillera: un proveedor reclama un pago.\n{supplier}: {subject}\n{body[:280]}"
+        f"📣 Cordillera: un proveedor reclama un pago.\n"
+        f"{supplier}: {subject}\n"
+        f"{body[:280]}\n"
+        f"Miralo en la bandeja: {_inbox_of(supplier)}"
     ).strip()
 
 
@@ -227,7 +291,8 @@ def message_due_message(*, supplier: str, subject: str, body: str) -> str:
     return (
         "⏰ Cordillera: aviso de vencimiento en la bandeja del portal.\n"
         f"{supplier}: {subject}\n"
-        f"{body[:280]}"
+        f"{body[:280]}\n"
+        f"Miralo en la bandeja: {_inbox_of(supplier)}"
     ).strip()
 
 
@@ -243,6 +308,21 @@ def daily_digest_message(*, pending_messages: int, stalled_orders: int, lines: l
         f"Mensajes sin resolver: {pending_messages}.\n"
         f"Órdenes estancadas: {stalled_orders}."
     )
-    if not lines:
+    if not lines and pending_messages == 0 and stalled_orders == 0:
+        # Sin enlace, y a propósito: un día sin nada pendiente no tiene adónde
+        # mandar a nadie. Un enlace acá enseñaría que el enlace no significa
+        # «hay algo para hacer», que es exactamente lo que significa en los
+        # otros tres avisos.
         return f"{header}\nNo hay nada pendiente."
-    return "\n".join([header, "", *lines[:10]])
+    # Una dirección por cuenta, y sólo la de las cuentas que no dan cero: el
+    # resumen cuenta dos cosas que se resuelven en dos pantallas distintas, y
+    # un enlace único tendría que apuntar a una de las dos o a ninguna.
+    where = [
+        line
+        for line, pending in (
+            (f"Mensajes: {_link(INBOX_SCREEN)}", pending_messages),
+            (f"Órdenes: {_link(ORDERS_SCREEN)}", stalled_orders),
+        )
+        if pending
+    ]
+    return "\n".join([header, "", *lines[:10], *(["", *where] if where else [])])
