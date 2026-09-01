@@ -377,6 +377,44 @@ class OrderSpend(Base):
         return f"<OrderSpend row={self.staging_row_id} code={self.product_code} {self.amount}>"
 
 
+class SaleRevenue(Base):
+    """Lo vendido de cada producto, como proyección propia de este módulo.
+
+    El gemelo exacto de `OrderSpend`, por el otro lado del negocio: los montos
+    viven en `sales` (`core.sale`), que este módulo no puede leer (Artículo IV),
+    así que guarda su copia alimentada por `SalesNormalized`. Con eso alcanza
+    para «ventas por rubro», que es la misma consulta que «gasto por rubro» con
+    otra tabla.
+
+    **Por qué hacía falta.** El tablero del vendedor mostraba gasto por rubro:
+    una pantalla que contesta qué se compró, puesta delante de quien vende. Y no
+    se podía cambiar sin esto — la venta sabe su producto y el producto sabe su
+    rubro, pero están en dos módulos distintos y ninguno de los dos puede leer
+    al otro.
+
+    Sólo entra lo que **suma**: una venta apartada no se cuenta en ningún total
+    (RF-13 de 009), y contarla acá sería contarla en el único lugar donde nadie
+    la está mirando.
+
+    Con la clave en la fila de `staging`, leer dos veces el mismo día deja el
+    mismo total: la proyección es idempotente, como las tasks que la alimentan.
+    """
+
+    __tablename__ = "sale_revenue"
+    __table_args__ = (
+        Index("ix_sale_revenue_product_code", "product_code"),
+        {"schema": CORE_SCHEMA},
+    )
+
+    staging_row_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    product_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    sold_on: Mapped[date | None] = mapped_column(Date, default=None)
+
+    def __repr__(self) -> str:
+        return f"<SaleRevenue row={self.staging_row_id} code={self.product_code} {self.amount}>"
+
+
 # Re-exported so the rest of the module names the status without reaching past
 # `models.py` for it.
 __all__ = [
@@ -393,5 +431,6 @@ __all__ = [
     "Product",
     "ProductPrice",
     "ProductStatus",
+    "SaleRevenue",
     "StockPoint",
 ]

@@ -260,6 +260,10 @@ class TriageService:
         """How many cases are waiting for somebody."""
         return await self.triage.count_cases(status=CaseStatus.PENDING, batch_id=batch_id)
 
+    async def pending_by_reason(self, limit: int = 5) -> list[tuple[str, int]]:
+        """Por qué están esperando, agrupado, lo más común primero."""
+        return await self.triage.pending_by_reason(limit)
+
     async def list_rules(
         self, *, include_revoked: bool = False, kind: str | None = None
     ) -> list[RuleRead]:

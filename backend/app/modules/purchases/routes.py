@@ -608,6 +608,39 @@ async def announce_presence(current_user: CurrentUser, session: Session) -> None
     await session.commit()
 
 
+@calendar_router.post(
+    "/presence/leaving",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_section(Section.CALENDAR, Level.WRITE)],
+    summary="Decir que se dejó de mirar el calendario",
+)
+async def announce_leaving(current_user: CurrentUser, session: Session) -> None:
+    """Contar en el canal que esta persona cerró el calendario.
+
+    **El turno vencido no alcanza, y por eso existe esto.** Sin despedida, el
+    que se va tarda hasta el vencimiento del turno en desaparecer de las otras
+    pantallas —más de un minuto—, y en ese rato las demás dicen que hay alguien
+    mirando algo que nadie está mirando. Eso es exactamente lo que la presencia
+    viene a evitar: mover un vencimiento creyendo que hay compañía es tan malo
+    como moverlo creyendo que no la hay.
+
+    **Y el turno sigue estando**, porque una despedida es lo primero que se
+    pierde: un navegador que se cierra de golpe, una pestaña que el sistema
+    operativo mata, una red que se corta. El aviso resuelve el caso normal en el
+    acto y el vencimiento sigue cubriendo el resto. Ninguno de los dos sobra.
+
+    `POST` y no `DELETE` aunque suene a borrar: no hay nada que borrar —no
+    existe registro de presencias— y `navigator.sendBeacon`, que es lo único
+    que un navegador entrega mientras se está cerrando, sólo sabe hacer `POST`.
+    """
+    await announce(
+        session,
+        "presence",
+        {"screen": "calendar", "user_id": current_user.id, "leaving": True},
+    )
+    await session.commit()
+
+
 async def _name_whoever_touched_the_calendar(
     entries: list[DueDateRead], directory: ActorDirectory
 ) -> None:

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { announceCalendarPresence } from '@/app/actions/purchases'
+import { announceCalendarPresence, leaveCalendarPresence } from '@/app/actions/purchases'
 
 /** Qué está pasando con el canal, en los términos en que la pantalla lo dice. */
 export type LiveState = 'conectando' | 'en-vivo' | 'caido'
@@ -100,6 +100,11 @@ export function useLiveCalendar({
     })
   }, [])
 
+  /** Sacar a alguien en el acto, porque avisó que se iba. */
+  const forget = useCallback((id: number) => {
+    setViewers(current => current.filter(one => one.id !== id))
+  }, [])
+
   useEffect(() => {
     const source = new EventSource('/api/calendar/stream')
 
@@ -110,12 +115,23 @@ export function useLiveCalendar({
       try {
         const message = JSON.parse(event.data) as {
           topic?: string
-          data?: { action?: string; actor_name?: string; user_id?: number; name?: string }
+          data?: {
+            action?: string
+            actor_name?: string
+            user_id?: number
+            name?: string
+            leaving?: boolean
+          }
         }
 
         if (message.topic === 'presence') {
           const id = message.data?.user_id
-          if (typeof id === 'number') remember(id, message.data?.name ?? '')
+          if (typeof id !== 'number') return
+          // Un aviso de despedida saca a la persona en el acto; sin él habría
+          // que esperar a que se le venza el turno, y hasta entonces la
+          // pantalla diría que hay alguien mirando que ya se fue.
+          if (message.data?.leaving) forget(id)
+          else remember(id, message.data?.name ?? '')
           return
         }
 
@@ -137,7 +153,7 @@ export function useLiveCalendar({
     source.onerror = () => setState('caido')
 
     return () => source.close()
-  }, [remember])
+  }, [remember, forget])
 
   // Anunciarse: una vez al abrir —para que los que ya están se enteren en el
   // acto— y después cada tanto. Quien sólo mira no se anuncia.
@@ -145,7 +161,28 @@ export function useLiveCalendar({
     if (!announce) return
     void announceCalendarPresence()
     const timer = setInterval(() => void announceCalendarPresence(), PRESENCE_MS)
-    return () => clearInterval(timer)
+
+    /*
+      Y despedirse, que es la mitad que faltaba. `sendBeacon` es lo único que un
+      navegador entrega mientras la pestaña se está cerrando —un `fetch` normal
+      se cancela con la página—, y va contra el proxy porque es la única puerta
+      del navegador hacia la API: la sesión vive en una cookie que el JavaScript
+      no lee, y el proxy es quien la convierte en cabecera.
+
+      `pagehide` y no `beforeunload`: es el evento que también dispara cuando el
+      navegador se lleva la página a su caché, y es el que Safari en un teléfono
+      efectivamente emite.
+    */
+    const goodbye = () => navigator.sendBeacon?.('/api/proxy/calendar/presence/leaving')
+    window.addEventListener('pagehide', goodbye)
+
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('pagehide', goodbye)
+      // Salir del calendario sin cerrar la pestaña —que es lo que pasa la mayor
+      // parte de las veces— no dispara `pagehide`, así que se avisa acá.
+      void leaveCalendarPresence()
+    }
   }, [announce])
 
   // Olvidar a los que dejaron de anunciarse. Se revisa con el mismo pulso que

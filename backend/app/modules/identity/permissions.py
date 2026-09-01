@@ -86,7 +86,19 @@ _SALES = "SALES"
 # own entry rather than borrowing a section whose name would be a lie.
 MATRIX: dict[Section, dict[str, Level]] = {
     Section.PRICES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.READ},
-    Section.CALENDAR: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.READ},
+    # El calendario es de compras y sólo de compras, **por decisión del dueño**
+    # (2026-09-01). La 002 se lo daba a ventas en lectura (RF-34) y el menú lo
+    # dibujaba; lo que hay ahí son vencimientos de facturas de proveedores, que
+    # no es una pregunta que quien vende tenga que contestar.
+    #
+    # Se saca de la matriz y no del menú. Este archivo dice arriba que la
+    # autorización es por recurso y no por esconder enlaces: dejar el `READ` y
+    # borrar la entrada daría una sección alcanzable que no se puede encontrar,
+    # que es la peor de las dos mitades.
+    #
+    # **Contradice un RF firmado**, y queda anotado acá hasta que la spec se
+    # enmiende: el Artículo V dice que esa decisión es del humano, y la tomó.
+    Section.CALENDAR: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.SUPPLIERS: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.PURCHASE_INVOICES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.PAYMENTS: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
@@ -94,7 +106,16 @@ MATRIX: dict[Section, dict[str, Level]] = {
     Section.RECEIPTS: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.SUPPLIER_MESSAGES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.NONE},
     Section.SALES: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
-    Section.DASHBOARD: {_OWNER: Level.READ, _PURCHASING: Level.NONE, _SALES: Level.READ},
+    # Compras **entra al tablero**, y no ve la facturación adentro. Tenía
+    # `NONE`, así que quien compra aterrizaba en `/tablero` —que es a donde
+    # lleva la raíz del área privada— y recibía una negativa: la pantalla con
+    # la que se abre el día, cerrada, para el rol que más facturas mira.
+    #
+    # Lo que la 009 protege con su RF-08 es la **facturación**, no la pantalla,
+    # y eso ahora lo protege `SALES` en el endpoint que la sirve. El corte de
+    # compras ya pedía `PURCHASE_INVOICES` además de éste, por la misma razón y
+    # desde antes.
+    Section.DASHBOARD: {_OWNER: Level.READ, _PURCHASING: Level.READ, _SALES: Level.READ},
     Section.STOCK: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},
     Section.PRODUCT_CATEGORIES: {_OWNER: Level.WRITE, _PURCHASING: Level.WRITE, _SALES: Level.READ},
     Section.PRODUCT_CATALOG: {_OWNER: Level.WRITE, _PURCHASING: Level.NONE, _SALES: Level.WRITE},

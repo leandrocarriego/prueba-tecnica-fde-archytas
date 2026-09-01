@@ -80,6 +80,7 @@ from app.shared.events import (
     NormalizedHistoryPoint,
     NormalizedPriceRow,
     NormalizedPurchaseOrder,
+    NormalizedSale,
     ProductPricesUpdated,
     ProductsRegistered,
     RegisteredProduct,
@@ -733,6 +734,36 @@ class CatalogService:
         ]
         await self.catalog.record_order_spend(lines)
 
+    async def record_sale_revenue(self, sales: tuple[NormalizedSale, ...]) -> None:
+        """Keep «ventas por rubro» fed by the sales that were typed.
+
+        **Sólo entra lo que suma.** Un registro que el parser no pudo leer
+        entero viaja igual en el evento —con su motivo, que es lo que la 009
+        pide— y no cuenta en ningún total: sin monto no hay venta que sumar, y
+        con un motivo la venta está apartada esperando a alguien. Contarla acá
+        sería contarla en el único lugar donde nadie la está mirando.
+
+        El rubro no se decide acá: es un join que se hace al leer contra los
+        productos de este módulo, así que una venta cuyo producto reciba un
+        rubro mañana se mueve sola de «sin rubro» al suyo.
+        """
+        lines = [
+            (sale.staging_row_id, sale.product_code, sale.total, sale.sold_on)
+            for sale in sales
+            if sale.total is not None and sale.reason is None
+        ]
+        await self.catalog.record_sale_revenue(lines)
+
+    async def products_first_seen_since(self, since: datetime) -> list[Product]:
+        """The products the catalog started to know after a moment.
+
+        La misma consulta que arma el corte de altas del tablero, con un solo
+        extremo: el resumen del día pregunta «desde ayer», no «entre dos
+        fechas», y un `until` que siempre es ahora es un parámetro que sólo se
+        puede pasar mal.
+        """
+        return await self.catalog.products_first_seen_between(since, None)
+
     async def list_categories(self) -> CategoryList:
         """The rubros with their count and their written forms (RF-01, RF-03, RF-04).
 
@@ -745,6 +776,7 @@ class CatalogService:
         categories = await self.catalog.list_categories()
         counts = await self.catalog.products_per_category()
         spend, spend_unclassified, spend_total = await self.catalog.spend_by_category()
+        revenue, revenue_unclassified, revenue_total = await self.catalog.revenue_by_category()
         aliases: dict[int, list[CategoryAliasRead]] = defaultdict(list)
         decided: set[str] = set()
         for alias in await self.catalog.aliases():
@@ -768,6 +800,7 @@ class CatalogService:
                     name=category.name,
                     product_count=counts.get(category.id, 0),
                     spend=spend.get(category.id, Decimal(0)),
+                    revenue=revenue.get(category.id, Decimal(0)),
                     aliases=aliases.get(category.id, []),
                 )
                 for category in categories
@@ -777,6 +810,8 @@ class CatalogService:
             total_products=sum(counts.values()),
             spend_unclassified=spend_unclassified,
             spend_total=spend_total,
+            revenue_unclassified=revenue_unclassified,
+            revenue_total=revenue_total,
         )
 
     async def create_category(self, *, name: str, actor_user_id: int) -> CategoryRead:

@@ -194,6 +194,10 @@ class CategoryRead(BaseModel):
     # the answer to «cuánto gasté en pinturas»: real amounts the portal printed,
     # never a total split by guess.
     spend: Decimal
+    # Lo vendido de este rubro, sumado de las ventas (009). El gemelo de
+    # `spend`, por el otro lado del negocio: el tablero de quien vende no tiene
+    # por qué contestar cuánto se compró.
+    revenue: Decimal = Decimal(0)
     aliases: list[CategoryAliasRead]
 
 
@@ -214,6 +218,10 @@ class CategoryList(BaseModel):
     # the whole spend, so the rubros and «sin rubro» add up to it (P7).
     spend_unclassified: Decimal
     spend_total: Decimal
+    # Lo mismo del lado de las ventas, para que los rubros y «sin rubro» sumen
+    # el total también acá.
+    revenue_unclassified: Decimal = Decimal(0)
+    revenue_total: Decimal = Decimal(0)
 
 
 class CategoryWrite(BaseModel):

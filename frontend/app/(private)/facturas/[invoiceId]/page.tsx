@@ -172,6 +172,33 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
               <Badge tone="danger">El portal informa otro estado</Badge>
             )}
           </div>
+
+          {/*
+            **En qué informa otro estado**, y no sólo que informa otro. La
+            píldora sola es un acertijo: la pantalla decía «$0» y «el portal
+            informa otro estado» teniendo el número del portal guardado en la
+            misma fila, sin publicarlo. Quien mira quiere saber de cuánta plata
+            se está hablando antes de ir a buscar el comprobante.
+
+            Lo de arriba **sigue saliendo de los pagos imputados y sólo de
+            ellos** (`RF-45` de la 005): esto es lo que dice el origen, dicho al
+            lado y nombrado como suyo. Ninguno de los dos gana.
+          */}
+          {invoice.payment_state_disagrees && (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              El portal informa
+              {invoice.portal_payment_status && ` «${invoice.portal_payment_status}»`}
+              {invoice.portal_paid !== null && invoice.portal_paid !== undefined && (
+                <>
+                  {': '}
+                  <Money value={invoice.portal_paid} as="span" /> de{' '}
+                  <Money value={invoice.total} as="span" />
+                </>
+              )}
+              . Lo de arriba sale de los pagos imputados acá, que son los únicos que esta plataforma
+              puede respaldar.
+            </p>
+          )}
         </section>
 
         {/*

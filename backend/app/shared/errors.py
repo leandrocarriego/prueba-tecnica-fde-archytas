@@ -40,4 +40,25 @@ class ExtractionError(DomainError):
 
     This is a technical failure of the extraction, not a data problem. Data that
     cannot be interpreted is quarantined instead of raised.
+
+    **Retried by default, because most of these are bad timing.** The portal
+    account is shared with the client's own staff and its session drops, so an
+    extraction that failed once very often succeeds a few minutes later.
+    """
+
+
+class PortalShapeError(ExtractionError):
+    """The page is not shaped the way this platform reads it.
+
+    A screen without the columns the parser names is **not** bad timing: it will
+    fail the same way in five minutes and in five hours, so it is reported at
+    once instead of being retried. Retrying a defect only repeats it, and while
+    the retries run the extraction stays `RUNNING` — which blocks the next one
+    and shows the owner a «Corriendo ahora» that will never end.
+
+    That is not a hypothesis: the sales section was published with `Cod. Venta`
+    and `Cant.` while its parser asked for `Codigo` and `Cantidad`, and every
+    run since the platform was deployed either wedged or was eventually
+    swept away with «its worker never came back» — a sentence that names the
+    symptom and hides the cause.
     """

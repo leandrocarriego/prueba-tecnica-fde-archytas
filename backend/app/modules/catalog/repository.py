@@ -22,6 +22,7 @@ from app.modules.catalog.models import (
     Product,
     ProductPrice,
     ProductStatus,
+    SaleRevenue,
     StockPoint,
 )
 
@@ -427,6 +428,72 @@ class CatalogRepository:
                 unclassified += spent
             else:
                 per_category[int(category_id)] = spent
+        return per_category, unclassified, total
+
+    async def record_sale_revenue(
+        self, lines: list[tuple[int, str | None, Decimal, date | None]]
+    ) -> None:
+        """Write what a batch of sales brought in, idempotently.
+
+        El gemelo de `record_order_spend`: una fila por registro de `staging`,
+        y `ON CONFLICT` sobre esa fila para que volver a leer el mismo día
+        actualice en lugar de sumar encima.
+        """
+        if not lines:
+            return
+        values = [
+            {
+                "staging_row_id": staging_row_id,
+                "product_code": product_code,
+                "amount": amount,
+                "sold_on": sold_on,
+            }
+            for staging_row_id, product_code, amount, sold_on in lines
+        ]
+        statement = insert(SaleRevenue).values(values)
+        await self.session.execute(
+            statement.on_conflict_do_update(
+                index_elements=[SaleRevenue.staging_row_id],
+                set_={
+                    "product_code": statement.excluded.product_code,
+                    "amount": statement.excluded.amount,
+                    "sold_on": statement.excluded.sold_on,
+                },
+            )
+        )
+        await self.session.flush()
+
+    async def revenue_by_category(
+        self, since: date | None = None, until: date | None = None
+    ) -> tuple[dict[int, Decimal], Decimal, Decimal]:
+        """What each rubro sold, plus «sin rubro» and the total.
+
+        La misma consulta que `spend_by_category` sobre la otra tabla, y con una
+        ventana: una venta tiene su día y mirar el mes que se está cerrando es
+        la pregunta que se hace con esto. El gasto por rubro no la tiene porque
+        una orden de compra no publica el suyo.
+        """
+        statement = (
+            select(Product.category_id, func.sum(SaleRevenue.amount))
+            .select_from(SaleRevenue)
+            .outerjoin(Product, Product.code == SaleRevenue.product_code)
+            .group_by(Product.category_id)
+        )
+        if since is not None:
+            statement = statement.where(SaleRevenue.sold_on >= since)
+        if until is not None:
+            statement = statement.where(SaleRevenue.sold_on <= until)
+        result = await self.session.execute(statement)
+        per_category: dict[int, Decimal] = {}
+        unclassified = Decimal(0)
+        total = Decimal(0)
+        for category_id, amount in result.all():
+            sold = Decimal(amount or 0)
+            total += sold
+            if category_id is None:
+                unclassified += sold
+            else:
+                per_category[int(category_id)] = sold
         return per_category, unclassified, total
 
     async def aliases(self) -> list[CategoryAlias]:

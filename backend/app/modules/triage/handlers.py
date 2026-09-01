@@ -47,6 +47,8 @@ from app.modules.triage.service import (
 )
 from app.shared.events import (
     BusinessParameterChanged,
+    DailyDigestContribution,
+    DailyDigestRequested,
     InvoiceRowsQuarantined,
     KnownProductsMissing,
     ManualEntryDisputed,
@@ -68,6 +70,35 @@ from app.shared.events import (
 from app.shared.sections import BusinessSection
 
 logger = get_logger(__name__)
+
+# Cuántos motivos nombra el resumen uno por uno. El resto va en la cuenta.
+DIGEST_LINES = 5
+
+
+@events.subscribe(DailyDigestRequested)
+async def contribute_to_the_digest(event: DailyDigestRequested, session: AsyncSession) -> None:
+    """Say how many decisions are waiting, and for what.
+
+    **Es la cola entera y no la de un área.** El recorte por permisos es de la
+    pantalla, que lo hace contra quien la está mirando; un resumen que sale a un
+    teléfono no tiene a nadie mirando todavía, y contar la mitad sería peor que
+    contar de más: el que lo recibe entra, ve el recorte que le toca y decide.
+
+    Los motivos van agrupados con su cuenta, no uno por caso. Dieciséis
+    renglones que dicen lo mismo con distinto proveedor no son un resumen.
+    """
+    service = TriageService(session)
+    waiting = await service.count_pending()
+    reasons = await service.pending_by_reason(DIGEST_LINES) if waiting else []
+    await events.publish(
+        DailyDigestContribution(
+            source="decisions",
+            pending=waiting,
+            lines=tuple(f"• {reason} ({total})" for reason, total in reasons),
+        ),
+        session,
+    )
+    del event
 
 
 @events.subscribe(PriceRowsQuarantined)
