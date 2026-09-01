@@ -33,8 +33,8 @@ export default async function SalesReviewPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/tablero">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/tablero">
         « Volver al tablero
       </Link>
 
@@ -51,6 +51,6 @@ export default async function SalesReviewPage() {
         discarded={discarded?.items ?? []}
         canEdit={canEdit(session?.permissions ?? {}, 'SALES')}
       />
-    </main>
+    </div>
   )
 }

@@ -9,19 +9,14 @@ const LABELS: Record<JobStatus, string> = {
   FAILED: 'Falló',
 }
 
-const COLORS: Record<JobStatus, string> = {
-  PENDING: 'text-muted-foreground',
-  RUNNING: 'text-info',
-  SUCCEEDED: 'text-ok',
-  FAILED: 'text-danger',
-}
-
 /** Spanish label for a run state, falling back to the raw value. */
 export function getJobStatusLabel(status: JobStatus | string): string {
   return LABELS[status as JobStatus] ?? status
 }
 
-/** Tailwind text colour for a run state. */
-export function getJobStatusColor(status: JobStatus | string): string {
-  return COLORS[status as JobStatus] ?? 'text-muted-foreground'
-}
+/*
+ * Acá había un `getJobStatusColor`, que era una **segunda** tabla de colores de
+ * estado: el mapa de la plataforma es `lib/ui/tone.ts`, y dos tablas de lo
+ * mismo terminan discrepando. La corrida ahora se dibuja con `<Badge>` y el
+ * tono que sale de ahí.
+ */

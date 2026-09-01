@@ -2,6 +2,8 @@ import Link from 'next/link'
 
 import { getSession } from '@/app/actions/auth'
 import { NoPermission } from '@/components/common/NoPermission'
+import { Button } from '@/components/ui/button'
+import { selectClassName } from '@/components/ui/input'
 import { OrderTable } from '@/components/purchases/OrderTable'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
@@ -45,7 +47,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 p-8">
+    <div className="space-y-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Órdenes de compra</h1>
         <p className="text-sm text-muted-foreground">
@@ -55,22 +57,22 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       </header>
 
       <nav className="flex flex-wrap gap-4 text-sm">
-        <Link className="underline" href="/ordenes">
+        <Link className="text-link hover:underline" href="/ordenes">
           Todas
         </Link>
         {Object.entries(listing.per_status).map(([status, howMany]) => (
           <Link
             key={status}
-            className="underline"
+            className="text-link hover:underline"
             href={`/ordenes?estado=${encodeURIComponent(status)}`}
           >
             {status} ({howMany})
           </Link>
         ))}
-        <Link className="underline" href="/ordenes?estancadas=1">
+        <Link className="text-link hover:underline" href="/ordenes?estancadas=1">
           Sólo estancadas ({listing.stalled})
         </Link>
-        <Link className="underline" href="/ordenes?apartadas=1">
+        <Link className="text-link hover:underline" href="/ordenes?apartadas=1">
           Sólo apartadas ({listing.held})
         </Link>
       </nav>
@@ -87,7 +89,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         {filters.apartadas && <input name="apartadas" type="hidden" value={filters.apartadas} />}
         <label htmlFor="proveedor">Proveedor</label>
         <select
-          className="rounded border p-2"
+          className={selectClassName}
           defaultValue={filters.proveedor ?? ''}
           id="proveedor"
           name="proveedor"
@@ -99,9 +101,10 @@ export default async function OrdersPage({ searchParams }: PageProps) {
             </option>
           ))}
         </select>
-        <button className="rounded border px-3 py-2" type="submit">
+        {/* Filtrar no es la tarea de la pantalla —leer las órdenes lo es—. */}
+        <Button type="submit" variant="outline">
           Filtrar
-        </button>
+        </Button>
       </form>
 
       <OrderTable
@@ -109,6 +112,6 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         suppliers={suppliers?.items ?? []}
         canEdit={canEdit(session?.permissions ?? {}, 'PURCHASE_ORDERS')}
       />
-    </main>
+    </div>
   )
 }

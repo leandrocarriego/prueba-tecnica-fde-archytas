@@ -10,6 +10,12 @@ import { readFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
 import type { PriceHistory } from '@/lib/catalog/types'
 import type { CorrectionReason } from '@/lib/operations/types'
+import { Empty, ErrorState } from '@/components/ui/state'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { Notice } from '@/components/ui/notice'
+import { isUnconfirmedPrice, pill } from '@/lib/ui/tone'
 
 /** Where a point came from, in words. */
 const SOURCE_LABEL: Record<string, string> = {
@@ -45,14 +51,14 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
     // somebody their product was deleted.
     if (read.failure === 'missing') notFound()
     return (
-      <main className="mx-auto max-w-4xl space-y-6 p-8">
-        <Link className="text-sm text-muted-foreground underline" href="/precios">
+      <div className="space-y-6">
+        <Link className="text-sm text-link hover:underline" href="/precios">
           « Volver a la lista de precios
         </Link>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer este producto. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer este producto.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
+      </div>
     )
   }
 
@@ -78,14 +84,14 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
   const correctedDescription = markFor(history.corrections, 'description')
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/precios">
+    <div className="space-y-6">
+      <Link className="text-sm text-link hover:underline" href="/precios">
         « Volver a la lista de precios
       </Link>
 
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{history.description}</h1>
-        <p className="font-mono text-muted-foreground">{history.code}</p>
+        <Code value={history.code} as="div" className="text-muted-foreground" />
         {correctedDescription && (
           <p className="text-sm text-muted-foreground">
             Descripción corregida a mano · el portal decía «
@@ -94,10 +100,10 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
         )}
       </header>
 
-      <section className="flex flex-wrap gap-8 rounded border p-4">
+      <Card className="flex flex-wrap gap-8 p-5">
         <div>
           <p className="text-sm text-muted-foreground">Precio vigente</p>
-          <p className="text-2xl font-bold">{formatPrice(history.price)}</p>
+          <p className="amount text-2xl font-bold">{formatPrice(history.price)}</p>
           {correctedPrice && (
             <p className="text-sm text-muted-foreground">
               Corregido a mano · el portal decía{' '}
@@ -107,19 +113,20 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Contra el mes pasado</p>
-          <p className={`text-2xl font-bold ${variationTone(history.monthly_variation_pct)}`}>
+          <p
+            className={`amount text-2xl font-bold ${variationTone(history.monthly_variation_pct)}`}
+          >
             {formatVariation(history.monthly_variation_pct)}
           </p>
         </div>
-      </section>
+      </Card>
 
       {history.corrections.some(correction => correction.status === 'CONFLICTED') && (
-        <section className="space-y-2 rounded border border-danger-border bg-danger-surface p-4">
-          <h2 className="font-medium text-danger">El portal informa otro valor</h2>
+        <Notice tone="danger" title="El portal informa otro valor">
           {history.corrections
             .filter(correction => correction.status === 'CONFLICTED')
             .map(correction => (
-              <p className="text-sm text-danger" key={correction.correction_id}>
+              <p key={correction.correction_id}>
                 Para {FIELD_LABELS[correction.field] ?? correction.field}, el portal había informado{' '}
                 <strong>{String(correction.portal_value)}</strong>, quedó corregido a mano en{' '}
                 <strong>{String(correction.corrected_value)}</strong>, y ahora informa{' '}
@@ -128,7 +135,7 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
                 dice el portal.
               </p>
             ))}
-        </section>
+        </Notice>
       )}
 
       {/*
@@ -141,7 +148,7 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
         its own would split the correction from the value it is about.
       */}
       {mayCorrect && (
-        <section className="space-y-3 rounded border p-4" id="correcciones">
+        <Card className="space-y-3 p-5" id="correcciones">
           <h2 className="text-lg font-medium">Corregir a mano</h2>
           <p className="text-sm text-muted-foreground">
             Lo que el portal informó se conserva siempre. Cada corrección queda registrada con tu
@@ -171,11 +178,11 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
               required and the API validates it against this very list. So the
               screen says the part that failed, and keeps everything below.
             */
-            <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-              No pudimos traer los motivos de corrección. Probá de nuevo en unos minutos.
-            </p>
+            <ErrorState title="No pudimos traer los motivos de corrección.">
+              Probá de nuevo en unos minutos.
+            </ErrorState>
           )}
-        </section>
+        </Card>
       )}
 
       {/*
@@ -184,7 +191,7 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
         RF-27). Only the button that undoes is the owner's (RF-30).
       */}
       {history.corrections.length > 0 && (
-        <section className="space-y-3 rounded border p-4">
+        <Card className="space-y-3 p-5">
           <h2 className="text-lg font-medium">Corregido a mano</h2>
           <ul className="space-y-2 text-sm">
             {history.corrections.map(correction => (
@@ -197,7 +204,7 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
 
       {/*
@@ -207,13 +214,13 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
       */}
       <p className="flex flex-wrap gap-4 text-sm">
         <Link
-          className="underline underline-offset-2"
+          className="text-link hover:underline"
           href={`/historial?entidad=catalog.product_price&id=${history.product_id}`}
         >
           Historial de cambios del precio
         </Link>
         <Link
-          className="underline underline-offset-2"
+          className="text-link hover:underline"
           href={`/historial?entidad=catalog.product&id=${history.product_id}`}
         >
           Historial de cambios del producto
@@ -223,11 +230,9 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Evolución del precio</h2>
         {points.length === 0 ? (
-          <p className="rounded border border-dashed p-6 text-center text-muted-foreground">
-            Todavía no hay historial para este producto.
-          </p>
+          <Empty title="Todavía no hay historial para este producto." />
         ) : (
-          <div className="overflow-x-auto rounded border">
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-left">
                 <tr>
@@ -239,10 +244,18 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
               <tbody>
                 {points.map(point => (
                   <tr key={`${point.changed_at}-${point.price}`} className="border-t">
-                    <td className="p-3">{formatDay(point.changed_at)}</td>
-                    <td className="p-3 text-right font-medium">{formatPrice(point.price)}</td>
-                    <td className="p-3 text-muted-foreground">
-                      {SOURCE_LABEL[point.source] ?? point.source}
+                    <Code value={formatDay(point.changed_at)} cell className="p-3 text-left" />
+                    <td className="amount p-3 text-right font-medium">
+                      {formatPrice(point.price)}
+                    </td>
+                    <td className="p-3">
+                      {/*
+                       * `RF-08`: un precio que puso la plataforma y que el
+                       * portal no publicó va punteado.
+                       */}
+                      <Badge tone={pill('neutral', isUnconfirmedPrice(point.source))}>
+                        {SOURCE_LABEL[point.source] ?? point.source}
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -251,6 +264,6 @@ export default async function ProductPage({ params }: { params: Promise<{ produc
           </div>
         )}
       </section>
-    </main>
+    </div>
   )
 }

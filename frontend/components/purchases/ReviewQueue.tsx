@@ -5,8 +5,12 @@ import { useRouter } from 'next/navigation'
 
 import { previewAlias, resolveInvoice } from '@/app/actions/purchases'
 import type { InvoiceCorrections } from '@/app/actions/purchases'
+import { Code, Day, Money } from '@/components/ui/amount'
 import { Button } from '@/components/ui/button'
-import { day, money } from '@/lib/format'
+import { Card } from '@/components/ui/card'
+import { Input, selectClassName } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 import type { Invoice, Supplier } from '@/lib/purchases/types'
 
 /** Los tres datos de cabecera que una persona puede confirmar o corregir (RF-31). */
@@ -120,32 +124,24 @@ export function ReviewQueue({
   }
 
   if (invoices.length === 0) {
-    return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        No quedó ninguna factura esperando una decisión.
-      </p>
-    )
+    return <Empty title="No quedó ninguna factura esperando una decisión." />
   }
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       {invoices.map(invoice => {
         const selected = chosen[invoice.id] ?? 0
         return (
-          <article key={invoice.id} className="space-y-3 rounded border p-4">
+          <Card key={invoice.id} className="space-y-3 p-5">
             <header className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
                 <h3 className="font-medium">
-                  {invoice.number} · {money(invoice.total)}
+                  <Code value={invoice.number} /> · <Money value={invoice.total} />
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Llegó a nombre de «{invoice.supplier_text}» · {day(invoice.issued_on)}
+                  Llegó a nombre de «{invoice.supplier_text}» · <Day value={invoice.issued_on} />
                 </p>
               </div>
               <p className="text-sm text-warn">{invoice.review_reason}</p>
@@ -156,7 +152,7 @@ export function ReviewQueue({
                 <p className="text-muted-foreground">
                   Lo que dice el archivo:{' '}
                   <a
-                    className="underline"
+                    className="text-link hover:underline"
                     href={`/api/proxy/invoices/${invoice.id}/file`}
                     rel="noreferrer"
                     target="_blank"
@@ -178,8 +174,7 @@ export function ReviewQueue({
                     return (
                       <label key={field} className="text-sm">
                         <span className="mb-1 block text-muted-foreground">{label}</span>
-                        <input
-                          className="w-full rounded border px-2 py-1"
+                        <Input
                           type={type}
                           step={type === 'number' ? '0.01' : undefined}
                           value={edited[invoice.id]?.[field] ?? from(invoice)}
@@ -203,7 +198,7 @@ export function ReviewQueue({
 
                 <div className="flex flex-wrap items-center gap-2">
                   <select
-                    className="rounded border px-2 py-1 text-sm"
+                    className={selectClassName}
                     value={selected}
                     onChange={event => {
                       const supplierId = Number(event.target.value)
@@ -247,7 +242,7 @@ export function ReviewQueue({
                 )}
               </div>
             )}
-          </article>
+          </Card>
         )
       })}
     </div>

@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { FIELD_NOUNS, isConflicted, markFor } from '@/lib/catalog/corrections'
 import { formatMoment, formatPrice, formatVariation, variationTone } from '@/lib/catalog/format'
 import type { Price } from '@/lib/catalog/types'
+import { Empty } from '@/components/ui/state'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
 
 interface PriceTableProps {
   items: Price[]
@@ -46,9 +49,9 @@ function amount(value: unknown): string | number | null {
 export function PriceTable({ items }: PriceTableProps) {
   if (items.length === 0) {
     return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        Todavía no hay precios cargados. Se cargan solos con la próxima consulta al portal.
-      </p>
+      <Empty title="Todavía no hay precios cargados.">
+        Se cargan solos con la próxima consulta al portal.
+      </Empty>
     )
   }
 
@@ -78,26 +81,20 @@ export function PriceTable({ items }: PriceTableProps) {
                 key={item.product_id}
                 className={`border-t ${item.is_highlighted ? 'bg-warn-surface' : ''}`}
               >
-                <td className="p-3 font-mono">
-                  <Link
-                    className="underline underline-offset-2"
-                    href={`/precios/${item.product_id}`}
-                  >
-                    {item.code}
+                <td className="p-3">
+                  <Link className="text-link hover:underline" href={`/precios/${item.product_id}`}>
+                    <Code value={item.code} />
                   </Link>
                 </td>
                 <td className="p-3">
                   {item.description}
+                  {/* Los tres son estados del dato, así que son píldoras (`RF-06`). */}
                   {item.is_highlighted && (
-                    <span className="ml-2 rounded bg-warn-border px-2 py-0.5 text-xs text-warn">
+                    <Badge tone="warn" className="ml-2">
                       Subió fuerte
-                    </span>
+                    </Badge>
                   )}
-                  {item.is_stale && (
-                    <span className="ml-2 rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                      No vino en la última lista
-                    </span>
-                  )}
+                  {item.is_stale && <Badge className="ml-2">No vino en la última lista</Badge>}
                   {/*
                     Keyed by the field, and the row cannot carry two marks of
                     one: the backend's `CORRECTABLE_FIELDS` maps each field to
@@ -109,32 +106,43 @@ export function PriceTable({ items }: PriceTableProps) {
                     is a row the database will not accept.
                   */}
                   {contradicted.map(mark => (
-                    <span
-                      className="ml-2 rounded bg-danger-surface px-2 py-0.5 text-xs text-danger"
-                      key={mark.field}
-                    >
+                    <Badge tone="danger" className="ml-2" key={mark.field}>
                       {mark.field === 'price'
                         ? `El portal informa ${formatPrice(amount(mark.conflict_value))}`
                         : `El portal informa otra ${FIELD_NOUNS[mark.field] ?? mark.field}`}
-                    </span>
+                    </Badge>
                   ))}
                 </td>
-                <td className="p-3 text-right font-medium">
+                {/*
+                  Las tres columnas de plata en mono tabular y a la derecha, que
+                  es lo que hace que las comas caigan en la misma vertical
+                  (`RF-09`, `RF-10`). El formateo sigue saliendo de
+                  `lib/catalog/format`, que es donde vive el precio del catálogo.
+                */}
+                <td className="amount p-3 text-right font-medium">
                   {formatPrice(item.price)}
                   {corrected && (
-                    <span className="block text-xs font-normal text-muted-foreground">
+                    <span className="block font-sans text-xs font-normal text-muted-foreground">
                       Corregido a mano · el portal decía{' '}
                       {formatPrice(amount(corrected.portal_value))}
                     </span>
                   )}
                 </td>
-                <td className="p-3 text-right text-muted-foreground">
-                  {formatPrice(item.previous_price)}
-                </td>
-                <td className={`p-3 text-right ${variationTone(item.monthly_variation_pct)}`}>
+                <Code
+                  value={formatPrice(item.previous_price)}
+                  cell
+                  className="p-3 text-muted-foreground"
+                />
+                <td
+                  className={`amount p-3 text-right ${variationTone(item.monthly_variation_pct)}`}
+                >
                   {formatVariation(item.monthly_variation_pct)}
                 </td>
-                <td className="p-3 text-muted-foreground">{formatMoment(item.effective_at)}</td>
+                <Code
+                  value={formatMoment(item.effective_at)}
+                  cell
+                  className="p-3 text-left text-muted-foreground"
+                />
               </tr>
             )
           })}

@@ -1,5 +1,7 @@
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { getJobStatusColor, getJobStatusLabel } from '@/lib/operations/taskStateUtils'
+import { getJobStatusLabel } from '@/lib/operations/taskStateUtils'
+import { jobTone } from '@/lib/ui/tone'
 import type { JobRun } from '@/lib/operations/types'
 import { MOMENT_FORMAT } from '@/lib/time'
 
@@ -24,12 +26,16 @@ export function JobRunCard({ run }: JobRunCardProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{run.task_name}</CardTitle>
-          <span className={`font-bold ${getJobStatusColor(run.status)}`}>
-            {getJobStatusLabel(run.status)}
-          </span>
+          {/*
+           * El estado de una corrida, en la píldora y con el tono del mapa
+           * único (`RF-06`). Antes lo pintaba `getJobStatusColor`, que era una
+           * segunda tabla de colores de estado: la que sobra.
+           */}
+          <Badge tone={jobTone(run.status)}>{getJobStatusLabel(run.status)}</Badge>
         </div>
         <CardDescription>
-          Inicio {formatTimestamp(run.started_at)} · Fin {formatTimestamp(run.finished_at)}
+          Inicio <span className="amount">{formatTimestamp(run.started_at)}</span> · Fin{' '}
+          <span className="amount">{formatTimestamp(run.finished_at)}</span>
           {run.attempts > 1 && ` · ${run.attempts} intentos`}
         </CardDescription>
       </CardHeader>

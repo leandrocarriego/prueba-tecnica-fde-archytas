@@ -2,8 +2,12 @@ import Link from 'next/link'
 
 import { NoPermission } from '@/components/common/NoPermission'
 import { PeriodPicker } from '@/components/sales/PeriodPicker'
+import { Code, Day, Money } from '@/components/ui/amount'
+import { Button } from '@/components/ui/button'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 import { fetchFromApi } from '@/lib/api/server'
-import { count, day, money } from '@/lib/format'
+import { count } from '@/lib/format'
 import type { CatalogDashboard, SalesDashboard } from '@/lib/sales/types'
 
 export const metadata = {
@@ -25,6 +29,51 @@ function period(since?: string, until?: string): string {
   if (since) query.set('since', since)
   if (until) query.set('until', until)
   return query.toString()
+}
+
+/**
+ * Lo que un indicador dejó afuera, **arriba** del número (`RF-14`, `RF-15`).
+ *
+ * Es la única parte de esta feature donde cambia el orden del contenido, y la
+ * spec lo pide con todas las letras: el aviso estaba debajo del importe, en un
+ * renglón gris del mismo tamaño que el resto, así que se leía el número —o se
+ * lo copiaba a un mensaje— sin haber pasado nunca por la advertencia de que no
+ * estaba completo. Primero se dice si se puede confiar en el dato; después se
+ * lo muestra.
+ *
+ * Y lleva su salida (`RF-15`): un aviso que dice «faltan 12 registros» y no
+ * dice dónde verlos no es un aviso, es una queja.
+ */
+function Excluded({
+  howMany,
+  href,
+  children,
+}: {
+  howMany: number
+  href?: string
+  children?: React.ReactNode
+}) {
+  if (howMany === 0) return null
+
+  return (
+    <Notice
+      tone="warn"
+      title={
+        howMany === 1
+          ? 'Este total deja 1 registro afuera'
+          : `Este total deja ${count(howMany)} registros afuera`
+      }
+      action={
+        href ? (
+          <Button asChild variant="outline" size="sm">
+            <Link href={href}>Ver cuáles</Link>
+          </Button>
+        ) : undefined
+      }
+    >
+      {children}
+    </Notice>
+  )
 }
 
 /**
@@ -55,7 +104,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const ranOut = (catalog?.stock ?? []).filter(cut => cut.ran_out)
 
   return (
-    <main className="mx-auto max-w-5xl space-y-10 p-8">
+    <div className="space-y-10">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Tablero</h1>
         <p className="text-sm text-muted-foreground">
@@ -66,9 +115,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Facturado</h2>
         <p className="text-sm text-muted-foreground">
-          {sales.since || sales.until
-            ? `Del ${day(sales.since)} al ${day(sales.until)}.`
-            : 'Todo el histórico.'}
+          {sales.since || sales.until ? (
+            <>
+              Del <Day value={sales.since} /> al <Day value={sales.until} />.
+            </>
+          ) : (
+            'Todo el histórico.'
+          )}
         </p>
         <PeriodPicker
           fromName="desde"
@@ -77,29 +130,29 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           to={filters.hasta}
           keep={{ cat_desde: filters.cat_desde, cat_hasta: filters.cat_hasta }}
         />
-        <p className="text-4xl font-semibold">{money(sales.invoiced.value)}</p>
+        {/*
+          RF-26: desde lo excluido se llega a los registros que excluyó, y por
+          eso el aviso lleva el botón que lleva ahí.
+        */}
+        <Excluded howMany={sales.invoiced.excluded} href="/ventas/revision">
+          Ninguno de esos registros suma en este total.
+          {sales.invoiced.merged > 0 &&
+            ` ${count(sales.invoiced.merged)} de ellos los unificó el sistema solo.`}
+        </Excluded>
+
+        <Money value={sales.invoiced.value} as="div" className="text-4xl font-semibold" />
+
         <p className="text-sm text-muted-foreground">
           {count(sales.invoiced.sales)} ventas sumadas ·{' '}
-          {sales.invoiced.excluded === 0 ? (
-            'no se excluyó ningún registro'
-          ) : (
-            /*
-              RF-26: desde el número excluido se llega a los registros que
-              excluyó. Antes el enlace aparecía sólo si había apartadas, y las
-              unificadas no estaban en ninguna cola: la mitad de lo excluido no
-              se podía ver desde ningún lado.
-            */
-            <Link className="underline" href="/ventas/revision">
-              {count(sales.invoiced.excluded)} registros excluidos
-            </Link>
-          )}
-          {sales.invoiced.merged > 0 &&
-            ` · ${count(sales.invoiced.merged)} de ellos los unificó el sistema solo`}
+          {/* `RF-16`: cero excluidos se dice con todas las letras. */}
+          {sales.invoiced.excluded === 0
+            ? 'no se excluyó ningún registro'
+            : `${count(sales.invoiced.excluded)} registros excluidos`}
           {sales.invoiced.has_estimates && ' · incluye valores estimados por una persona'}.
         </p>
         {sales.held_total > 0 && (
           <p className="text-sm">
-            <Link className="underline" href="/ventas/revision">
+            <Link className="text-link hover:underline" href="/ventas/revision">
               {sales.held_total} ventas apartadas esperan una decisión
             </Link>
             {sales.pending_groups > 0 && ` · ${sales.pending_groups} grupos de repetidas`}.
@@ -110,15 +163,15 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Facturado por mes</h2>
         {sales.by_month.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no hay ventas para mostrar.</p>
+          <Empty title="Todavía no hay ventas para mostrar." />
         ) : (
           <table className="w-full max-w-xl text-sm">
             <tbody>
               {sales.by_month.map(month => (
                 <tr key={month.month} className="border-b">
-                  <td className="py-2">{day(month.month)}</td>
-                  <td className="py-2 text-right">{money(month.total)}</td>
-                  <td className="py-2 text-right text-muted-foreground">
+                  <Day value={month.month} cell className="py-2 text-left" />
+                  <Money value={month.total} cell className="py-2" />
+                  <td className="amount py-2 text-right text-muted-foreground">
                     {count(month.sales)} ventas
                   </td>
                 </tr>
@@ -133,9 +186,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Catálogo</h2>
             <p className="text-sm text-muted-foreground">
-              {catalog.since || catalog.until
-                ? `Del ${day(catalog.since)} al ${day(catalog.until)}.`
-                : 'Todo el histórico. Sin fecha de inicio el corte de stock no tiene con qué comparar.'}
+              {catalog.since || catalog.until ? (
+                <>
+                  Del <Day value={catalog.since} /> al <Day value={catalog.until} />.
+                </>
+              ) : (
+                'Todo el histórico. Sin fecha de inicio el corte de stock no tiene con qué comparar.'
+              )}
             </p>
             <PeriodPicker
               fromName="cat_desde"
@@ -148,18 +205,20 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Precios del proveedor</h2>
+            <Excluded howMany={catalog.price_curve_excluded}>
+              No entran en la curva: les falta el precio o la fecha con que compararlos.
+            </Excluded>
+
             {catalog.price_curve.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Todavía no hay historial de precios en este período.
-              </p>
+              <Empty title="Todavía no hay historial de precios en este período." />
             ) : (
               <table className="w-full max-w-xl text-sm">
                 <tbody>
                   {catalog.price_curve.map(point => (
                     <tr key={point.month} className="border-b">
-                      <td className="py-2">{day(point.month)}</td>
-                      <td className="py-2 text-right">{money(point.average_price)}</td>
-                      <td className="py-2 text-right text-muted-foreground">
+                      <Day value={point.month} cell className="py-2 text-left" />
+                      <Money value={point.average_price} cell className="py-2" />
+                      <td className="amount py-2 text-right text-muted-foreground">
                         {count(point.changes)} cambios
                       </td>
                     </tr>
@@ -176,6 +235,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Stock</h2>
+
+            <Excluded howMany={catalog.stock_excluded}>
+              Quedaron afuera por no tener foto en alguno de los dos extremos del período.
+            </Excluded>
+
             <p className="text-sm text-muted-foreground">
               {count(catalog.stock.length)} productos con foto al principio y al final del período ·{' '}
               {catalog.stock_excluded === 0
@@ -187,7 +251,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               <ul className="text-sm">
                 {ranOut.slice(0, 20).map(cut => (
                   <li key={cut.product_id}>
-                    {cut.code} — {cut.description}
+                    <Code value={cut.code} /> — {cut.description}
                   </li>
                 ))}
               </ul>
@@ -196,6 +260,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Productos nuevos</h2>
+
+            <Excluded howMany={catalog.new_products_excluded}>
+              No se pudieron fechar dentro del período, así que no se cuentan como nuevos.
+            </Excluded>
+
             <p className="text-sm text-muted-foreground">
               {count(catalog.new_products.length)} productos aparecieron por primera vez en este
               período ·{' '}
@@ -207,6 +276,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </section>
         </>
       )}
-    </main>
+    </div>
   )
 }

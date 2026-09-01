@@ -7,6 +7,13 @@ import { annotateMessage, assignMessage, resolveMessage } from '@/app/actions/me
 import { Button } from '@/components/ui/button'
 import { formatMoment } from '@/lib/catalog/format'
 import type { Assignee, Message } from '@/lib/messaging/types'
+import { Empty } from '@/components/ui/state'
+import { Notice } from '@/components/ui/notice'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { selectClassName } from '@/components/ui/input'
+import { messageTone } from '@/lib/ui/tone'
 
 const KINDS: Record<string, string> = {
   PAYMENT_CLAIM: 'Reclamo de pago',
@@ -54,23 +61,15 @@ export function MessageList({
   }
 
   if (messages.length === 0) {
-    return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        No hay mensajes que coincidan.
-      </p>
-    )
+    return <Empty title="No hay mensajes que coincidan." />
   }
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       {messages.map(message => (
-        <article key={message.id} className="space-y-2 rounded border p-4">
+        <Card key={message.id} className="space-y-2 p-5">
           <header className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <p className="text-sm text-muted-foreground">
@@ -81,7 +80,11 @@ export function MessageList({
               </p>
               <h3 className="font-medium">{message.subject}</h3>
             </div>
-            <p className="text-sm text-muted-foreground">{formatMoment(message.received_at)}</p>
+            <Code
+              value={formatMoment(message.received_at)}
+              as="div"
+              className="text-sm text-muted-foreground"
+            />
           </header>
 
           <p className="text-sm">
@@ -97,17 +100,18 @@ export function MessageList({
           {message.body && <p className="text-sm text-muted-foreground">{message.body}</p>}
 
           {message.alert_failure && (
-            <p className="rounded border border-warn-border bg-warn-surface p-2 text-xs text-warn">
-              El aviso por este mensaje no se pudo entregar: {message.alert_failure}
-            </p>
+            <Notice tone="warn" title="El aviso por este mensaje no se pudo entregar">
+              {message.alert_failure}
+            </Notice>
           )}
 
           {message.note && <p className="rounded bg-muted p-2 text-sm">Nota: {message.note}</p>}
 
           <footer className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground">
+            {/* El estado del mensaje, del mapa único (`RF-06`). */}
+            <Badge tone={messageTone(message.state)}>
               {message.state === 'RESOLVED' ? 'Resuelto' : 'Pendiente'}
-            </span>
+            </Badge>
             {message.assignee_user_id !== null && (
               <span className="text-muted-foreground">
                 A cargo de{' '}
@@ -117,15 +121,20 @@ export function MessageList({
             )}
             {canEdit && message.state !== 'RESOLVED' && (
               <>
+                {/*
+                  Resolver es la tarea de esta pantalla, y es la única acción de
+                  acento (`RF-11`): elegir responsable es un `select`.
+                */}
                 <Button
                   type="button"
+                  variant="brand"
                   disabled={busy}
                   onClick={() => void run(() => resolveMessage(message.id))}
                 >
                   Marcar resuelto
                 </Button>
                 <select
-                  className="rounded border px-2 py-1 text-sm"
+                  className={selectClassName}
                   value={message.assignee_user_id === null ? '' : String(message.assignee_user_id)}
                   disabled={busy}
                   onChange={event =>
@@ -158,7 +167,7 @@ export function MessageList({
               </>
             )}
           </footer>
-        </article>
+        </Card>
       ))}
     </div>
   )

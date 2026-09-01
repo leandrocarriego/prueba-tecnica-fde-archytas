@@ -64,6 +64,15 @@
   --border: #e2ded6;
   --input: #d5d0c6;
 
+  /* Gris de rótulo: la etiqueta que nombra un bloque sin competir con su
+     título. Es más apagado que `--muted-foreground`, que es texto que se lee;
+     esto se recorre con la vista. */
+  --muted-ink: #8a8e93;
+
+  /* Borde del punteado de "todavía sin confirmar". Es el borde del papel, un
+     paso más cálido que `--border`, para que el guion se vea sin gritar. */
+  --draft-border: #c6c0b4;
+
   /* --- Marca ---------------------------------------------------------- */
   /* Naranja de obra. Una sola acción llena por pantalla: el resto es contorno
      o enlace. El foco también usa el acento, para que se vea sobre papel. */
@@ -116,6 +125,8 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-muted-ink: var(--muted-ink);
+  --color-draft-border: var(--draft-border);
   --color-ring: var(--ring);
 
   --color-brand: var(--brand);
@@ -186,7 +197,7 @@
     line-height: 1;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #8a8e93;
+    color: var(--muted-ink);
   }
 
   /* Un monto, una fecha o un código: mono tabular, sin excepción. */
@@ -240,6 +251,6 @@
     color: var(--foreground);
     background: var(--card);
     border-style: dashed;
-    border-color: #c6c0b4;
+    border-color: var(--draft-border);
   }
 }

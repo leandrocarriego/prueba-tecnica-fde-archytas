@@ -75,7 +75,12 @@ export function UpdateNowButton() {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button onClick={onClick} disabled={running}>
+      {/*
+        Traer la lista es la tarea de esta pantalla, y por eso es su único
+        naranja (`RF-11`). Los otros dos controles —el filtro y los enlaces— son
+        navegación.
+      */}
+      <Button variant="brand" onClick={onClick} disabled={running}>
         {running ? 'Trayendo la lista…' : 'Actualizar ahora'}
       </Button>
       {outcome && <p className={`text-sm ${TONES[outcome.tone]}`}>{outcome.message}</p>}

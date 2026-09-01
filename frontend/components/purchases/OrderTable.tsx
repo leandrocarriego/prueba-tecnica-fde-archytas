@@ -4,9 +4,15 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { dismissRepeat, resolveOrder } from '@/app/actions/purchases'
+import { Code, Day, Money } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { count, day, money } from '@/lib/format'
+import { selectClassName } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
+import { count } from '@/lib/format'
 import type { PurchaseOrder, Supplier } from '@/lib/purchases/types'
+import { orderReviewTone } from '@/lib/ui/tone'
 
 /**
  * Las órdenes de compra, con desde cuándo el sistema las viene mirando.
@@ -59,20 +65,12 @@ export function OrderTable({
   }
 
   if (orders.length === 0) {
-    return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        No hay órdenes que coincidan.
-      </p>
-    )
+    return <Empty title="No hay órdenes que coincidan." />
   }
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -94,8 +92,12 @@ export function OrderTable({
                 className={`border-b align-top ${order.is_stalled ? 'bg-warn-surface' : ''}`}
               >
                 <td className="py-2">
-                  {order.number}
-                  <p className="text-xs text-muted-foreground">{day(order.ordered_on)}</p>
+                  <Code value={order.number} />
+                  <Day
+                    value={order.ordered_on}
+                    as="div"
+                    className="text-xs text-muted-foreground"
+                  />
                 </td>
                 <td className="py-2">
                   {order.supplier_name ?? (
@@ -106,10 +108,20 @@ export function OrderTable({
                   )}
                 </td>
                 <td className="py-2">{order.product_text}</td>
-                <td className="py-2 text-right">{count(order.quantity)}</td>
-                <td className="py-2 text-right">{money(order.amount)}</td>
-                <td className="py-2">
-                  {order.status_text}
+                <td className="amount py-2 text-right">{count(order.quantity)}</td>
+                <Money value={order.amount} cell className="py-2" />
+                <td className="space-y-1 py-2">
+                  {/*
+                   * Dos estados distintos, y por eso dos píldoras: el que
+                   * publica el portal —texto libre, `status_text`— y el de la
+                   * revisión de esta plataforma, que sale del mapa único.
+                   */}
+                  <Badge>{order.status_text}</Badge>
+                  {order.review_state !== 'OK' && (
+                    <Badge tone={orderReviewTone(order.review_state)}>
+                      {order.review_state === 'PENDING' ? 'Apartada' : 'Resuelta'}
+                    </Badge>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {order.observed_from_start
                       ? `${count(order.days_in_status)} días observada así`
@@ -147,7 +159,7 @@ export function OrderTable({
                         negocio que se toma en otro lado (RF-55).
                       */
                       <select
-                        className="rounded border px-2 py-1 text-sm"
+                        className={selectClassName}
                         defaultValue=""
                         disabled={busy}
                         onChange={event => {

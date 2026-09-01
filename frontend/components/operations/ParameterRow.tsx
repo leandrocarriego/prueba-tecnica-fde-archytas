@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { saveParameter } from '@/app/actions/parameters'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Parameter } from '@/lib/operations/types'
@@ -78,13 +79,11 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
         <label className="text-sm font-medium" htmlFor={parameter.key}>
           {parameter.label}
         </label>
+        {/* Es el estado del parámetro, así que es una píldora (`RF-06`). */}
         {!parameter.has_effect && (
-          <span
-            className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
-            title="El valor se guarda y queda listo, pero todavía no hay ninguna funcionalidad que lo lea."
-          >
+          <Badge title="El valor se guarda y queda listo, pero todavía no hay ninguna funcionalidad que lo lea.">
             Todavía sin efecto
-          </span>
+          </Badge>
         )}
       </div>
 

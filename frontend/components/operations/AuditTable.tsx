@@ -7,6 +7,8 @@ import { datumKey } from '@/lib/catalog/corrections'
 import { formatMoment } from '@/lib/catalog/format'
 import { actionLabel, entityHref, entityLabel, fieldLabel, valueText } from '@/lib/operations/audit'
 import type { AuditEntry } from '@/lib/operations/types'
+import { Empty } from '@/components/ui/state'
+import { Code } from '@/components/ui/amount'
 
 /**
  * Which rows get the offer to undo, and which do not.
@@ -73,15 +75,11 @@ export function AuditTable({
   const offers = rowsThatOfferTheUndo(items, undoable)
 
   if (items.length === 0) {
-    return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        No hay cambios manuales registrados con estos filtros.
-      </p>
-    )
+    return <Empty title="No hay cambios manuales registrados con estos filtros." />
   }
 
   return (
-    <div className="overflow-x-auto rounded border">
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
       <table className="w-full text-sm">
         <thead className="bg-muted/50 text-left">
           <tr>
@@ -100,14 +98,17 @@ export function AuditTable({
             const correctionId = offers.get(entry.id)
             return (
               <tr key={entry.id} className="border-t align-top">
-                <td className="p-3 whitespace-nowrap text-muted-foreground">
-                  {formatMoment(entry.occurred_at)}
-                </td>
+                {/* Cuándo pasó algo es un dato que se compara: mono tabular. */}
+                <Code
+                  value={formatMoment(entry.occurred_at)}
+                  cell
+                  className="p-3 text-left whitespace-nowrap text-muted-foreground"
+                />
                 <td className="p-3">{entry.actor_name ?? `Usuario ${entry.actor_user_id}`}</td>
                 <td className="p-3">
                   <span className="font-medium">{actionLabel(entry.action)}</span>{' '}
                   {href ? (
-                    <Link className="underline underline-offset-2" href={href}>
+                    <Link className="text-link hover:underline" href={href}>
                       {entityLabel(entry.entity_type)} {entry.entity_id}
                     </Link>
                   ) : (
@@ -117,8 +118,18 @@ export function AuditTable({
                   )}
                   {field && <span className="text-muted-foreground"> · {field}</span>}
                 </td>
-                <td className="p-3 text-muted-foreground">{valueText(entry.old_value)}</td>
-                <td className="p-3 font-medium">{valueText(entry.new_value)}</td>
+                {/* Lo que decía y lo que quedó se leen enfrentados: mono, para
+                    que dos valores parecidos se distingan de un vistazo. */}
+                <Code
+                  value={valueText(entry.old_value)}
+                  cell
+                  className="p-3 text-left text-muted-foreground"
+                />
+                <Code
+                  value={valueText(entry.new_value)}
+                  cell
+                  className="p-3 text-left font-medium"
+                />
                 <td className="p-3">
                   {entry.reason_label ?? '—'}
                   {entry.reason_detail && (

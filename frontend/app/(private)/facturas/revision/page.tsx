@@ -6,6 +6,7 @@ import { ReviewQueue } from '@/components/purchases/ReviewQueue'
 import { readFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
 import type { InvoiceList, SupplierList } from '@/lib/purchases/types'
+import { ErrorState } from '@/components/ui/state'
 
 export const metadata = {
   title: 'Facturas en revisión — Plataforma Cordillera',
@@ -33,20 +34,20 @@ export default async function InvoiceReviewPage() {
       return <NoPermission what="la revisión de facturas" />
     }
     return (
-      <main className="mx-auto max-w-4xl space-y-6 p-8">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold">Facturas en revisión</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer la cola de revisión. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer la cola de revisión.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
+      </div>
     )
   }
 
   const queue = read.data
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/facturas">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/facturas">
         « Volver a las facturas
       </Link>
 
@@ -64,6 +65,6 @@ export default async function InvoiceReviewPage() {
         suppliers={suppliers.ok ? suppliers.data.items : []}
         canDecide={canEdit(session?.permissions ?? {}, 'PURCHASE_INVOICES')}
       />
-    </main>
+    </div>
   )
 }

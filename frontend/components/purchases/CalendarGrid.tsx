@@ -4,12 +4,20 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { addDueDate, editDueDate, moveDueDate, removeDueDate } from '@/app/actions/purchases'
+import { Day, Money } from '@/components/ui/amount'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 import { useLiveCalendar } from '@/components/purchases/useLiveCalendar'
+/*
+ * `day()` y `money()` se siguen usando **como string**, y por eso este archivo
+ * es una de las excepciones permanentes del chequeo de `UI-04`: un `title` y un
+ * `aria-label` no pueden llevar un elemento adentro. Todo lo que se ve pasa por
+ * `<Day>` y `<Money>`.
+ */
 import { day, money } from '@/lib/format'
 import {
   MOVING_INTO_THE_PAST,
@@ -22,6 +30,7 @@ import {
 import { paymentStateLabel } from '@/lib/purchases/labels'
 import { cn } from '@/lib/utils'
 import type { Calendar, DueDate } from '@/lib/purchases/types'
+import { dueDateTone, invoicePaymentTone, type BadgeTone } from '@/lib/ui/tone'
 
 /**
  * Un mes del calendario, con lo que vence cada día.
@@ -59,14 +68,6 @@ const VERBOS: Record<string, string> = {
 /** Los encabezados de la grilla, que empieza el lunes como la semana laboral. */
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
-/** El tono de la píldora de cada estado de pago (`UI-03`). */
-const TONO_DE_PAGO = {
-  SALDADA: 'ok',
-  PARCIAL: 'warn',
-  SIN_PAGOS: 'neutral',
-  INCONSISTENTE: 'danger',
-} as const
-
 /**
  * En qué estado está un vencimiento, dicho con píldoras (`UI-03`).
  *
@@ -81,23 +82,21 @@ const TONO_DE_PAGO = {
  */
 function estadosDe(entry: DueDate): ReadonlyArray<{ label: string; tone: BadgeTone }> {
   const pills: Array<{ label: string; tone: BadgeTone }> = []
-  if (entry.is_overdue_without_receipt) {
-    pills.push({ label: 'Venció sin recibo', tone: 'danger' })
-  } else if (entry.receipt_issued) {
-    pills.push({ label: 'Recibo emitido', tone: 'ok' })
-  } else if (entry.is_past) {
-    pills.push({ label: 'Ya pasó', tone: 'warn' })
-  }
+  /*
+   * Los dos tonos salen de `lib/ui/tone.ts` y no de una tabla propia de esta
+   * pantalla: es lo que hace que «venció sin recibo» sea la **misma** píldora
+   * roja acá, en `/facturas` y en la ficha del proveedor (`RF-06`).
+   */
+  const estado = dueDateTone(entry)
+  if (estado !== null) pills.push(estado)
   if (entry.payment_state) {
     pills.push({
       label: paymentStateLabel(entry.payment_state),
-      tone: TONO_DE_PAGO[entry.payment_state as keyof typeof TONO_DE_PAGO] ?? 'neutral',
+      tone: invoicePaymentTone(entry.payment_state),
     })
   }
   return pills
 }
-
-type BadgeTone = 'ok' | 'info' | 'warn' | 'danger' | 'neutral'
 
 /**
  * Lo que la pantalla necesita para operar sobre una tarjeta.
@@ -147,10 +146,14 @@ function DayEntries({
           <DueDateCard key={entry.id} entry={entry} acciones={acciones} />
         ))}
       </ul>
+      {/*
+        Abrir el día no cambia ningún dato: sólo muestra lo que ya está, así que
+        puede ir en el azul de enlace sin violar `RF-13`.
+      */}
       {entries.length > PER_DAY && (
-        <button type="button" className="text-xs underline" onClick={() => onToggle(date)}>
+        <Button type="button" variant="link" size="sm" onClick={() => onToggle(date)}>
           {expanded ? 'Ver menos' : `y ${entries.length - PER_DAY} más en este día`}
-        </button>
+        </Button>
       )}
     </>
   )
@@ -178,7 +181,7 @@ function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-medium">{entry.description}</span>
         {/* `UI-04`: la plata en mono tabular, que es lo que deja leer una columna. */}
-        <span className="amount">{money(entry.amount)}</span>
+        <Money value={entry.amount} />
       </div>
       {estados.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -197,7 +200,7 @@ function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }
         {entry.was_rescheduled && (
           <>
             {' · reprogramado, original '}
-            <span className="amount">{day(entry.original_date)}</span>
+            <Day value={entry.original_date} />
           </>
         )}
         {entry.created_by_name && (
@@ -206,7 +209,7 @@ function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }
             {entry.created_at && (
               <>
                 {' el '}
-                <span className="amount">{day(entry.created_at)}</span>
+                <Day value={entry.created_at} />
               </>
             )}
           </>
@@ -216,8 +219,7 @@ function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }
         <ul className="mt-1 text-xs text-muted-foreground">
           {(entry.changes ?? []).map(change => (
             <li key={change.id}>
-              <span className="amount">{day(change.previous_date)}</span> →{' '}
-              <span className="amount">{day(change.new_date)}</span>
+              <Day value={change.previous_date} /> → <Day value={change.new_date} />
               {change.actor_name ? ` · lo movió ${change.actor_name}` : ''}
               {change.reason ? ` · ${change.reason}` : ''}
             </li>
@@ -226,7 +228,7 @@ function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }
       )}
       <div className="mt-2 flex flex-wrap gap-2">
         {entry.invoice_id && (
-          <a className="text-xs underline" href={`/facturas/${entry.invoice_id}`}>
+          <a className="text-xs text-link hover:underline" href={`/facturas/${entry.invoice_id}`}>
             Ver la factura
           </a>
         )}
@@ -485,9 +487,8 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
       >
         {preguntando !== null && (
           <>
-            Estás por mover «{preguntando.entry.description}» al{' '}
-            <span className="amount">{day(preguntando.next)}</span>, que ya pasó. Queda registrado
-            quién lo movió y desde qué fecha.
+            Estás por mover «{preguntando.entry.description}» al <Day value={preguntando.next} />,
+            que ya pasó. Queda registrado quién lo movió y desde qué fecha.
           </>
         )}
       </ConfirmDialog>
@@ -613,11 +614,9 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
         {/* El día elegido, entero: la celda muestra qué hay, acá se opera. */}
         {abierto !== null && (
           <section className="mt-4 space-y-2">
-            <h3 className="amount text-sm font-medium text-muted-foreground">{day(abierto)}</h3>
+            <Day value={abierto} as="div" className="text-sm font-medium text-muted-foreground" />
             {(byDay.get(abierto) ?? []).length === 0 ? (
-              <p className="rounded border border-dashed p-6 text-center text-muted-foreground">
-                No vence nada este día.
-              </p>
+              <Empty title="No vence nada este día." />
             ) : (
               <DayEntries
                 date={abierto}
@@ -637,9 +636,7 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
         lee no sirve para consultarlo, que es exactamente lo que H8 pide.
       */}
       {byDay.size === 0 ? (
-        <p className="rounded border border-dashed p-8 text-center text-muted-foreground md:hidden">
-          No vence nada en este período.
-        </p>
+        <Empty title="No vence nada en este período." className="md:hidden" />
       ) : (
         <ol aria-label="Los días con vencimientos" className="space-y-4 md:hidden">
           {conAlgo.map(date => (
@@ -654,7 +651,7 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
               onDragLeave={() => setOver(current => (current === date ? null : current))}
               onDrop={() => void drop(date)}
             >
-              <h3 className="amount text-sm font-medium text-muted-foreground">{day(date)}</h3>
+              <Day value={date} as="div" className="text-sm font-medium text-muted-foreground" />
               <DayEntries
                 date={date}
                 entries={byDay.get(date) ?? []}

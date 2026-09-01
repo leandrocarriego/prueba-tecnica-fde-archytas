@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 
 import { revokeRule } from '@/app/actions/triage'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 import { formatMoment } from '@/lib/catalog/format'
 import { caseKindLabel, type Rule } from '@/lib/triage/types'
 
@@ -38,20 +41,19 @@ export function RuleList({ rules }: RuleListProps) {
 
   if (rules.length === 0) {
     return (
-      <p className="rounded border border-dashed p-6 text-center text-muted-foreground">
-        Todavía no hay decisiones guardadas. Cada caso que resuelvas se guarda como regla y se
-        aplica sola a los casos iguales.
-      </p>
+      <Empty title="Todavía no hay decisiones guardadas.">
+        Cada caso que resuelvas se guarda como regla y se aplica sola a los casos iguales.
+      </Empty>
     )
   }
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <Notice tone="danger" title={error} />}
       {rules.map(rule => (
-        <article
+        <Card
           key={rule.id}
-          className="flex flex-wrap items-center justify-between gap-3 rounded border p-3 text-sm"
+          className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm"
         >
           <div>
             <p className="font-medium">{caseKindLabel(rule.kind)}</p>
@@ -74,7 +76,7 @@ export function RuleList({ rules }: RuleListProps) {
           >
             {working === rule.id ? 'Anulando…' : 'Dejar sin efecto'}
           </Button>
-        </article>
+        </Card>
       ))}
     </div>
   )

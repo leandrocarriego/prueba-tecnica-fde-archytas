@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import { readQuality } from '@/app/actions/quality'
 import { ApiStatusCard } from '@/components/status/ApiStatusCard'
 import { probeHealth } from '@/lib/health'
+import { Card } from '@/components/ui/card'
+import { Empty } from '@/components/ui/state'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +36,7 @@ export default async function HealthPage() {
   const [probe, quality] = await Promise.all([probeHealth(), readQuality()])
 
   return (
-    <main className="mx-auto max-w-2xl space-y-8 px-6 py-10">
+    <div className="max-w-2xl space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Salud del sistema</h1>
         <p className="text-muted-foreground">
@@ -49,21 +51,22 @@ export default async function HealthPage() {
 
         {quality ? (
           <dl className="grid grid-cols-2 gap-4">
-            <div className="rounded border p-4">
+            <Card className="p-5">
               <dt className="text-sm text-muted-foreground">Tests en verde</dt>
-              <dd className="text-3xl font-semibold">{quality.tests}</dd>
-            </div>
-            <div className="rounded border p-4">
+              <dd className="amount text-3xl font-semibold">{quality.tests}</dd>
+            </Card>
+            <Card className="p-5">
               <dt className="text-sm text-muted-foreground">Cobertura</dt>
-              <dd className="text-3xl font-semibold">{PERCENT.format(quality.coverage / 100)}</dd>
-            </div>
+              <dd className="amount text-3xl font-semibold">
+                {PERCENT.format(quality.coverage / 100)}
+              </dd>
+            </Card>
           </dl>
         ) : (
-          <p className="rounded border border-dashed p-4 text-sm text-muted-foreground">
-            Esta versión no trae la medición. Se genera con <code>make quality</code> a partir de
-            una corrida real de la suite, así que preferimos no decir nada antes que mostrar un
-            número que nadie midió.
-          </p>
+          <Empty title="Esta versión no trae la medición.">
+            Se genera con <code>make quality</code> a partir de una corrida real de la suite, así
+            que preferimos no decir nada antes que mostrar un número que nadie midió.
+          </Empty>
         )}
 
         <div className="space-y-3 text-sm text-muted-foreground">
@@ -79,6 +82,6 @@ export default async function HealthPage() {
           </p>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

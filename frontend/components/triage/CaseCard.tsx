@@ -5,8 +5,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { resolveCase } from '@/app/actions/triage'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Card } from '@/components/ui/card'
+import { Input, selectClassName } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 import { useToast } from '@/components/ui/toast'
 import { formatMoment, formatPrice } from '@/lib/catalog/format'
 import type { Category } from '@/lib/catalog/types'
@@ -120,7 +124,7 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
   }
 
   return (
-    <article className="space-y-3 rounded border p-4">
+    <Card className="space-y-3 p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="text-sm text-muted-foreground">{caseKindLabel(item.kind)}</p>
@@ -137,11 +141,12 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
             (RF-18), así que la pantalla no decide nada acá: lo muestra.
           */}
           {item.status === 'PENDING' && (
-            <p className={item.is_stale ? 'font-medium text-warn' : undefined}>
+            <p className="flex flex-wrap items-center justify-end gap-1.5">
               {item.waiting_days === 0
                 ? 'Llegó hoy'
                 : `Espera hace ${item.waiting_days} ${item.waiting_days === 1 ? 'día' : 'días'}`}
-              {item.is_stale && ' · demorado'}
+              {/* Demorado es un estado del caso, así que es una píldora (`RF-06`). */}
+              {item.is_stale && <Badge tone="warn">Demorado</Badge>}
             </p>
           )}
         </div>
@@ -151,7 +156,7 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
         {payloadText(item, 'product_code') && (
           <div>
             <dt className="inline text-muted-foreground">Código: </dt>
-            <dd className="inline font-mono">{payloadText(item, 'product_code')}</dd>
+            <Code value={payloadText(item, 'product_code')} as="dd" className="inline" />
           </div>
         )}
         {payloadText(item, 'description') && (
@@ -169,7 +174,7 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
         {payloadText(item, 'category_text') && (
           <div>
             <dt className="inline text-muted-foreground">Forma escrita: </dt>
-            <dd className="inline font-mono">{payloadText(item, 'category_text')}</dd>
+            <Code value={payloadText(item, 'category_text')} as="dd" className="inline" />
           </div>
         )}
         {/*
@@ -268,7 +273,7 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
           */
           <>
             <select
-              className="rounded border px-2 py-1 text-sm"
+              className={selectClassName}
               value={categoryId}
               onChange={event => setCategoryId(event.target.value)}
             >
@@ -330,32 +335,36 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
         be half the decision.
       */}
       {error && (
-        <div className="space-y-2 text-sm">
-          <p className="text-danger">{error}</p>
+        <Notice tone="danger" title={error}>
           {refused !== null && (
             <>
-              {refused.correctedBy !== null && (
-                <p className="text-danger">La corrección la hizo {refused.correctedBy}.</p>
-              )}
-              <p className="flex flex-wrap gap-4">
-                <Link className="underline" href={`/precios/${refused.productId}`}>
+              {refused.correctedBy !== null && <p>La corrección la hizo {refused.correctedBy}.</p>}
+              {/*
+               * `RF-13`: los dos son enlaces porque llevan a otra pantalla. Lo
+               * que **cambia** una corrección es el botón que está allá.
+               */}
+              <p className="mt-1 flex flex-wrap gap-4">
+                <Link className="text-link hover:underline" href={`/precios/${refused.productId}`}>
                   Ver la corrección
                 </Link>
                 {mayCorrect && (
-                  <Link className="underline" href={`/precios/${refused.productId}#correcciones`}>
+                  <Link
+                    className="text-link hover:underline"
+                    href={`/precios/${refused.productId}#correcciones`}
+                  >
                     Cambiarla
                   </Link>
                 )}
               </p>
               {!mayCorrect && (
-                <p className="text-muted-foreground">
+                <p className="mt-1">
                   Cambiar una corrección es de quien maneja el catálogo: el dueño o ventas.
                 </p>
               )}
             </>
           )}
-        </div>
+        </Notice>
       )}
-    </article>
+    </Card>
   )
 }

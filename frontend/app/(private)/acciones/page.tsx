@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { getSession } from '@/app/actions/auth'
 import { actionsFor } from '@/lib/operations/actions'
+import { Empty } from '@/components/ui/state'
 
 export const metadata = {
   title: 'Acciones — Plataforma Cordillera',
@@ -28,13 +29,13 @@ export default async function ActionsPage() {
   const actions = actionsFor(session.permissions)
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-8">
+    <div className="space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Acciones</h1>
         <p className="text-sm text-muted-foreground">
           Todo lo que podés cargar y corregir, en un solo lugar. Cada cambio queda registrado con tu
           nombre en el{' '}
-          <Link className="underline underline-offset-2" href="/historial">
+          <Link className="text-link hover:underline" href="/historial">
             historial
           </Link>
           .
@@ -42,15 +43,18 @@ export default async function ActionsPage() {
       </header>
 
       {actions.length === 0 ? (
-        <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-          Tu acceso no tiene todavía ninguna acción de carga o corrección.
-        </p>
+        <Empty title="Tu acceso no tiene todavía ninguna acción de carga o corrección." />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {actions.map(action => (
             <li key={action.id}>
+              {/*
+                Cada acción es una tarjeta que lleva a su pantalla. Ninguna va
+                en naranja: es una lista de decisiones, y ninguna es más
+                importante que otra (`RF-21`).
+              */}
               <Link
-                className="block h-full rounded border p-4 transition hover:border-input hover:bg-muted"
+                className="block h-full rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
                 href={action.href}
               >
                 <span className="block font-medium">{action.label}</span>
@@ -62,6 +66,6 @@ export default async function ActionsPage() {
           ))}
         </ul>
       )}
-    </main>
+    </div>
   )
 }

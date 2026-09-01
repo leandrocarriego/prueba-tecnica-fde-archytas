@@ -5,9 +5,15 @@ import { useRouter } from 'next/navigation'
 
 import { correctSale, resolveSaleGroup, undoSaleResolution } from '@/app/actions/sales'
 import { SaleCorrection } from '@/components/sales/SaleCorrection'
+import { Code, Day, Money } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { count, day, money } from '@/lib/format'
+import { Card } from '@/components/ui/card'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
+import { count } from '@/lib/format'
 import type { ReviewQueue, Sale } from '@/lib/sales/types'
+import { isUnconfirmedSale, pill, saleTone } from '@/lib/ui/tone'
 
 const FIELDS: Record<string, string> = {
   sold_on: 'la fecha',
@@ -50,19 +56,15 @@ export function SalesReview({
 
   return (
     <div className="space-y-8">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Ventas repetidas ({queue.pending_groups})</h2>
         {queue.groups.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ninguna repetida esperando una decisión.</p>
+          <Empty title="Ninguna repetida esperando una decisión." />
         ) : (
           queue.groups.map(group => (
-            <article key={group.code_key} className="space-y-3 rounded border p-4">
+            <Card key={group.code_key} className="space-y-3 p-5">
               <header>
                 <h3 className="font-medium">Código {group.versions[0]?.code}</h3>
                 <p className="text-sm text-warn">
@@ -85,10 +87,22 @@ export function SalesReview({
                 <tbody>
                   {group.versions.map(version => (
                     <tr key={version.id} className="border-b">
-                      <td className="py-1">{day(version.sold_on)}</td>
-                      <td className="py-1">{version.product_code ?? '—'}</td>
-                      <td className="py-1 text-right">{count(version.quantity)}</td>
-                      <td className="py-1 text-right">{money(version.total)}</td>
+                      <Day value={version.sold_on} cell className="py-1 text-left" />
+                      <Code value={version.product_code} cell className="py-1 text-left" />
+                      <td className="amount py-1 text-right">{count(version.quantity)}</td>
+                      <td className="py-1 text-right">
+                        <Money value={version.total} />
+                        {/*
+                         * `RF-08`: una venta estimada o apartada no está
+                         * confirmada, y se ve punteada sin leer la etiqueta.
+                         */}
+                        <Badge
+                          className="ml-2"
+                          tone={pill(saleTone(version.state), isUnconfirmedSale(version))}
+                        >
+                          {version.is_estimated ? 'Estimada' : 'Apartada'}
+                        </Badge>
+                      </td>
                       {canEdit && (
                         <td className="py-1 text-right">
                           <Button
@@ -130,7 +144,7 @@ export function SalesReview({
                   </Button>
                 </div>
               )}
-            </article>
+            </Card>
           ))
         )}
       </section>
@@ -138,7 +152,7 @@ export function SalesReview({
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Ventas con datos rotos ({queue.broken.length})</h2>
         {queue.broken.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ninguna con datos rotos.</p>
+          <Empty title="Ninguna con datos rotos." />
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b text-left text-muted-foreground">
@@ -154,10 +168,10 @@ export function SalesReview({
             <tbody>
               {queue.broken.map(sale => (
                 <tr key={sale.id} className="border-b align-top">
-                  <td className="py-2">{sale.code}</td>
-                  <td className="py-2">{day(sale.sold_on)}</td>
-                  <td className="py-2">{sale.product_code ?? '—'}</td>
-                  <td className="py-2 text-right">{money(sale.total)}</td>
+                  <Code value={sale.code} cell className="py-2 text-left" />
+                  <Day value={sale.sold_on} cell className="py-2 text-left" />
+                  <Code value={sale.product_code} cell className="py-2 text-left" />
+                  <Money value={sale.total} cell className="py-2" />
                   <td className="py-2 text-warn">{sale.reason}</td>
                   {canEdit && (
                     <td className="py-2 text-right">
@@ -185,7 +199,7 @@ export function SalesReview({
           número que dice cuánto dejó afuera tiene que dejar ver qué dejó afuera.
         </p>
         {discarded.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ninguna.</p>
+          <Empty title="Ninguna." />
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b text-left text-muted-foreground">
@@ -200,10 +214,10 @@ export function SalesReview({
             <tbody>
               {discarded.map(sale => (
                 <tr key={sale.id} className="border-b align-top">
-                  <td className="py-2">{sale.code}</td>
-                  <td className="py-2">{day(sale.sold_on)}</td>
-                  <td className="py-2">{sale.product_code ?? '—'}</td>
-                  <td className="py-2 text-right">{money(sale.total)}</td>
+                  <Code value={sale.code} cell className="py-2 text-left" />
+                  <Day value={sale.sold_on} cell className="py-2 text-left" />
+                  <Code value={sale.product_code} cell className="py-2 text-left" />
+                  <Money value={sale.total} cell className="py-2" />
                   <td className="py-2 text-muted-foreground">{sale.reason}</td>
                 </tr>
               ))}

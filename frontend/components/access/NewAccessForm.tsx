@@ -4,17 +4,17 @@ import { useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
 import { createAccess, type ActionResult } from '@/app/actions/access'
+import { Button } from '@/components/ui/button'
+import { Input, selectClassName } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 
+/** Dar de alta es la tarea de esta pantalla: su único naranja (`RF-11`). */
 function SubmitButton() {
   const { pending } = useFormStatus()
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="cursor-pointer rounded bg-primary px-4 py-2 text-white disabled:opacity-50"
-    >
-      {pending ? 'Dando de alta...' : 'Dar de alta e invitar'}
-    </button>
+    <Button type="submit" variant="brand" disabled={pending}>
+      {pending ? 'Dando de alta…' : 'Dar de alta e invitar'}
+    </Button>
   )
 }
 
@@ -30,27 +30,27 @@ export function NewAccessForm() {
   return (
     <form
       action={async formData => setResult(await createAccess(formData))}
-      className="space-y-3 rounded border p-4"
+      className="space-y-3 rounded-lg border border-border bg-card p-5"
     >
       <h2 className="font-medium">Dar de alta a alguien</h2>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <input name="name" required placeholder="Nombre" className="rounded border px-3 py-2" />
-        <input name="last_name" placeholder="Apellido" className="rounded border px-3 py-2" />
-        <input
+        <Input name="name" required placeholder="Nombre" aria-label="Nombre" />
+        <Input name="last_name" placeholder="Apellido" aria-label="Apellido" />
+        <Input
           name="email"
           type="email"
           required
           placeholder="Correo con el que entra"
-          className="rounded border px-3 py-2"
+          aria-label="Correo con el que entra"
         />
-        <input
+        <Input
           name="phone"
           required
           placeholder="Teléfono, con código de país"
-          className="rounded border px-3 py-2"
+          aria-label="Teléfono, con código de país"
         />
-        <select name="role" defaultValue="SALES" className="rounded border px-3 py-2">
+        <select name="role" defaultValue="SALES" className={selectClassName} aria-label="Rol">
           <option value="PURCHASING">Compras</option>
           <option value="SALES">Ventas</option>
         </select>
@@ -62,9 +62,7 @@ export function NewAccessForm() {
 
       <SubmitButton />
 
-      {result && (
-        <p className={`text-sm ${result.ok ? 'text-ok' : 'text-danger'}`}>{result.message}</p>
-      )}
+      {result && <Notice tone={result.ok ? 'ok' : 'danger'} title={result.message} />}
     </form>
   )
 }

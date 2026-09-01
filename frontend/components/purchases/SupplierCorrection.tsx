@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { correctSupplier } from '@/app/actions/purchases'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, selectClassName } from '@/components/ui/input'
 import type { CorrectionReason } from '@/lib/operations/types'
 
 interface SupplierCorrectionProps {
@@ -100,7 +100,7 @@ export function SupplierCorrection({
   return (
     <div className={open ? 'space-y-2' : 'inline-flex flex-wrap items-center gap-2'}>
       {open ? (
-        <form className="space-y-3 rounded border bg-white p-3" onSubmit={onSubmit}>
+        <form className="space-y-3 rounded-lg border bg-card p-3" onSubmit={onSubmit}>
           <p className="text-sm font-medium">Corregir {fieldLabel}</p>
 
           <div className="space-y-1">
@@ -123,7 +123,7 @@ export function SupplierCorrection({
               Por qué
             </label>
             <select
-              className="w-full rounded border px-3 py-2 text-sm"
+              className={selectClassName}
               id={`supplier-reason-${field}`}
               required
               value={reasonCode}

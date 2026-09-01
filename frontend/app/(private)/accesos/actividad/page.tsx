@@ -1,19 +1,23 @@
 import { getSession } from '@/app/actions/auth'
 import { listAccessEvents } from '@/app/actions/access'
 import { NoPermission } from '@/components/common/NoPermission'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { Empty } from '@/components/ui/state'
 import { canSee } from '@/lib/auth/permissions'
 import { SHORT_MOMENT_FORMAT } from '@/lib/time'
+import type { BadgeTone } from '@/lib/ui/tone'
 
 /** What each kind of event is called on screen, in the owner's words. */
-const EVENT_LABELS: Record<string, { label: string; tone: string }> = {
-  LOGIN_SUCCEEDED: { label: 'Entró', tone: 'pill pill-ok' },
-  LOGIN_REJECTED: { label: 'No pudo entrar', tone: 'pill pill-warn' },
-  ACCESS_LOCKED: { label: 'Acceso bloqueado', tone: 'pill pill-danger' },
-  PERMISSION_DENIED: { label: 'Quiso ver algo que no le toca', tone: 'pill pill-danger' },
-  ACCESS_GRANTED: { label: 'Alta de acceso', tone: 'pill pill-info' },
-  ACCESS_ROLE_CHANGED: { label: 'Cambio de rol', tone: 'pill pill-info' },
-  ACCESS_DEACTIVATED: { label: 'Acceso desactivado', tone: 'pill' },
-  ACCESS_REACTIVATED: { label: 'Acceso reactivado', tone: 'pill pill-info' },
+const EVENT_LABELS: Record<string, { label: string; tone: BadgeTone }> = {
+  LOGIN_SUCCEEDED: { label: 'Entró', tone: 'ok' },
+  LOGIN_REJECTED: { label: 'No pudo entrar', tone: 'warn' },
+  ACCESS_LOCKED: { label: 'Acceso bloqueado', tone: 'danger' },
+  PERMISSION_DENIED: { label: 'Quiso ver algo que no le toca', tone: 'danger' },
+  ACCESS_GRANTED: { label: 'Alta de acceso', tone: 'info' },
+  ACCESS_ROLE_CHANGED: { label: 'Cambio de rol', tone: 'info' },
+  ACCESS_DEACTIVATED: { label: 'Acceso desactivado', tone: 'neutral' },
+  ACCESS_REACTIVATED: { label: 'Acceso reactivado', tone: 'info' },
 }
 
 // Shorter than `formatMoment` in lib/catalog/format on purpose: this table
@@ -45,7 +49,7 @@ export default async function ActivityPage() {
   accesses?.items.forEach(item => names.set(item.id, item.name))
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-6 py-10">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Actividad</h1>
         <p className="text-muted-foreground">
@@ -54,7 +58,7 @@ export default async function ActivityPage() {
       </div>
 
       {log.items.length === 0 ? (
-        <p className="text-muted-foreground">Todavía no hay nada registrado.</p>
+        <Empty title="Todavía no hay nada registrado." />
       ) : (
         <table className="w-full text-left text-sm">
           <thead className="border-b text-muted-foreground">
@@ -69,13 +73,17 @@ export default async function ActivityPage() {
             {log.items.map(event => {
               const label = EVENT_LABELS[event.kind] ?? {
                 label: event.kind,
-                tone: 'pill',
+                tone: 'neutral' as BadgeTone,
               }
               return (
                 <tr key={event.id} className="border-b last:border-0 align-top">
-                  <td className="py-3 whitespace-nowrap">{shortMoment(event.occurred_at)}</td>
+                  <Code
+                    value={shortMoment(event.occurred_at)}
+                    cell
+                    className="py-3 text-left whitespace-nowrap"
+                  />
                   <td>
-                    <span className={label.tone}>{label.label}</span>
+                    <Badge tone={label.tone}>{label.label}</Badge>
                   </td>
                   <td>
                     {event.user_id
@@ -91,6 +99,6 @@ export default async function ActivityPage() {
           </tbody>
         </table>
       )}
-    </main>
+    </div>
   )
 }

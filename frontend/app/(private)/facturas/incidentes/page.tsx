@@ -4,6 +4,7 @@ import { IncidentList } from '@/components/purchases/IncidentList'
 import { NoPermission } from '@/components/common/NoPermission'
 import { readFromApi } from '@/lib/api/server'
 import type { Incident } from '@/lib/purchases/types'
+import { ErrorState } from '@/components/ui/state'
 
 export const metadata = {
   title: 'Incidentes de recibo — Plataforma Cordillera',
@@ -31,12 +32,12 @@ export default async function IncidentsPage() {
       return <NoPermission what="los recibos de recepción" />
     }
     return (
-      <main className="mx-auto max-w-4xl space-y-4 p-8">
+      <div className="space-y-4">
         <h1 className="text-2xl font-bold">Incidentes de recibo</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer los incidentes. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer los incidentes.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
+      </div>
     )
   }
 
@@ -45,8 +46,8 @@ export default async function IncidentsPage() {
   const closed = incidents.filter(incident => incident.closed_at !== null)
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/facturas">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/facturas">
         « Volver a las facturas
       </Link>
 
@@ -74,6 +75,6 @@ export default async function IncidentsPage() {
           <IncidentList incidents={closed} />
         </section>
       )}
-    </main>
+    </div>
   )
 }

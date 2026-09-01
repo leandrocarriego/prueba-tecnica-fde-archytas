@@ -1,8 +1,10 @@
 import Link from 'next/link'
 
 import { NoPermission } from '@/components/common/NoPermission'
+import { Code, Money } from '@/components/ui/amount'
+import { ErrorState } from '@/components/ui/state'
 import { readFromApi } from '@/lib/api/server'
-import { count, money } from '@/lib/format'
+import { count } from '@/lib/format'
 import type { SupplierList } from '@/lib/purchases/types'
 
 export const metadata = {
@@ -30,19 +32,17 @@ export default async function SuppliersPage() {
       return <NoPermission what="el padrón de proveedores" />
     }
     return (
-      <main className="mx-auto max-w-5xl space-y-6 p-8">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold">Proveedores</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer el padrón. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer el padrón" />
+      </div>
     )
   }
 
   const listing = read.data
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-8">
+    <div className="space-y-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Proveedores</h1>
         <p className="text-sm text-muted-foreground">
@@ -52,10 +52,10 @@ export default async function SuppliersPage() {
       </header>
 
       <nav className="flex gap-4 text-sm">
-        <Link className="underline" href="/proveedores/grafias">
+        <Link className="text-link hover:underline" href="/proveedores/grafias">
           Grafías guardadas
         </Link>
-        <Link className="underline" href="/facturas">
+        <Link className="text-link hover:underline" href="/facturas">
           Facturas
         </Link>
       </nav>
@@ -76,16 +76,16 @@ export default async function SuppliersPage() {
             {listing.items.map(supplier => (
               <tr key={supplier.id} className="border-b align-top">
                 <td className="py-2">
-                  <Link className="underline" href={`/proveedores/${supplier.id}`}>
+                  <Link className="text-link hover:underline" href={`/proveedores/${supplier.id}`}>
                     {supplier.legal_name}
                   </Link>
                 </td>
-                <td className="py-2">{supplier.tax_id ?? '—'}</td>
+                <Code value={supplier.tax_id} cell className="py-2 text-left" />
                 <td className="py-2">
                   {supplier.payment_term_days === null ? '—' : `${supplier.payment_term_days} días`}
                 </td>
-                <td className="py-2 text-right">{money(supplier.balance)}</td>
-                <td className="py-2 text-right">{count(supplier.invoice_count)}</td>
+                <Money value={supplier.balance} cell className="py-2" />
+                <td className="amount py-2 text-right">{count(supplier.invoice_count)}</td>
                 <td className="py-2 text-warn">
                   {(supplier.missing ?? [])
                     .map(field => MISSING_LABELS[field] ?? field)
@@ -96,6 +96,6 @@ export default async function SuppliersPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
   )
 }

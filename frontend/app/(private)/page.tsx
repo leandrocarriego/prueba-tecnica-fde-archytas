@@ -1,45 +1,17 @@
-import Link from 'next/link'
-
-import { getCurrentUser } from '@/app/actions/auth'
+import { redirect } from 'next/navigation'
 
 /**
- * Dashboard — landing page of the protected area.
+ * La raíz del área privada no es una pantalla: es una puerta (`RF-24`).
+ *
+ * Acá había una bienvenida —«Plataforma Cordillera», el mail de quien entró y
+ * dos enlaces subrayados— que no es ninguna de las dieciséis secciones y que
+ * nadie pidió: quedó del andamio del primer día. Lo que una persona viene a ver
+ * al entrar es cómo está el negocio, y eso es el tablero.
+ *
+ * `redirect` y no un `page.tsx` que dibuje el tablero: la ruta `/tablero`
+ * existe, está en el menú y es la que se comparte. Dos rutas que muestran lo
+ * mismo terminan divergiendo.
  */
-export default async function DashboardPage() {
-  const user = await getCurrentUser()
-
-  // Defensive check: the layout already guards this route, but avoid rendering
-  // errors if there is a timing issue with the session cookie.
-  if (!user) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24">
-        <div className="z-10 w-full max-w-5xl items-center justify-between text-sm">
-          <h1 className="mb-8 text-center text-4xl font-bold">Plataforma Cordillera</h1>
-          <div className="text-center">
-            <p className="mb-4 text-lg">Cargando...</p>
-          </div>
-        </div>
-      </main>
-    )
-  }
-
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between text-sm">
-        <h1 className="mb-8 text-center text-4xl font-bold">Plataforma Cordillera</h1>
-        <div className="text-center">
-          <p className="mb-4 text-lg">Bienvenido, {user.email}</p>
-          <p className="text-muted-foreground">Esta es la página principal de la plataforma.</p>
-          <nav className="mt-8 flex justify-center gap-6">
-            <Link className="underline underline-offset-4" href="/precios">
-              Lista de precios
-            </Link>
-            <Link className="underline underline-offset-4" href="/revision">
-              Revisión
-            </Link>
-          </nav>
-        </div>
-      </div>
-    </main>
-  )
+export default function PrivateRoot() {
+  redirect('/tablero')
 }

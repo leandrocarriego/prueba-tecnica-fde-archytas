@@ -30,9 +30,20 @@ El sistema tiene dos capas, y no se contradicen:
   `--ok`, …) y las clases compartidas (`.pill`, `.amount`, `.section-label`). Cambiar la paleta es
   editar ese archivo, y nada más.
 
-Encima de esa base hay tres primitivas que existen para que un mismo estado no se dibuje dos veces
-distinto: `components/ui/badge.tsx` (la píldora), `components/ui/notice.tsx` (el aviso con su
-acción) y `components/ui/button.tsx` (donde `variant="brand"` es el único naranja).
+Encima de esa base hay seis piezas que existen para que un mismo estado no se dibuje dos veces
+distinto:
+
+| Pieza | Qué decide |
+|---|---|
+| `components/ui/badge.tsx` | La píldora de estado |
+| `components/ui/notice.tsx` | El aviso, con la acción que lo resuelve |
+| `components/ui/button.tsx` | Las variantes, donde `variant="brand"` es el único naranja |
+| `components/ui/amount.tsx` | `<Money>`, `<Day>`, `<Code>` y `<Decimal>`: la plata, las fechas y los códigos en mono tabular, alineados cuando son celda |
+| `components/ui/state.tsx` | `<Loading>`, `<ErrorState>` y `<Empty>`: las tres caras de una pantalla sin datos |
+| `lib/ui/tone.ts` | **El** mapa de cada estado del negocio a uno de los cinco tonos, y qué cuenta como «todavía sin confirmar» |
+
+La última es la que sostiene a las demás: mientras cada pantalla elija su color, «vencida» se
+dibuja de tres maneras distintas y nadie se entera.
 
 ## Cómo se hace cumplir
 
@@ -58,7 +69,33 @@ No se improvisa en el componente. Se agrega el **token** en `globals.css` y su *
 y esa decisión es del `Frontend-Architect` (`agents/roles/frontend_architect.md`). Si el cambio
 altera lo que una señal significa para el cliente, vuelve al `Solution-Designer`.
 
+Los que se agregaron así, y qué quieren decir:
+
+| Token | Significa | Dónde se ve |
+|---|---|---|
+| `--muted-ink` | El gris del **rótulo**: nombra un bloque sin competir con su título. Es más apagado que `--muted-foreground`, que es texto para leer; esto se recorre con la vista | `.section-label` |
+| `--draft-border` | El borde del punteado de **"todavía sin confirmar"**: un paso más cálido que `--border`, para que el guion se vea sin gritar | `.pill-draft` |
+
+Los dos existían como color escrito a mano dentro de `globals.css` —el único archivo donde el test
+lo permite— y por eso no rompían nada; pero un color sin nombre no se puede reusar ni cambiar, que
+es justamente lo que `UI-09` pide evitar.
+
 ## Estado de la aplicación
 
-La adopción del sistema sobre las pantallas existentes es la feature
-[`012-design-system`](../specs/012-design-system/spec.md).
+**El sistema está adoptado en toda la plataforma.** Las dieciséis secciones del menú, Mi cuenta y
+las cuatro pantallas de sesión usan los tokens, las primitivas y el mapa de tonos; el shell del área
+privada pone el fondo y el ancho, y ninguna pantalla pone el suyo.
+
+Lo hizo la feature [`012-design-system`](../specs/012-design-system/spec.md), que fue una
+**migración y no una construcción**: la base ya existía y no la usaba nadie.
+
+Lo que queda de eso, y que conviene saber antes de escribir una pantalla nueva:
+
+- El estado de un dato sale de `lib/ui/tone.ts`. Si el estado que necesitás no está, se agrega ahí
+  —una vez— y no en la pantalla.
+- La plata, las fechas y los códigos pasan por `components/ui/amount.tsx`. `money()` y `day()` se
+  usan sueltos **sólo** cuando hace falta el string y no el elemento (un `title`, un `aria-label`),
+  y `frontend/tests/design-system.test.ts` lleva la lista de esos casos.
+- El naranja es uno por pantalla, y ninguno en las nueve rutas donde se decide. Los dos chequeos
+  recorren el árbol de imports de cada `page.tsx`, así que no alcanza con no ponerlo en la pantalla:
+  cuenta también lo que traigan sus componentes.

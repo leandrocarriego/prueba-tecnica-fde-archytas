@@ -1,13 +1,14 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
+import { useFormStatus } from 'react-dom'
+
 import { loginAction } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 import { cn } from '@/lib/utils'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useFormStatus } from 'react-dom'
 import { useBranding } from './AuthBrandingProvider'
 
 interface LoginFormProps {
@@ -17,117 +18,57 @@ interface LoginFormProps {
 }
 
 /**
- * Submit button.
+ * El botón de entrar.
  *
- * It is a child component because `useFormStatus` only reports the pending
- * state of a form it is rendered inside — reading it from the form component
- * itself would always return false.
+ * Es un componente hijo porque `useFormStatus` sólo informa el estado del
+ * formulario adentro del cual se dibuja: leerlo desde el formulario mismo
+ * devolvería `false` siempre.
+ *
+ * **Es el único naranja de la pantalla** (`RF-11`): entrar es la tarea. Antes
+ * el color se pintaba a mano con `style` y dos manejadores de mouse que
+ * reescribían el fondo al pasar por encima; eso es lo que `variant="brand"` ya
+ * sabe hacer, con el token y con el foco visible que la guía pide.
  */
-function SubmitButton({ branding }: { branding: ReturnType<typeof useBranding> }) {
+function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus()
 
   return (
-    <Button
-      type="submit"
-      disabled={pending}
-      className="w-full cursor-pointer rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-      style={{
-        backgroundColor: branding.colors.primary,
-        color: branding.colors.primaryForeground,
-      }}
-      onMouseEnter={e => {
-        if (!pending) {
-          e.currentTarget.style.backgroundColor = branding.colors.primaryHover
-        }
-      }}
-      onMouseLeave={e => {
-        if (!pending) {
-          e.currentTarget.style.backgroundColor = branding.colors.primary
-        }
-      }}
-    >
-      {pending ? 'Iniciando sesión...' : branding.texts.loginButton}
+    <Button type="submit" variant="brand" disabled={pending} className="w-full">
+      {pending ? 'Iniciando sesión…' : label}
     </Button>
   )
 }
 
 /**
- * Login form.
- * Provides functionality without hardcoded styles.
- * Styles and layout can be customized via branding config.
+ * La pantalla de ingreso.
  *
- * Uses loginAction directly as form action to allow redirect() to work correctly.
+ * Los textos siguen saliendo de `lib/branding.ts`; lo que ya no sale de ahí es
+ * el aspecto: la tarjeta, los radios y el color son los mismos que los del
+ * resto de la plataforma, porque es la misma plataforma (`RF-05`).
+ *
+ * Usa `loginAction` directamente como `action` del formulario para que el
+ * `redirect()` del servidor funcione.
  */
 export function LoginForm({ className, renderLogo, renderFooter }: LoginFormProps) {
   const branding = useBranding()
   const searchParams = useSearchParams()
-  // The server action redirects back with `?error=` on failure, so the query
-  // string is the only source of error state: there is nothing to keep locally.
+  // La acción del servidor vuelve con `?error=` cuando falla, así que la query
+  // string es el único estado de error: no hay nada que guardar acá.
   const error = searchParams.get('error')
-
-  // Card styling from branding config
-  const cardRounded =
-    branding.formOptions?.cardStyle?.rounded === 'xl'
-      ? 'rounded-xl'
-      : branding.formOptions?.cardStyle?.rounded === '2xl'
-        ? 'rounded-2xl'
-        : branding.formOptions?.cardStyle?.rounded === 'lg'
-          ? 'rounded-lg'
-          : branding.formOptions?.cardStyle?.rounded === 'md'
-            ? 'rounded-md'
-            : branding.formOptions?.cardStyle?.rounded === 'sm'
-              ? 'rounded-sm'
-              : 'rounded-lg'
-
-  const cardShadow =
-    branding.formOptions?.cardStyle?.shadow === 'xl'
-      ? 'shadow-xl'
-      : branding.formOptions?.cardStyle?.shadow === 'lg'
-        ? 'shadow-lg'
-        : branding.formOptions?.cardStyle?.shadow === 'md'
-          ? 'shadow-md'
-          : branding.formOptions?.cardStyle?.shadow === 'sm'
-            ? 'shadow-sm'
-            : branding.formOptions?.cardStyle?.shadow === 'none'
-              ? 'shadow-none'
-              : 'shadow-sm'
+  const alignment = branding.formOptions?.textAlignment === 'left' ? 'text-left' : 'text-center'
 
   return (
-    <Card
-      className={cn(className, cardRounded, cardShadow)}
-      style={{
-        backgroundColor: branding.colors.cardBackground,
-        borderColor: branding.colors.border,
-      }}
-    >
+    <Card className={className}>
       <CardHeader className="space-y-1">
         {renderLogo && renderLogo(branding)}
-        <CardTitle
-          className={`text-2xl ${branding.formOptions?.textAlignment === 'left' ? 'text-left' : 'text-center'}`}
-          style={{ color: branding.colors.text }}
-        >
-          {branding.texts.loginTitle}
-        </CardTitle>
-        <CardDescription
-          className={branding.formOptions?.textAlignment === 'left' ? 'text-left' : 'text-center'}
-          style={{ color: branding.colors.textSecondary }}
-        >
-          {branding.texts.loginSubtitle}
-        </CardDescription>
+        <CardTitle className={cn('text-2xl', alignment)}>{branding.texts.loginTitle}</CardTitle>
+        <CardDescription className={alignment}>{branding.texts.loginSubtitle}</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={loginAction} className="space-y-5">
-          {error && (
-            <div className="rounded-lg border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-              {error}
-            </div>
-          )}
+          {error && <Notice tone="danger" title={error} />}
           <div className="space-y-2">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium"
-              style={{ color: branding.colors.text }}
-            >
+            <label htmlFor="email" className="text-sm font-medium">
               {branding.texts.emailLabel}
             </label>
             <Input
@@ -136,15 +77,10 @@ export function LoginForm({ className, renderLogo, renderFooter }: LoginFormProp
               type="email"
               placeholder={branding.texts.emailPlaceholder}
               required
-              className="rounded-lg"
             />
           </div>
           <div className="space-y-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium"
-              style={{ color: branding.colors.text }}
-            >
+            <label htmlFor="password" className="text-sm font-medium">
               {branding.texts.passwordLabel}
             </label>
             <Input
@@ -153,34 +89,9 @@ export function LoginForm({ className, renderLogo, renderFooter }: LoginFormProp
               type="password"
               placeholder={branding.texts.passwordPlaceholder}
               required
-              className="rounded-lg"
             />
           </div>
-          {/* Remember me checkbox - optional, shown if needed */}
-          {branding.formOptions?.showRememberMe && (
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="remember"
-                  defaultChecked={true}
-                  className="w-4 h-4 rounded border-input text-info focus:ring-ring"
-                  style={{ accentColor: branding.colors.primary }}
-                />
-                <span className="text-sm" style={{ color: branding.colors.text }}>
-                  {branding.texts.rememberMe || 'Recordarme'}
-                </span>
-              </label>
-              <Link
-                href="/reset-password"
-                className="text-sm hover:underline"
-                style={{ color: branding.colors.primary }}
-              >
-                {branding.texts.forgotPasswordLink}
-              </Link>
-            </div>
-          )}
-          <SubmitButton branding={branding} />
+          <SubmitButton label={branding.texts.loginButton} />
           {renderFooter && renderFooter(branding)}
         </form>
       </CardContent>

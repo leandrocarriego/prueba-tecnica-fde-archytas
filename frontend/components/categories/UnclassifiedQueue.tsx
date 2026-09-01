@@ -6,6 +6,11 @@ import { useRouter } from 'next/navigation'
 import { setProductCategory } from '@/app/actions/categories'
 import { Button } from '@/components/ui/button'
 import type { Category, UnclassifiedList } from '@/lib/catalog/types'
+import { Empty } from '@/components/ui/state'
+import { Notice } from '@/components/ui/notice'
+import { Code } from '@/components/ui/amount'
+import { Card } from '@/components/ui/card'
+import { selectClassName } from '@/components/ui/input'
 
 /**
  * The products waiting for a rubro, each with the proposal — or without one.
@@ -43,28 +48,20 @@ export function UnclassifiedQueue({
   }
 
   if (queue.items.length === 0) {
-    return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        No quedó ningún producto sin rubro.
-      </p>
-    )
+    return <Empty title="No quedó ningún producto sin rubro." />
   }
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       {queue.items.map(item => {
         const selected = chosen[item.product_id] ?? item.proposed_category_id ?? 0
         return (
-          <article key={item.product_id} className="space-y-2 rounded border p-4">
+          <Card key={item.product_id} className="space-y-2 p-5">
             <header className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="font-medium">
-                {item.code} — {item.description}
+                <Code value={item.code} /> — {item.description}
               </h3>
               <p className="text-sm text-muted-foreground">
                 {item.category_raw
@@ -88,7 +85,7 @@ export function UnclassifiedQueue({
             {canEdit && (
               <div className="flex flex-wrap items-center gap-2">
                 <select
-                  className="rounded border px-2 py-1 text-sm"
+                  className={selectClassName}
                   value={selected}
                   onChange={event =>
                     setChosen({ ...chosen, [item.product_id]: Number(event.target.value) })
@@ -110,7 +107,7 @@ export function UnclassifiedQueue({
                 </Button>
               </div>
             )}
-          </article>
+          </Card>
         )
       })}
     </div>

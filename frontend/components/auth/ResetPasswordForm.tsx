@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useBranding } from './AuthBrandingProvider'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
+import { useBranding } from './AuthBrandingProvider'
 
 interface ResetPasswordFormProps {
   className?: string
@@ -15,8 +17,62 @@ interface ResetPasswordFormProps {
 }
 
 /**
- * Reset password form.
- * Provides functionality without hardcoded styles.
+ * La marca, arriba de la tarjeta.
+ *
+ * Estaba escrita tres veces en este archivo, con la misma escalera de tamaños
+ * copiada en cada una: acá es una sola, y el cuadrado naranja sale del token
+ * como el resto de la aplicación (`RF-05`).
+ */
+function BrandMark({ branding }: { branding: ReturnType<typeof useBranding> }) {
+  const { logo } = branding
+  const size = logo.size === 'sm' ? 'size-8' : logo.size === 'lg' ? 'size-16' : 'size-12'
+  const Logo = logo.component
+
+  if (!Logo && !logo.src && !logo.text) return null
+
+  return (
+    <div className="mb-4 flex items-center justify-center">
+      {Logo ? (
+        <Logo className={size} />
+      ) : logo.src ? (
+        /*
+         * El logo lo configura `lib/branding.ts` y puede ser cualquier URL,
+         * incluida una que `next/image` no puede optimizar sin declarar antes
+         * su dominio en la config. Hoy no hay ninguna: la marca es el texto.
+         */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo.src} alt={logo.alt || 'Logo'} className={size} />
+      ) : (
+        <div
+          className={`${size} flex items-center justify-center rounded-lg bg-brand text-2xl font-bold text-brand-foreground`}
+        >
+          {logo.text}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * El botón que guarda, en los dos pasos.
+ *
+ * Es **uno solo** y no dos a propósito: pedir el enlace y elegir la clave nueva
+ * son dos caras de la misma pantalla, y el presupuesto de naranja de `RF-11` es
+ * de la pantalla, no de la cara que esté visible.
+ */
+function SubmitButton({ label, loading }: { label: string; loading: boolean }) {
+  return (
+    <Button type="submit" variant="brand" className="w-full" disabled={loading}>
+      {label}
+    </Button>
+  )
+}
+
+/**
+ * Pedir el enlace de recuperación, y usarlo.
+ *
+ * Cuál de las dos caras se muestra lo decide el token de la URL, y no cambia
+ * mientras el formulario está montado.
  */
 export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPasswordFormProps) {
   const branding = useBranding()
@@ -30,8 +86,6 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  // Which half of the flow to show is decided by the token in the URL and
-  // never changes while the form is mounted.
   const step: 'request' | 'confirm' = token ? 'confirm' : 'request'
 
   const handleRequestReset = async (e: React.FormEvent) => {
@@ -118,90 +172,34 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
     }
   }
 
-  const LogoComponent = branding.logo.component
-
   if (step === 'request') {
     return (
-      <Card
-        className={className}
-        style={{
-          backgroundColor: branding.colors.cardBackground,
-          borderColor: branding.colors.border,
-        }}
-      >
+      <Card className={className}>
         <CardHeader className="space-y-1">
-          {renderLogo ? (
-            renderLogo(branding)
-          ) : (
-            <div className="flex items-center justify-center mb-4">
-              {LogoComponent ? (
-                <LogoComponent className="w-12 h-12" />
-              ) : branding.logo.src ? (
-                <img
-                  src={branding.logo.src}
-                  alt={branding.logo.alt || 'Logo'}
-                  className={`${branding.logo.size === 'sm' ? 'w-8 h-8' : branding.logo.size === 'lg' ? 'w-16 h-16' : 'w-12 h-12'}`}
-                />
-              ) : branding.logo.text ? (
-                <div
-                  className={`${branding.logo.size === 'sm' ? 'w-8 h-8' : branding.logo.size === 'lg' ? 'w-16 h-16' : 'w-12 h-12'} rounded-lg flex items-center justify-center`}
-                  style={{ backgroundColor: branding.colors.primary }}
-                >
-                  <span
-                    className="font-bold text-2xl"
-                    style={{ color: branding.colors.primaryForeground }}
-                  >
-                    {branding.logo.text}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          )}
-          <CardTitle className="text-2xl text-center" style={{ color: branding.colors.text }}>
+          {renderLogo ? renderLogo(branding) : <BrandMark branding={branding} />}
+          <CardTitle className="text-center text-2xl">
             {branding.texts.resetPasswordTitle}
           </CardTitle>
-          <CardDescription className="text-center" style={{ color: branding.colors.textSecondary }}>
+          <CardDescription className="text-center">
             {branding.texts.resetPasswordSubtitle}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {success ? (
             <div className="space-y-4">
-              <div
-                className="p-4 text-sm rounded-md border"
-                style={{
-                  color: branding.colors.success,
-                  backgroundColor: `${branding.colors.success}10`,
-                  borderColor: `${branding.colors.success}30`,
-                }}
-              >
-                Si el email existe, se ha enviado un enlace de restablecimiento.
-              </div>
-              <Button
-                onClick={() => router.push('/login')}
-                className="w-full cursor-pointer"
-                style={{
-                  backgroundColor: branding.colors.primary,
-                  color: branding.colors.primaryForeground,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = branding.colors.primaryHover
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = branding.colors.primary
-                }}
-              >
+              <Notice
+                tone="ok"
+                title="Si el email existe, se envió un enlace de restablecimiento"
+              />
+              {/* Volver no es la tarea de esta pantalla: va en contorno. */}
+              <Button variant="outline" className="w-full" onClick={() => router.push('/login')}>
                 {branding.texts.backToLogin}
               </Button>
             </div>
           ) : (
             <form onSubmit={handleRequestReset} className="space-y-4">
               <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium"
-                  style={{ color: branding.colors.text }}
-                >
+                <label htmlFor="email" className="text-sm font-medium">
                   {branding.texts.emailLabel}
                 </label>
                 <Input
@@ -214,43 +212,15 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
                   disabled={loading}
                 />
               </div>
-              {error && (
-                <div
-                  className="p-3 text-sm rounded-md border"
-                  style={{
-                    color: branding.colors.error,
-                    backgroundColor: `${branding.colors.error}10`,
-                    borderColor: `${branding.colors.error}30`,
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-              <Button
-                type="submit"
-                className="w-full cursor-pointer"
-                style={{
-                  backgroundColor: branding.colors.primary,
-                  color: branding.colors.primaryForeground,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = branding.colors.primaryHover
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = branding.colors.primary
-                }}
-                disabled={loading}
-              >
-                {loading ? 'Enviando...' : branding.texts.resetPasswordButton}
-              </Button>
+              {error && <Notice tone="danger" title={error} />}
+              <SubmitButton
+                loading={loading}
+                label={loading ? 'Enviando…' : branding.texts.resetPasswordButton}
+              />
               <div className="text-center">
-                <Link
-                  href="/login"
-                  className="text-sm hover:underline"
-                  style={{ color: branding.colors.primary }}
-                >
-                  {branding.texts.backToLogin}
-                </Link>
+                <Button asChild variant="link" size="sm">
+                  <Link href="/login">{branding.texts.backToLogin}</Link>
+                </Button>
               </div>
             </form>
           )}
@@ -260,66 +230,21 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
   }
 
   return (
-    <Card
-      className={className}
-      style={{
-        backgroundColor: branding.colors.cardBackground,
-        borderColor: branding.colors.border,
-      }}
-    >
+    <Card className={className}>
       <CardHeader className="space-y-1">
-        <div className="flex items-center justify-center mb-4">
-          {LogoComponent ? (
-            <LogoComponent className="w-12 h-12" />
-          ) : branding.logo.src ? (
-            <img
-              src={branding.logo.src}
-              alt={branding.logo.alt || 'Logo'}
-              className={`${branding.logo.size === 'sm' ? 'w-8 h-8' : branding.logo.size === 'lg' ? 'w-16 h-16' : 'w-12 h-12'}`}
-            />
-          ) : branding.logo.text ? (
-            <div
-              className={`${branding.logo.size === 'sm' ? 'w-8 h-8' : branding.logo.size === 'lg' ? 'w-16 h-16' : 'w-12 h-12'} rounded-lg flex items-center justify-center`}
-              style={{ backgroundColor: branding.colors.primary }}
-            >
-              <span
-                className="font-bold text-2xl"
-                style={{ color: branding.colors.primaryForeground }}
-              >
-                {branding.logo.text}
-              </span>
-            </div>
-          ) : null}
-        </div>
-        <CardTitle className="text-2xl text-center" style={{ color: branding.colors.text }}>
-          Nueva Contraseña
-        </CardTitle>
-        <CardDescription className="text-center" style={{ color: branding.colors.textSecondary }}>
-          Ingresa tu nueva contraseña
-        </CardDescription>
+        <BrandMark branding={branding} />
+        <CardTitle className="text-center text-2xl">Nueva contraseña</CardTitle>
+        <CardDescription className="text-center">Ingresá tu nueva contraseña</CardDescription>
       </CardHeader>
       <CardContent>
         {success ? (
-          <div className="space-y-4">
-            <div
-              className="p-4 text-sm rounded-md border"
-              style={{
-                color: branding.colors.success,
-                backgroundColor: `${branding.colors.success}10`,
-                borderColor: `${branding.colors.success}30`,
-              }}
-            >
-              Contraseña restablecida exitosamente. Redirigiendo al login...
-            </div>
-          </div>
+          <Notice tone="ok" title="Contraseña restablecida">
+            Te llevamos a la pantalla de ingreso.
+          </Notice>
         ) : (
           <form onSubmit={handleConfirmReset} className="space-y-4">
             <div className="space-y-2">
-              <label
-                htmlFor="newPassword"
-                className="text-sm font-medium"
-                style={{ color: branding.colors.text }}
-              >
+              <label htmlFor="newPassword" className="text-sm font-medium">
                 {branding.texts.passwordLabel}
               </label>
               <Input
@@ -334,11 +259,7 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
               />
             </div>
             <div className="space-y-2">
-              <label
-                htmlFor="confirmPassword"
-                className="text-sm font-medium"
-                style={{ color: branding.colors.text }}
-              >
+              <label htmlFor="confirmPassword" className="text-sm font-medium">
                 {branding.texts.confirmPasswordLabel}
               </label>
               <Input
@@ -352,35 +273,11 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
                 minLength={8}
               />
             </div>
-            {error && (
-              <div
-                className="p-3 text-sm rounded-md border"
-                style={{
-                  color: branding.colors.error,
-                  backgroundColor: `${branding.colors.error}10`,
-                  borderColor: `${branding.colors.error}30`,
-                }}
-              >
-                {error}
-              </div>
-            )}
-            <Button
-              type="submit"
-              className="w-full cursor-pointer"
-              style={{
-                backgroundColor: branding.colors.primary,
-                color: branding.colors.primaryForeground,
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = branding.colors.primaryHover
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = branding.colors.primary
-              }}
-              disabled={loading}
-            >
-              {loading ? 'Restableciendo...' : 'Restablecer Contraseña'}
-            </Button>
+            {error && <Notice tone="danger" title={error} />}
+            <SubmitButton
+              loading={loading}
+              label={loading ? 'Restableciendo…' : 'Restablecer contraseña'}
+            />
           </form>
         )}
       </CardContent>

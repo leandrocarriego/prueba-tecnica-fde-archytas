@@ -5,6 +5,7 @@ import { UpdateNowButton } from '@/components/catalog/UpdateNowButton'
 import { UpdateStatus } from '@/components/catalog/UpdateStatus'
 import { fetchFromApi } from '@/lib/api/server'
 import type { PriceList, PriceUpdateStatus } from '@/lib/catalog/types'
+import { ErrorState } from '@/components/ui/state'
 
 /** The supplier publishes a hundred products; the page shows them all. */
 const PAGE_SIZE = 200
@@ -39,7 +40,7 @@ export default async function PricesPage({
   ])
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-8">
+    <div className="space-y-6">
       <header className="flex items-start justify-between gap-4">
         <div className="space-y-2">
           <h1 className="text-2xl font-bold">Lista de precios</h1>
@@ -50,18 +51,18 @@ export default async function PricesPage({
 
       <nav className="flex items-center gap-4 text-sm">
         <Link
-          className={highlighted ? 'text-muted-foreground' : 'font-medium underline'}
+          className={highlighted ? 'text-muted-foreground' : 'font-medium text-link'}
           href="/precios"
         >
           Todos
         </Link>
         <Link
-          className={highlighted ? 'font-medium underline' : 'text-muted-foreground'}
+          className={highlighted ? 'font-medium text-link' : 'text-muted-foreground'}
           href="/precios?destacados=1"
         >
           Solo los que subieron fuerte
         </Link>
-        <Link className="ml-auto text-muted-foreground underline" href="/revision">
+        <Link className="ml-auto text-link hover:underline" href="/revision">
           Revisión
         </Link>
         {/*
@@ -70,21 +71,21 @@ export default async function PricesPage({
           screen of the feature that reads it. The link points there, and
           `/precios/configuracion` redirects to the same place.
         */}
-        <Link className="text-muted-foreground underline" href="/configuracion">
+        <Link className="text-link hover:underline" href="/configuracion">
           Parámetros
         </Link>
       </nav>
 
       {prices === null ? (
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer los precios. Probá de nuevo en unos minutos.
-        </p>
+        <ErrorState title="No pudimos traer los precios.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">{prices.total} productos</p>
           <PriceTable items={prices.items} />
         </>
       )}
-    </main>
+    </div>
   )
 }

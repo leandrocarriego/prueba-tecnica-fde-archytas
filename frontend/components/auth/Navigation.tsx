@@ -59,6 +59,21 @@ const GROUPS: ReadonlyArray<Group> = [
     ],
   },
   {
+    /*
+     * Ventas es un grupo propio y no una entrada de «Catálogo y datos» porque
+     * el backend ya modela `SALES` como una de las tres áreas del negocio
+     * (`BusinessSection`), y porque quien entra con acceso de Ventas tiene que
+     * ver su área, no una sección adentro del área de otro (`RF-22`).
+     *
+     * `/ventas` redirige a `/ventas/revision`, que es la única pantalla que hay
+     * hoy: el `href` queda estable —el resaltado por prefijo marca el grupo
+     * cuando se está en cualquier pantalla de ventas— sin inventar una pantalla
+     * que la spec no pidió.
+     */
+    title: 'Ventas',
+    entries: [{ href: '/ventas', label: 'Ventas', section: 'SALES' }],
+  },
+  {
     title: 'Catálogo y datos',
     entries: [
       { href: '/precios', label: 'Catálogo y precios', section: 'PRICES' },

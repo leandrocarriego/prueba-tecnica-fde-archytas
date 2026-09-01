@@ -31,8 +31,8 @@ export default async function AliasesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/rubros">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/rubros">
         « Volver a los rubros
       </Link>
 
@@ -49,6 +49,6 @@ export default async function AliasesPage() {
         rules={rules ?? []}
         canEdit={canEdit(session?.permissions ?? {}, 'PRODUCT_CATEGORIES')}
       />
-    </main>
+    </div>
   )
 }

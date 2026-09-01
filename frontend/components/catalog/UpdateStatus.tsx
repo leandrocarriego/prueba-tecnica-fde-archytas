@@ -2,6 +2,8 @@ import Link from 'next/link'
 
 import { formatMoment } from '@/lib/catalog/format'
 import type { PriceUpdateStatus } from '@/lib/catalog/types'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 
 interface UpdateStatusProps {
   status: PriceUpdateStatus | null
@@ -20,23 +22,18 @@ interface UpdateStatusProps {
  */
 export function UpdateStatus({ status }: UpdateStatusProps) {
   if (status === null) {
-    return (
-      <p className="rounded border border-dashed p-3 text-sm text-muted-foreground">
-        No pudimos consultar el estado de la actualización.
-      </p>
-    )
+    return <Empty title="No pudimos consultar el estado de la actualización." />
   }
 
   if (status.is_stalled) {
+    // El aviso va **arriba** de los precios que califica, con todo lo que hace
+    // falta para entenderlo (`RF-14`).
     return (
-      <div className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-        <p className="font-medium">La actualización de precios dejó de funcionar.</p>
-        <p>
-          Van {status.consecutive_failures} consultas seguidas sin éxito. Última actualización
-          exitosa: {formatMoment(status.last_success_at)}. Los precios de abajo pueden estar
-          desactualizados.
-        </p>
-      </div>
+      <Notice tone="danger" title="La actualización de precios dejó de funcionar.">
+        Van {status.consecutive_failures} consultas seguidas sin éxito. Última actualización
+        exitosa: {formatMoment(status.last_success_at)}. Los precios de abajo pueden estar
+        desactualizados.
+      </Notice>
     )
   }
 
@@ -68,7 +65,7 @@ function SetAside({ rows }: { rows: number | null }) {
 
   return (
     <p className="text-sm">
-      <Link className="underline underline-offset-2" href="/revision">
+      <Link className="text-link hover:underline" href="/revision">
         {rows === 1
           ? '1 fila quedó apartada en esa actualización'
           : `${rows} filas quedaron apartadas en esa actualización`}

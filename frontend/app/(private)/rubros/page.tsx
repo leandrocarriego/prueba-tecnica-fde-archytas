@@ -33,7 +33,7 @@ export default async function CategoriesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-8">
+    <div className="space-y-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Rubros</h1>
         <p className="text-sm text-muted-foreground">
@@ -42,10 +42,10 @@ export default async function CategoriesPage() {
       </header>
 
       <nav className="flex gap-4 text-sm">
-        <Link className="underline" href="/rubros/sin-clasificar">
+        <Link className="text-link hover:underline" href="/rubros/sin-clasificar">
           Productos sin rubro ({listing.unclassified_count})
         </Link>
-        <Link className="underline" href="/rubros/equivalencias">
+        <Link className="text-link hover:underline" href="/rubros/equivalencias">
           Equivalencias guardadas
         </Link>
       </nav>
@@ -54,6 +54,6 @@ export default async function CategoriesPage() {
         listing={listing}
         canEdit={canEdit(session?.permissions ?? {}, 'PRODUCT_CATEGORIES')}
       />
-    </main>
+    </div>
   )
 }

@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { HeldVouchers } from '@/components/purchases/HeldVouchers'
 import { NoPermission } from '@/components/common/NoPermission'
+import { Empty, ErrorState } from '@/components/ui/state'
 import { readFromApi } from '@/lib/api/server'
 import type { Invoice, InvoiceList, Payment } from '@/lib/purchases/types'
 
@@ -39,12 +40,10 @@ export default async function HeldPaymentsPage() {
       return <NoPermission what="los pagos" />
     }
     return (
-      <main className="mx-auto max-w-4xl space-y-4 p-8">
+      <div className="space-y-4">
         <h1 className="text-2xl font-bold">Comprobantes por repartir</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer los comprobantes. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer los comprobantes" />
+      </div>
     )
   }
 
@@ -63,8 +62,8 @@ export default async function HeldPaymentsPage() {
   )
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/facturas">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/facturas">
         « Volver a las facturas
       </Link>
 
@@ -82,13 +81,17 @@ export default async function HeldPaymentsPage() {
       </header>
 
       {held.length === 0 ? (
-        <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-          Nada apartado. Cuando llegue un comprobante que no diga a qué factura corresponde, va a
-          aparecer acá con el motivo, en lugar de aplicarse a la que más se le parezca.
-        </p>
+        /*
+         * `RF-23`: cero apartados **no** es un aviso. Es la mejor noticia del
+         * día, y pintarla de ámbar enseñaría lo contrario.
+         */
+        <Empty title="Nada apartado.">
+          Cuando llegue un comprobante que no diga a qué factura corresponde, va a aparecer acá con
+          el motivo, en lugar de aplicarse a la que más se le parezca.
+        </Empty>
       ) : (
         <HeldVouchers held={held} invoicesBySupplier={Object.fromEntries(invoicesBySupplier)} />
       )}
-    </main>
+    </div>
   )
 }

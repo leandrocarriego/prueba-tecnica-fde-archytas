@@ -8,6 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { count } from '@/lib/format'
 import type { CategoryList as CategoryListRead } from '@/lib/catalog/types'
+import { Notice } from '@/components/ui/notice'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { isUnconfirmedCategoryAlias, pill } from '@/lib/ui/tone'
 
 /**
  * The rubros, with how many products each one has and how it arrives written.
@@ -43,11 +47,7 @@ export function CategoryList({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       <table className="w-full text-sm">
         <thead className="border-b text-left text-muted-foreground">
@@ -62,9 +62,23 @@ export function CategoryList({
           {listing.items.map(category => (
             <tr key={category.id} className="border-b align-top">
               <td className="py-2 font-medium">{category.name}</td>
-              <td className="py-2">{count(category.product_count)}</td>
-              <td className="py-2 text-muted-foreground">
-                {category.aliases.map(alias => alias.text_original).join(' · ') || '—'}
+              <td className="amount py-2">{count(category.product_count)}</td>
+              <td className="py-2">
+                {/* Cada forma escrita, en su píldora: son datos, no una frase. */}
+                {category.aliases.length === 0 ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <span className="flex flex-wrap gap-1.5">
+                    {category.aliases.map(alias => (
+                      <Badge
+                        key={alias.id}
+                        tone={pill('neutral', isUnconfirmedCategoryAlias(alias.source))}
+                      >
+                        <Code value={alias.text_original} />
+                      </Badge>
+                    ))}
+                  </span>
+                )}
               </td>
               {canEdit && (
                 <td className="py-2 text-right">
@@ -97,7 +111,7 @@ export function CategoryList({
           ))}
           <tr className="border-b align-top">
             <td className="py-2 font-medium text-muted-foreground">Sin rubro</td>
-            <td className="py-2">{count(listing.unclassified_count)}</td>
+            <td className="amount py-2">{count(listing.unclassified_count)}</td>
             <td className="py-2 text-muted-foreground">
               El producto llegó sin categoría, o con una que todavía no está asignada
             </td>
@@ -123,7 +137,8 @@ export function CategoryList({
             <span className="mb-1 block text-muted-foreground">Agregar un rubro</span>
             <Input value={name} onChange={event => setName(event.target.value)} maxLength={100} />
           </label>
-          <Button type="submit" disabled={busy || !name.trim()}>
+          {/* Agregar un rubro es la tarea de esta pantalla: su único naranja. */}
+          <Button type="submit" variant="brand" disabled={busy || !name.trim()}>
             Agregar
           </Button>
         </form>
