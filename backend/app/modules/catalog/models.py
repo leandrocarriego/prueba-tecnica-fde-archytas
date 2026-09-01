@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -365,7 +366,10 @@ class OrderSpend(Base):
         {"schema": CORE_SCHEMA},
     )
 
-    staging_row_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    # `BigInteger` porque es lo que la migración creó, y la tabla es la que
+    # manda: `Mapped[int]` a secas se declara `Integer`, y esa diferencia dejaba
+    # `alembic check` —el DB-01 del CI— en rojo desde que la feature entró.
+    staging_row_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
     product_code: Mapped[str | None] = mapped_column(String(64), default=None)
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
 
