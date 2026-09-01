@@ -2,8 +2,8 @@
 
 **Estado:** Aprobado · **Feature:** 012-design-system · **Fecha:** 2026-08-31
 **Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-31
-**Enmendada y vuelta a firmar:** 2026-08-31 — Leandro Carriego (FDE), por el alta de `RF-24`
-(ver *Enmiendas*)
+**Enmendada y vuelta a firmar:** 2026-08-31 — Leandro Carriego (FDE), por el alta de `RF-24` y
+por la excepción de la ventana de confirmación en `RF-11`/`RF-21` (ver *Enmiendas*)
 
 ## Problema
 
@@ -69,7 +69,8 @@ sea el que resuelve lo que vine a hacer**, para **saber dónde tengo que apretar
 
 **Cómo se prueba que anda:** en cualquier pantalla hay como mucho un botón naranja; el resto son de
 contorno, grises o enlaces. En las pantallas que listan casos para resolver —Revisar esto, el
-calendario— no hay ninguno: la acción de cada caso va en tinta o contorno.
+calendario— no hay ninguno: la acción de cada caso va en tinta o contorno. Se cuentan los botones
+de la pantalla: el botón de confirmar de una ventana de confirmación no entra en la cuenta.
 
 ### H5 — El aviso va antes que el número
 Como **el dueño**, quiero que **cuando un total dejó cosas afuera por dudosas, el aviso aparezca
@@ -100,7 +101,7 @@ de compra ni Accesos; tampoco aparece el grupo que quedó vacío.
 | RF-08 | El sistema debe distinguir visualmente un dato leído del origen y todavía sin confirmar por una persona, de un dato ya confirmado. | H2 |
 | RF-09 | El sistema debe mostrar los importes, las fechas y los códigos en tipografía de ancho fijo con cifras de ancho uniforme. | H3 |
 | RF-10 | Mientras una tabla muestre una columna de importes, el sistema debe alinearla de modo que las cifras queden en columna. | H3 |
-| RF-11 | El sistema debe mostrar como mucho un botón de acción naranja por pantalla, y debe ser el que resuelve la tarea principal de esa pantalla. | H4 |
+| RF-11 | El sistema debe mostrar como mucho un botón de acción naranja por pantalla, y debe ser el que resuelve la tarea principal de esa pantalla. Una ventana de confirmación no es una pantalla: su botón de confirmar no cuenta, porque no ofrece una acción nueva sino que vuelve a preguntar por la que ya se eligió. | H4 |
 | RF-12 | El sistema debe presentar toda acción secundaria como botón de contorno, botón gris o enlace, nunca en naranja. | H4 |
 | RF-13 | El sistema debe usar el color de enlace únicamente para navegar o consultar, y nunca para una acción que modifica datos. | H4 |
 | RF-14 | Cuando una pantalla muestre un total que dejó registros afuera por dudosos, el sistema debe mostrar el aviso correspondiente por encima de ese total. | H5 |
@@ -110,7 +111,7 @@ de compra ni Accesos; tampoco aparece el grupo que quedó vacío.
 | RF-18 | Si un grupo del menú queda sin ninguna sección visible, entonces el sistema debe ocultar también el título del grupo. | H6 |
 | RF-19 | El sistema debe mostrar los estados de carga, de error y de lista vacía con la misma forma en todas las pantallas. | H1 |
 | RF-20 | El sistema debe presentar sus pantallas en un solo tema claro, sin cambiarlo según la configuración del dispositivo. | H1 |
-| RF-21 | Mientras una pantalla liste casos que requieren una decisión, el sistema debe presentar la acción de cada caso en tinta o contorno, y no debe mostrar ningún botón naranja en esa pantalla. | H4 |
+| RF-21 | Mientras una pantalla liste casos que requieren una decisión, el sistema debe presentar la acción de cada caso en tinta o contorno, y no debe mostrar ningún botón naranja en esa pantalla. La ventana de confirmación que abre una de esas acciones queda exceptuada (RF-11). | H4 |
 | RF-22 | El sistema debe ofrecer la sección de Ventas como una entrada más del menú principal, visible para quien pueda abrirla. | H6 |
 | RF-23 | Fuera del tablero, si un total no dejó ningún registro afuera, entonces el sistema no debe mostrar ningún aviso sobre ese total. | H5 |
 | RF-24 | Cuando una persona entra a la plataforma, el sistema debe dejarla directamente en el tablero, sin una pantalla de bienvenida en el medio. | H1 |
@@ -148,7 +149,7 @@ de compra ni Accesos; tampoco aparece el grupo que quedó vacío.
 - [ ] **RF-10** — En una tabla con importes de distinta cantidad de cifras, las cifras quedan
       alineadas verticalmente.
 - [ ] **RF-11** — En cada pantalla se cuenta como mucho un botón naranja, y es el de la tarea
-      principal.
+      principal. Los botones de una ventana de confirmación no se cuentan.
 - [ ] **RF-12** — Ninguna acción secundaria aparece en naranja.
 - [ ] **RF-13** — Ningún botón que guarda, corrige o borra usa el color de enlace.
 - [ ] **RF-14** — En el tablero con casos sin resolver, el aviso se lee antes que los importes.
@@ -164,7 +165,8 @@ de compra ni Accesos; tampoco aparece el grupo que quedó vacío.
 - [ ] **RF-20** — Con el dispositivo configurado en modo oscuro, la plataforma se sigue viendo
       clara y legible.
 - [ ] **RF-21** — En Revisar esto y en el calendario no hay ningún botón naranja: cada caso ofrece
-      su acción en tinta o contorno.
+      su acción en tinta o contorno. Si una de esas acciones abre una ventana de confirmación, el
+      botón de confirmar sí puede ser naranja.
 - [ ] **RF-22** — Con un acceso de Ventas, la sección de Ventas aparece en el menú y se abre desde
       ahí.
 
@@ -198,4 +200,5 @@ volver a firmar, y esta lo cambia: por eso la fila de abajo lleva su propia firm
 
 | Fecha | Qué cambió | Alcance |
 |---|---|---|
+| 2026-08-31 | **La ventana de confirmación no cuenta como botón naranja de la pantalla.** `RF-11` decía "como mucho un botón naranja por pantalla" y `RF-21` "ninguno en las pantallas de decisión", sin distinguir superficies. El calendario ya tiene, desde la 006, un botón de confirmar naranja dentro de una ventana de confirmación: leída al pie de la letra, la spec obligaba a despintarlo, y a dejar sin acento a toda pantalla cuya acción principal viva dentro de una ventana así. Se aclara en los dos requisitos y en sus criterios | **Sí lo cambia**: exceptúa una superficie que antes estaba incluida, y por eso se vuelve a firmar. El significado del naranja no se toca —sigue siendo "acá decidís vos"—; lo que se reconoce es que confirmar no es una acción nueva, es la misma preguntada de nuevo |
 | 2026-08-31 | **Alta de `RF-24`: al entrar se cae en el tablero.** Hoy lo primero que ve alguien que entra es una pantalla de bienvenida que no es ninguna de las dieciséis secciones. La planificación técnica ya la daba por sacada, pero ningún requisito lo pedía: era alcance sin firmar. Se agrega el requisito, su criterio de aceptación, y el *fuera de alcance* pasa a nombrar las dos excepciones firmadas en vez de una | **Sí lo cambia**, y por eso se vuelve a firmar. No es presentación: cambia dónde cae una persona al entrar. Lo encontró `/analyze` (hallazgo H-6) antes de que se escribiera una línea de código |

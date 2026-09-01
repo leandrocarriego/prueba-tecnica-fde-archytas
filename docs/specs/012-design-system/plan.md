@@ -23,10 +23,10 @@ archivo está cada cosa. Este plan lo da por leído.
 | III — Flujo unidireccional, `raw` inmutable | ✅ | No se toca ninguna capa de datos. Cero migraciones. |
 | IV — Las fronteras entre módulos son reales | ✅ | Cero cambios en `backend/app/modules/`. En el frontend la pieza compartida nueva (`lib/ui/tone.ts`) importa **sólo** los tipos generados de `lib/api/types.ts`, no de `lib/purchases/`, `lib/sales/` ni ningún otro vecino: la misma disciplina, del lado que no tiene test que la verifique. |
 | V — Spec primero, y con firma | ✅ | `spec.md` en **Aprobado**, firmada por Leandro Carriego (FDE) el 2026-08-31. Este plan no agrega ni un requisito que la spec no pida. |
-| VI — Lo que no está tipado y testeado no está terminado | ✅ | El grueso del plan **es** el enforcement: cuatro chequeos estáticos nuevos que rompen el build más tests de render sobre las tres pantallas donde la regla se puede violar sin que se note. Ningún test existente se debilita. |
+| VI — Lo que no está tipado y testeado no está terminado | ✅ | El grueso del plan **es** el enforcement: **cinco** chequeos estáticos nuevos que rompen el build, más **cuatro** tests de render sobre lo que puede fallar en silencio. Ningún test existente se debilita. |
 | VII — Las credenciales de terceros viven sólo en el entorno | ✅ | No se tocan credenciales. Las pantallas de sesión cambian de aspecto, no de mecanismo. |
 | VIII — Un idioma para cada audiencia | ✅ | Documentación y artefactos en español; código y nombres de token en inglés (`--warn-surface`, `tone`, `Amount`); los textos que ve el usuario, en español. |
-| IX — Las dependencias entran por la puerta | ⚠️ ✅ | **Ninguna dependencia nueva.** `vitest`, `@testing-library/*` y `jsdom` ya están en `package.json` con su `package-lock.json` actualizado, pero **sin commitear**: tienen que entrar en el mismo commit que el código que las usa. Ver *Riesgos*. |
+| IX — Las dependencias entran por la puerta | ✅ | **Ninguna dependencia nueva.** `vitest`, `@testing-library/*` y `jsdom` entraron a `main` con su `package-lock.json` en el PR #29, junto al código que las usa. Nada por agregar acá. |
 
 **Excepciones solicitadas:** ninguna.
 
@@ -35,10 +35,12 @@ archivo está cada cosa. Este plan lo da por leído.
 **El punto de partida no es cero, y no es lo que parece.** La base del sistema de diseño ya está
 construida —tokens en `globals.css`, `Badge`, `Notice`, `Button` con `variant="brand"`, el test
 que verifica `UI-01` y `UI-02`, las diez convenciones escritas, la guía en `docs/design/`— pero
-está en el árbol de trabajo **sin commitear**, y sobre todo: **no la usa nadie**. Cero usos de
-`<Badge>`, cero de `<Notice>`, cero de `variant="brand"` en veintiocho pantallas privadas, cuatro
-de sesión y cuarenta y tres componentes. Lo que falta, entonces, no es construir el sistema: es
-**adoptarlo**. Esta feature es una migración, no una construcción.
+entró entera a `main` con el PR #29 —y con ella `vitest.config.ts`, la suite del frontend y el
+bloque `UI-01`…`UI-10` de `CONVENTIONS.md`—. Lo que sigue siendo cierto, y es lo que importa:
+**casi no la usa nadie**. Un solo archivo de los setenta y cinco usa `<Badge>` y `<Notice>`
+—`components/purchases/CalendarGrid.tsx`, que los estrenó la 006— y el único `variant="brand"` del
+repositorio vive en `components/ui/confirm-dialog.tsx`. Lo que falta, entonces, no es construir el
+sistema: es **adoptarlo**. Esta feature es una migración, no una construcción.
 
 **Una migración de este tamaño no se sostiene con disciplina.** Son ~9.400 líneas de UI repartidas
 en setenta y cinco archivos, y la mitad de los requisitos —"la misma píldora en las tres
@@ -64,14 +66,15 @@ archivo**, y recién después migra:
   `app/(private)/loading.tsx` y un `app/(private)/error.tsx`, que Next.js aplica a todo el árbol
   privado de una sola vez.
 
-**Después, el enforcement.** `frontend/tests/design-system.test.ts` pasa de verificar dos reglas a
-verificar seis, todas por análisis estático del texto del código —el mismo mecanismo que ya usa,
+**Después, el enforcement.** `frontend/tests/design-system.test.ts` pasa de **tres casos a ocho**,
+los cinco nuevos por análisis estático del texto del código —el mismo mecanismo que ya usa,
 que no necesita renderizar y por eso alcanza también a las pantallas que ningún test toca:
 
 | Chequeo nuevo | Qué decide | RF |
 |---|---|---|
 | Presupuesto de naranja | Para cada `app/(private)/**/page.tsx`, se recorre su árbol de imports `@/` y se cuentan los `variant="brand"`: **como mucho uno**. | `RF-11`, `UI-05` |
 | Pantallas de decisión | Una lista fija de rutas —`revision`, `calendario`, `facturas/revision`, `facturas/incidentes`, `ventas/revision`, `proveedores/grafias`, `rubros/sin-clasificar`, `rubros/equivalencias`, `acciones`— tiene que dar **cero**. | `RF-21` |
+| *(los dos de arriba)* | **No cuentan el naranja de una ventana de confirmación**: `components/ui/confirm-dialog.tsx` queda fuera del recorrido del árbol de imports. Lo pide la spec enmendada el 2026-08-31, y sin esto `/calendario` daría uno en vez de cero por el diálogo que la 006 dejó en `main`. | `RF-11`, `RF-21` |
 | La píldora es de `Badge` | Las clases `.pill*` no aparecen fuera de `components/ui/badge.tsx` y `globals.css`. | `RF-06`, `UI-03` |
 | La plata pasa por el envoltorio | `money`, `decimal` y `day` se importan de `@/lib/format` **sólo** desde `components/ui/amount.tsx` y desde una lista de excepciones fijada por nombre de archivo —las que necesitan el string, no el elemento: un `title`, un `aria-label`, un asunto de mensaje—. | `RF-09`, `RF-10`, `UI-04` |
 | Un solo tema | Cero `dark:` y cero `prefers-color-scheme` fuera del comentario de cabecera de `globals.css`. Hoy ya da cero: el test lo congela. | `RF-20`, `UI-10` |
@@ -80,8 +83,30 @@ La lista de excepciones va **por nombre de archivo**, como la del test de fronte
 como las dos que ya tiene este test: ampliarla exige editar el test a propósito, que es
 exactamente el punto.
 
-**Lo que el análisis estático no puede decidir se prueba renderizando.** Tres tests de React
-Testing Library, sobre lo único que puede fallar en silencio: que el menú muestre Ventas y esconda
+**Cómo nace verde un test que describe el final, escrito al principio.** Dos de los cinco chequeos
+—la píldora y la plata— son falsos hoy, y siguen siéndolo hasta la última ola: `.pill*` está escrito
+a mano en dos archivos que se migran en la tarea 37, y catorce archivos importan de `@/lib/format`
+hasta la tarea 41. Un test que arranca en rojo no es un gate: es ruido que se aprende a ignorar, y
+además dejaría el build roto durante toda la migración, contra el Artículo VI.
+
+Por eso los dos nacen con su **lista de excepciones sembrada con exactamente los archivos que
+todavía no se migraron**, y **cada tarea de pantalla saca los suyos de esa lista en el mismo
+commit en que migra la pantalla**. La lista es el mapa de lo que falta: empieza con dieciséis
+entradas y tiene que llegar a cero —salvo las que el propio chequeo admite para siempre, las que
+necesitan el string y no el elemento—. El día que la ola 4 cierra, la lista queda vacía y el
+chequeo pasa a ser lo que dice ser.
+
+Los otros tres nacen verdes de verdad y no necesitan siembra: el presupuesto de naranja y las rutas
+de decisión, con la ventana de confirmación excluida, dan cero hoy; el tema único ya daba cero.
+
+**Ninguna excepción se agrega después.** Sembrar la lista es un acto único de la tarea 6, con el
+árbol de hoy a la vista; a partir de ahí sólo se sacan entradas. Una entrada nueva significa que
+alguien escribió una pantalla nueva sin las primitivas, y eso es lo que el chequeo existe para
+frenar.
+
+**Lo que el análisis estático no puede decidir se prueba renderizando.** Cuatro tests de React
+Testing Library en tres archivos, sobre lo único que puede fallar en silencio: que las pantallas de
+sesión tomen la identidad visual (`RF-05`); que el menú muestre Ventas y esconda
 lo que no corresponde (`RF-17`, `RF-18`, `RF-22`); que en el tablero el aviso salga **antes** que
 el importe en el orden del DOM y que el "cero excluidos" aparezca (`RF-14`, `RF-16`); y que fuera
 del tablero un total sin exclusiones no dibuje ningún aviso (`RF-23`).
@@ -91,7 +116,7 @@ lo que se ve en todas las pantallas, después la plata, después las decisiones.
 
 | Ola | Qué | Por qué va acá |
 |---|---|---|
-| 0 · Cimientos | `lib/ui/tone.ts`, `components/ui/amount.tsx`, `components/ui/state.tsx`, `loading.tsx`/`error.tsx`, tokens `--muted-ink` y `--draft-border` para los dos hex sueltos de `globals.css` (`UI-09`), y los seis chequeos del test | Nada de lo que sigue se puede hacer bien sin esto, y el test tiene que existir antes de la migración para que la migración lo obedezca |
+| 0 · Cimientos | `lib/ui/tone.ts`, `components/ui/amount.tsx`, `components/ui/state.tsx`, `loading.tsx`/`error.tsx`, tokens `--muted-ink` y `--draft-border` para los dos hex sueltos de `globals.css` (`UI-09`), y los cinco chequeos nuevos del test | Nada de lo que sigue se puede hacer bien sin esto, y el test tiene que existir antes de la migración para que la migración lo obedezca |
 | 1 · Shell y sesión | `app/(private)/layout.tsx`, `Navigation.tsx` (+ Ventas), `app/(private)/page.tsx`, las cuatro pantallas de sesión, `AuthLayout`, `LoginForm`, `ResetPasswordForm`, `NoPermission` | Es lo que se ve en **todas** las pantallas y en el primer segundo de la sesión: `RF-01` a `RF-05`, `RF-22` |
 | 2 · La plata | `facturas/*`, `ordenes`, `proveedores/*`, `calendario` y sus componentes (`InvoiceTable`, `InvoicePanel`, `OrderTable`, `HeldVouchers`, `CalendarGrid`, `SalesReview`) | Es donde `RF-09` y `RF-10` valen plata de verdad, y donde vive la píldora "vencida" que `RF-06` pide idéntica en tres lugares |
 | 3 · Las decisiones | `revision`, `ventas/revision`, `facturas/revision`, `facturas/incidentes`, `proveedores/grafias`, `rubros/*`, `acciones`, y `CaseCard`, `ReviewQueue`, `UnclassifiedQueue`, `SpellingList`, `SaleCorrection`, `CorrectionDialog` | `RF-21` y `RF-12`: son las pantallas donde el naranja tiene prohibido aparecer, y las que más botones tienen |
@@ -113,7 +138,7 @@ Los veintitrés, para que ninguno dependa de que alguien lo recuerde:
 | `RF-08` | Ola 2: `pill-draft` sobre lo no confirmado, previa verificación del dato | Recorrido del Tester |
 | `RF-09` | Ola 0 (`<Money>`, `<Day>`, `<Code>`) y olas 2 a 4 | Chequeo "la plata pasa por el envoltorio" |
 | `RF-10` | Ola 0: el envoltorio ya alinea a la derecha en celda de tabla | Ídem + recorrido con cifras de distinto largo |
-| `RF-11` | Olas 1 a 4: un `variant="brand"` por pantalla | Chequeo "presupuesto de naranja" |
+| `RF-11` | Olas 1 a 4: un `variant="brand"` por pantalla; el de una ventana de confirmación no cuenta | Chequeo "presupuesto de naranja", con los diálogos excluidos |
 | `RF-12` | Olas 1 a 4: toda acción secundaria a `default`, `outline`, `ghost` o `link` | Presupuesto de naranja + `UI-05` en el review |
 | `RF-13` | Olas 2 a 4: `variant="link"` sólo navega o consulta; lo que guarda, corrige o borra va en tinta o contorno | `UI-06`, **Code-Reviewer**: no es decidible estáticamente, y está dicho en su traspaso |
 | `RF-14` | Ola 4 (tablero): `<Notice>` por encima del importe | Test de render: orden del DOM |
@@ -123,9 +148,10 @@ Los veintitrés, para que ninguno dependa de que alguien lo recuerde:
 | `RF-18` | Ya cumplido en `Navigation.tsx` (grupo vacío filtrado) | Ídem |
 | `RF-19` | Ola 0: `<Loading>`, `<ErrorState>`, `<Empty>` + `loading.tsx`/`error.tsx` del árbol privado | Recorrido del Tester |
 | `RF-20` | Ya cumplido: cero `dark:`, cero `prefers-color-scheme` | Chequeo "un solo tema" lo congela |
-| `RF-21` | Ola 3 | Chequeo "pantallas de decisión": cero naranjas en nueve rutas |
+| `RF-21` | Ola 3, salvo `calendario` que va en la ola 2 (tarea 20) | Chequeo "pantallas de decisión": cero naranjas en nueve rutas, sin contar el de la ventana de confirmación |
 | `RF-22` | Ola 1: grupo Ventas + `/ventas` redirect | Test de render del menú (dieciséis entradas con acceso de dueño) |
 | `RF-23` | Olas 2 a 4: fuera del tablero, cero exclusiones no dibujan nada | Test de render + `UI-07` en el review |
+| `RF-24` | Ola 1 (tarea 8): la raíz privada redirige al tablero | Recorrido de cierre de la ola 1 (tarea 13) |
 
 **Cómo se desglosa esto en tareas** (decidido el 2026-08-31, para que `/tasks` no lo vuelva a
 abrir): **una tarea por pantalla**, no una pasada por historia. La skill de `tasks` agrupa por
@@ -174,7 +200,7 @@ es su spec.
 | `frontend/components/*` (11 carpetas) | Los 43 componentes de dominio adoptan `Badge`, `Notice`, `Button` y los envoltorios | — |
 | `frontend/lib/ui/` | `tone.ts`: el mapa estado de dominio → tono, único | 1 carpeta, 1 archivo |
 | `frontend/app/globals.css` | Dos tokens nuevos (`--muted-ink`, `--draft-border`) para los dos hex sueltos (`UI-09`) | — |
-| `frontend/tests/` | `design-system.test.ts` pasa de 3 a 8 casos; tres tests de render nuevos | 3 archivos |
+| `frontend/tests/` | `design-system.test.ts` pasa de 3 a 8 casos; cuatro tests de render nuevos | 3 archivos |
 | `docs/design/README.md` | Al cerrar, *Estado de la aplicación* deja de decir "la adopción es la 012" | — |
 
 Ningún módulo nuevo: no aparece ninguna capacidad del negocio con lenguaje propio. `lib/ui/` no es
@@ -267,7 +293,8 @@ siendo una comodidad, nunca la restricción. `lib/auth/permissions.ts` no se toc
 
 | Riesgo | Impacto | Cómo se mitiga |
 |---|---|---|
-| **La base del sistema de diseño está sin commitear, en la rama `fix/extractions-were-wedged`** — tokens, primitivas, el test, las convenciones `UI-*`, las devDependencies de vitest | Alto: si esa rama se mergea o se descarta por separado, la 012 arranca sobre un árbol que no tiene nada de esto, o se pierde trabajo hecho | **Decidido el 2026-08-31. Primera tarea de la ola 0, antes que ninguna otra:** separar ese trabajo en la rama `feat/012-design-system` (`GIT-01`) y commitearlo como los cimientos de esta feature, con `package.json` y `package-lock.json` en el mismo commit (Artículo IX). Lo que sea de la corrección de extracciones se queda en su rama |
+| ~~La base del sistema de diseño está sin commitear~~ **Cerrado el 2026-08-31** | — | El PR #29 llevó a `main` los tokens, las primitivas, `design-system.test.ts`, `vitest.config.ts`, `docs/design/README.md`, el bloque `UI-*` de `CONVENTIONS.md` y las devDependencies con su lock. La 012 arranca sobre un árbol que ya los tiene, y la tarea 1 quedó sin objeto |
+| **La 006 dejó en `main` el único `variant="brand"` del repositorio, dentro de `confirm-dialog.tsx`, y llega a `/calendario`** | Medio: leída al pie de la letra, la spec obligaba a despintarlo y a dejar sin acento a toda pantalla cuya acción principal viva en un diálogo | Cerrado por enmienda de la spec del 2026-08-31, firmada: la ventana de confirmación no cuenta (`RF-11`, `RF-21`). El chequeo la excluye, y por eso las dos reglas del naranja nacen verdes |
 | Migrar setenta y cinco archivos rompe una pantalla en silencio: la UI no tiene tests de regresión salvo los cuatro que existen | Alto: una tabla que deja de renderizar no la ve nadie hasta producción | Las olas se cierran de a una con `npm run build`, `npm test` y un recorrido manual del `Tester` con Playwright sobre las pantallas de esa ola. Ninguna ola empieza con la anterior a medias |
 | El presupuesto de naranja se cuenta sobre el árbol de imports, no sobre el DOM: un componente compartido por dos pantallas puede contar dos veces, o un `variant` calculado en runtime puede escaparse | Medio: falsos positivos que molestan, o un naranja de más que el test no ve | El test reporta archivo y línea de cada naranja que cuenta, así que un falso positivo se lee en un segundo. Y `variant` se escribe literal por convención: si alguien lo calcula, `UI-05` es Major y lo agarra el reviewer |
 | ~~`RF-08` asume que la API dice qué está confirmado~~ **Cerrado el 2026-08-31** | — | Verificado sobre el contrato: la señal existe, heterogénea por entidad. El mapa quedó decidido en *Datos → Qué cuenta como "sin confirmar"*, y vive en un solo archivo |
@@ -277,11 +304,16 @@ siendo una comodidad, nunca la restricción. `lib/auth/permissions.ts` no se toc
 
 ## Contexto de traspaso
 
-**Para el Developer** — Empezá por el riesgo de la rama: nada de esto tiene sentido si los
-cimientos siguen sin commitear en `fix/extractions-were-wedged`. Después, la ola 0 completa
-—`lib/ui/tone.ts`, `components/ui/amount.tsx`, `components/ui/state.tsx`, los seis chequeos del
-test— y **recién ahí** tocás una pantalla: el test tiene que existir antes de la migración para
-que la migración lo obedezca. Las olas van en orden y no se solapan.
+**Para el Developer** — Los cimientos ya están en `main` (PR #29): no hay nada que rescatar de
+ninguna rama, arrancás por la ola 0 completa —`lib/ui/tone.ts`, `components/ui/amount.tsx`,
+`components/ui/state.tsx`, los cinco chequeos nuevos del test— y **recién ahí** tocás una pantalla:
+el test tiene que existir antes de la migración para que la migración lo obedezca. Las olas van en
+orden y no se solapan.
+
+Lo que más se malinterpreta de la tarea 6: los chequeos de la píldora y de la plata **nacen con una
+lista de excepciones sembrada** con los archivos que todavía no migraste, y **cada pantalla que
+migrás saca los suyos en el mismo commit**. Si terminás una pantalla y el test sigue verde sin que
+hayas tocado la lista, la migraste a medias.
 
 Lo que **no** tocás: el backend, entero. Ningún cálculo, ninguna validación, ningún permiso
 (`lib/auth/permissions.ts` se queda como está). Ningún contenido de pantalla: no agregues, no
