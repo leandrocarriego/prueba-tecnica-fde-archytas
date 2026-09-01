@@ -93,7 +93,7 @@ export async function createAccess(formData: FormData): Promise<ActionResult> {
   if (!response.ok) {
     return failure(response, 'No se pudo dar de alta el acceso.')
   }
-  revalidatePath('/accesos')
+  revalidatePath('/configuracion/accesos')
   return {
     ok: true,
     // Says where the invitation went, because that is the next thing that has
@@ -112,7 +112,7 @@ export async function changeRole(userId: number, role: string): Promise<ActionRe
   if (!response.ok) {
     return failure(response, 'No se pudo cambiar el rol.')
   }
-  revalidatePath('/accesos')
+  revalidatePath('/configuracion/accesos')
   return { ok: true, message: 'Rol cambiado. Se aplica la próxima vez que entre.' }
 }
 
@@ -125,7 +125,7 @@ export async function deactivateAccess(userId: number): Promise<ActionResult> {
   if (!response.ok) {
     return failure(response, 'No se pudo desactivar el acceso.')
   }
-  revalidatePath('/accesos')
+  revalidatePath('/configuracion/accesos')
   return { ok: true, message: 'Acceso desactivado. Sus sesiones abiertas se cerraron.' }
 }
 
@@ -138,7 +138,7 @@ export async function reactivateAccess(userId: number): Promise<ActionResult> {
   if (!response.ok) {
     return failure(response, 'No se pudo reactivar el acceso.')
   }
-  revalidatePath('/accesos')
+  revalidatePath('/configuracion/accesos')
   return {
     ok: true,
     message: 'Acceso reactivado. Le llegó una invitación para definir una clave nueva.',

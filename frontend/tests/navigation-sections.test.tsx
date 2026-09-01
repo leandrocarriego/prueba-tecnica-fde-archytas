@@ -24,23 +24,28 @@ const DUENO = new Proxy({}, { get: () => 2 }) as unknown as Permissions
 /** Julián, que trabaja en ventas y no tiene por qué ver las compras. */
 const VENTAS: Permissions = { SALES: 2, DASHBOARD: 1 }
 
-/** Las dieciséis secciones, en el orden en que la barra las nombra. */
-const LAS_DIECISEIS = [
+/**
+ * Las doce secciones, en el orden en que la barra las nombra.
+ *
+ * **«Para decidir» va segunda, pegada al Tablero**, y no dentro de un grupo: no
+ * es de un área —lleva lo apartado de ventas, de compras y del padrón—, y con
+ * el tablero forma el par con el que se abre el día.
+ *
+ * Accesos y Parámetros dejaron de ser dos entradas: son dos pestañas de
+ * «Configuración», que es una sola. Por eso son doce y no trece.
+ */
+const LAS_DOCE = [
   'Tablero',
+  'Para decidir',
   'Proveedores',
   'Facturas',
   'Órdenes de compra',
   'Calendario',
-  'Mensajes',
   'Ventas',
   'Catálogo y precios',
   'Rubros',
-  'Para decidir',
-  'Acciones',
-  'Historial',
-  'Accesos',
   'Actividad',
-  'Parámetros',
+  'Configuración',
   'Salud',
 ]
 
@@ -52,28 +57,23 @@ function secciones() {
 }
 
 describe('la barra lateral', () => {
-  it('con el acceso del dueño lista las dieciséis secciones, Ventas entre ellas', () => {
+  it('con el acceso del dueño lista las doce secciones, Ventas entre ellas', () => {
     render(<Navigation user={USER} permissions={DUENO} />)
 
-    expect(secciones()).toEqual(LAS_DIECISEIS)
+    expect(secciones()).toEqual(LAS_DOCE)
     // RF-22: Ventas es una entrada más, y lleva al área, no a una pantalla.
     expect(screen.getByRole('link', { name: 'Ventas' })).toHaveAttribute('href', '/ventas')
   })
 
-  it('con un acceso de Ventas no aparecen Facturas, Órdenes ni Accesos', () => {
+  it('con un acceso de Ventas no aparecen Facturas, Órdenes ni Configuración', () => {
     render(<Navigation user={USER} permissions={VENTAS} />)
 
-    // Las cuatro últimas no nombran sección: cualquier sesión las alcanza, y
-    // cada una recorta adentro lo que muestra.
-    expect(secciones()).toEqual([
-      'Tablero',
-      'Ventas',
-      'Para decidir',
-      'Acciones',
-      'Historial',
-      'Salud',
-    ])
-    for (const ajena of ['Facturas', 'Órdenes de compra', 'Accesos', 'Parámetros']) {
+    // «Para decidir», «Actividad» y «Salud» no nombran sección: cualquier
+    // sesión las alcanza, y cada una recorta adentro lo que muestra.
+    expect(secciones()).toEqual(['Tablero', 'Para decidir', 'Ventas', 'Actividad', 'Salud'])
+    // Configuración es una entrada sola y sigue siendo del dueño: quien no
+    // llega a los parámetros no la ve, como no veía «Accesos» ni «Parámetros».
+    for (const ajena of ['Facturas', 'Órdenes de compra', 'Configuración', 'Rubros']) {
       expect(screen.queryByRole('link', { name: ajena })).toBeNull()
     }
   })
@@ -83,8 +83,9 @@ describe('la barra lateral', () => {
 
     // Compras se queda sin una sola entrada: el título tampoco tiene que estar.
     expect(screen.queryByText('Compras')).toBeNull()
-    // «Catálogo y datos» conserva dos —Ventas y la cola—, así que su título
-    // sigue. Ventas ya no es un grupo: es la primera entrada de este.
+    // «Catálogo y datos» conserva a Ventas, así que su título sigue. Ventas ya
+    // no es un grupo: es la primera entrada de éste. La cola se fue de acá
+    // arriba, pegada al tablero, porque no es del catálogo.
     expect(screen.getByText('Catálogo y datos', { selector: 'p' })).toBeInTheDocument()
     expect(screen.queryByText('Ventas', { selector: 'p' })).toBeNull()
   })

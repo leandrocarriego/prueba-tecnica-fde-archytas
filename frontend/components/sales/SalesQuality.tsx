@@ -21,7 +21,7 @@ export function SalesQuality({ sales }: { sales: SalesDashboard }) {
   return (
     <p className="text-xs text-muted-foreground">
       {sales.held_total > 0 ? (
-        <Link className="font-medium text-link hover:underline" href="/ventas/revision">
+        <Link className="font-medium text-link hover:underline" href="/revision?area=SALES">
           {count(sales.held_total)} ventas apartadas →
         </Link>
       ) : (

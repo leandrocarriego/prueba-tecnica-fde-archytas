@@ -92,6 +92,7 @@ from app.shared.events import (
     NormalizedSupplier,
     PaymentReviewCase,
     PaymentsNeedingReview,
+    PendingItem,
     QuarantinedSourceResolved,
     ReceiptIssued,
     ReceiptVoided,
@@ -350,6 +351,30 @@ def _filename_for(number: str, content_type: str | None) -> str:
     return f"Factura {number}{extension}"
 
 
+# Las dos clases de caso que compras abre en la cola de pendientes. Son las
+# palabras de `triage` para ellas, escritas acá y no importadas: un módulo nunca
+# importa otro (Artículo IV), y lo que viaja entre los dos es justamente el
+# string. Si alguna vez dejan de coincidir, el caso no se abre ni se cierra —por
+# eso están las dos juntas y con este comentario encima.
+INVOICE_IN_REVIEW = "invoice_in_review"
+INCOMPLETE_SUPPLIER = "incomplete_supplier"
+
+# Cómo se lee en castellano cada dato que el portal puede no haber publicado de
+# un proveedor. Es texto que lee una persona en la cola, así que va en español
+# (Artículo VIII) y vive del lado que arma la frase.
+MISSING_LABELS = {
+    "tax_id": "el CUIT",
+    "email": "el correo",
+    "phone": "el teléfono",
+    "payment_term_days": "el plazo de pago",
+}
+
+INVOICE_NEEDS_A_DECISION = "La factura está apartada esperando una decisión"
+# De a cuántas se recorre el inventario de pendientes. No es un tope: el
+# recorrido sigue hasta el final, y esto sólo decide el tamaño del viaje.
+PENDING_PAGE = 200
+
+
 class PurchasesService:
     """Registers invoices, resolves who they are from, and answers what is owed."""
 
@@ -532,6 +557,66 @@ class PurchasesService:
         change that never happened.
         """
         return str(left) == str(right)
+
+    async def pending_work(self) -> tuple[PendingItem, ...]:
+        """Todo lo que compras tiene esperando a una persona, como lista completa.
+
+        Dos cosas, y las dos estaban invisibles desde la cola: una **factura en
+        revisión** —su proveedor es ambiguo, no está en el padrón, o parece
+        duplicada— y un **proveedor incompleto**, al que el portal nunca le
+        publicó un dato que hace falta para operar con él. Cada una tenía su
+        propia pantalla, que es exactamente el problema: lo que hace que nadie
+        vacíe una cola no es que sea larga, es que haya varias.
+
+        **Completa quiere decir completa, y por eso pagina hasta el final.** El
+        que la escucha cierra los casos que no estén en esta lista, así que un
+        corte en la fila quinientos no dejaría cien facturas afuera del informe:
+        cerraría sus casos como si alguien las hubiera resuelto.
+        """
+        items: list[PendingItem] = []
+
+        skip = 0
+        while True:
+            page = await self.list_invoices(
+                skip=skip, limit=PENDING_PAGE, review_state=InvoiceReviewState.PENDING
+            )
+            items.extend(
+                PendingItem(
+                    kind=INVOICE_IN_REVIEW,
+                    key=str(invoice.id),
+                    reason=invoice.review_reason or INVOICE_NEEDS_A_DECISION,
+                    section=BusinessSection.PURCHASING.value,
+                    detail=(
+                        ("number", invoice.number),
+                        ("supplier", invoice.supplier_name or invoice.supplier_text),
+                        ("total", str(invoice.total)),
+                    ),
+                )
+                for invoice in page.items
+            )
+            skip += len(page.items)
+            if not page.items or skip >= page.total:
+                break
+
+        register = await self.list_suppliers()
+        items.extend(
+            PendingItem(
+                kind=INCOMPLETE_SUPPLIER,
+                key=str(supplier.id),
+                reason=(
+                    "El portal no publicó "
+                    + ", ".join(MISSING_LABELS.get(field, field) for field in supplier.missing)
+                ),
+                section=BusinessSection.PURCHASING.value,
+                detail=(
+                    ("supplier", supplier.legal_name),
+                    ("missing", ", ".join(supplier.missing)),
+                ),
+            )
+            for supplier in register.items
+            if supplier.missing
+        )
+        return tuple(items)
 
     async def list_suppliers(self) -> SupplierList:
         """The register, with what the portal did not publish marked as missing."""

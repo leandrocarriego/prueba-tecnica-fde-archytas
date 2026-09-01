@@ -236,3 +236,38 @@ class PriceUpdateSettingsWrite(BaseModel):
 
     interval_hours: int = Field(ge=MIN_INTERVAL_HOURS, le=MAX_INTERVAL_HOURS)
     highlight_threshold_pct: Decimal = Field(ge=0, le=MAX_THRESHOLD_PCT)
+
+
+class SyncSourceRead(BaseModel):
+    """Una de las seis cosas que se traen del portal, y en qué anda.
+
+    `label` viaja desde el backend porque el catálogo de fuentes vive ahí: una
+    lista de nombres del lado de la pantalla sería una segunda lista para
+    mantener en paralelo, y agregar una fuente exigiría acordarse de las dos.
+
+    `interval_key` viaja porque es lo que deja poner el control del parámetro al
+    lado de la fuente que gobierna, sin que la pantalla tenga que saberse de
+    memoria qué parámetro es de cuál.
+    """
+
+    key: str
+    label: str
+    interval_key: str
+    interval: int
+    # `hours` o `minutes`: los mensajes se traen en minutos y todo lo demás en
+    # horas, y sin la unidad el número no quiere decir nada.
+    unit: str
+    is_running: bool
+    last_run_at: datetime | None
+    last_run_status: JobStatus | None
+    last_success_at: datetime | None
+    # `None` es «todavía no corrió nunca», que no es lo mismo que «no vence»:
+    # una fuente que nunca corrió corre en el próximo latido.
+    next_due_at: datetime | None
+
+
+class SyncRequested(BaseModel):
+    """La respuesta a pedir una extracción a mano, para cualquiera de las seis."""
+
+    key: str
+    job_run_id: int

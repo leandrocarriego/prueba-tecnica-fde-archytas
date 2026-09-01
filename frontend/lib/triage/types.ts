@@ -18,11 +18,16 @@ export type Rule = components['schemas']['RuleRead']
  * de la 004 y la 007: la cola es genérica a propósito y no cambió de forma para
  * tomar ninguna.
  *
- * Las **cuatro últimas** son de la 011, y son las que terminan de cumplir la
- * promesa: hasta esa feature el sistema apartaba una fila del padrón, un
- * comprobante ilegible, un mensaje del buzón o una venta que no podía
- * interpretar, y no se lo contaba a nadie. Quedaban guardadas y contadas, que
- * para el que tiene que decidir es lo mismo que si se hubieran perdido.
+ * Cuatro de ellas son de la 011, y son las que terminan de cumplir la promesa:
+ * hasta esa feature el sistema apartaba una fila del padrón, un comprobante
+ * ilegible, un mensaje del buzón o una venta que no podía interpretar, y no se
+ * lo contaba a nadie. Quedaban guardadas y contadas, que para el que tiene que
+ * decidir es lo mismo que si se hubieran perdido.
+ *
+ * `repeated_sale` y `broken_sale` cierran el mismo agujero por el otro lado: no
+ * estaban perdidas —tenían su propia pantalla, y bastante buena— pero tenerlas
+ * aparte hacía falsa la única regla que hace que alguien vacíe esto, que es que
+ * **la lista de lo pendiente sea una sola**.
  */
 export const CASE_KINDS = {
   unreadable_row: 'Fila que no se pudo interpretar',
@@ -36,6 +41,24 @@ export const CASE_KINDS = {
   unreadable_payment_row: 'Comprobante de pago que no se pudo interpretar',
   unreadable_message_row: 'Mensaje del buzón que no se pudo interpretar',
   unreadable_sale_row: 'Venta que no se pudo interpretar',
+  /*
+    Las dos que abre una venta que **sí** entró y aun así no puede sumar. Las
+    otras once son sobre algo que el portal publicó ilegible; éstas son sobre un
+    registro entero y correcto que la plataforma no sabe cómo contar: dos
+    versiones de la misma venta que no coinciden, o una a la que le falta un
+    dato. Vivían en una pantalla propia —la revisión de ventas—, que era una
+    segunda cola de pendientes al lado de ésta.
+  */
+  repeated_sale: 'Venta repetida con datos distintos',
+  broken_sale: 'Venta con un dato para corregir',
+  /*
+    Y las dos de compras, por lo mismo. Una factura cuyo proveedor nadie pudo
+    resolver esperaba en `/facturas/revision`, y un proveedor al que le falta un
+    dato esperaba en una columna del padrón: dos colas más al lado de la única
+    que promete tener todo.
+  */
+  invoice_in_review: 'Factura apartada esperando una decisión',
+  incomplete_supplier: 'Proveedor con un dato sin completar',
   /*
     Las dos que abre la carga manual. No existían mientras la única salida de
     una fila ilegible era darla por revisada: aparecen cuando una persona
@@ -82,6 +105,43 @@ export const ACKNOWLEDGE_ONLY_KINDS: readonly string[] = [
   'unreadable_message_row',
   'unreadable_sale_row',
 ]
+
+/**
+ * De qué área es cada clase de caso, para agrupar **las decisiones ya tomadas**.
+ *
+ * Un caso pendiente trae su área del backend, que es quien la decide; una regla
+ * guardada no la trae —la tabla de reglas no la guarda— y sin embargo se
+ * agrupan en la misma pantalla. Así que este mapa existe para eso y sólo para
+ * eso: ordenar en pestañas lo que ya se decidió.
+ *
+ * **Es una segunda copia y conviene saber qué pasa si se desincroniza:** una
+ * regla aparece bajo la pestaña equivocada. Nada más — no cambia qué ve nadie ni
+ * qué puede tocar, porque el recorte por permisos lo sigue haciendo el backend
+ * sobre los casos. Una clase que no esté acá cae en «Sistema».
+ */
+const KIND_SECTIONS: Record<string, string> = {
+  unreadable_row: 'SALES',
+  unknown_product: 'SALES',
+  missing_product: 'SALES',
+  unreadable_history: 'SALES',
+  unknown_category: 'PURCHASING',
+  unreadable_sale_row: 'SALES',
+  repeated_sale: 'SALES',
+  broken_sale: 'SALES',
+  unreadable_invoice_row: 'PURCHASING',
+  unreadable_order_row: 'PURCHASING',
+  unreadable_supplier_row: 'PURCHASING',
+  unreadable_payment_row: 'PURCHASING',
+  unreadable_message_row: 'PURCHASING',
+  disputed_invoice: 'PURCHASING',
+  disputed_order: 'PURCHASING',
+  invoice_in_review: 'PURCHASING',
+  incomplete_supplier: 'PURCHASING',
+}
+
+export function sectionOfKind(kind: string): string {
+  return KIND_SECTIONS[kind] ?? 'SYSTEM'
+}
 
 export function caseKindLabel(kind: string): string {
   return kind in CASE_KINDS ? CASE_KINDS[kind as keyof typeof CASE_KINDS] : kind

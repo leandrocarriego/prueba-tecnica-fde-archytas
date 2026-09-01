@@ -9,6 +9,7 @@ import type { components } from '@/lib/api/types'
 
 export type AlertKind = components['schemas']['AlertKind']
 export type AlertRoute = components['schemas']['RouteRead']
+export type AlertTested = components['schemas']['RouteTested']
 
 /**
  * Qué es cada tipo de aviso, dicho como lo diría quien lo recibe (RF-37).

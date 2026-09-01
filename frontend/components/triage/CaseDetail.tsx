@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { resolveCase } from '@/app/actions/triage'
+import { CaseHeader } from '@/components/triage/CaseHeader'
 import { Code } from '@/components/ui/amount'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input, selectClassName } from '@/components/ui/input'
 import { Notice } from '@/components/ui/notice'
@@ -18,8 +18,6 @@ import {
   ACKNOWLEDGE_ONLY_KINDS,
   DISPUTED_KINDS,
   LOADABLE_KINDS,
-  caseKindLabel,
-  sectionLabel,
   type Case,
 } from '@/lib/triage/types'
 
@@ -507,31 +505,7 @@ export function CaseDetail({ item, mayCorrect, categories, suppliers }: CaseDeta
 
   return (
     <div className="flex h-full flex-col gap-5 rounded-xl border border-border bg-card p-6">
-      <header className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="section-label">{caseKindLabel(item.kind)}</span>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{sectionLabel(item.section)}</span>
-            <span className="amount">{formatMoment(item.created_at)}</span>
-            {item.occurrences > 1 && <span>se repitió {item.occurrences} veces</span>}
-            {/*
-              Cuánto hace que espera, y si eso ya es demasiado (RF-16, RF-17).
-              El número lo calcula el backend contra el parámetro que el dueño
-              mueve (RF-18), así que la pantalla no decide nada acá: lo muestra.
-              Demorado es un estado del caso, así que es una píldora (`UI-03`).
-            */}
-            {pending && (
-              <span>
-                {item.waiting_days === 0
-                  ? 'llegó hoy'
-                  : `espera hace ${item.waiting_days} ${item.waiting_days === 1 ? 'día' : 'días'}`}
-              </span>
-            )}
-            {pending && item.is_stale && <Badge tone="warn">Demorado</Badge>}
-          </div>
-        </div>
-        <h2 className="text-lg font-semibold text-foreground">{item.reason}</h2>
-      </header>
+      <CaseHeader item={item} />
 
       {pending && <Stepper step={step} />}
 

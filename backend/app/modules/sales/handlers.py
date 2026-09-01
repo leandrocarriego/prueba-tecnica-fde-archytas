@@ -9,9 +9,11 @@ importing the module that owns the answer (Artículo IV).
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
-from app.modules.sales.service import OUTLIER_KEY, SalesService
+from app.modules.sales.service import BROKEN_SALE, OUTLIER_KEY, REPEATED_SALE, SalesService
 from app.shared.events import (
     BusinessParameterChanged,
+    PendingWorkReported,
+    PendingWorkRequested,
     ProductsRegistered,
     SalesNormalized,
     events,
@@ -40,3 +42,22 @@ async def remember_parameter(event: BusinessParameterChanged, session: AsyncSess
     if event.key != OUTLIER_KEY:
         return
     await SalesService(session).remember_setting(event.key, event.value)
+
+
+@events.subscribe(PendingWorkRequested)
+async def report_pending_sales(event: PendingWorkRequested, session: AsyncSession) -> None:
+    """Contestar qué ventas siguen esperando una decisión.
+
+    Se contesta **siempre**, también cuando no hay ninguna: una lista vacía no
+    es silencio, es la frase «de esto ya no queda nada», y es lo que cierra los
+    casos de ventas que quedaron abiertos después de que alguien las resolviera.
+    Callarse cuando no hay nada dejaría esos casos colgados para siempre.
+    """
+    await events.publish(
+        PendingWorkReported(
+            kinds=(REPEATED_SALE, BROKEN_SALE),
+            items=await SalesService(session).pending_work(),
+        ),
+        session,
+    )
+    del event

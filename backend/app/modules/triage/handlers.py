@@ -1,6 +1,6 @@
 """What `triage` does when something happens elsewhere.
 
-Fourteen subscriptions: one per way the platform can fail to resolve something
+Sixteen subscriptions: one per way the platform can fail to resolve something
 on its own, plus the two that close a case when the work got done on the screen
 that owned it and reopen it if that work is undone, plus the one that keeps the
 parameter this module reads. None of them knows which module published: a case is a case, whether
@@ -52,12 +52,14 @@ from app.shared.events import (
     ManualEntryDisputed,
     MessageRowsQuarantined,
     PaymentRowsQuarantined,
+    PendingWorkReported,
     PriceHistoryRowsQuarantined,
     PriceRowsQuarantined,
     PurchaseOrderRowsQuarantined,
     QuarantinedSourceReopened,
     QuarantinedSourceResolved,
     SaleRowsQuarantined,
+    SalesHeld,
     SupplierRowsQuarantined,
     UnknownCategoryObserved,
     UnknownProductsObserved,
@@ -403,6 +405,80 @@ async def open_unreadable_sale_rows(event: SaleRowsQuarantined, session: AsyncSe
             batch_id=event.batch_id,
         )
     logger.info("Unreadable sale rows queued", extra={"cases": len(event.cases)})
+
+
+@events.subscribe(SalesHeld)
+async def open_held_sales(event: SalesHeld, session: AsyncSession) -> None:
+    """A sales record got in and still may not be added up.
+
+    The other half of the subscription above, and the half that was missing.
+    That one takes the rows `staging` could not type at all; these are records
+    that made it into `core` whole and are held anyway — two versions of the
+    same sale that disagree, a sale pointing at a product nobody knows, a total
+    wildly out of line, a field the parser could not read.
+
+    Until now they lived only on the sales screen, which made RF-06 of 011 —
+    **una sola lista de lo que está pendiente** — true for four origins and
+    false for this one. A person emptying this queue had no way of knowing that
+    another list existed, and that is exactly what happened with the portal's
+    inbox before 011: what kept nobody looking at it was not its length, it was
+    that it was one more place to remember to go.
+
+    The `kind` travels in the event rather than being decided here, and that is
+    deliberate: the kind and the key are one pair — `repeated_sale` is keyed by
+    the code, `broken_sale` by the row — and whoever resolves it sends the same
+    pair back to close it. Rebuilding either side here would close a case
+    nobody resolved.
+    """
+    service = TriageService(session)
+    for case in event.cases:
+        await service.open_case(
+            kind=case.kind,
+            section=BusinessSection.SALES,
+            reason=case.reason,
+            payload={
+                "code": case.code,
+                # Cuántas versiones hay que mirar, para que el renglón de la
+                # cola diga el tamaño de la decisión antes de abrirla.
+                "versions": case.versions,
+                # La llave viaja también **adentro** del caso, y no sólo dentro
+                # de la huella. La huella es un hash: sirve para no abrir dos
+                # veces el mismo caso y no sirve para volver a encontrar de qué
+                # venta hablaba. Sin esto la pantalla tendría el caso y no el
+                # registro, que es tanto como no tener el caso.
+                "key": case.key,
+                "origin": SALE_ORIGIN,
+                "held_at": event.occurred_at.isoformat(),
+            },
+            key=case.key,
+            batch_id=event.batch_id,
+        )
+    logger.info("Held sales queued", extra={"cases": len(event.cases)})
+
+
+@events.subscribe(PendingWorkReported)
+async def reconcile_pending_work(event: PendingWorkReported, session: AsyncSession) -> None:
+    """Un módulo contó todo lo que tiene esperando a una persona.
+
+    La suscripción que le faltaba a esta cola desde el principio, y el agujero
+    que tapa no se ve mirando el código: se ve el día que se enciende. Todo lo
+    demás acá abre un caso **en el momento en que algo pasa**, así que la cola
+    conoce exactamente lo que ocurrió desde que existe el evento que lo cuenta.
+    Lo que estaba apartado desde antes —una factura en revisión desde marzo, un
+    proveedor sin CUIT desde siempre— no lo publicó nadie nunca, y para la cola
+    no existe. El dueño ve «hay 12 ventas esperando una decisión», entra, y la
+    cola está vacía.
+
+    Acá el informe es completo, así que se hacen las dos mitades: se abre lo que
+    falta y se cierra lo que ya no está. Es lo que hace que la promesa —*una sola
+    verdad sobre si algo sigue pendiente*— valga también hacia atrás.
+    """
+    opened, closed = await TriageService(session).reconcile(kinds=event.kinds, items=event.items)
+    if opened or closed:
+        logger.info(
+            "Pending work reconciled",
+            extra={"kinds": list(event.kinds), "opened": opened, "closed": closed},
+        )
 
 
 @events.subscribe(QuarantinedSourceResolved)

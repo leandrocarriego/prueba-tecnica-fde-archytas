@@ -54,7 +54,8 @@ export async function resolveSaleGroup(
     body: JSON.stringify({ action, sale_id: saleId }),
   })
   if (result.ok) {
-    revalidatePath('/ventas/revision')
+    revalidatePath('/revision')
+    revalidatePath('/ventas')
     revalidatePath('/tablero')
   }
   return result
@@ -66,7 +67,8 @@ export async function undoSaleResolution(codeKey: string): Promise<ActionResult<
     method: 'DELETE',
   })
   if (result.ok) {
-    revalidatePath('/ventas/revision')
+    revalidatePath('/revision')
+    revalidatePath('/ventas')
     revalidatePath('/tablero')
   }
   return result
@@ -93,7 +95,8 @@ export async function correctSale(
     body: JSON.stringify({ ...values, is_estimated: isEstimated }),
   })
   if (result.ok) {
-    revalidatePath('/ventas/revision')
+    revalidatePath('/revision')
+    revalidatePath('/ventas')
     revalidatePath('/tablero')
   }
   return result

@@ -2,10 +2,13 @@
 
 import { useState } from 'react'
 
+import { SALE_CASE_KINDS, SaleCase } from '@/components/sales/SaleCase'
 import { CaseDetail } from '@/components/triage/CaseDetail'
+import { LINKED_CASE_KINDS, LinkedCase } from '@/components/triage/LinkedCase'
 import { Badge } from '@/components/ui/badge'
 import type { Category } from '@/lib/catalog/types'
 import type { Supplier } from '@/lib/purchases/types'
+import type { ReviewQueue } from '@/lib/sales/types'
 import { caseKindLabel, sectionLabel, type Case } from '@/lib/triage/types'
 
 /**
@@ -54,6 +57,17 @@ interface CaseQueueProps {
   categories: Category[]
   /** El padrón, para cargar a mano una factura o una orden. Vacío si no se alcanza. */
   suppliers: Supplier[]
+  /**
+   * Las ventas apartadas, para los casos que son sobre una de ellas.
+   *
+   * Las trae la pantalla, como los rubros y el padrón, y por la misma razón:
+   * este panel es de `triage` y pedirlas él mismo lo ataría a ventas. `null`
+   * cuando quien mira no alcanza el área — el caso se sigue viendo, la venta
+   * no.
+   */
+  salesQueue: ReviewQueue | null
+  /** Si quien mira puede decidir sobre una venta, que es `SALES` en escritura. */
+  mayResolveSales: boolean
 }
 
 /**
@@ -82,6 +96,8 @@ export function CaseQueue({
   mayCorrect,
   categories,
   suppliers,
+  salesQueue,
+  mayResolveSales,
 }: CaseQueueProps) {
   const [openId, setOpenId] = useState<number | null>(null)
   const [order, setOrder] = useState<Order>('newest')
@@ -152,13 +168,32 @@ export function CaseQueue({
       </div>
 
       <div className="min-w-0 flex-1">
-        <CaseDetail
-          key={current.id}
-          item={current}
-          mayCorrect={mayCorrect}
-          categories={categories}
-          suppliers={suppliers}
-        />
+        {/*
+          Tres paneles, una cola. El genérico resuelve las clases que se
+          contestan eligiendo entre opciones; el de ventas, las que se contestan
+          mirando dos versiones o completando un dato; y el de la puerta, las que
+          se resuelven en la pantalla de su entidad. Los tres con la misma cabeza
+          y la misma caja, y la lista de la izquierda no distingue: cada caso es
+          un pendiente más, que es exactamente lo que se quería.
+        */}
+        {SALE_CASE_KINDS.includes(current.kind) ? (
+          <SaleCase
+            key={current.id}
+            item={current}
+            queue={salesQueue}
+            mayResolve={mayResolveSales}
+          />
+        ) : LINKED_CASE_KINDS.includes(current.kind) ? (
+          <LinkedCase key={current.id} item={current} />
+        ) : (
+          <CaseDetail
+            key={current.id}
+            item={current}
+            mayCorrect={mayCorrect}
+            categories={categories}
+            suppliers={suppliers}
+          />
+        )}
       </div>
     </div>
   )

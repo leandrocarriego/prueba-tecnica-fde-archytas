@@ -31,6 +31,7 @@ const SALES: SalesDashboard = {
   by_month: [],
   held_total: 0,
   pending_groups: 0,
+  pending_decisions: 0,
 } as SalesDashboard
 
 const PURCHASES: PurchasesDashboard = {

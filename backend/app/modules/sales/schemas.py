@@ -139,3 +139,12 @@ class SalesDashboard(BaseModel):
     by_month: list[MonthTotal]
     held_total: int
     pending_groups: int
+    # Cuántas decisiones de ventas hay realmente esperando a alguien: los grupos
+    # de repetidas sin resolver **más** las apartadas sueltas.
+    #
+    # Existe porque `excluded` contesta otra pregunta y las dos se estaban
+    # leyendo como la misma. `excluded` cuenta **registros que no suman**, y ahí
+    # entran los que el sistema unificó solo y los que una persona ya descartó:
+    # noventa y seis registros afuera del total podían ser trece decisiones
+    # pendientes, y el tablero ofrecía «ver cuáles» sobre los noventa y seis.
+    pending_decisions: int

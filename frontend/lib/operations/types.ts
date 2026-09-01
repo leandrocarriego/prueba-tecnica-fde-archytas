@@ -18,3 +18,6 @@ export type AuditEntryList = components['schemas']['AuditEntryList']
 export type AuditAction = components['schemas']['AuditAction']
 export type BusinessSection = components['schemas']['BusinessSection']
 export type CorrectionReason = components['schemas']['CorrectionReasonRead']
+
+/** Una de las seis cosas que la plataforma trae del portal, y en qué anda. */
+export type SyncSource = components['schemas']['SyncSourceRead']

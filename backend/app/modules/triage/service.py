@@ -8,6 +8,7 @@ Two ideas hold this module together, and both are Artículo II:
   rule is what stops the system from asking the same question tomorrow.
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Any
@@ -20,6 +21,7 @@ from app.modules.triage.repository import TriageRepository
 from app.modules.triage.schemas import CaseList, CaseRead, RuleRead
 from app.shared.errors import ConflictError, NotFoundError, PermissionDeniedError
 from app.shared.events import (
+    PendingItem,
     QuarantineCaseResolved,
     QuarantineRuleRedecided,
     QuarantineRuleRevoked,
@@ -61,6 +63,14 @@ UNREADABLE_SUPPLIER_ROW = "unreadable_supplier_row"
 UNREADABLE_PAYMENT_ROW = "unreadable_payment_row"
 UNREADABLE_MESSAGE_ROW = "unreadable_message_row"
 UNREADABLE_SALE_ROW = "unreadable_sale_row"
+
+# Las dos clases que no nacen de una lectura rota sino de un registro entero que
+# igual no puede seguir: una factura cuyo proveedor nadie pudo resolver, y un
+# proveedor al que el portal nunca le publicó un dato que hace falta. Existían
+# desde la 004 y no tenían dónde verse: la primera vivía en su propia pantalla
+# de revisión y la segunda en una columna del padrón.
+INVOICE_IN_REVIEW = "invoice_in_review"
+INCOMPLETE_SUPPLIER = "incomplete_supplier"
 
 # Las dos clases que abre la **carga manual**, y que no existían mientras la
 # única salida de una fila ilegible era darla por revisada: una persona
@@ -110,6 +120,10 @@ STALE_DAYS_KEY = "triage.stale_days"
 # did the work is recorded where the work happened, and a second copy of that
 # fact here could only ever drift from the first.
 RESOLVED_ELSEWHERE = "resolved_elsewhere"
+# Lo que dice un caso que se cerró porque el módulo dueño dejó de informarlo. No
+# nombra a nadie a propósito: nadie lo cerró acá, y quién hizo el trabajo lo sabe
+# la pantalla donde se hizo.
+RECONCILED_AWAY = "ya no figura entre lo pendiente de su módulo"
 ALREADY_REVOKED = "This rule is already revoked"
 
 
@@ -329,6 +343,66 @@ class TriageService:
             extra={"case_id": case.id, "kind": case.kind, "rule_id": rule.id if rule else None},
         )
         return CaseRead.model_validate(case)
+
+    async def reconcile(
+        self, *, kinds: tuple[str, ...], items: Sequence[PendingItem]
+    ) -> tuple[int, int]:
+        """Poner la cola al día con lo que un módulo dice que sigue pendiente.
+
+        Las dos mitades de la misma frase —*ésta es toda mi lista*— y ninguna
+        sirve sin la otra. Abrir lo que falta sin cerrar lo que sobra deja
+        creciendo una cola de cosas ya resueltas; cerrar sin abrir no arregla
+        nada.
+
+        **Abrir es `ensure_case` y no `open_case`**, porque el informe no es un
+        hecho nuevo: contestar «esto sigue pendiente» cada quince minutos no es
+        que haya pasado noventa y seis veces. Un caso que ya estaba abierto no se
+        toca —conserva desde cuándo espera, que es de lo que sale «demorado»—.
+
+        **Cerrar toca sólo lo que se cerraría solo.** Un caso que una persona
+        resolvió a mano lleva su nombre y su decisión, y no vuelve por acá: si
+        el módulo dueño lo sigue informando como pendiente, el que está mal es
+        el módulo, y borrarle la firma a alguien no lo arregla. Por eso el cierre
+        recorre los pendientes y nunca los resueltos.
+
+        Devuelve cuántos abrió y cuántos cerró, para que quien pregunta lo
+        pueda registrar: una reconciliación que mueve cosas todas las veces es
+        una señal de que algo no está publicando lo que le toca.
+        """
+        if not kinds:
+            return (0, 0)
+
+        reported = {fingerprint_of(item.kind, item.key): item for item in items}
+
+        for fingerprint, item in reported.items():
+            await self.triage.ensure_case(
+                kind=item.kind,
+                reason=item.reason,
+                # La llave viaja adentro del caso además de dentro de la huella:
+                # la huella es un hash, sirve para no abrirlo dos veces y no
+                # sirve para volver a encontrar de qué hablaba. Sin esto la
+                # pantalla tendría el caso y no el registro.
+                payload={"key": item.key, **dict(item.detail)},
+                fingerprint=fingerprint,
+                section=BusinessSection(item.section),
+            )
+
+        closed = 0
+        for case in await self.triage.pending_of_kinds(kinds):
+            if case.fingerprint in reported:
+                continue
+            case.status = CaseStatus.RESOLVED
+            case.decision = {"action": RESOLVED_ELSEWHERE, "where": RECONCILED_AWAY}
+            case.resolved_at = datetime.now(UTC)
+            closed += 1
+
+        await self.session.flush()
+        if reported or closed:
+            logger.info(
+                "Queue reconciled",
+                extra={"kinds": list(kinds), "reported": len(reported), "closed": closed},
+            )
+        return (len(reported), closed)
 
     async def close_resolved_elsewhere(self, *, kind: str, key: str, where: str) -> bool:
         """Close the case whose cause was resolved on its own screen (RF-20).
