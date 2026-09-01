@@ -7,7 +7,13 @@ from sqlalchemy import Select, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.triage.models import CaseStatus, ExceptionCase, ResolutionRule
+from app.modules.triage.models import (
+    CaseStatus,
+    ExceptionCase,
+    ResolutionRule,
+    TriageSetting,
+)
+from app.shared.sections import BusinessSection
 
 
 class TriageRepository:
@@ -26,6 +32,7 @@ class TriageRepository:
         payload: dict[str, Any],
         fingerprint: str,
         batch_id: int | None,
+        section: BusinessSection,
     ) -> None:
         """Open a case, or count one more occurrence of the one already pending.
 
@@ -41,6 +48,7 @@ class TriageRepository:
                 payload=payload,
                 fingerprint=fingerprint,
                 batch_id=batch_id,
+                section=section,
                 status=CaseStatus.PENDING,
                 occurrences=1,
             )
@@ -56,6 +64,11 @@ class TriageRepository:
                     "batch_id": batch_id,
                     "reason": reason,
                     "payload": payload,
+                    # The area travels on the re-arrival too. A kind that
+                    # changes owner — the rubros already did, in 010 — would
+                    # otherwise leave every case opened before the change
+                    # filed under the old area for ever.
+                    "section": section,
                 },
             )
         )
@@ -73,9 +86,10 @@ class TriageRepository:
         status: CaseStatus | None = CaseStatus.PENDING,
         kind: str | None = None,
         batch_id: int | None = None,
+        sections: frozenset[BusinessSection] | None = None,
     ) -> list[ExceptionCase]:
         """Return a page of cases, newest first."""
-        statement = self._filtered(select(ExceptionCase), status, kind, batch_id)
+        statement = self._filtered(select(ExceptionCase), status, kind, batch_id, sections)
         result = await self.session.execute(
             statement.order_by(ExceptionCase.id.desc()).offset(skip).limit(limit)
         )
@@ -87,26 +101,105 @@ class TriageRepository:
         status: CaseStatus | None = CaseStatus.PENDING,
         kind: str | None = None,
         batch_id: int | None = None,
+        sections: frozenset[BusinessSection] | None = None,
     ) -> int:
         """How many cases match the same filters as `list_cases`."""
         statement = self._filtered(
-            select(func.count()).select_from(ExceptionCase), status, kind, batch_id
+            select(func.count()).select_from(ExceptionCase), status, kind, batch_id, sections
         )
         result = await self.session.execute(statement)
         return int(result.scalar_one())
 
     @staticmethod
     def _filtered(
-        statement: Select[Any], status: CaseStatus | None, kind: str | None, batch_id: int | None
+        statement: Select[Any],
+        status: CaseStatus | None,
+        kind: str | None,
+        batch_id: int | None,
+        sections: frozenset[BusinessSection] | None = None,
     ) -> Select[Any]:
-        """Apply the filters the listing and its count share."""
+        """Apply the filters the listing and its count share.
+
+        `sections` is the one that is not a convenience: it is what keeps a case
+        of an area somebody does not reach off their screen (RF-12). An
+        **empty** set is honoured as "nothing" rather than ignored as "no
+        filter" — a role nobody decided the areas of reads an empty queue, never
+        everybody's.
+        """
         if status is not None:
             statement = statement.where(ExceptionCase.status == status)
         if kind is not None:
             statement = statement.where(ExceptionCase.kind == kind)
         if batch_id is not None:
             statement = statement.where(ExceptionCase.batch_id == batch_id)
+        if sections is not None:
+            statement = statement.where(ExceptionCase.section.in_(sections))
         return statement
+
+    async def oldest_pending_at(
+        self, *, sections: frozenset[BusinessSection] | None = None
+    ) -> datetime | None:
+        """When the case that has been waiting longest was opened (RF-16).
+
+        Narrowed by the same areas as the listing: the oldest thing somebody may
+        not see is not "their" oldest thing.
+        """
+        statement = self._filtered(
+            select(func.min(ExceptionCase.created_at)), CaseStatus.PENDING, None, None, sections
+        )
+        result = await self.session.execute(statement)
+        return result.scalar_one_or_none()
+
+    async def pending_by_fingerprint(self, fingerprint: str) -> ExceptionCase | None:
+        """The case still open under this fingerprint, if there is one."""
+        result = await self.session.execute(
+            select(ExceptionCase).where(
+                ExceptionCase.fingerprint == fingerprint,
+                ExceptionCase.status == CaseStatus.PENDING,
+            )
+        )
+        return result.scalars().first()
+
+    async def closed_elsewhere_by_fingerprint(
+        self, fingerprint: str, *, action: str
+    ) -> ExceptionCase | None:
+        """The case this fingerprint closed **by itself**, if there is one.
+
+        Deliberately narrower than `pending_by_fingerprint`: it only ever finds
+        a case whose decision was taken by the screen that owned the work, never
+        one a person resolved by hand. Reopening one of those would throw away
+        somebody's decision because a *different* record happened to share a
+        fingerprint, and their name is on it (RF-08).
+
+        `action` travels as an argument rather than being read from `service`,
+        which imports this file: the vocabulary of a decision belongs up there,
+        and a repository that reached for it would close the import in a circle.
+        """
+        result = await self.session.execute(
+            select(ExceptionCase).where(
+                ExceptionCase.fingerprint == fingerprint,
+                ExceptionCase.status == CaseStatus.RESOLVED,
+                ExceptionCase.resolved_by_user_id.is_(None),
+                ExceptionCase.decision["action"].astext == action,
+            )
+        )
+        return result.scalars().first()
+
+    # --- The parameters this module reads --------------------------------
+
+    async def setting(self, key: str) -> Any | None:
+        """The value of a parameter as this module last heard it, or None."""
+        row = await self.session.get(TriageSetting, key)
+        return None if row is None else row.value
+
+    async def put_setting(self, key: str, value: Any) -> None:
+        """Record the value of a parameter the owner changed."""
+        row = await self.session.get(TriageSetting, key)
+        if row is None:
+            self.session.add(TriageSetting(key=key, value=value))
+        else:
+            row.value = value
+        await self.session.flush()
 
     async def reopen_by_rule(self, rule_id: int) -> int:
         """Bring back the cases a revoked rule was resolving (RF-37).

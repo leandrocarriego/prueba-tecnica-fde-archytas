@@ -128,6 +128,10 @@ FIELDS = {
     "section": re.compile(r"\bsection:\s*'(?P<value>[^']+)'"),
     "writes": re.compile(r"\bwrites:\s*(?P<value>true|false)"),
 }
+# The fields an entry cannot be read without. `section` is deliberately not one
+# of them: see `registry()`.
+REQUIRED = ("id", "href", "writes")
+
 # How many entries were declared, whatever shape they were written in — the
 # count `registry()` has to match.
 DECLARED = re.compile(r"^\s+id:", re.MULTILINE)
@@ -140,8 +144,12 @@ LISTS_THEM_ITSELF = re.compile(r"\bMANUAL_ACTIONS\b")
 # `TestEachRoleIsOfferedItsOwnActions` green while the screen offered actions
 # the route refuses.
 THE_LEVEL_IT_DEMANDS = re.compile(
-    r"action\.writes\s*\?\s*canEdit\(\s*permissions\s*,\s*action\.section\s*\)"
-    r"\s*:\s*canSee\(\s*permissions\s*,\s*action\.section\s*\)"
+    r"action\.section\s*===\s*undefined"
+    r"\s*\?\s*true"
+    r"\s*:\s*action\.writes"
+    r"\s*\?\s*canEdit\(\s*permissions\s*,\s*action\.section\s*\)"
+    r"\s*:\s*canSee\(\s*permissions\s*,\s*action\.section\s*\)",
+    re.DOTALL,
 )
 
 
@@ -151,7 +159,11 @@ class RegisteredAction:
 
     id: str
     href: str
-    section: str
+    # `None` when the row declares no section, which since 011 means its route
+    # asks for a session and nothing more. It is not "unknown": an entry that
+    # could not be parsed is dropped instead, and `test_every_entry_was_read`
+    # fails on that. See `test_only_the_review_queue_has_no_section`.
+    section: str | None
     writes: bool
 
 
@@ -169,27 +181,38 @@ def declared_block() -> str:
 def registry() -> list[RegisteredAction]:
     """Every action declared in `actions.ts` that could be read whole.
 
-    An entry missing one of the four fields is left out rather than guessed at,
-    and `test_every_entry_was_read` is what turns that silence into a failure.
+    An entry missing one of the **required** fields is left out rather than
+    guessed at, and `test_every_entry_was_read` is what turns that silence into
+    a failure.
+
+    `section` stopped being one of them in 011. An action whose route asks only
+    for a session declares none, and reading that as "unparsable" would drop the
+    row out of every test in this file — the exact silence this function exists
+    to make impossible. So a missing section is read as `None` and judged as
+    `None`, and `test_only_the_review_queue_has_no_section` keeps that from
+    becoming the cheap way to skip the check.
     """
     actions = []
     for entry in ENTRY.finditer(declared_block()):
         found = {name: pattern.search(entry["body"]) for name, pattern in FIELDS.items()}
-        if any(field is None for field in found.values()):
+        if any(found[name] is None for name in REQUIRED):
             continue
+        section = found["section"]
         actions.append(
             RegisteredAction(
                 id=found["id"]["value"],
                 href=found["href"]["value"],
-                section=found["section"]["value"],
+                section=None if section is None else section["value"],
                 writes=found["writes"]["value"] == "true",
             )
         )
     return actions
 
 
-def section_of(action: RegisteredAction) -> Section:
+def section_of(action: RegisteredAction) -> Section | None:
     """The action's section as the business knows it, or say it is invented."""
+    if action.section is None:
+        return None
     try:
         return Section(action.section)
     except ValueError:
@@ -203,12 +226,20 @@ def offered_to(role: str) -> set[str]:
     reading one, over the map `permissions_for(role)` builds — which is
     `level_for` on every section. So this is the same question, asked of the
     matrix the backend actually enforces rather than of a copy of it.
+
+    An action with no section is offered to everybody, which is what its route
+    now does: 011 opened the review queue to any session and moved the refusal
+    into the service, where the area of the **case** can be read. Answering
+    `NONE` for it instead would hide it from the owner too.
     """
-    return {
-        action.id
-        for action in registry()
-        if level_for(role, section_of(action)) >= (Level.WRITE if action.writes else Level.READ)
-    }
+
+    def offered(action: RegisteredAction) -> bool:
+        section = section_of(action)
+        if section is None:
+            return True
+        return level_for(role, section) >= (Level.WRITE if action.writes else Level.READ)
+
+    return {action.id for action in registry() if offered(action)}
 
 
 @pytest.mark.unit
@@ -249,7 +280,31 @@ class TestTheRegistryNamesRealSections:
         # Assert
         assert len(ids) == len(set(ids)), f"repeated action ids in the registry: {ids}"
 
-    @pytest.mark.parametrize("action", registry(), ids=lambda action: action.id)
+    def test_only_the_review_queue_has_no_section(self) -> None:
+        """Declaring no section is one action's answer, not an escape hatch.
+
+        Since 011 a row may leave `section` out, and that says its route asks
+        for a session and nothing more — so it is offered to everybody and none
+        of the per-role tests below constrain it. Exactly one action is like
+        that today, and it is named here on purpose: the next row that simply
+        forgets the field would otherwise inherit the exemption in silence, and
+        the first sign of it would be an action offered to somebody the route
+        refuses.
+        """
+        # Arrange / Act
+        without = {action.id for action in registry() if action.section is None}
+
+        # Assert
+        assert without == {"resolve-triage-case"}, (
+            "only «resolve-triage-case» may declare no section, because its route asks "
+            f"only for a session. These do too, and should not: {without}"
+        )
+
+    @pytest.mark.parametrize(
+        "action",
+        [action for action in registry() if action.section is not None],
+        ids=lambda action: action.id,
+    )
     def test_its_section_exists(self, action: RegisteredAction) -> None:
         """Otherwise the permission map answers `undefined`, read as `NONE`."""
         # Arrange

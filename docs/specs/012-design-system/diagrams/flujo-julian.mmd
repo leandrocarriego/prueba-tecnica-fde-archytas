@@ -1,0 +1,17 @@
+---
+title: Julián, ventas — el menú le ofrece sólo lo que puede abrir
+---
+flowchart TD
+    A["Entra con su acceso"] --> B["Mira el menú principal"]
+    B --> C["Encuentra Ventas como una entrada más, y la abre desde ahí"]
+    B --> D["No lista Facturas, Órdenes de compra ni Accesos"]
+    D --> E["No choca con una negativa después de hacer clic"]
+    B --> F{"¿Quedó algún grupo sin ninguna sección visible?"}
+    F -->|Sí| G["Tampoco aparece el título de ese grupo"]
+    F -->|No| H["El grupo se muestra con las secciones que sí puede abrir"]
+
+    C --> I["Revisa ventas y catálogo"]
+    I --> J["Ve las mismas pastillas de estado que los demás,<br/>con las mismas formas y los mismos colores"]
+    I --> K["Los importes y las fechas, en ancho fijo y alineados en columna"]
+
+    L["Los permisos no cambian con esta feature:<br/>cambia que lo que no puede abrir ya no se le ofrece"]

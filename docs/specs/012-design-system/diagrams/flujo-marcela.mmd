@@ -1,0 +1,26 @@
+---
+title: Marcela, compras — la plata en columna y los estados siempre iguales
+---
+flowchart TD
+    A["Entra con su acceso"] --> B["El menú le ofrece sólo las secciones que puede abrir"]
+
+    B --> C["Trabaja sobre facturas, pagos y órdenes"]
+    C --> D["Los importes, las fechas y los códigos se ven en tipografía de ancho fijo"]
+    D --> E["Las cifras quedan alineadas en columna aunque tengan distinta cantidad de dígitos"]
+
+    C --> F["Busca una factura vencida en el listado, en el calendario<br/>y en la ficha del proveedor"]
+    F --> G["La señal es la misma pastilla roja en los tres lugares"]
+
+    C --> H["Un dato leído del origen y todavía sin confirmar<br/>se distingue del que ya confirmó una persona"]
+
+    B --> I["Abre Revisar esto"]
+    I --> J["Es una lista de casos para decidir: ningún botón naranja"]
+    J --> K["Cada caso ofrece su acción en tinta o contorno"]
+
+    B --> L{"¿Qué botón resuelve esta pantalla?"}
+    L -->|El de la tarea principal| M["Es el único naranja"]
+    L -->|El resto| N["Contorno, gris o enlace, nunca naranja"]
+
+    B --> O["Una pantalla cargando, una con error y una sin resultados<br/>se ven con la misma forma que en cualquier otra sección"]
+
+    P["Nada de lo que calcula el sistema cambia acá:<br/>cambia cómo se muestra lo que ya estaba decidido"]

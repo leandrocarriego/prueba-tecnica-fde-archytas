@@ -4,11 +4,22 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { addDueDate, editDueDate, moveDueDate, removeDueDate } from '@/app/actions/purchases'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 import { useLiveCalendar } from '@/components/purchases/useLiveCalendar'
 import { day, money } from '@/lib/format'
-import { PER_DAY, dayNumber, isInWindow, weeksOf } from '@/lib/purchases/calendar'
+import {
+  MOVING_INTO_THE_PAST,
+  PER_DAY,
+  dayNumber,
+  isInWindow,
+  refusalCode,
+  weeksOf,
+} from '@/lib/purchases/calendar'
+import { paymentStateLabel } from '@/lib/purchases/labels'
 import { cn } from '@/lib/utils'
 import type { Calendar, DueDate } from '@/lib/purchases/types'
 
@@ -48,6 +59,46 @@ const VERBOS: Record<string, string> = {
 /** Los encabezados de la grilla, que empieza el lunes como la semana laboral. */
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
+/** El tono de la píldora de cada estado de pago (`UI-03`). */
+const TONO_DE_PAGO = {
+  SALDADA: 'ok',
+  PARCIAL: 'warn',
+  SIN_PAGOS: 'neutral',
+  INCONSISTENTE: 'danger',
+} as const
+
+/**
+ * En qué estado está un vencimiento, dicho con píldoras (`UI-03`).
+ *
+ * Antes esto era una frase corrida de fragmentos pegados con « · », donde el
+ * estado de pago salía crudo del enum —«sin_pagos», con guión bajo— y lo que
+ * requiere una decisión pesaba lo mismo que lo que no. Son estados de un dato,
+ * así que van en la píldora.
+ *
+ * **El color se gana.** `venció sin recibo` tapa a `recibo emitido` porque son
+ * excluyentes y el primero es el que pide algo, y `ya pasó` sólo aparece cuando
+ * no hay ya una píldora roja diciendo lo mismo más fuerte.
+ */
+function estadosDe(entry: DueDate): ReadonlyArray<{ label: string; tone: BadgeTone }> {
+  const pills: Array<{ label: string; tone: BadgeTone }> = []
+  if (entry.is_overdue_without_receipt) {
+    pills.push({ label: 'Venció sin recibo', tone: 'danger' })
+  } else if (entry.receipt_issued) {
+    pills.push({ label: 'Recibo emitido', tone: 'ok' })
+  } else if (entry.is_past) {
+    pills.push({ label: 'Ya pasó', tone: 'warn' })
+  }
+  if (entry.payment_state) {
+    pills.push({
+      label: paymentStateLabel(entry.payment_state),
+      tone: TONO_DE_PAGO[entry.payment_state as keyof typeof TONO_DE_PAGO] ?? 'neutral',
+    })
+  }
+  return pills
+}
+
+type BadgeTone = 'ok' | 'info' | 'warn' | 'danger' | 'neutral'
+
 /**
  * Lo que la pantalla necesita para operar sobre una tarjeta.
  *
@@ -63,8 +114,16 @@ interface Acciones {
   setMoving: (id: number | null) => void
   setEditing: (id: number | null) => void
   setDragging: (id: number | null) => void
+  setOver: (date: string | null) => void
   run: (action: () => Promise<{ ok: boolean; message?: string }>) => Promise<boolean>
   move: (entry: DueDate, next: string, reason: string | null) => Promise<void>
+}
+
+/** Una movida planteada y todavía sin contestar (RF-25). */
+interface Movida {
+  entry: DueDate
+  next: string
+  reason: string | null
 }
 
 /** Lo que se dibuja de un día, con su recorte y su «y N más» (RF-08). */
@@ -99,12 +158,17 @@ function DayEntries({
 
 /** Una tarjeta entera, con todo lo que la spec pide leer de un vencimiento. */
 function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }) {
-  const { canEdit, busy, moving, editing, setMoving, setEditing, setDragging, run, move } = acciones
+  const { canEdit, busy, moving, editing, setMoving, setEditing, setDragging, setOver, run, move } =
+    acciones
+  const estados = estadosDe(entry)
   return (
     <li
-      draggable={canEdit}
+      draggable={canEdit && !busy}
       onDragStart={() => setDragging(entry.id)}
-      onDragEnd={() => setDragging(null)}
+      onDragEnd={() => {
+        setDragging(null)
+        setOver(null)
+      }}
       className={cn(
         'rounded border p-3 text-sm',
         canEdit && 'cursor-grab',
@@ -113,27 +177,47 @@ function DueDateCard({ entry, acciones }: { entry: DueDate; acciones: Acciones }
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-medium">{entry.description}</span>
-        <span>{money(entry.amount)}</span>
+        {/* `UI-04`: la plata en mono tabular, que es lo que deja leer una columna. */}
+        <span className="amount">{money(entry.amount)}</span>
       </div>
-      <p className="text-xs text-muted-foreground">
+      {estados.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {estados.map(estado => (
+            <Badge key={estado.label} tone={estado.tone}>
+              {estado.label}
+            </Badge>
+          ))}
+        </div>
+      )}
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        {/* De dónde salió y quién lo cargó: procedencia, no estado. */}
         {/* RF-02: el proveedor, cuando el vencimiento tiene uno. */}
         {entry.supplier_name && `${entry.supplier_name} · `}
         {entry.origin === 'INVOICE' ? 'De una factura' : 'Cargado a mano'}
-        {entry.is_past && ' · ya pasó'}
-        {entry.was_rescheduled && ` · reprogramado, original ${day(entry.original_date)}`}
-        {entry.receipt_issued && ' · recibo emitido'}
-        {entry.is_overdue_without_receipt && ' · venció sin recibo'}
-        {entry.payment_state && ` · ${entry.payment_state.toLowerCase()}`}
-        {entry.created_by_name &&
-          ` · lo cargó ${entry.created_by_name}${
-            entry.created_at ? ` el ${day(entry.created_at)}` : ''
-          }`}
+        {entry.was_rescheduled && (
+          <>
+            {' · reprogramado, original '}
+            <span className="amount">{day(entry.original_date)}</span>
+          </>
+        )}
+        {entry.created_by_name && (
+          <>
+            {` · lo cargó ${entry.created_by_name}`}
+            {entry.created_at && (
+              <>
+                {' el '}
+                <span className="amount">{day(entry.created_at)}</span>
+              </>
+            )}
+          </>
+        )}
       </p>
       {(entry.changes ?? []).length > 0 && (
         <ul className="mt-1 text-xs text-muted-foreground">
           {(entry.changes ?? []).map(change => (
             <li key={change.id}>
-              {day(change.previous_date)} → {day(change.new_date)}
+              <span className="amount">{day(change.previous_date)}</span> →{' '}
+              <span className="amount">{day(change.new_date)}</span>
               {change.actor_name ? ` · lo movió ${change.actor_name}` : ''}
               {change.reason ? ` · ${change.reason}` : ''}
             </li>
@@ -260,6 +344,17 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
   const [moving, setMoving] = useState<number | null>(null)
   const [editing, setEditing] = useState<number | null>(null)
   const [dragging, setDragging] = useState<number | null>(null)
+  // El día sobre el que está la tarjeta ahora mismo. Antes se pintaban los
+  // treinta a la vez, que dice «se puede soltar» pero no dice dónde.
+  const [over, setOver] = useState<string | null>(null)
+  /*
+   * La movida que espera una respuesta (RF-25). Es estado y no una llamada que
+   * devuelve `true`, porque preguntar dejó de ser sincrónico: el `window.confirm`
+   * que había acá congelaba el hilo, no se podía leer entero, y algunos
+   * navegadores lo saltean devolviendo `false` — o sea, contestando «no» en
+   * nombre de una persona a la que nunca se le preguntó.
+   */
+  const [preguntando, setPreguntando] = useState<Movida | null>(null)
   // Los días que la persona pidió ver enteros (RF-08).
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -272,7 +367,17 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
   // El día abierto en la grilla. Arranca en el primero que tenga algo, para que
   // la pantalla llegue con detalle en vez de con una invitación a hacer clic.
   const [selected, setSelected] = useState<string | null>(conAlgo[0] ?? null)
-  const abierto = selected !== null && byDay.has(selected) ? selected : (conAlgo[0] ?? null)
+  /*
+   * Un día **vacío también se abre**: en un calendario «acá no vence nada» es
+   * información, y es la mitad de por qué RF-01 pide una grilla y no una lista.
+   * Antes sólo se podían elegir los días con algo, así que la grilla dejaba
+   * treinta botones que no hacían nada en el orden de tabulación. Si el mes
+   * cambia y el día elegido se fue de la ventana, se vuelve al primero con algo.
+   */
+  const abierto =
+    selected !== null && isInWindow(selected, calendar.since, calendar.until)
+      ? selected
+      : (conAlgo[0] ?? null)
 
   async function run(action: () => Promise<{ ok: boolean; message?: string }>) {
     setBusy(true)
@@ -294,26 +399,40 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
    * es la misma decisión, y cómo la dijo la persona es asunto del navegador.
    */
   async function move(entry: DueDate, next: string, reason: string | null) {
+    // El primer intento también pasa por el guard: sin esto el botón «Mover»
+    // seguía habilitado y la tarjeta arrastrable durante todo el viaje, y
+    // soltarla dos veces rápido mandaba dos `PUT`.
+    if (busy) return
+    setBusy(true)
+    setError(null)
     const first = await moveDueDate(entry.id, next, reason)
+    setBusy(false)
     if (first.ok) {
       setMoving(null)
       router.refresh()
       return
     }
-    if (first.message.includes('ya pasó')) {
+    if (refusalCode(first) === MOVING_INTO_THE_PAST) {
       // RF-25: se pregunta antes, y la respuesta vuelve como confirmación.
-      if (window.confirm('La fecha nueva ya pasó. ¿Lo movés igual?')) {
-        if (await run(() => moveDueDate(entry.id, next, reason, true))) setMoving(null)
-      }
+      setPreguntando({ entry, next, reason })
       return
     }
     setError(first.message)
+  }
+
+  /** Que sí: se repite la movida, ahora con la confirmación puesta (RF-25). */
+  async function confirmarLaMovida() {
+    if (preguntando === null) return
+    const { entry, next, reason } = preguntando
+    setPreguntando(null)
+    if (await run(() => moveDueDate(entry.id, next, reason, true))) setMoving(null)
   }
 
   /** Soltar una tarjeta sobre un día es moverla a ese día (RF-19). */
   async function drop(date: string) {
     const entry = calendar.items.find(item => item.id === dragging)
     setDragging(null)
+    setOver(null)
     if (entry === undefined || entry.on_date === date) return
     await move(entry, date, null)
   }
@@ -336,6 +455,7 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
     setMoving,
     setEditing,
     setDragging,
+    setOver,
     run,
     move,
   }
@@ -350,27 +470,60 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
   return (
     <div className="space-y-6">
       {/*
+        RF-25: mover algo a una fecha que ya pasó se pregunta antes, y la
+        respuesta vuelve al backend como confirmación. Cerrar por `Escape` o por
+        el fondo es decir que no: la única forma de seguir es el botón.
+      */}
+      <ConfirmDialog
+        open={preguntando !== null}
+        tone="warn"
+        title="La fecha nueva ya pasó"
+        confirmLabel="Moverlo igual"
+        busy={busy}
+        onConfirm={() => void confirmarLaMovida()}
+        onCancel={() => setPreguntando(null)}
+      >
+        {preguntando !== null && (
+          <>
+            Estás por mover «{preguntando.entry.description}» al{' '}
+            <span className="amount">{day(preguntando.next)}</span>, que ya pasó. Queda registrado
+            quién lo movió y desde qué fecha.
+          </>
+        )}
+      </ConfirmDialog>
+
+      {/*
         El estado del canal, dicho en una línea. Que se corte no es un error de
         la persona ni algo que pueda arreglar: lo que necesita saber es que lo
         que está mirando puede haber quedado viejo, porque sobre esta pantalla
         se toman decisiones entre dos.
       */}
       {live === 'caido' && (
-        <p className="rounded border border-warn-border bg-warn-surface p-3 text-sm text-warn">
-          Se cortó la conexión en vivo: lo que ves puede estar desactualizado. Se está reintentando
-          solo.
-        </p>
+        <Notice tone="warn" title="Se cortó la conexión en vivo">
+          Lo que ves puede estar desactualizado. Se está reintentando solo.
+        </Notice>
       )}
 
       {live === 'en-vivo' && cambio !== null && (
-        <p className="rounded border border-info-border bg-info-surface p-3 text-sm text-info">
-          {cambio}. La pantalla ya se actualizó.
-        </p>
+        <Notice tone="info" title={cambio}>
+          La pantalla ya se actualizó.
+        </Notice>
       )}
 
       {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
+        <Notice tone="danger" title="No se pudo guardar">
           {error}
+        </Notice>
+      )}
+
+      {/*
+        `TS-08`: mientras la escritura viaja, la pantalla lo dice. Antes sólo
+        deshabilitaba botones, y una pantalla que se congela sin explicar por
+        qué se lee como una pantalla rota.
+      */}
+      {busy && (
+        <p role="status" className="text-sm text-muted-foreground">
+          Guardando…
         </p>
       )}
 
@@ -400,26 +553,40 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
                   type="button"
                   // Un día fuera de la ventana es relleno para que la semana se
                   // lea entera: no recibe una tarjeta que nadie vería caer.
-                  onDragOver={event => dentro && event.preventDefault()}
+                  onDragOver={event => {
+                    if (!dentro) return
+                    event.preventDefault()
+                    setOver(date)
+                  }}
+                  onDragLeave={() => setOver(current => (current === date ? null : current))}
                   onDrop={() => dentro && void drop(date)}
-                  onClick={() => entries.length > 0 && setSelected(date)}
+                  onClick={() => dentro && setSelected(date)}
                   aria-current={date === abierto ? 'date' : undefined}
+                  aria-label={`${day(date)}, ${
+                    entries.length === 0
+                      ? 'no vence nada'
+                      : `${entries.length} ${entries.length === 1 ? 'vencimiento' : 'vencimientos'}`
+                  }`}
                   className={cn(
                     'min-h-24 space-y-1 p-1.5 text-left align-top transition-colors',
                     dentro ? 'bg-card' : 'bg-muted text-muted-foreground',
-                    dentro && dragging !== null && 'bg-info-surface',
+                    // Sólo el día bajo la tarjeta, no los treinta a la vez.
+                    dentro && over === date && 'bg-info-surface',
                     date === abierto && 'ring-2 ring-ring ring-inset'
                   )}
                 >
-                  <span className="block text-xs font-medium text-muted-foreground">
+                  <span className="amount block text-xs font-medium text-muted-foreground">
                     {dayNumber(date)}
                   </span>
                   {entries.slice(0, PER_DAY).map(entry => (
                     <span
                       key={entry.id}
-                      draggable={canEdit}
+                      draggable={canEdit && !busy}
                       onDragStart={() => setDragging(entry.id)}
-                      onDragEnd={() => setDragging(null)}
+                      onDragEnd={() => {
+                        setDragging(null)
+                        setOver(null)
+                      }}
                       className={cn(
                         'block truncate rounded border px-1 py-0.5 text-[11px]',
                         canEdit && 'cursor-grab',
@@ -446,14 +613,20 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
         {/* El día elegido, entero: la celda muestra qué hay, acá se opera. */}
         {abierto !== null && (
           <section className="mt-4 space-y-2">
-            <h3 className="text-sm font-medium text-muted-foreground">{day(abierto)}</h3>
-            <DayEntries
-              date={abierto}
-              entries={byDay.get(abierto) ?? []}
-              expanded={expanded.has(abierto)}
-              onToggle={toggleExpanded}
-              acciones={acciones}
-            />
+            <h3 className="amount text-sm font-medium text-muted-foreground">{day(abierto)}</h3>
+            {(byDay.get(abierto) ?? []).length === 0 ? (
+              <p className="rounded border border-dashed p-6 text-center text-muted-foreground">
+                No vence nada este día.
+              </p>
+            ) : (
+              <DayEntries
+                date={abierto}
+                entries={byDay.get(abierto) ?? []}
+                expanded={expanded.has(abierto)}
+                onToggle={toggleExpanded}
+                acciones={acciones}
+              />
+            )}
           </section>
         )}
       </div>
@@ -473,11 +646,15 @@ export function CalendarGrid({ calendar, canEdit }: { calendar: Calendar; canEdi
             <li
               key={date}
               className="space-y-2 rounded p-1 transition-colors data-[over=true]:bg-info-surface"
-              data-over={dragging !== null}
-              onDragOver={event => event.preventDefault()}
+              data-over={over === date}
+              onDragOver={event => {
+                event.preventDefault()
+                setOver(date)
+              }}
+              onDragLeave={() => setOver(current => (current === date ? null : current))}
               onDrop={() => void drop(date)}
             >
-              <h3 className="text-sm font-medium text-muted-foreground">{day(date)}</h3>
+              <h3 className="amount text-sm font-medium text-muted-foreground">{day(date)}</h3>
               <DayEntries
                 date={date}
                 entries={byDay.get(date) ?? []}

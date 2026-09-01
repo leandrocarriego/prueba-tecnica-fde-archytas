@@ -27,8 +27,15 @@ from app.modules.triage.models import CaseStatus, ExceptionCase
 from app.modules.triage.service import TriageService
 from app.shared.errors import ConflictError
 from app.shared.events import NormalizedPriceRow
+from app.shared.sections import BusinessSection
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
+
+
+# Lo que el dueño alcanza, que es todo. Se escribe y no se da por sentado porque
+# `resolve` no acepta un default: qué áreas puede tocar alguien es cosa de quien
+# llama, y un default sería la cola creyéndole a cualquiera (RF-13 de 011).
+EVERY_AREA = frozenset(BusinessSection)
 
 
 def row(
@@ -179,7 +186,7 @@ class TestAFormNobodyDecidedAbout:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"category_id": target.id}, user_id=owner.id
+            case.id, decision={"category_id": target.id}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert
@@ -202,7 +209,7 @@ class TestAFormNobodyDecidedAbout:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"category_id": target.id}, user_id=owner.id
+            case.id, decision={"category_id": target.id}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert — the one that was waiting is classified retroactively, and
@@ -222,7 +229,7 @@ class TestCorrectingAnEquivalence:
         case = (await pending_categories(session))[0]
         first = await named(session, "Ferretería General")
         await TriageService(session).resolve(
-            case.id, decision={"category_id": first.id}, user_id=owner.id
+            case.id, decision={"category_id": first.id}, user_id=owner.id, visible=EVERY_AREA
         )
         rule = (await TriageService(session).list_rules(kind=UNKNOWN_CATEGORY))[0]
         return rule.id, first
@@ -313,7 +320,7 @@ class TestRevokingAnEquivalence:
         case = (await pending_categories(session))[0]
         target = await named(session, "Ferretería General")
         await TriageService(session).resolve(
-            case.id, decision={"category_id": target.id}, user_id=owner.id
+            case.id, decision={"category_id": target.id}, user_id=owner.id, visible=EVERY_AREA
         )
         rule = (await TriageService(session).list_rules(kind=UNKNOWN_CATEGORY))[0]
 
@@ -340,6 +347,7 @@ class TestRevokingAnEquivalence:
             case.id,
             decision={"category_id": (await named(session, "Ferretería General")).id},
             user_id=owner.id,
+            visible=EVERY_AREA,
         )
         rule = (await TriageService(session).list_rules(kind=UNKNOWN_CATEGORY))[0]
 

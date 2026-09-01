@@ -19,7 +19,7 @@
  * desde `md`, la lista de días en un teléfono (RF-41). `jsdom` no aplica CSS,
  * así que cada aserción dice explícitamente en cuál de las dos mira.
  */
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -40,7 +40,7 @@ vi.mock('@/components/purchases/useLiveCalendar', () => ({
 const DAY = '2026-03-10'
 
 /** Una tarjeta del calendario, con lo mínimo que la pantalla lee de ella. */
-function entry(id: number, on_date = DAY): DueDate {
+function entry(id: number, on_date = DAY, overrides: Partial<DueDate> = {}): DueDate {
   return {
     id,
     on_date,
@@ -59,6 +59,7 @@ function entry(id: number, on_date = DAY): DueDate {
     created_by_name: null,
     created_at: null,
     changes: [],
+    ...overrides,
   } as unknown as DueDate
 }
 
@@ -123,9 +124,27 @@ describe('el recorte por día', () => {
   it('la celda del día también recorta, y dice cuántos quedan', () => {
     render(<CalendarGrid calendar={calendarWith(8)} canEdit />)
 
-    const celda = grilla().getByRole('button', { name: /Vencimiento 1/ })
+    // La celda se busca por su nombre accesible —la fecha y cuántos vencen—,
+    // que es lo que un lector de pantalla anuncia. Antes se la buscaba por el
+    // texto de las tarjetas de adentro, que nombraba la celda con las cuatro
+    // descripciones pegadas: lo que se recorta no puede ser también la etiqueta
+    // de lo que recorta.
+    const celda = grilla().getByRole('button', { name: '10/03/2026, 8 vencimientos' })
     expect(within(celda).getAllByText(/^Vencimiento \d+$/)).toHaveLength(4)
     expect(within(celda).getByText('y 4 más')).toBeInTheDocument()
+  })
+
+  it('un día vacío dice que no vence nada, y se puede abrir igual', async () => {
+    const user = userEvent.setup()
+    render(<CalendarGrid calendar={calendarWith(8)} canEdit />)
+
+    // RF-01: en un calendario, «acá no vence nada» también es información, y es
+    // lo que una lista de los días con algo no puede mostrar.
+    const vacio = grilla().getByRole('button', { name: '06/03/2026, no vence nada' })
+    await user.click(vacio)
+
+    expect(screen.getByText('No vence nada este día.')).toBeInTheDocument()
+    expect(vacio).toHaveAttribute('aria-current', 'date')
   })
 })
 
@@ -145,5 +164,51 @@ describe('la grilla del mes', () => {
     // La tarjeta entera aparece dos veces —una por vista— y las dos ofrecen
     // mover: es la misma tarjeta dibujada en los dos lugares.
     expect(screen.getAllByRole('button', { name: 'Mover' })).toHaveLength(2)
+  })
+})
+
+describe('los estados de una tarjeta (`UI-03`)', () => {
+  /** Una ventana con un solo vencimiento, en el estado que se pida. */
+  function conEstado(overrides: Partial<DueDate>): Calendar {
+    return {
+      since: '2026-03-01',
+      until: '2026-03-31',
+      items: [entry(1, DAY, overrides)],
+    } as unknown as Calendar
+  }
+
+  it('van en la píldora, y el estado de pago con su nombre y no con el enum', () => {
+    render(<CalendarGrid calendar={conEstado({ payment_state: 'SIN_PAGOS' })} canEdit />)
+
+    // Antes esto salía como «· sin_pagos», con guión bajo: el enum del backend
+    // llegando crudo a la pantalla.
+    expect(lista().getAllByText('Sin pagos')[0]).toBeInTheDocument()
+    expect(lista().queryByText(/sin_pagos/i)).not.toBeInTheDocument()
+  })
+
+  it('lo que venció sin recibo tapa al recibo emitido: el color se gana', () => {
+    render(
+      <CalendarGrid
+        calendar={conEstado({ is_overdue_without_receipt: true, receipt_issued: true })}
+        canEdit
+      />
+    )
+
+    expect(lista().getAllByText('Venció sin recibo')[0]).toBeInTheDocument()
+    expect(lista().queryByText('Recibo emitido')).not.toBeInTheDocument()
+  })
+
+  it('«ya pasó» no se repite cuando ya hay una píldora roja diciendo más', () => {
+    render(<CalendarGrid calendar={conEstado({ is_past: true })} canEdit />)
+    expect(lista().getAllByText('Ya pasó')[0]).toBeInTheDocument()
+
+    cleanup()
+    render(
+      <CalendarGrid
+        calendar={conEstado({ is_past: true, is_overdue_without_receipt: true })}
+        canEdit
+      />
+    )
+    expect(lista().queryByText('Ya pasó')).not.toBeInTheDocument()
   })
 })

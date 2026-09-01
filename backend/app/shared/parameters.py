@@ -362,6 +362,19 @@ PARAMETERS: tuple[ParameterSpec, ...] = (
         unit="%",
         consumed_by="sales",
     ),
+    ParameterSpec(
+        key="triage.stale_days",
+        label="Días a partir de los cuales un pendiente de revisión se considera demorado",
+        effect="Cambia a partir de cuántos días esperando un pendiente de la pantalla "
+        "«Revisar esto» queda señalado como demorado. No cierra nada ni avisa a nadie: "
+        "sólo lo marca, para que se note si la lista se está abandonando.",
+        kind=ParameterKind.INTEGER,
+        initial=7,
+        minimum=1,
+        maximum=365,
+        unit="días",
+        consumed_by="triage",
+    ),
 )
 
 BY_KEY: dict[str, ParameterSpec] = {spec.key: spec for spec in PARAMETERS}

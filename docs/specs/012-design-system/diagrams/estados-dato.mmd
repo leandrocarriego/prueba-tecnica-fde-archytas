@@ -1,0 +1,32 @@
+---
+title: Un dato — cómo se lo confirma y cómo se lo dibuja
+---
+stateDiagram-v2
+    state "Leído del origen, sin confirmar" as SinConfirmar
+    state "Confirmado por una persona" as Confirmado
+
+    [*] --> SinConfirmar: el sistema lo lee del origen
+    SinConfirmar --> Confirmado: una persona lo confirma
+
+    note right of SinConfirmar
+        Se distingue a simple vista
+        del dato ya confirmado
+    end note
+
+    state "En cualquiera de los dos casos, la pastilla dice el estado" as Senal {
+        state "Conforme" as S1
+        state "Informativo" as S2
+        state "Requiere decisión" as S3
+        state "Vencido o con error" as S4
+        state "Sin novedad" as S5
+    }
+
+    SinConfirmar --> Senal
+    Confirmado --> Senal
+
+    note right of Senal
+        Cinco significados y nada más.
+        El naranja no aparece acá: señala
+        la acción que resuelve la pantalla,
+        no un estado
+    end note

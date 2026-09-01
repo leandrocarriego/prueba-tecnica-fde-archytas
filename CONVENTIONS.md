@@ -23,13 +23,14 @@ Cada convención tiene tres cosas:
 
 ## Convenciones verificadas por un test que rompe el build
 
-Esta es la distinción más importante del documento. Estas cinco convenciones **no dependen de que
+Esta es la distinción más importante del documento. Estas siete convenciones **no dependen de que
 alguien las lea**: hay un test que falla, y la suite no pasa.
 
 **Dónde se verifican.** El hook `pytest-fast` del pre-commit corre `tests/unit` y
 `tests/architecture`, así que `GEN-02`, `GEN-03`, `GEN-09` y `PY-09` frenan el commit antes de que
 salga de la máquina. `TEST-05` mide la suite completa y por eso se verifica en CI
-(`.github/workflows/ci.yml`), junto con integración, e2e y `alembic check`.
+(`.github/workflows/ci.yml`), junto con integración, e2e y `alembic check`. `UI-01` y `UI-02` son
+del frontend: las corre `npm test` (vitest), también en CI.
 
 | Convención | Verificada por | Qué pasa si se viola |
 |---|---|---|
@@ -38,12 +39,19 @@ salga de la máquina. `TEST-05` mide la suite completa y por eso se verifica en 
 | `GEN-09` | `backend/tests/unit/shared/test_events.py::TestPublishing::test_a_failing_handler_aborts_the_publisher` | La suite falla si el bus deja de propagar la excepción de un handler. |
 | `PY-09` | `backend/tests/architecture/test_route_authorization.py` (`TestRoutesDeclareAuthorization` + `TestRoutesEnforceAuthorization`) | La suite falla por cada endpoint que responde sin decidir quién lo llama. |
 | `TEST-05` | `--cov-fail-under=80` en `backend/pyproject.toml` | `pytest` termina en rojo aunque todos los tests pasen. |
+| `UI-01` | `frontend/tests/design-system.test.ts` | La suite falla y lista archivo, línea y el color escrito a mano. |
+| `UI-02` | `frontend/tests/design-system.test.ts` | Ídem, con la clase de la paleta de Tailwind que se coló. |
 
-Dos detalles que importan al revisarlas:
+Tres detalles que importan al revisarlas:
 
 - `test_module_boundaries.py` es un chequeo **estático** (lee los imports con `ast`), así que
   detecta violaciones en código que todavía no ejercita ningún test. Además se testea a sí mismo
   (`test_the_check_catches_a_real_violation`).
+
+- `design-system.test.ts` es un chequeo **estático de texto**: lee las fuentes de `app/`,
+  `components/` y `lib/` y no necesita renderizar nada, así que alcanza a una pantalla que ningún
+  test ejercita. Sus dos excepciones están fijadas por nombre de archivo, como las de las fronteras
+  entre módulos: ampliarlas exige editar el test a propósito.
 
 - `test_route_authorization.py` verifica dos cosas distintas: que el árbol de dependencias de la
   ruta **declare** autenticación, y que un request anónimo real **reciba 401**. Una ruta pública
@@ -67,6 +75,7 @@ cd frontend
 npx tsc --noEmit        # TS-01  (equivale a `npm run type-check`)
 npm run lint            # TS-02, TS-06
 npm run format:check    # TS-06
+npm test                # UI-01, UI-02 (y el resto de la suite de pantalla)
 
 # Todo junto, desde la raíz
 make lint && make test
@@ -271,6 +280,71 @@ datos y utilidades en `frontend/lib/`, Server Actions en `frontend/app/actions/`
 
 **`TS-09` · Minor — Los textos visibles por el usuario están en español.**
 
+
+---
+
+## Diseño de interfaz (`UI-*`)
+
+El sistema de diseño del producto es **"taller ordenado"**, y su fuente es doble y no ambigua: la
+guía visual en `docs/design/` dice **qué significa cada cosa**, y `frontend/app/globals.css` la
+implementa en tokens. Una pantalla no elige su aspecto; lo hereda.
+
+La regla que ordena todas las demás: **el color se gana, no se reparte.** Un color aparece cuando
+comunica el estado de un dato o una decisión pendiente. Un color que decora le quita fuerza al que
+avisa, y avisar es la promesa central del producto (`CONSTITUTION.md`, Artículo II).
+
+**`UI-01` · Blocker — Ningún color literal en el código de la UI.**
+Nada de `#c24b15`, `rgb(...)`, `hsl(...)` ni `oklch(...)` dentro de `app/`, `components/` o `lib/`.
+Los colores salen de los tokens de `app/globals.css`. Si falta un color, **se agrega el token**; no
+se escribe el color en el componente. Las dos únicas excepciones —`app/globals.css`, que es donde
+los tokens viven, y `lib/branding.ts`, que los necesita como string— están fijadas **por nombre de
+archivo** en el test.
+
+**`UI-02` · Blocker — No se usa la paleta por defecto de Tailwind.**
+`bg-red-500`, `text-slate-600`, `border-amber-300` y sus parientes no son del producto: son de
+Tailwind. El estado de un dato se dice con `bg-ok-surface`, `text-danger`, `border-warn-border`,
+`pill-info`.
+
+> `UI-01` y `UI-02` **las verifica un test que rompe el build**:
+> `frontend/tests/design-system.test.ts`. No se revisan a ojo; si la suite pasó, están verificadas.
+```bash
+cd frontend && npx vitest run tests/design-system.test.ts
+```
+
+**`UI-03` · Major — El estado de un dato se dibuja con la píldora, no con un `span` propio.**
+`<Badge tone="ok|info|warn|danger|draft">` (`components/ui/badge.tsx`) o las clases `.pill*` cuando
+el markup no pasa por React. Cinco significados y ni uno más: conforme, informativo, requiere
+decisión, vencido o con error, y sin novedad.
+
+**`UI-04` · Major — Importes, fechas y códigos van en mono tabular.**
+`font-mono` o la clase `.amount`. Es lo que hace que una columna de plata se lea de un golpe, y es
+la mitad del valor de una tabla de facturas.
+
+**`UI-05` · Major — Una sola acción llena de acento por pantalla.**
+`<Button variant="brand">` es el naranja y significa "acá tenés que decidir vos": va una vez por
+pantalla, en la acción que resuelve la tarea principal. Todo lo demás es `default` (tinta),
+`outline`, `ghost` o `link`.
+
+**`UI-06` · Major — El color de enlace no ejecuta acciones.**
+`variant="link"` y `text-link` son para navegar o consultar. Una acción que guarda, corrige o borra
+no se disfraza de enlace.
+
+**`UI-07` · Major — Los avisos usan `<Notice>`, y van antes del dato que califican.**
+Un total que dejó registros afuera lleva su aviso **arriba**, no al pie, y el aviso lleva la acción
+que lo resuelve. Un aviso sin salida es una queja.
+
+**`UI-08` · Minor — Radios y espaciados de la escala.**
+Escala de 4 px. Radios: `rounded-md` (8 px) para controles, `rounded-lg` (12 px) para tarjetas,
+`.pill` (20 px) para píldoras. Sombra sólo en lo que flota (popover, diálogo).
+
+**`UI-09` · Minor — Un token nuevo se agrega en `globals.css`, y con nombre semántico.**
+El token se llama por lo que significa (`--warn-surface`), no por el color que tiene
+(`--orange-100`): un nombre semántico sobrevive a un cambio de paleta.
+
+**`UI-10` · Major — Un solo tema, y es el claro.**
+No se agregan variantes `dark:` ni se lee la preferencia del sistema operativo. El porqué está
+escrito en la cabecera de `app/globals.css`.
+
 ---
 
 ## Manejo de errores (`ERR-*`)
@@ -452,7 +526,7 @@ pre-commit run --all-files
 ## Índice de Blockers
 
 El `Code-Reviewer` marca estos hallazgos como **Blocker**, sin excepción. Es la **lista completa**:
-las 32 convenciones marcadas `Blocker` en este documento entran acá, sin un segundo grupo aparte. Si
+las 34 convenciones marcadas `Blocker` en este documento entran acá, sin un segundo grupo aparte. Si
 una convención está marcada Blocker y no aparece en esta tabla, la tabla está incompleta.
 
 | # | Hallazgo | Convención |
@@ -474,6 +548,7 @@ una convención está marcada Blocker y no aparece en esta tabla, la tabla está
 | 15 | Secretos commiteados | `SEC-01` |
 | 16 | Parsers testeados contra el portal en vivo en lugar de HTML fijado | `TEST-03` |
 | 17 | Commit directo a `main`, o mensaje fuera de Conventional Commits | `GIT-01`, `GIT-03` |
+| 18 | Color escrito a mano en la UI, o paleta por defecto de Tailwind | `UI-01`, `UI-02` |
 
 ## Identificadores retirados
 

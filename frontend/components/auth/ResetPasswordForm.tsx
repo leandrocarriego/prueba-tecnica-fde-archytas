@@ -147,7 +147,10 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
                   className={`${branding.logo.size === 'sm' ? 'w-8 h-8' : branding.logo.size === 'lg' ? 'w-16 h-16' : 'w-12 h-12'} rounded-lg flex items-center justify-center`}
                   style={{ backgroundColor: branding.colors.primary }}
                 >
-                  <span className="font-bold text-2xl" style={{ color: '#ffffff' }}>
+                  <span
+                    className="font-bold text-2xl"
+                    style={{ color: branding.colors.primaryForeground }}
+                  >
                     {branding.logo.text}
                   </span>
                 </div>
@@ -179,7 +182,7 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
                 className="w-full cursor-pointer"
                 style={{
                   backgroundColor: branding.colors.primary,
-                  color: '#ffffff',
+                  color: branding.colors.primaryForeground,
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.backgroundColor = branding.colors.primaryHover
@@ -228,7 +231,7 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
                 className="w-full cursor-pointer"
                 style={{
                   backgroundColor: branding.colors.primary,
-                  color: '#ffffff',
+                  color: branding.colors.primaryForeground,
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.backgroundColor = branding.colors.primaryHover
@@ -279,7 +282,10 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
               className={`${branding.logo.size === 'sm' ? 'w-8 h-8' : branding.logo.size === 'lg' ? 'w-16 h-16' : 'w-12 h-12'} rounded-lg flex items-center justify-center`}
               style={{ backgroundColor: branding.colors.primary }}
             >
-              <span className="font-bold text-2xl" style={{ color: '#ffffff' }}>
+              <span
+                className="font-bold text-2xl"
+                style={{ color: branding.colors.primaryForeground }}
+              >
                 {branding.logo.text}
               </span>
             </div>
@@ -363,7 +369,7 @@ export function ResetPasswordForm({ className, onSuccess, renderLogo }: ResetPas
               className="w-full cursor-pointer"
               style={{
                 backgroundColor: branding.colors.primary,
-                color: '#ffffff',
+                color: branding.colors.primaryForeground,
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.backgroundColor = branding.colors.primaryHover

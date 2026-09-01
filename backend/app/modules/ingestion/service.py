@@ -52,6 +52,7 @@ from app.shared.events import InvoiceFileRead as InvoiceFileRead_
 from app.shared.events import (
     InvoiceRowsQuarantined,
     InvoicesNormalized,
+    MessageRowsQuarantined,
     NormalizedHistoryPoint,
     NormalizedInvoice,
     NormalizedMessage,
@@ -60,6 +61,7 @@ from app.shared.events import (
     NormalizedPurchaseOrder,
     NormalizedSale,
     NormalizedSupplier,
+    PaymentRowsQuarantined,
     PaymentsNormalized,
     PriceHistoryNormalized,
     PriceHistoryRowsQuarantined,
@@ -71,6 +73,7 @@ from app.shared.events import (
     SaleRowsQuarantined,
     SalesNormalized,
     SupplierMessagesNormalized,
+    SupplierRowsQuarantined,
     SuppliersNormalized,
     events,
 )
@@ -574,6 +577,35 @@ class IngestionService:
                 ),
                 self.session,
             )
+        # What could not be typed, said out loud (RF-01, RF-02 of 011). Until
+        # this feature these two `QUARANTINED` statuses were written to
+        # `staging` and announced to nobody: a supplier the register published
+        # broken and a payment nobody could read stopped right here, so they
+        # were not counted, not shown, and never decided. Setting something
+        # aside and telling somebody are the same action, or the Artículo II is
+        # only half true.
+        quarantined_suppliers = self._quarantined_of(supplier_rows)
+        if quarantined_suppliers:
+            await events.publish(
+                SupplierRowsQuarantined(
+                    raw_document_id=raw_document_id, cases=quarantined_suppliers
+                ),
+                self.session,
+            )
+        # The payments are announced apart from the suppliers even though both
+        # come out of the same document: they are two areas of the queue, two
+        # screens of the portal and two things a person reads differently, and
+        # merging them would make the case say it came from a place it did not.
+        quarantined_payments = self._quarantined_of(payment_rows)
+        if quarantined_payments:
+            await events.publish(
+                PaymentRowsQuarantined(
+                    batch_id=batch_id,
+                    raw_document_id=raw_document_id,
+                    cases=quarantined_payments,
+                ),
+                self.session,
+            )
         logger.info(
             "Supplier ledger normalized",
             extra={"suppliers": len(supplier_rows), "payments": len(payment_rows)},
@@ -700,6 +732,34 @@ class IngestionService:
                 ),
                 self.session,
             )
+        # A message the inbox published broken (RF-03 of 011). What is announced
+        # is `rows`, which is what survived the `known` filter.
+        #
+        # **That filter keeps a broken message out from the second reading on,
+        # and this comment used to claim the opposite.** It said an unreadable
+        # message has no `external_id` to be known by — it has one: the id is
+        # composed of date, sender and subject, and a date that could not be
+        # read composes the literal `"None|…"`, which is as good a key as any
+        # other. So the row is typed once, opens its case once, and is filtered
+        # out of every reading after that.
+        #
+        # For a message set aside **from this feature onwards** that is right:
+        # the case is already open and nothing is lost. What it does mean is
+        # that anything the inbox published broken *before* these subscribers
+        # existed never opens a case on its own, because it is already known.
+        # Whoever decides that — a one-off backfill, a narrower filter, or
+        # leaving it — is a decision on the record, not something to fix here
+        # by accident. `test_set_aside_visibility.py` fixes the fact.
+        quarantined_messages = self._quarantined_of(rows)
+        if quarantined_messages:
+            await events.publish(
+                MessageRowsQuarantined(
+                    batch_id=batch_id,
+                    raw_document_id=raw_document_id,
+                    cases=quarantined_messages,
+                ),
+                self.session,
+            )
         logger.info(
             "Inbox normalized",
             extra={"batch_id": batch_id, "new": len(fresh), "first_run": first_run},
@@ -742,11 +802,17 @@ class IngestionService:
         # not correctable. That is RF-16 to RF-19 of 009, and holding them is
         # what the signed spec asks for (Artículo II).
         #
-        # `SaleRowsQuarantined` is still published below and still has no
-        # subscriber, and that is deliberate: the row already has a human
-        # surface in the sales review queue, and opening a `triage` case as well
-        # would show the same record on two screens belonging to two different
-        # people.
+        # `SaleRowsQuarantined` is published below **and since 011 it has a
+        # subscriber**, which reverses what 009 decided here. 009 argued that
+        # the row already had a human surface in the sales review queue, and
+        # that opening a `triage` case too would show one record on two screens
+        # belonging to two people. The 011 spec decided otherwise, and decided
+        # well: the whole point of that feature is that there is **one** list of
+        # what is pending (RF-06), because the thing that made nobody watch the
+        # portal inbox was not its length, it was being one more place to
+        # remember to open. And the objection 009 raised — two screens
+        # disagreeing — is what RF-20 answers: when the sale is resolved on its
+        # own screen, the case closes itself.
         await events.publish(
             SalesNormalized(
                 batch_id=batch_id,

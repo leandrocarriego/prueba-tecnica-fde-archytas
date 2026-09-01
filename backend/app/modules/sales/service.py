@@ -14,6 +14,7 @@ que se sumen como si fueran válidas"* — and the whole module is that sentence
   many records it left out of itself (RF-25, RF-27).
 """
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -33,7 +34,12 @@ from app.modules.sales.schemas import (
     SalesDashboard,
 )
 from app.shared.errors import ConflictError, NotFoundError, ValidationError
-from app.shared.events import NormalizedSale
+from app.shared.events import (
+    NormalizedSale,
+    QuarantinedSourceReopened,
+    QuarantinedSourceResolved,
+    events,
+)
 from app.shared.parameters import initial_value
 
 logger = get_logger(__name__)
@@ -51,6 +57,14 @@ DUPLICATE_IDENTICAL = "Repetida idéntica: se cuenta una sola vez"
 # why somebody had to decide — and telling the person who decided that the
 # system unified them is telling them something that did not happen.
 DISCARDED_BY_DECISION = "Se descartó al elegir otra versión de esta venta"
+
+# What 011 needs said out loud when a held record stops being held. The kind is
+# `triage`'s word for the case an unreadable sales row opens, and the key is the
+# `staging` row it was opened with: rebuilding it any other way would close a
+# case nobody resolved.
+UNREADABLE_SALE_ROW = "unreadable_sale_row"
+RESOLVED_IN_SALES = "la pantalla de ventas"
+REOPENED_IN_SALES = "la pantalla de ventas"
 
 NO_SUCH_SALE = "No encontramos esa venta"
 NOT_HELD = "Esa venta no está apartada"
@@ -327,9 +341,40 @@ class SalesService:
             sale.resolved_by_user_id = actor_user_id
             sale.resolved_at = now
         await self.session.flush()
+        await self._announce_resolved(records)
         await self.session.commit()
         logger.info("Sales group resolved", extra={"code_key": code_key, "action": action})
         return [SaleRead.model_validate(sale) for sale in records]
+
+    async def _announce_resolved(self, records: Sequence[Sale]) -> None:
+        """Say that a reading nobody could type has been dealt with (RF-20 of 011).
+
+        Until 011 an unreadable sales row went to quarantine and opened no case
+        anywhere; now it opens one, and a case a person then resolves *on this
+        screen* has to stop counting as pending — asking them to close it again
+        in the review queue is the same work twice, and the day they forget, the
+        list of pending things is lying.
+
+        It is announced and not called. `sales` may not touch `triage`
+        (Artículo IV), so what happens here is a fact stated in public —
+        identifiers and a label, never the record — and whoever cares listens.
+        Most of these close nothing, because most sales never had a case, and
+        that is the ordinary outcome rather than an error.
+
+        Only records that came from a reading are announced: one somebody typed
+        has no `staging_row_id` and never had a case to close.
+        """
+        for sale in records:
+            if sale.staging_row_id is None:
+                continue
+            await events.publish(
+                QuarantinedSourceResolved(
+                    kind=UNREADABLE_SALE_ROW,
+                    key=str(sale.staging_row_id),
+                    resolved_where=RESOLVED_IN_SALES,
+                ),
+                self.session,
+            )
 
     async def undo_resolution(self, code_key: str) -> list[SaleRead]:
         """Put a resolved group back in the queue and recalculate (RF-35 of 009)."""
@@ -346,8 +391,35 @@ class SalesService:
             sale.resolved_by_user_id = None
             sale.resolved_at = None
         await self.session.flush()
+        await self._announce_reopened(records)
         await self.session.commit()
         return [SaleRead.model_validate(sale) for sale in records]
+
+    async def _announce_reopened(self, records: Sequence[Sale]) -> None:
+        """Say that a reading that had been dealt with is waiting again (RF-24).
+
+        The mirror of `_announce_resolved`, and it is here for the reason the
+        signed rule gives: *hay una sola verdad sobre si algo sigue pendiente*,
+        and it has to hold in both directions. This screen lets somebody undo a
+        resolution — 009 promised that (RF-35) — and until 011 the case that had
+        closed itself stayed closed, so the queue said there was nothing to
+        review about a record that was, right then, back under review.
+
+        Announced and not called, like its mirror: `sales` may not touch
+        `triage` (Artículo IV). Only records that came from a reading are
+        announced, because only those ever had a case.
+        """
+        for sale in records:
+            if sale.staging_row_id is None:
+                continue
+            await events.publish(
+                QuarantinedSourceReopened(
+                    kind=UNREADABLE_SALE_ROW,
+                    key=str(sale.staging_row_id),
+                    reopened_where=REOPENED_IN_SALES,
+                ),
+                self.session,
+            )
 
     async def correct_sale(
         self,
@@ -387,5 +459,6 @@ class SalesService:
             sale.state = SaleState.COUNTED
             sale.reason = None
         await self.session.flush()
+        await self._announce_resolved([sale])
         await self.session.commit()
         return SaleRead.model_validate(sale)

@@ -283,7 +283,29 @@ nuevo bajo `backend/app/modules/<module>/` siguiendo la anatomía de arriba y re
 router en `app/main.py`.
 
 **Frontend** — página en `frontend/app/(private)/<modulo>/`, componentes en
-`frontend/components/<modulo>/`, acceso a datos en `frontend/lib/`.
+`frontend/components/<modulo>/`, acceso a datos en `frontend/lib/`. La pantalla **no elige su
+aspecto**: lo hereda del sistema de diseño (ver abajo).
+
+### El sistema de diseño
+
+Tiene una sola fuente, partida en dos capas que no se contradicen:
+
+- **`docs/design/`** dice *qué significa* cada señal: la guía de estilos, las pantallas de alta
+  fidelidad y los wireframes acordados. Es material de producto, se discute con el cliente y es lo
+  que se abre antes de dibujar una pantalla.
+- **`frontend/app/globals.css`** es su *implementación*: los tokens (`--brand`, `--warn-surface`,
+  `--ok`, …) y las clases compartidas (`.pill`, `.amount`, `.section-label`). Cambiar la paleta es
+  editar este archivo, y nada más.
+
+Encima de esa base hay tres primitivas que existen para que un estado no se dibuje dos veces
+distinto: `components/ui/badge.tsx` (la píldora de estado), `components/ui/notice.tsx` (el aviso
+con su acción) y `components/ui/button.tsx` (donde `variant="brand"` es el único naranja).
+
+**Por qué está acá y no librado al criterio de cada pantalla.** El producto promete avisar cuando
+algo no se puede resolver solo (`CONSTITUTION.md`, Artículo II). Un aviso sólo cumple esa promesa
+si se distingue de un adorno, y eso deja de ser cierto en cuanto el color se usa para decorar. Por
+eso el color es un recurso escaso y administrado: `CONVENTIONS.md` → `UI-*`, con `UI-01` y `UI-02`
+verificadas por `frontend/tests/design-system.test.ts`, que rompe el build.
 
 Un módulo nuevo se justifica cuando representa una **capacidad del negocio** con lenguaje
 propio, no cuando simplemente hay muchos archivos.
@@ -351,6 +373,9 @@ para que el backend nativo se conecte, y en producción evita exponer la base po
 - **Librería de UI**: React
 - **Estilos**: Tailwind CSS
 - **Componentes**: shadcn/ui
+- **Sistema de diseño**: "taller ordenado" — guía en `docs/design/`, tokens en
+  `frontend/app/globals.css`, reglas en `CONVENTIONS.md` → `UI-*` (ver abajo)
+- **Tipografías**: Instrument Sans (texto) e IBM Plex Mono (plata, fechas y códigos)
 - **Lenguaje**: TypeScript
 
 ### Backend

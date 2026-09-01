@@ -17,6 +17,29 @@ export interface CalendarFilters {
 export const PER_DAY = 4
 
 /**
+ * El código con el que el backend dice que la fecha nueva ya pasó (RF-25).
+ *
+ * Es lo único que la pantalla tiene que **reconocer** de una negativa en vez de
+ * sólo mostrarla: RF-25 la convierte en una pregunta. Viaja como código dentro
+ * de `details` y no como el texto del mensaje, porque comparar el castellano
+ * haría de la redacción un contrato que nadie declaró — y reescribir el mensaje
+ * mataría la confirmación en silencio, dejando un movimiento legítimo como
+ * error. El otro lado es `MOVING_INTO_THE_PAST_CODE`, en `purchases/service.py`.
+ */
+export const MOVING_INTO_THE_PAST = 'DUE_DATE_MOVING_INTO_THE_PAST'
+
+/**
+ * El código de una negativa, si la trajo.
+ *
+ * `details` llega como `Record<string, unknown>` a propósito —las claves
+ * cambian por negativa—, así que se pregunta por el código en vez de afirmarlo.
+ */
+export function refusalCode(result: { details?: Record<string, unknown> }): string | null {
+  const code = result.details?.code
+  return typeof code === 'string' ? code : null
+}
+
+/**
  * La URL del mes anterior o el siguiente, conservando los filtros puestos.
  *
  * El desplazamiento se calcula sobre `since` —la ventana que el backend

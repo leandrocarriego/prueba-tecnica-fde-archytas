@@ -32,8 +32,25 @@ export interface ManualAction {
   readonly description: string
   /** Where it is done. The action itself lives on that screen. */
   readonly href: string
-  /** The section its route demands. */
-  readonly section: Section
+  /**
+   * The section its route demands, or nothing when the route demands only a
+   * session.
+   *
+   * Optional since 011, and for one action: resolving a case of the review
+   * queue stopped being a `PRICES` question the day the queue stopped being
+   * only about prices. Its route now asks to be signed in, and the **service**
+   * refuses a case of an area the person does not reach — because which area a
+   * case belongs to is a fact of the case, and no `Depends` can know it before
+   * the row is read.
+   *
+   * So an action without a section is offered to everybody, and that is not a
+   * hole: it is this list saying what is true, which is that the route turns
+   * nobody away at the door. Whoever opens that screen sees their own part of
+   * the queue, and for somebody with no area at all it is honestly empty.
+   * Leaving `PRICES` here instead would hide the action from Julián, who owns
+   * the sales half of what is in it.
+   */
+  readonly section?: Section
   /**
    * Whether that route demands the level to write, or only the level to see.
    *
@@ -59,10 +76,10 @@ export const MANUAL_ACTIONS: readonly ManualAction[] = [
   },
   {
     id: 'resolve-triage-case',
-    label: 'Resolver un caso de la cola de revisión',
+    label: 'Resolver un pendiente de la cola de revisión',
     description: 'Decidí qué hacer con lo que el sistema no pudo interpretar solo.',
     href: '/revision',
-    section: 'PRICES',
+    // Sin sección, y es la única. Ver `ManualAction.section`.
     writes: true,
   },
   {
@@ -163,6 +180,14 @@ export const MANUAL_ACTIONS: readonly ManualAction[] = [
  * action asks for the level its own route asks for, so a reading one lands
  * already offered to the right people instead of arriving with a filter to fix.
  *
+ * The section-less branch is 011's, and it comes first because it is the only
+ * one that is not a question about levels: an action whose route asks for a
+ * session and nothing more has no section to ask `canEdit` about, and
+ * `canEdit(permissions, undefined)` would read `undefined` out of the map, call
+ * it `NONE`, and hide the action from **everybody**, the owner included — a
+ * screen that quietly offers nothing looks exactly like a feature that was
+ * never built.
+ *
  * `tests/architecture/test_manual_actions.py` pins this expression exactly, and
  * that is deliberate: swapping the two would leave every test about who is
  * offered what green while the screen offered a writing action to somebody the
@@ -170,6 +195,10 @@ export const MANUAL_ACTIONS: readonly ManualAction[] = [
  */
 export function actionsFor(permissions: Permissions): ManualAction[] {
   return MANUAL_ACTIONS.filter(action =>
-    action.writes ? canEdit(permissions, action.section) : canSee(permissions, action.section)
+    action.section === undefined
+      ? true
+      : action.writes
+        ? canEdit(permissions, action.section)
+        : canSee(permissions, action.section)
   )
 }

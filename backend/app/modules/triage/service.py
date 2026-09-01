@@ -18,13 +18,15 @@ from app.logging import get_logger
 from app.modules.triage.models import CaseStatus, ExceptionCase
 from app.modules.triage.repository import TriageRepository
 from app.modules.triage.schemas import CaseList, CaseRead, RuleRead
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, NotFoundError, PermissionDeniedError
 from app.shared.events import (
     QuarantineCaseResolved,
     QuarantineRuleRedecided,
     QuarantineRuleRevoked,
     events,
 )
+from app.shared.parameters import initial_value
+from app.shared.sections import BusinessSection
 
 logger = get_logger(__name__)
 
@@ -49,6 +51,31 @@ UNREADABLE_INVOICE_ROW = "unreadable_invoice_row"
 # worst place for the Artículo II to be half-applied.
 UNREADABLE_ORDER_ROW = "unreadable_order_row"
 
+# The four kinds 011 adds, and they all say the same thing: `ingestion` was
+# already setting these rows aside in `staging` and announcing it to nobody, so
+# they were held, not counted, not shown and never decided. A datum set aside
+# in silence is a datum discarded with extra steps (Artículo II), and closing
+# those four silences is the whole of that feature.
+UNREADABLE_SUPPLIER_ROW = "unreadable_supplier_row"
+UNREADABLE_PAYMENT_ROW = "unreadable_payment_row"
+UNREADABLE_MESSAGE_ROW = "unreadable_message_row"
+UNREADABLE_SALE_ROW = "unreadable_sale_row"
+
+# Where each of the four came from, in the words of the portal screen a person
+# would go looking at (RF-11). Spanish, because the screen shows it.
+SUPPLIER_ORIGIN = "padrón de proveedores"
+PAYMENT_ORIGIN = "comprobantes de pago"
+MESSAGE_ORIGIN = "buzón"
+SALE_ORIGIN = "ventas"
+# Y las de todo lo que ya abría caso antes de la 011 y no decía de dónde salía.
+# RF-11 dice «para **cada** pendiente», y hasta acá lo cumplían cinco de once:
+# quien miraba la lista tenía que saber de antemano cuáles lo traían, que es
+# justo el trabajo que el requisito existe para ahorrarle.
+ORDER_ORIGIN = "órdenes de compra"
+PRICE_LIST_ORIGIN = "lista de precios"
+HISTORY_ORIGIN = "historial del producto"
+INVOICE_ORIGIN = "facturas"
+
 # What the person reads in the review screen (RF-26), in Spanish like every
 # other user-facing string.
 UNKNOWN_PRODUCT_REASON = "El producto no está entre los conocidos"
@@ -56,6 +83,18 @@ MISSING_PRODUCT_REASON = "El producto dejó de figurar en la lista"
 UNKNOWN_CATEGORY_REASON = "No sabemos a qué rubro corresponde esta forma escrita"
 
 ALREADY_RESOLVED = "This case has already been resolved"
+NOT_YOUR_SECTION = "No tenés permiso para resolver un pendiente de esta área"
+
+# The parameter that says when a pending case has been waiting too long
+# (RF-17). Read through this module's own projection, like every other module
+# reads the ones it consumes.
+STALE_DAYS_KEY = "triage.stale_days"
+
+# How a case closed by the screen that owned the work is recorded (RF-21). No
+# name of a person goes in it, and that is the decision the spec took: whoever
+# did the work is recorded where the work happened, and a second copy of that
+# fact here could only ever drift from the first.
+RESOLVED_ELSEWHERE = "resolved_elsewhere"
 ALREADY_REVOKED = "This rule is already revoked"
 
 
@@ -85,15 +124,24 @@ class TriageService:
         reason: str,
         payload: dict[str, Any],
         key: str,
+        section: BusinessSection,
         batch_id: int | None = None,
     ) -> None:
-        """Put one thing in front of a person, once."""
+        """Put one thing in front of a person, once.
+
+        `section` has no default on purpose. It says who this case is for, and
+        the only moment anybody knows that is now, while the publisher is still
+        in the room: a default here would quietly file the next kind somebody
+        adds under one area and show it to the wrong person, with nothing
+        failing (RF-12).
+        """
         await self.triage.open_case(
             kind=kind,
             reason=reason,
             payload=payload,
             fingerprint=fingerprint_of(kind, key),
             batch_id=batch_id,
+            section=section,
         )
 
     # --- Reading ----------------------------------------------------------
@@ -106,18 +154,72 @@ class TriageService:
         status: CaseStatus | None = CaseStatus.PENDING,
         kind: str | None = None,
         batch_id: int | None = None,
+        visible: frozenset[BusinessSection],
+        section: BusinessSection | None = None,
     ) -> CaseList:
-        """The review screen: what was set aside and why (RF-26, RF-27)."""
+        """The review screen: what was set aside and why (RF-26, RF-27).
+
+        `visible` is the areas this person reaches, and everything below is
+        narrowed to them (RF-12, RF-14). It is keyword-only and has **no
+        default** on purpose: a default of "every area" would turn the next
+        caller that forgets it into a leak of purchasing's money to whoever
+        reads sales, and it would do it silently.
+
+        `section` on top of that is the person **choosing** to see less
+        (RF-22). Asking for an area they do not reach is refused rather than
+        quietly emptied: an empty list reads as «no hay nada ahí», which is a
+        different answer and an untrue one.
+        """
+        if section is not None and section not in visible:
+            raise PermissionDeniedError(NOT_YOUR_SECTION, details={"section": section.value})
+        sections = frozenset({section}) if section is not None else visible
+
         cases = await self.triage.list_cases(
-            skip=skip, limit=limit, status=status, kind=kind, batch_id=batch_id
+            skip=skip, limit=limit, status=status, kind=kind, batch_id=batch_id, sections=sections
         )
-        total = await self.triage.count_cases(status=status, kind=kind, batch_id=batch_id)
+        total = await self.triage.count_cases(
+            status=status, kind=kind, batch_id=batch_id, sections=sections
+        )
+        # The header counts what is pending regardless of the `status` being
+        # browsed: somebody reading the resolved ones still wants to know how
+        # many are waiting (RF-15).
+        pending_total = await self.triage.count_cases(status=CaseStatus.PENDING, sections=sections)
+        oldest_at = await self.triage.oldest_pending_at(sections=sections)
+
+        stale_days = int(await self._setting(STALE_DAYS_KEY))
+        now = datetime.now(UTC)
         return CaseList(
-            items=[CaseRead.model_validate(case) for case in cases],
+            items=[self._read(case, now=now, stale_days=stale_days) for case in cases],
             total=total,
             skip=skip,
             limit=limit,
+            pending_total=pending_total,
+            oldest_at=oldest_at,
+            sections=sorted(visible),
         )
+
+    @staticmethod
+    def _read(case: ExceptionCase, *, now: datetime, stale_days: int) -> CaseRead:
+        """A case with how long it has been waiting worked out (RF-16, RF-17).
+
+        A resolved case is never stale: it stopped waiting the day somebody —
+        or the screen that owned the work — decided about it, so what it shows
+        is how long it waited, not how long it has been ignored.
+        """
+        waiting_days = max((now - case.created_at).days, 0)
+        read = CaseRead.model_validate(case)
+        read.waiting_days = waiting_days
+        read.is_stale = case.status is CaseStatus.PENDING and waiting_days > stale_days
+        return read
+
+    async def _setting(self, key: str) -> Any:
+        """A business parameter, from this module's projection or its initial value."""
+        stored = await self.triage.setting(key)
+        return initial_value(key) if stored is None else stored
+
+    async def remember_setting(self, key: str, value: Any) -> None:
+        """Keep a business parameter this module reads."""
+        await self.triage.put_setting(key, value)
 
     async def count_pending(self, *, batch_id: int | None = None) -> int:
         """How many cases are waiting for somebody."""
@@ -148,6 +250,7 @@ class TriageService:
         user_id: int,
         user_name: str | None = None,
         remember: bool = True,
+        visible: frozenset[BusinessSection],
     ) -> CaseRead:
         """Record what a person decided, and tell whoever has to act on it.
 
@@ -157,6 +260,13 @@ class TriageService:
         time (RF-34).
         """
         case = await self._require_case(case_id)
+        # RF-13, and it lives here rather than on the route because it depends
+        # on the **case**: a `Depends` runs before the row is read, so it cannot
+        # know which area this one belongs to.
+        if case.section not in visible:
+            raise PermissionDeniedError(
+                NOT_YOUR_SECTION, details={"case_id": case_id, "section": case.section.value}
+            )
         if case.status is CaseStatus.RESOLVED:
             raise ConflictError(ALREADY_RESOLVED, details={"case_id": case_id})
 
@@ -198,6 +308,76 @@ class TriageService:
             extra={"case_id": case.id, "kind": case.kind, "rule_id": rule.id if rule else None},
         )
         return CaseRead.model_validate(case)
+
+    async def close_resolved_elsewhere(self, *, kind: str, key: str, where: str) -> bool:
+        """Close the case whose cause was resolved on its own screen (RF-20).
+
+        The list of pending things has to be the one truth about what is still
+        pending. Asking somebody to close a case here after they already did
+        the work on the payments screen is the same work twice, and the day
+        they forget, the list lies — so the list keeps itself honest instead.
+
+        The case is found by the **same** fingerprint that opened it, rebuilt
+        from the kind and key the publisher sends, never by a looser match: a
+        fingerprint reconstructed generously would close a case nobody
+        resolved, which is the same silence read backwards.
+
+        Nothing found is not a failure. Most payments never had a case, and an
+        event that closes nothing is the ordinary outcome, so it returns
+        whether it closed one and does not raise.
+        """
+        case = await self.triage.pending_by_fingerprint(fingerprint_of(kind, key))
+        if case is None:
+            return False
+
+        case.status = CaseStatus.RESOLVED
+        # No `resolved_by_*`. RF-21 asks to record that it was resolved this
+        # way and keep it readable — not to name a person, whose name belongs
+        # to the screen where the work actually happened.
+        case.decision = {"action": RESOLVED_ELSEWHERE, "where": where}
+        case.resolved_at = datetime.now(UTC)
+        await self.session.flush()
+        logger.info(
+            "Case closed by the screen that owned it",
+            extra={"case_id": case.id, "kind": kind, "where": where},
+        )
+        return True
+
+    async def reopen_closed_elsewhere(self, *, kind: str, key: str) -> bool:
+        """What had closed a case got undone on its own screen (RF-24).
+
+        The mirror of `close_resolved_elsewhere`, and it exists because the rule
+        the client signed holds in both directions: a list that knows how to
+        close itself and not how to reopen is true only until somebody changes
+        their mind. The sales screen lets them — 009 promised that undo — and
+        without this the record went back to being reviewed while the queue kept
+        saying there was nothing to review about it.
+
+        **Only a case that closed itself is reopened.** One a person resolved by
+        hand carries their name and their decision, and reopening it would erase
+        both because some other record happened to share a fingerprint. That is
+        why the lookup asks for `resolved_by_user_id IS NULL` and for this exact
+        action, rather than for any resolved case.
+
+        Nothing found is the ordinary outcome, same as its mirror: most undos
+        are of work that never had a case.
+        """
+        case = await self.triage.closed_elsewhere_by_fingerprint(
+            fingerprint_of(kind, key), action=RESOLVED_ELSEWHERE
+        )
+        if case is None:
+            return False
+
+        case.status = CaseStatus.PENDING
+        # Back to how it arrived. The `decision` goes because there is no longer
+        # a decision — what closed it was undone — and `resolved_at` with it, so
+        # the age the screen shows keeps counting from `created_at`, which is
+        # when it actually started waiting (RF-16).
+        case.decision = None
+        case.resolved_at = None
+        await self.session.flush()
+        logger.info("Case reopened by the screen that owned it", extra={"case_id": case.id})
+        return True
 
     async def revoke_rule(self, rule_id: int, *, user_id: int) -> None:
         """Leave a rule without effect and give its cases back (RF-37)."""

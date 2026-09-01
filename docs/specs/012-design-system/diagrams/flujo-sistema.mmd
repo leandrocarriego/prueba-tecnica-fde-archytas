@@ -1,0 +1,31 @@
+---
+title: El sistema — qué señal le corresponde a cada cosa
+---
+flowchart TD
+    A["Tiene algo que mostrar en pantalla"] --> B{"¿Qué es?"}
+
+    B -->|El estado de un dato| C["Lo dibuja como una pastilla"]
+    C --> D["Con uno de los cinco significados acordados:<br/>conforme, informativo, requiere decisión, vencido o con error, sin novedad"]
+    D --> E["Nunca en naranja: el naranja señala la acción, no el estado"]
+
+    B -->|Un importe, una fecha o un código| F["Tipografía de ancho fijo con cifras de ancho uniforme"]
+    F --> G["Si es una columna de importes, la alinea para que las cifras queden en columna"]
+
+    B -->|Una acción| H{"¿Resuelve la tarea principal de la pantalla?"}
+    H -->|Sí, y es la única| I["Botón naranja"]
+    H -->|No| J["Contorno, gris o enlace"]
+    H -->|La pantalla es una lista de casos para decidir| K["Ningún naranja: tinta o contorno en cada caso"]
+    J --> L["El color de enlace sólo navega o consulta,<br/>nunca modifica datos"]
+
+    B -->|Un total| M{"¿Dejó registros afuera por dudosos?"}
+    M -->|Sí| N["Muestra el aviso por encima del total"]
+    N --> O["Y lo acompaña con la acción que permite resolverlo"]
+    M -->|No, y es un indicador del tablero| P["Lo dice explícitamente"]
+    M -->|No, y está fuera del tablero| Q["No muestra ningún aviso"]
+
+    B -->|El menú| R["Oculta las secciones que la persona no puede abrir"]
+    R --> S{"¿El grupo quedó vacío?"}
+    S -->|Sí| T["Oculta también el título del grupo"]
+    S -->|No| U["Muestra el grupo con lo que queda"]
+
+    V["Y siempre sobre lo mismo: un solo fondo de aplicación, un solo color de tarjeta,<br/>un solo tema claro que no cambia con la configuración del dispositivo"]

@@ -432,6 +432,19 @@ de tocar este código.
   nadie recibe nada: es lo que hace que `GEN-09` se cumpla sin acoplar el movimiento de un
   vencimiento a la conexión de otra persona. Cambiarlo por un `POST` a un servicio de sockets mete
   I/O de red dentro de la transacción.
+- **RF-25 se pregunta con un diálogo de la aplicación, no con `window.confirm`.**
+  `components/ui/confirm-dialog.tsx`, sobre `@radix-ui/react-dialog` —que ya era dependencia y no
+  usaba nadie—. No es un `Dialog` genérico a propósito: se pasa la pregunta y las dos respuestas, y
+  no hay siete formas de armar mal el mismo diálogo. **Cerrarlo por `Escape` o por el fondo es
+  decir que no**, y hay un test que lo fija: es lo que más se rompe de una confirmación. La guía
+  visual todavía no tiene una entrada para el diálogo — es deuda de la 012, no de esta feature.
+- **RF-25 se reconoce por un código, no por el texto del mensaje.** El backend manda
+  `details.code = "DUE_DATE_MOVING_INTO_THE_PAST"` y la pantalla pregunta por eso
+  (`MOVING_INTO_THE_PAST`, en `lib/purchases/calendar.ts`). Hasta el review de la 006 se comparaba
+  el castellano —`message.includes('ya pasó')`—, y eso hacía de la redacción un contrato que nadie
+  declaró: reescribir el mensaje mataba la confirmación en silencio y dejaba un movimiento legítimo
+  como error. Los dos extremos están comentados, uno apuntando al otro, y hay un test que usa un
+  mensaje **distinto** a propósito.
 - **Al reconectar se relee el calendario entero**, no se recuperan mensajes perdidos. La verdad está
   en la base a una consulta de distancia, y una cola por sesión es infraestructura para una promesa
   que la spec no hace.
@@ -461,7 +474,12 @@ de otra feature.
    volviendo a buscar las facturas por ventana de fechas, ese test es el que avisa.
 3. **El canal en vivo desde el otro worker.** Lo que de verdad se rompe no es que el mensaje llegue:
    es que llegue desde el otro proceso —el despliegue corre con `--workers 2`—. Y el caso que hay
-   que sostener antes que ninguno: **una transacción que aborta no notifica a nadie**.
+   que sostener antes que ninguno: **una transacción que aborta no notifica a nadie**. Desde el
+   review de la 006 los dos tienen test propio, contra la base de verdad y con una conexión que
+   escucha aparte: `tests/integration/features/test_the_live_channel.py`, doce tests que dejan
+   `app/shared/live.py` al 100%. Antes de eso el transporte entero —`LiveBus`, la ruta del stream—
+   no tenía ninguno y el archivo quedaba al 50%; `announce` sólo estaba probado por el evento de
+   dominio, que demuestra que **se anuncia**, no que viaje.
 4. **El reloj.** Todo cuelga de `today_here()`, que es Buenos Aires. Los tests usan una ventana
    relativa a hoy a propósito: un mes fijo empieza a fallar solo el día que queda en el pasado.
 5. **Lo que ningún test puede sostener: el teléfono.** RF-41 no tiene código propio en el calendario
@@ -488,7 +506,9 @@ calendario pide el portal, está mal escrito.
    de comportamiento que llama a las cinco como ventas.
 
 Y dos de forma, aunque una no lo es. **`TS-09`**: los textos de `CalendarGrid.tsx` van en español y
-están. **`TS-08`**: la pantalla resuelve **vacío**, el **error de una escritura** y el **error de la
+están. **`TS-08`**: la pantalla resuelve **vacío**, el **error de una escritura**, el **error de la
 lectura** —`readFromApi` distingue una negativa de una caída, así que un backend caído ya no se le
-muestra al dueño como falta de permiso—; lo que sigue sin resolver es **«cargando»**, y el `busy`
-sólo deshabilita botones.
+muestra al dueño como falta de permiso— y, desde el review de la 006, **«cargando»**: `move()`
+pasa por el guard de `busy` como el resto —antes era el único que no, así que el botón seguía
+habilitado y la tarjeta arrastrable durante todo el viaje, y soltarla dos veces mandaba dos
+`PUT`— y mientras la escritura viaja la pantalla lo dice en lugar de sólo congelarse.

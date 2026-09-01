@@ -28,8 +28,15 @@ reconstruido contra el código y contra las doce derivas `D0`–`D11` que el pla
   está en `evidence/README.md`.
 - ✅ **La H5 está construida** (2026-08-31): SSE sobre `GET /calendar/stream`, `LISTEN`/`NOTIFY` de
   Postgres para cruzar los dos workers de uvicorn, y un Route Handler de Next que pone el `Bearer`
-  desde la cookie. Cero dependencias nuevas. `GEN-09` se cumple sin acoplar nada, y hay un test que
-  lo sostiene: **un movimiento rechazado no anuncia nada**.
+  desde la cookie. Cero dependencias nuevas. `GEN-09` se cumple sin acoplar nada, y desde el review
+  de la 006 hay **doce** tests que lo sostienen (`test_the_live_channel.py`), empezando por el que
+  va antes que ninguno: **una transacción que aborta no notifica a nadie**, verificado con una
+  conexión que escucha el canal aparte. Hasta ese review el transporte no tenía **ningún** test
+  —`app/shared/live.py` quedaba al 50%, y las líneas sin cubrir eran el mecanismo entero— y lo
+  único que había era el test del evento de dominio, que demuestra que el cambio **se anuncia**, no
+  que viaje. Ahora ese archivo está al **100%**, con `start` no-fatal incluido: que la plataforma
+  arranque igual sin canal es una decisión, y una decisión que sólo vive en un docstring es la que
+  alguien "arregla" seis meses después poniendo un `raise`.
 - ❌ **Dos tareas de la H5 desaparecieron y otras dos ocuparon su lugar.** Se fue la que pedía
   cerrar el plan —el plan ya está cerrado— y se fue el cartel provisorio de «esta pantalla no se
   actualiza sola», que era superficie que el cliente no firmó: el humano decidió no construirlo
@@ -39,16 +46,19 @@ reconstruido contra el código y contra las doce derivas `D0`–`D11` que el pla
   de mes y recorte por día (D5, D6), y mover una tarjeta es arrastrarla o elegir la fecha en un
   selector con motivo opcional, no dos `window.prompt` encadenados (D3, D11).
 
-Suite de la feature al cierre: **13 tests de integración** en
-`backend/tests/integration/features/test_due_date_calendar.py` —ocho de servicio y cinco de ruta,
-que son los permisos de ventas por comportamiento— y **21 tests de pantalla** en `frontend/tests/`:
-el control de mes y la grilla, el recorte por día en las dos vistas, y la barra plegable. Los de
-pantalla obligaron a darle al frontend el runner que no tenía: vitest sobre jsdom, corriendo en
-`make test` y en el job Frontend del CI.
+Suite de la feature al cierre: **25 tests de integración** —trece en
+`test_due_date_calendar.py`, ocho de servicio y cinco de ruta que son los permisos de ventas por
+comportamiento, más doce en `test_the_live_channel.py`, que es el transporte de la H5— y **30 tests
+de pantalla** en `frontend/tests/`: el control de mes y la grilla, el recorte por día en las dos
+vistas, los estados en píldora, el guard de `busy`, cómo se reconoce RF-25, y la barra plegable.
+Los de pantalla obligaron a darle al frontend el runner que no tenía: vitest sobre jsdom, corriendo
+en `make test` y en el job Frontend del CI.
 
 > **Dónde queda la cadena.** `/converge` se corrió el 2026-08-31 (`converge.md`), volvió **deriva
 > mayor** por RF-41, el humano decidió construir la barra plegable, y la segunda corrida cierra los
-> cinco hallazgos. La feature pasa al `Code-Reviewer`.
+> cinco hallazgos. El `Code-Reviewer` pasó el gate el 2026-08-31 **sin Blockers**, con dos hallazgos
+> Major y cinco Minor; los siete se corrigieron el mismo día, cada uno con su test. La feature pasa
+> al `Release-Manager`.
 
 > **El módulo es compartido.** De esta feature son `DueDate`, `DueDateChange`, `DueDateOrigin`, el
 > bloque de calendario del repositorio y del servicio, los seis schemas `DueDate*`/`CalendarRead`, el
@@ -167,7 +177,11 @@ migración → backend → frontend → tests.
 |---|-------|-------|-----|-------|--------|
 | ✅ 43 | `PUT /calendar/{id}/date` sirve igual para arrastrar que para elegir la fecha: el backend no distingue cómo lo dijo la persona. Las dos formas de H8 y de H4 dependen **sólo del frontend**. | `add_backend_feature` | Developer | RF-42 | — |
 | ✅ 44 | **Hecho el 2026-08-31**: mover abre un panel con `<Input type="date">` y un motivo opcional. Se fue el `window.prompt` donde la fecha se escribía a mano — que es la peor forma de elegir un día en una pantalla que existe para no equivocarse de día. Lo que había antes:: hoy la única forma es `window.prompt('Fecha nueva (aaaa-mm-dd)')`, donde la persona **escribe** la fecha como texto, y H8 se prueba *"eligiendo la fecha nueva de un selector"*. El propio componente demuestra que el patrón está a mano: el formulario de alta ya usa un `<Input type="date">` — es la deriva más barata de cerrar de toda la lista. **Corregir también el docstring del componente**, que afirma lo contrario de lo que el código hace. | `add_frontend_feature` | Developer | RF-42 | D11 |
-| ✅ 45 | **Corrida dos veces el 2026-08-31**, contra el stack local y sobre un iPhone 13 emulado. Acta y capturas en `evidence/`. **RF-19 y RF-42 cumplen**: se arrastró una tarjeta del 26 al 30 —preguntando antes, porque el 30 ya pasó, y sin respuesta no movió nada (RF-25)— y se movió otra desde el teléfono eligiendo la fecha en el `<input type="date">`, con motivo; las dos guardaron la fecha original, quién y cuándo. **RF-41 no cumplía en la primera corrida**, y el defecto no era del calendario: la barra lateral del shell medía 832px de alto sobre un viewport de 664px, así que la primera pantalla entera era el menú y el calendario empezaba en y=864px. **El humano aprobó plegarla** (2026-08-31) y se construyó: la barra pasó a 76px y el calendario arranca en y=108px. Falta la palabra final sobre un teléfono de verdad, que un emulador no puede dar. | `add_tests` | Tester | RF-19, RF-41, RF-42 | D3, D11 |
+| ✅ 45 | **Corrida dos veces el 2026-08-31**, contra el stack local y sobre un iPhone 13 emulado. Acta y capturas en `evidence/`. **RF-19 y RF-42 cumplen**: se arrastró una tarjeta del 26 al 30 —preguntando antes, porque el 30 ya pasó, y sin respuesta no movió nada (RF-25)— y se movió otra desde el teléfono eligiendo la fecha en el `<input type="date">`, con motivo; las dos guardaron la fecha original, quién y cuándo. **RF-41 no cumplía en la primera corrida**, y el defecto no era del calendario: la barra lateral del shell medía 832px de alto sobre un viewport de 664px, así que la primera pantalla entera era el menú y el calendario empezaba en y=864px. **El humano aprobó plegarla** (2026-08-31) y se construyó: la barra pasó a 76px y el calendario arranca en y=108px. Falta la palabra final sobre un teléfono de verdad, que un emulador no puede dar. **Y falta
+volver a correrla para RF-25**: el review cambió el `window.confirm` nativo por un diálogo de la
+aplicación, así que las capturas de esas dos corridas ya no muestran lo que la pantalla hace. La
+conducta quedó fijada por test —incluido que cerrar por `Escape` sea «no»—; cómo se ve un modal en
+390px, no. | `add_tests` | Tester | RF-19, RF-41, RF-42 | D3, D11 |
 
 ## Cobertura de requisitos
 

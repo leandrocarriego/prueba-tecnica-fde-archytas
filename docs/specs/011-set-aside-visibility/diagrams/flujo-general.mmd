@@ -24,11 +24,11 @@ sequenceDiagram
 
     Note over Marcela,Julian: Cada uno entra a la misma lista y ve lo de su área
 
-    Marcela->>Sistema: Revisa lo de proveedores, pagos, órdenes y mensajes
-    Julian->>Sistema: Revisa lo de precios y ventas
+    Marcela->>Sistema: Revisa lo de proveedores, pagos, órdenes, mensajes y precios
+    Julian->>Sistema: Revisa las ventas apartadas
 
-    alt Se puede resolver desde su pantalla
-        Marcela->>Sistema: Lo resuelve donde corresponde
+    alt Se resuelve en la pantalla propia del origen (hoy, las ventas)
+        Julian->>Sistema: Corrige la venta en la pantalla de ventas
         Sistema->>Sistema: Saca el pendiente de la lista sin que nadie lo cierre a mano
     else Sólo se puede dar por revisado
         Marcela->>Sistema: Deja constancia de que lo vio

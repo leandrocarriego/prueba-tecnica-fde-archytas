@@ -22,6 +22,7 @@ stateDiagram-v2
     Demorado --> Revisado: Una persona lo da por revisado
     Pendiente --> Resuelto: Se resuelve lo que lo originó,<br/>en la pantalla que le corresponde
     Demorado --> Resuelto: Se resuelve lo que lo originó
+    Resuelto --> Pendiente: Se deshace ese trabajo en la pantalla<br/>que le corresponde, y vuelve a la lista
     Revisado --> [*]: Sale de la lista y queda consultable
     Resuelto --> [*]: Sale de la lista y queda consultable
 ```
@@ -74,11 +75,11 @@ sequenceDiagram
 
     Note over Marcela,Julian: Cada uno entra a la misma lista y ve lo de su área
 
-    Marcela->>Sistema: Revisa lo de proveedores, pagos, órdenes y mensajes
-    Julian->>Sistema: Revisa lo de precios y ventas
+    Marcela->>Sistema: Revisa lo de proveedores, pagos, órdenes, mensajes y precios
+    Julian->>Sistema: Revisa las ventas apartadas
 
-    alt Se puede resolver desde su pantalla
-        Marcela->>Sistema: Lo resuelve donde corresponde
+    alt Se resuelve en la pantalla propia del origen (hoy, las ventas)
+        Julian->>Sistema: Corrige la venta en la pantalla de ventas
         Sistema->>Sistema: Saca el pendiente de la lista sin que nadie lo cierre a mano
     else Sólo se puede dar por revisado
         Marcela->>Sistema: Deja constancia de que lo vio
@@ -97,13 +98,14 @@ sequenceDiagram
 title: Julián, ventas — lo apartado de su área
 ---
 flowchart TD
-    A["Julián entra a la lista de pendientes"] --> B["Ve lo de su área: precios y ventas"]
-    B --> C["De cada uno lee el motivo y lo que se alcanzó a leer"]
-    C --> D{"¿Se puede resolver?"}
-    D -->|Sí| E["Lo resuelve en la pantalla que le corresponde"]
-    D -->|No, sólo mirarlo| F["Lo da por revisado, y queda quién y cuándo"]
-    B --> G["Lo de proveedores, pagos, órdenes y mensajes<br/>no le aparece"]
-    G --> H["Y si intenta resolver uno de esos,<br/>el sistema se lo impide"]
+    A["Julián entra a la lista de pendientes"] --> B["Ve lo de su área: las ventas apartadas"]
+    B --> C["De cada una lee el motivo, lo que se alcanzó<br/>a leer, de dónde salió y cuándo se leyó"]
+    C --> D{"¿La corrige en la pantalla de ventas?"}
+    D -->|Sí| E["El pendiente deja de figurar solo,<br/>sin que nadie lo cierre a mano"]
+    D -->|"No, sólo mirarla"| F["La da por revisada, y queda quién y cuándo"]
+    E --> G["Queda consultable, diciendo que se resolvió<br/>en la pantalla de ventas"]
+    B --> H["Lo de proveedores, pagos, órdenes, mensajes<br/>y precios no le aparece"]
+    H --> I["Y si intenta resolver uno de esos,<br/>el sistema se lo impide"]
 ```
 
 ## Marcela, compras — lo apartado de su área
@@ -113,14 +115,14 @@ flowchart TD
 title: Marcela, compras — lo apartado de su área
 ---
 flowchart TD
-    A["Marcela entra a la lista de pendientes"] --> B["Ve lo de su área: proveedores, pagos,<br/>órdenes de compra y mensajes"]
-    B --> C["De cada uno lee el motivo, lo que el sistema<br/>alcanzó a leer y de dónde salió"]
-    C --> D{"¿Se puede resolver?"}
-    D -->|Sí| E["Lo resuelve en la pantalla que le corresponde"]
-    E --> F["El pendiente deja de figurar solo"]
-    D -->|No, sólo mirarlo| G["Lo da por revisado"]
-    G --> H["Queda registrado quién lo hizo y cuándo"]
-    B --> I["Si intenta abrir algo de precios o de ventas,<br/>el sistema no se lo muestra"]
+    A["Marcela entra a la lista de pendientes"] --> B["Ve lo de su área: proveedores, pagos,<br/>órdenes, mensajes y precios"]
+    B --> C["De cada uno lee el motivo, lo que el sistema<br/>alcanzó a leer, de dónde salió y cuándo se leyó"]
+    C --> D{"¿Se puede decidir algo?"}
+    D -->|Sí| E["Decide qué hacer con él,<br/>ahí mismo en la lista"]
+    D -->|"No, sólo mirarlo"| F["Lo da por revisado"]
+    E --> G["Queda registrado quién lo hizo y cuándo"]
+    F --> G
+    B --> H["Lo de ventas no le aparece, y si intenta<br/>resolverlo el sistema se lo impide"]
 ```
 
 ## Qué hace el sistema cuando no puede interpretar algo
@@ -147,4 +149,3 @@ flowchart TD
     M -->|No| L
     K --> O["Queda consultable para siempre"]
 ```
-

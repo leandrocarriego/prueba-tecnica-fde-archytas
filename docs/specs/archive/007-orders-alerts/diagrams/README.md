@@ -415,4 +415,3 @@ flowchart TD
 
     O["Las órdenes anteriores a la puesta en marcha se listan mostrando cuántos días pasaron desde el pedido"] --> P["El primer día ninguna queda señalada como estancada: el reloj arranca cuando el sistema empieza a mirar"]
 ```
-

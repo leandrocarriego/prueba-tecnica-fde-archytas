@@ -2,10 +2,11 @@
 title: Julián, ventas — lo apartado de su área
 ---
 flowchart TD
-    A["Julián entra a la lista de pendientes"] --> B["Ve lo de su área: precios y ventas"]
-    B --> C["De cada uno lee el motivo y lo que se alcanzó a leer"]
-    C --> D{"¿Se puede resolver?"}
-    D -->|Sí| E["Lo resuelve en la pantalla que le corresponde"]
-    D -->|No, sólo mirarlo| F["Lo da por revisado, y queda quién y cuándo"]
-    B --> G["Lo de proveedores, pagos, órdenes y mensajes<br/>no le aparece"]
-    G --> H["Y si intenta resolver uno de esos,<br/>el sistema se lo impide"]
+    A["Julián entra a la lista de pendientes"] --> B["Ve lo de su área: las ventas apartadas"]
+    B --> C["De cada una lee el motivo, lo que se alcanzó<br/>a leer, de dónde salió y cuándo se leyó"]
+    C --> D{"¿La corrige en la pantalla de ventas?"}
+    D -->|Sí| E["El pendiente deja de figurar solo,<br/>sin que nadie lo cierre a mano"]
+    D -->|"No, sólo mirarla"| F["La da por revisada, y queda quién y cuándo"]
+    E --> G["Queda consultable, diciendo que se resolvió<br/>en la pantalla de ventas"]
+    B --> H["Lo de proveedores, pagos, órdenes, mensajes<br/>y precios no le aparece"]
+    H --> I["Y si intenta resolver uno de esos,<br/>el sistema se lo impide"]

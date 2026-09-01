@@ -63,7 +63,14 @@ const GROUPS: ReadonlyArray<Group> = [
     entries: [
       { href: '/precios', label: 'Catálogo y precios', section: 'PRICES' },
       { href: '/rubros', label: 'Rubros', section: 'PRODUCT_CATEGORIES' },
-      { href: '/revision', label: 'Revisar esto', section: 'PRICES' },
+      /*
+       * No nombra sección, igual que `/acciones` y `/historial`. Pedía
+       * `PRICES`, que era cierto cuando en la cola sólo había precios y dejó de
+       * serlo cuando las ventas empezaron a caer ahí: le cerraba la puerta a
+       * Julián, el dueño de esa mitad. La pantalla recorta lo que *muestra* a
+       * las áreas que el que mira alcanza, en vez de cerrarse.
+       */
+      { href: '/revision', label: 'Revisar esto' },
     ],
   },
   {
@@ -117,7 +124,7 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
 
   return (
     <aside className="flex w-full flex-none flex-col bg-primary text-primary-foreground md:sticky md:top-0 md:h-dvh md:w-60">
-      <div className="flex items-center justify-between gap-3 px-5 py-5 md:py-5">
+      <div className="flex items-center justify-between gap-3 px-5 py-5">
         <Link href="/" className="flex items-center gap-3">
           <span className="flex size-9 flex-none items-center justify-center rounded-lg border-2 border-brand text-sm font-bold">
             FC
@@ -146,15 +153,8 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
         Plegado en un teléfono, siempre abierto desde `md`: la barra de
         escritorio no tiene botón, así que no puede quedar cerrada sin salida.
       */}
-      {/*
-        Elegir algo cierra el menú: en un teléfono, quedarse abierto tapa
-        exactamente la pantalla que la persona acaba de pedir. Va acá, sobre lo
-        que se puede tocar, y no en un efecto que mira la ruta: cerrar es la
-        consecuencia del clic, no de haber navegado.
-      */}
       <div
         id="menu-principal"
-        onClick={() => setOpen(false)}
         className={cn('min-h-0 flex-1 flex-col md:flex', open ? 'flex' : 'hidden')}
       >
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-5">
@@ -167,6 +167,15 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
                 <Link
                   key={entry.href}
                   href={entry.href}
+                  /*
+                   * Elegir algo cierra el menú: en un teléfono, quedarse
+                   * abierto tapa exactamente la pantalla que la persona acaba
+                   * de pedir. Va sobre cada enlace y no sobre el contenedor
+                   * —que es un `div`, y un `div` con `onClick` no se alcanza
+                   * con el teclado— ni en un efecto que mire la ruta: cerrar es
+                   * la consecuencia del clic, no de haber navegado.
+                   */
+                  onClick={() => setOpen(false)}
                   aria-current={isCurrent(pathname, entry.href, hrefs) ? 'page' : undefined}
                   className={cn(
                     'block rounded-md px-2.5 py-1.5 text-[13.5px] transition-colors',
@@ -186,6 +195,7 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
         <div className="border-t border-white/10 px-3 py-3">
           <Link
             href="/mi-cuenta"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-white/5"
           >
             <span className="flex size-8 flex-none items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold">

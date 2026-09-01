@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.operations import service as operations_service
 from app.modules.operations.models import JobStatus
 from app.modules.operations.service import (
     ABANDONED,
@@ -28,7 +29,6 @@ from app.modules.operations.service import (
     SYNC_JOBS,
     OperationsService,
 )
-from app.modules.operations import service as operations_service
 from app.modules.portal import service as portal_service
 from app.modules.portal import tasks as portal_tasks
 

@@ -28,6 +28,9 @@ HISTORY_PAGE = FIXTURES / "price-history-page-2026-08-28.html"
 INVOICES_PAGE = FIXTURES / "invoices-page-2026-08-29.html"
 INVOICE_FILE = FIXTURES / "invoice-F-8411-text.pdf"
 SUPPLIER_LEDGER = FIXTURES / "suppliers-ledger-page-2026-08-29.html"
+PURCHASE_ORDERS = FIXTURES / "purchase-orders-page-2026-08-29.html"
+MESSAGES = FIXTURES / "messages-page-2026-08-31.html"
+SALES = FIXTURES / "sales-page-2026-08-29.html"
 
 PRICE_COLUMN = 5
 CODE_COLUMN = 1
@@ -62,6 +65,125 @@ def invoice_file_bytes() -> bytes:
 def supplier_ledger_bytes() -> bytes:
     """The supplier register, with its eight rows already expanded."""
     return SUPPLIER_LEDGER.read_bytes()
+
+
+def purchase_orders_page_bytes() -> bytes:
+    """The purchase orders screen, with its forty rows."""
+    return PURCHASE_ORDERS.read_bytes()
+
+
+def messages_page_bytes() -> bytes:
+    """The portal inbox, with its sixty-seven messages."""
+    return MESSAGES.read_bytes()
+
+
+def sales_page_bytes() -> bytes:
+    """The sales screen, with the 588 records the survey measured."""
+    return SALES.read_bytes()
+
+
+# --- Rows the portal published broken -------------------------------------
+#
+# Four of the five screens 011 cares about were captured on a good day: only
+# the sales page carries unreadable rows, twelve of them. Testing that «lo
+# apartado se ve» needs a row that is actually apartada, so the broken variants
+# are **derived** from the pinned pages by blanking exactly one cell — the same
+# thing `price_list_with()` does to the spreadsheet, and for the same reason.
+#
+# Derived rather than checked in as four more `*-broken-*.html` files, because a
+# second copy of a captured page drifts from the first the day the portal
+# changes and nobody notices: these break a cell of whatever is pinned today, so
+# they cannot describe a page that no longer exists.
+#
+# What makes a cell fatal is not invented either — it is read off the parser. A
+# date it cannot interpret sets `reason`, and `reason` is what sends the row to
+# quarantine.
+
+UNREADABLE_CELL = "<td>—</td>"
+
+
+def _blank_the_cell(page: bytes, *, before: str, cell: str, after: str = "") -> bytes:
+    """Blank one cell, keeping every other cell of its row exactly as it was.
+
+    `before` and `after` are what pin the edit to one row of one table, and they
+    are also what keeps the row a row: an early version of this replaced two
+    cells with one, the row came out a column short, and the payment stopped
+    being a payment at all — the parser dropped it instead of quarantining it,
+    which looks from the test's side exactly like the feature not working.
+
+    The `AssertionError` is the other half of that. A silent no-op would hand
+    back the intact page, no case would open, and the failure would surface far
+    from here claiming the code is broken when what moved was the fixture.
+    """
+    html = page.decode("utf-8")
+    target = before + cell + after
+    assert target in html, f"the pinned page no longer has the cell {target!r} this breaks"
+    return html.replace(target, before + UNREADABLE_CELL + after, 1).encode("utf-8")
+
+
+def supplier_ledger_with_a_broken_payment() -> bytes:
+    """The register, with one payment of Aceros Belgrano whose date is unreadable."""
+    return _blank_the_cell(
+        supplier_ledger_bytes(),
+        before="<tr>",
+        cell="<td>2026-08-15</td>",
+        after="<td>Pago</td>",
+    )
+
+
+def supplier_ledger_with_a_broken_balance() -> bytes:
+    """The register, with one supplier whose current balance is unreadable.
+
+    The balance is the only cell of a supplier row a parser can fail on: the
+    name is text and the rest of the card is optional. Until 011 the failure was
+    swallowed — the reason was discarded and the row stored as readable with no
+    balance — so this fixture had nothing to prove against.
+    """
+    return _blank_the_cell(
+        supplier_ledger_bytes(),
+        before="<tr><td>Aceros Belgrano SA</td>",
+        cell="<td>$4.307.338</td>",
+    )
+
+
+def supplier_ledger_with_both_broken() -> bytes:
+    """El padrón con las dos cosas rotas: el saldo de un proveedor y la fecha de un pago.
+
+    Las dos en la **misma** lectura, porque así llegan: un documento, dos tablas
+    y dos clases de pendiente. Es lo que hace falta para preguntar si las dos
+    terminan en la misma pantalla (RF-06).
+    """
+    return _blank_the_cell(
+        supplier_ledger_with_a_broken_balance(),
+        before="<tr>",
+        cell="<td>2026-08-15</td>",
+        after="<td>Pago</td>",
+    )
+
+
+def purchase_orders_with_a_broken_row() -> bytes:
+    """The orders screen, with one order whose date is unreadable."""
+    return _blank_the_cell(
+        purchase_orders_page_bytes(),
+        before="<tr><td>OC-0022</td>",
+        cell="<td>2026-08-07</td>",
+    )
+
+
+def messages_with_a_broken_row() -> bytes:
+    """The inbox, with one message whose date is unreadable.
+
+    The inbox publishes no id of its own, so a message is recognised by its date,
+    sender and subject. A message whose date cannot be read therefore has no
+    identity either, which is exactly why it has to be shown to somebody rather
+    than merged with something else.
+    """
+    return _blank_the_cell(
+        messages_page_bytes(),
+        before="<tr>",
+        cell="<td>2026-08-30</td>",
+        after="<td>Insumos Industriales Bahia</td>",
+    )
 
 
 def price_list_with(

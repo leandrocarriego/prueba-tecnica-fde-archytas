@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.triage.models import CaseStatus
+from app.shared.sections import BusinessSection
 
 
 class CaseRead(BaseModel):
@@ -17,6 +18,10 @@ class CaseRead(BaseModel):
     kind: str
     reason: str
     payload: dict[str, Any]
+    # Which part of the business the case belongs to (RF-12). The screen shows
+    # it and filters by it; the service is what makes sure a case of an area
+    # somebody does not reach never gets this far.
+    section: BusinessSection
     status: CaseStatus
     batch_id: int | None
     occurrences: int
@@ -25,6 +30,12 @@ class CaseRead(BaseModel):
     resolved_by_name: str | None
     resolved_at: datetime | None
     created_at: datetime
+    # How long it has been waiting, and whether that is too long (RF-16,
+    # RF-17). Both are computed when the case is read and neither is stored: a
+    # subtraction between two dates kept in a column is a derived state that
+    # goes stale the moment nobody re-runs the job that wrote it.
+    waiting_days: int = 0
+    is_stale: bool = False
 
 
 class CaseList(BaseModel):
@@ -34,6 +45,18 @@ class CaseList(BaseModel):
     total: int
     skip: int
     limit: int
+    # What the header of the screen says: how many are waiting and since when
+    # (RF-15, RF-16). They are about **every** pending case of the areas this
+    # person reaches, not about the page — a page-sized total would say the
+    # list is short whenever the page is.
+    pending_total: int = 0
+    oldest_at: datetime | None = None
+    # The areas this person may ask to see on their own (RF-22). It travels with
+    # the page so the screen can draw the filter **without keeping a second copy
+    # of the role matrix**: which areas a role reaches is `identity`'s answer
+    # and nobody else's, and a copy of it in the browser would be one rule in
+    # two places, which is one rule and one bug.
+    sections: list[BusinessSection] = []
 
 
 class ResolutionRequest(BaseModel):

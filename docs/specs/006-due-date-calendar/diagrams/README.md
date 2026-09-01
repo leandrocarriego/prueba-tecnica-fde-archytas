@@ -273,4 +273,3 @@ flowchart TD
     S{"¿La conexión en vivo se interrumpió?"} -->|Sí| T["Avisa a quien está mirando que el calendario puede estar desactualizado"]
     T --> U["Cuando se restablece, le muestra el estado actualizado del calendario"]
 ```
-

@@ -308,4 +308,3 @@ flowchart TD
     AB["Nunca completa un dato por suposición"] --- U
     AC["El CUIT que estas facturas imprimen suele ser el del propio cliente:<br/>por eso sólo identifica si es de alguno de los ocho del padrón"] --- V
 ```
-

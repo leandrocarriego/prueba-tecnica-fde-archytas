@@ -1,0 +1,21 @@
+---
+title: El dueño — el aviso antes que el número
+---
+flowchart TD
+    A["Entra con su acceso"] --> B["Encuentra el menú a la izquierda, agrupado por área,<br/>con la sección que está mirando señalada"]
+    B --> C["Ve su nombre y la salida para cerrar sesión sin abrir ningún desplegable"]
+
+    B --> D["Abre el tablero"]
+    D --> E{"¿El indicador dejó registros afuera por dudosos?"}
+    E -->|Sí| F["El aviso aparece por encima del número"]
+    F --> G["Y trae el enlace para ir a resolver esos casos"]
+    E -->|No| H["El tablero lo dice con todas las letras, en vez de no mostrar nada"]
+
+    B --> I["Recorre el calendario y los proveedores"]
+    I --> J["El mismo estado se dibuja igual que en el tablero:<br/>misma pastilla, mismo color"]
+    I --> K["Distingue a simple vista lo que todavía nadie confirmó<br/>de lo que ya está confirmado"]
+
+    B --> L["Ve todo el sistema: ninguna sección se le oculta"]
+
+    M["En cada pantalla hay como mucho un botón naranja,<br/>y es el que resuelve lo que vino a hacer"]
+    N["En el calendario, que es una lista de casos para decidir,<br/>no hay ninguno"]

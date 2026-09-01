@@ -64,6 +64,23 @@ describe('la barra lateral en una pantalla angosta', () => {
     expect(screen.getByRole('button', { name: 'Menú' })).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('elegir una sección la cierra, que es lo que el menú tapaba', async () => {
+    /*
+     * El handler vive sobre cada enlace y no sobre el contenedor. Estaba sobre
+     * el `div`, que es un elemento no interactivo: funcionaba con el dedo y no
+     * con el teclado, y cerraba también al tocar el título de un grupo.
+     */
+    const user = userEvent.setup()
+    render(<Navigation user={USER} permissions={TODO} />)
+
+    await user.click(screen.getByRole('button', { name: 'Menú' }))
+    expect(menu().className).not.toContain('hidden')
+
+    await user.click(screen.getByRole('link', { name: 'Facturas' }))
+    expect(menu().className).toContain('hidden')
+    expect(screen.getByRole('button', { name: 'Menú' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('el botón nombra el panel que abre', () => {
     render(<Navigation user={USER} permissions={TODO} />)
 
