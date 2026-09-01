@@ -17,7 +17,7 @@ import { selectClassName } from '@/components/ui/input'
  * sistema, porque es la misma clase de decisión: un valor que el dueño elige y
  * que rige para todo el equipo.
  *
- * Client Component por lo mismo que `ParameterRow`: es un control con estado, y
+ * Client Component por lo mismo que `ParameterCard`: es un control con estado, y
  * cada fila se guarda sola para que un rechazo diga cuál falló.
  *
  * **Cuántas personas alcanza cada ruta se muestra al lado**, y no es decoración:
@@ -40,19 +40,20 @@ export function AlertRoutes({ routes }: { routes: AlertRoute[] }) {
 
   return (
     <section className="space-y-3">
-      <header className="space-y-1">
-        <h2 className="text-lg font-semibold">Quién recibe cada aviso</h2>
-        <p className="text-sm text-muted-foreground">
-          El aviso llega por WhatsApp al número registrado de cada persona que tenga el rol elegido.
-          Ventas no figura: no accede a la bandeja de mensajes de la que hablan estos avisos.
-        </p>
-      </header>
+      <Card className="overflow-hidden">
+        <header className="space-y-1 p-5">
+          <h2 className="font-semibold">Por dónde llegan los avisos</h2>
+          <p className="text-sm text-muted-foreground">
+            El aviso llega por WhatsApp al número registrado de cada persona que tenga el rol
+            elegido. Ventas no figura: no accede a la bandeja de mensajes de la que hablan estos
+            avisos.
+          </p>
+        </header>
 
-      <Card>
         {routes.map(route => (
           <div
             key={route.kind}
-            className="flex flex-wrap items-center justify-between gap-3 border-b p-4 last:border-b-0"
+            className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4"
           >
             <div>
               <p className="font-medium">{ALERT_KINDS[route.kind] ?? route.kind}</p>

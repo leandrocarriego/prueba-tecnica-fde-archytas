@@ -1,22 +1,18 @@
 /**
- * Branding configuration for authentication pages.
+ * La identidad de las pantallas de sesión: colores, marca y textos.
  *
- * This configuration allows customization of:
- * - Colors and theme
- * - Logo and branding elements
- * - Text content
- * - Layout styles
- * - Background images
+ * Es un archivo de datos, no de aspecto. **La forma la pone `AuthLayout`** y es
+ * una sola —el panel de identidad y el formulario al lado, como en
+ * `docs/design/` (3m)—, así que acá ya no hay variantes de layout ni opciones
+ * de tarjeta: eran andamio de una plantilla genérica que nadie usaba y que hacía
+ * que el ingreso se viera como cualquier producto menos como éste.
  */
-
-export type AuthLayout = 'centered' | 'split-screen' | 'full-width'
 
 export interface BrandingColors {
   primary: string
   primaryHover: string
   /** El texto que va encima de `primary`. Es paleta, no un blanco cualquiera. */
   primaryForeground: string
-  secondary?: string
   background: string
   cardBackground: string
   text: string
@@ -27,16 +23,20 @@ export interface BrandingColors {
 }
 
 export interface BrandingLogo {
-  src?: string
+  /** El sello del panel: dos letras. Lo dibuja `AuthLayout`. */
+  text: string
   alt?: string
-  component?: React.ComponentType<{ className?: string }>
-  text?: string
-  size?: 'sm' | 'md' | 'lg'
+}
+
+/** De quién es la plataforma, tal como se lee en el panel de identidad. */
+export interface BrandingBusiness {
+  name: string
+  /** La bajada del panel: qué es esto, en tres palabras. */
+  tagline: string
 }
 
 export interface BrandingTexts {
   loginTitle: string
-  loginSubtitle: string
   loginButton: string
   resetPasswordTitle: string
   resetPasswordSubtitle: string
@@ -48,40 +48,17 @@ export interface BrandingTexts {
   confirmPasswordLabel: string
   emailPlaceholder: string
   passwordPlaceholder: string
-  rememberMe?: string // Optional "Remember me" checkbox label
-}
-
-export interface BrandingFormOptions {
-  showRememberMe?: boolean // Show "Remember me" checkbox
-  textAlignment?: 'left' | 'center' // Text alignment for titles and descriptions
-  cardStyle?: {
-    rounded?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
-    shadow?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'none'
-  }
-}
-
-export interface BrandingLayout {
-  type: AuthLayout
-  backgroundImage?: string
-  backgroundOverlay?: string
-  leftSideContent?: {
-    title?: string
-    subtitle?: string
-    description?: string
-    image?: string
-  }
 }
 
 export interface AuthBrandingConfig {
   colors: BrandingColors
   logo: BrandingLogo
+  business: BrandingBusiness
   texts: BrandingTexts
-  layout: BrandingLayout
-  formOptions?: BrandingFormOptions
 }
 
 /**
- * Branding for the authentication pages (colors, logo, copy, layout).
+ * Branding for the authentication pages (colors, logo, copy).
  * There is a single configuration: this file.
  */
 export const brandingConfig: AuthBrandingConfig = {
@@ -107,34 +84,29 @@ export const brandingConfig: AuthBrandingConfig = {
     success: 'var(--ok)',
   },
   logo: {
-    text: 'Cordillera',
-    size: 'md',
+    text: 'FC',
+    alt: 'Ferretería Industrial Cordillera',
+  },
+  business: {
+    name: 'Ferretería Industrial Cordillera',
+    tagline: 'Gestión interna',
   },
   texts: {
-    loginTitle: 'Iniciar Sesión',
-    loginSubtitle: 'Ingresa tus credenciales para acceder a la plataforma',
-    loginButton: 'Iniciar Sesión',
-    resetPasswordTitle: 'Restablecer Contraseña',
-    resetPasswordSubtitle: 'Ingresa tu email para recibir un enlace de restablecimiento',
-    resetPasswordButton: 'Enviar Enlace',
-    forgotPasswordLink: '¿Olvidaste tu contraseña?',
-    backToLogin: 'Volver al Login',
+    loginTitle: 'Entrar',
+    loginButton: 'Ingresar',
+    resetPasswordTitle: 'Recuperar el acceso',
+    // El enlace **sale por WhatsApp**, al número registrado del acceso: el
+    // email es sólo con lo que se identifica quien lo pide.
+    resetPasswordSubtitle:
+      'Poné el email con el que entrás y te mandamos el enlace por WhatsApp, al número que tenés registrado.',
+    resetPasswordButton: 'Mandarme el enlace',
+    forgotPasswordLink: 'Olvidé mi contraseña',
+    backToLogin: 'Volver al ingreso',
     emailLabel: 'Email',
     passwordLabel: 'Contraseña',
-    confirmPasswordLabel: 'Confirmar Contraseña',
-    emailPlaceholder: 'tu@email.com',
+    confirmPasswordLabel: 'Repetir la contraseña',
+    emailPlaceholder: 'nombre@cordillera.com.ar',
     passwordPlaceholder: '••••••••',
-  },
-  layout: {
-    type: 'centered',
-  },
-  formOptions: {
-    showRememberMe: false,
-    textAlignment: 'center',
-    cardStyle: {
-      rounded: 'md',
-      shadow: 'sm',
-    },
   },
 }
 
