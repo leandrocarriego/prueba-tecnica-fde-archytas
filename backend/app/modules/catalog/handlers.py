@@ -32,7 +32,7 @@ from app.shared.events import (
     QuarantineCaseResolved,
     QuarantineRuleRedecided,
     QuarantineRuleRevoked,
-    SalesNormalized,
+    SalesCounted,
     events,
 )
 
@@ -162,19 +162,27 @@ async def record_order_spend(event: PurchaseOrdersNormalized, session: AsyncSess
     await CatalogService(session).record_order_spend(event.orders)
 
 
-@events.subscribe(SalesNormalized)
-async def record_sale_revenue(event: SalesNormalized, session: AsyncSession) -> None:
-    """Keep this module's «ventas por rubro» fed by the sales that were typed.
+@events.subscribe(SalesCounted)
+async def record_sale_revenue(event: SalesCounted, session: AsyncSession) -> None:
+    """Keep this module's «ventas por rubro» fed by the sales that **count**.
 
-    El gemelo exacto del handler de arriba, por el otro lado del negocio.
-    `sales` es dueño de los montos y este módulo no lee su tabla (Artículo IV):
-    reacciona a que un lote de ventas se normalizó y mantiene su proyección, que
-    es lo que la pantalla de rubros suma.
+    El gemelo del handler de arriba, por el otro lado del negocio. `sales` es
+    dueño de los montos y este módulo no lee su tabla (Artículo IV): reacciona a
+    un hecho y mantiene su proyección, que es lo que la pantalla de rubros suma.
+
+    **Escucha `SalesCounted` y no `SalesNormalized`, y la diferencia es plata.**
+    «Se pudo leer» no es «cuenta»: una venta cuyo total se aleja de lo habitual
+    para su producto, o una repetida con datos distintos, se leyó entera y queda
+    apartada igual. Sumando por lo normalizado, este panel contaba noventa y
+    seis ventas mientras la pantalla de ventas contaba noventa y una — dos
+    números distintos sobre lo mismo, que es peor que un número que falta.
 
     Existe porque el tablero del vendedor mostraba **gasto** por rubro, que es
     una respuesta sobre lo que se compra puesta delante de quien vende.
     """
-    await CatalogService(session).record_sale_revenue(event.sales)
+    await CatalogService(session).record_sale_revenue(
+        event.counted, no_longer_counted=event.no_longer_counted
+    )
 
 
 @events.subscribe(QuarantineCaseResolved)

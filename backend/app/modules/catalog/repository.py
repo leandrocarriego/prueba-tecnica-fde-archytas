@@ -463,6 +463,15 @@ class CatalogRepository:
         )
         await self.session.flush()
 
+    async def drop_sale_revenue(self, staging_row_ids: list[int]) -> None:
+        """Sacar de lo vendido las ventas que dejaron de contar."""
+        if not staging_row_ids:
+            return
+        await self.session.execute(
+            delete(SaleRevenue).where(SaleRevenue.staging_row_id.in_(staging_row_ids))
+        )
+        await self.session.flush()
+
     async def revenue_by_category(
         self, since: date | None = None, until: date | None = None
     ) -> tuple[dict[int, Decimal], Decimal, Decimal]:

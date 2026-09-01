@@ -1152,6 +1152,41 @@ class SalesHeld(DomainEvent):
     cases: tuple[HeldSale, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class CountedSale:
+    """Una venta que **suma**, dicha para quien la tenga que sumar por otra cosa."""
+
+    staging_row_id: int
+    product_code: str | None
+    total: Decimal
+    sold_on: date | None
+
+
+@dataclass(frozen=True, slots=True)
+class SalesCounted(DomainEvent):
+    """Qué ventas cuentan después de un lote, y cuáles dejaron de contar.
+
+    El gemelo de `SalesHeld` por el lado bueno, y existe por una razón precisa:
+    `SalesNormalized` dice qué **se pudo leer**, que no es lo mismo que qué
+    **cuenta**. Entre las dos hay una venta cuyo total se aleja de lo habitual y
+    una repetida con datos distintos: leídas enteras las dos, apartadas las dos.
+    Un módulo que sumara por `SalesNormalized` estaría contando plata que la
+    pantalla de ventas deja explícitamente afuera de todos sus totales, y dos
+    números distintos sobre lo mismo es peor que un número que falta.
+
+    **Las dos mitades viajan juntas y ninguna sirve sola.** Una venta que ya
+    contaba puede dejar de contar cuando llega su repetida —las dos quedan
+    esperando a que alguien elija—, así que quien mantiene una proyección
+    necesita tanto lo que entra como lo que sale. Es el mismo argumento que
+    `PendingWorkReported` hace para los casos: informar sólo las altas deja
+    creciendo un total con cosas que ya no están.
+    """
+
+    batch_id: int
+    counted: tuple[CountedSale, ...]
+    no_longer_counted: tuple[int, ...] = ()
+
+
 # ── the daily digest, assembled across modules (007) ─────────────────────────
 #
 # The digest is one message about two modules' business — the messages still

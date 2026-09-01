@@ -74,13 +74,13 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
     AuditAction,
     CorrectionConflicted,
+    CountedSale,
     KnownProductsMissing,
     ManualChangeRecorded,
     MissingProduct,
     NormalizedHistoryPoint,
     NormalizedPriceRow,
     NormalizedPurchaseOrder,
-    NormalizedSale,
     ProductPricesUpdated,
     ProductsRegistered,
     RegisteredProduct,
@@ -734,25 +734,24 @@ class CatalogService:
         ]
         await self.catalog.record_order_spend(lines)
 
-    async def record_sale_revenue(self, sales: tuple[NormalizedSale, ...]) -> None:
-        """Keep «ventas por rubro» fed by the sales that were typed.
+    async def record_sale_revenue(
+        self, sales: tuple[CountedSale, ...], *, no_longer_counted: tuple[int, ...] = ()
+    ) -> None:
+        """Keep «ventas por rubro» fed by the sales that count.
 
-        **Sólo entra lo que suma.** Un registro que el parser no pudo leer
-        entero viaja igual en el evento —con su motivo, que es lo que la 009
-        pide— y no cuenta en ningún total: sin monto no hay venta que sumar, y
-        con un motivo la venta está apartada esperando a alguien. Contarla acá
-        sería contarla en el único lugar donde nadie la está mirando.
+        **Las dos mitades, y ninguna sirve sola.** Lo que empieza a contar entra;
+        lo que dejó de contar —una venta que ya sumaba y quedó apartada cuando
+        llegó su repetida— sale. Aplicar sólo las altas deja un total creciendo
+        con plata que la pantalla de ventas ya no suma.
 
         El rubro no se decide acá: es un join que se hace al leer contra los
         productos de este módulo, así que una venta cuyo producto reciba un
         rubro mañana se mueve sola de «sin rubro» al suyo.
         """
-        lines = [
-            (sale.staging_row_id, sale.product_code, sale.total, sale.sold_on)
-            for sale in sales
-            if sale.total is not None and sale.reason is None
-        ]
-        await self.catalog.record_sale_revenue(lines)
+        await self.catalog.drop_sale_revenue(list(no_longer_counted))
+        await self.catalog.record_sale_revenue(
+            [(sale.staging_row_id, sale.product_code, sale.total, sale.sold_on) for sale in sales]
+        )
 
     async def products_first_seen_since(self, since: datetime) -> list[Product]:
         """The products the catalog started to know after a moment.

@@ -36,11 +36,13 @@ from app.modules.sales.schemas import (
 )
 from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
+    CountedSale,
     HeldSale,
     NormalizedSale,
     PendingItem,
     QuarantinedSourceReopened,
     QuarantinedSourceResolved,
+    SalesCounted,
     SalesHeld,
     events,
 )
@@ -125,6 +127,10 @@ class SalesService:
         # because a repeated sale is **one** thing to decide, however many
         # versions of it arrived in the same batch.
         waiting: list[Sale] = []
+        # Y las dos mitades de «esto suma»: lo que empieza a contar y lo que
+        # dejó de hacerlo porque llegó su repetida.
+        adding: list[CountedSale] = []
+        dropped: list[int] = []
 
         for row in sales:
             if row.reason is not None:
@@ -163,6 +169,12 @@ class SalesService:
                     if sibling.state is SaleState.COUNTED:
                         sibling.state = SaleState.HELD
                         sibling.reason = DUPLICATE_WITH_DIFFERENCES
+                        # Contaba y dejó de contar. Quien tenga una proyección
+                        # de lo vendido tiene que enterarse de la baja igual que
+                        # de las altas, o sigue sumando plata que esta pantalla
+                        # ya no suma.
+                        if sibling.staging_row_id is not None:
+                            dropped.append(sibling.staging_row_id)
 
             sale = await self.sales.add(
                 self._sale_of(
@@ -175,9 +187,27 @@ class SalesService:
             held += int(sale.state is SaleState.HELD)
             if sale.state is SaleState.HELD:
                 waiting.append(sale)
+            elif sale.staging_row_id is not None and sale.total is not None:
+                adding.append(
+                    CountedSale(
+                        staging_row_id=sale.staging_row_id,
+                        product_code=sale.product_code,
+                        total=sale.total,
+                        sold_on=sale.sold_on,
+                    )
+                )
 
         await self.session.flush()
         await self._announce_held(batch_id=batch_id, records=waiting)
+        # Y lo que cuenta, que es la otra mitad. Se publica siempre, también
+        # vacío: quien mantiene una proyección de lo vendido necesita las bajas
+        # aunque no haya altas.
+        await events.publish(
+            SalesCounted(
+                batch_id=batch_id, counted=tuple(adding), no_longer_counted=tuple(dropped)
+            ),
+            self.session,
+        )
         logger.info(
             "Sales registered",
             extra={"batch_id": batch_id, "counted": counted, "held": held, "merged": merged},
