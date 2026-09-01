@@ -1,63 +1,17 @@
-import Link from 'next/link'
-
-import { getSession } from '@/app/actions/auth'
-import { NoPermission } from '@/components/common/NoPermission'
-import { SalesReview } from '@/components/sales/SalesReview'
-import { fetchFromApi } from '@/lib/api/server'
-import { canEdit } from '@/lib/auth/permissions'
-import type { ResolvedGroup, ReviewQueue, SaleList } from '@/lib/sales/types'
-
-export const metadata = {
-  title: 'Ventas apartadas — Plataforma Cordillera',
-}
+import { redirect } from 'next/navigation'
 
 /**
- * Las ventas que ningún indicador puede sumar todavía (H2, H3 y H5 de 009).
+ * La revisión de ventas se mudó a «Para decidir».
  *
- * Es la frase del cliente hecha pantalla: *"que se nos avise cuáles son, no que
- * se sumen como si fueran válidas"*.
+ * Era la única pantalla del área, y era una segunda cola de pendientes: lo
+ * repetido y lo roto esperaban acá mientras todo lo demás que la plataforma
+ * aparta esperaba en `/revision`. RF-06 de la 011 pide **una sola lista de lo
+ * que está pendiente**, y dos listas no son una aunque las dos estén bien
+ * hechas.
+ *
+ * La ruta se queda redirigiendo, con el área ya elegida: puede estar en el
+ * historial de quien la usaba todos los días.
  */
-export default async function SalesReviewPage() {
-  // Lo descartado se pide aparte y a propósito: **no está en la cola**, porque
-  // no espera ninguna decisión. Pero es la mitad de lo que los indicadores
-  // excluyen, y RF-26 pide poder ver los registros que un número dejó afuera —
-  // hasta acá, la mitad unificada no se veía desde ningún lado.
-  //
-  // Y los casos ya decididos se piden aparte por lo mismo: tampoco están en la
-  // cola —RF-37 quiere que se vayan de los pendientes— y sin embargo RF-34,
-  // RF-35 y RF-36 son sobre ellos. Mientras no se pidieron, esos tres
-  // requisitos no tenían pantalla donde ocurrir.
-  const [queue, resolved, discarded, session] = await Promise.all([
-    fetchFromApi<ReviewQueue>('/sales/review'),
-    fetchFromApi<ResolvedGroup[]>('/sales/resolved?limit=50'),
-    fetchFromApi<SaleList>('/sales?state=DISCARDED&limit=200'),
-    getSession(),
-  ])
-
-  if (queue === null) {
-    return <NoPermission what="las ventas" />
-  }
-
-  return (
-    <div className="space-y-8">
-      <Link className="text-sm text-link hover:underline" href="/tablero">
-        « Volver al tablero
-      </Link>
-
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Ventas apartadas</h1>
-        <p className="text-sm text-muted-foreground">
-          {queue.held} registros apartados en total. Ninguno entra en los indicadores hasta que
-          alguien decida.
-        </p>
-      </header>
-
-      <SalesReview
-        queue={queue}
-        resolved={resolved ?? []}
-        discarded={discarded?.items ?? []}
-        canEdit={canEdit(session?.permissions ?? {}, 'SALES')}
-      />
-    </div>
-  )
+export default function SalesReviewMoved() {
+  redirect('/revision?area=SALES')
 }

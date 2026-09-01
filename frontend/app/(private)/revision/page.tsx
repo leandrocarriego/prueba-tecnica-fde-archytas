@@ -1,12 +1,13 @@
 import { getSession } from '@/app/actions/auth'
 import { CaseQueue } from '@/components/triage/CaseQueue'
 import { ReviewHeader } from '@/components/triage/ReviewHeader'
-import { RuleList } from '@/components/triage/RuleList'
+import { SavedDecisions } from '@/components/triage/SavedDecisions'
 import { Empty, ErrorState } from '@/components/ui/state'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
 import type { CategoryList } from '@/lib/catalog/types'
 import type { SupplierList } from '@/lib/purchases/types'
+import type { ResolvedGroup, ReviewQueue } from '@/lib/sales/types'
 import type { CaseList, Rule } from '@/lib/triage/types'
 
 export const metadata = {
@@ -54,9 +55,17 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
     pregunta no se hace, y el bloque no se dibuja.
   */
   const mayReadRules = session !== null && canEdit(session.permissions, 'PRICES')
+  /*
+    Lo mismo para las ventas apartadas, y por la misma razón. Desde ahora una
+    venta repetida o rota es un caso más de esta cola, y resolverla necesita el
+    registro entero —las versiones enfrentadas, o el dato que falta—, que vive
+    detrás de `SALES` en escritura. Quien no la alcanza ve el caso igual, con su
+    motivo: lo que no ve es la venta.
+  */
+  const mayResolveSales = session !== null && canEdit(session.permissions, 'SALES')
   const query = area ? `&section=${encodeURIComponent(area)}` : ''
 
-  const [cases, rules, categories, suppliers] = await Promise.all([
+  const [cases, rules, categories, suppliers, salesQueue, decidedSales] = await Promise.all([
     fetchFromApi<CaseList>(`/triage/cases?limit=100${query}`),
     mayReadRules ? fetchFromApi<Rule[]>('/triage/rules') : Promise.resolve(null),
     // Los rubros, para que un caso de forma escrita nueva se pueda resolver acá
@@ -73,6 +82,16 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
       403 sería peor que decir quién puede hacerlo.
     */
     fetchFromApi<SupplierList>('/suppliers'),
+    mayResolveSales ? fetchFromApi<ReviewQueue>('/sales/review') : Promise.resolve(null),
+    /*
+      Y las que ya se decidieron, que es lo que hace revocable la decisión
+      (RF-34, RF-35, RF-36 de 009). Vive acá desde que `/ventas` es un listado:
+      deshacer una decisión devuelve la venta a esta cola, así que la palanca y
+      su consecuencia están en la misma pantalla.
+    */
+    mayResolveSales
+      ? fetchFromApi<ResolvedGroup[]>('/sales/resolved?limit=50')
+      : Promise.resolve(null),
   ])
   // Asked here so a case can offer the second door when a load is refused by a
   // correction in force. It is not the permission that opens this screen —
@@ -113,20 +132,22 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
           mayCorrect={mayCorrect}
           categories={categories?.items ?? []}
           suppliers={suppliers?.items ?? []}
+          salesQueue={salesQueue}
+          mayResolveSales={mayResolveSales}
         />
       )}
 
-      {mayReadRules && (
-        <section className="space-y-3 rounded-xl border border-border bg-card p-6">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-foreground">Decisiones guardadas</h2>
-            <p className="text-sm text-muted-foreground">
-              El sistema las aplica solo a los casos iguales. Si dejás una sin efecto, esos casos
-              vuelven a esta pantalla.
-            </p>
-          </div>
-          <RuleList rules={rules ?? []} />
-        </section>
+      {/*
+        Todo lo ya decidido, en un solo bloque: las reglas aprendidas y las
+        ventas resueltas son la misma clase de cosa —una decisión tomada que se
+        puede revocar— y estaban en dos secciones distintas al pie.
+
+        Se dibuja si quien mira alcanza **alguna** de las dos mitades; adentro,
+        cada una aparece sólo si la trajo su consulta, que es la que el backend
+        recorta por permisos.
+      */}
+      {(mayReadRules || mayResolveSales) && (
+        <SavedDecisions rules={rules ?? []} sales={decidedSales ?? []} />
       )}
     </div>
   )

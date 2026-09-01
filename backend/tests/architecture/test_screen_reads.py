@@ -301,7 +301,14 @@ class TestThePageOfTheLogSaysHowMuchOfItThereIs:
 # hay runner de tests en el frontend, y estas dos reglas son estáticas.
 
 DASHBOARD = FRONTEND / "app" / "(private)" / "tablero" / "page.tsx"
-SALES_REVIEW = FRONTEND / "app" / "(private)" / "ventas" / "revision" / "page.tsx"
+# Las dos mitades de lo excluido dejaron de vivir en la misma pantalla, y por
+# eso son dos rutas y no una. Lo que **espera una decisión** está en la cola
+# —desde que `/ventas/revision` se mudó a «Para decidir»— y lo que **ya se
+# decidió** está en el listado de ventas, bajo «Que no suman». La regla que
+# verifica esta clase no cambió: sigue siendo que desde el número se llega a los
+# registros, y que ninguna de las dos mitades queda sin pantalla.
+SALES_QUEUE = "/revision?area=SALES"
+SALES_LISTING = FRONTEND / "app" / "(private)" / "ventas" / "page.tsx"
 
 
 @pytest.mark.unit
@@ -310,19 +317,20 @@ class TestTheExcludedRecordsCanBeReached:
 
     def test_the_excluded_count_is_a_link(self) -> None:
         """Un número que dice «excluí doce» y no lleva a los doce no se puede verificar."""
-        assert "/ventas/revision" in source(DASHBOARD), (
-            f"{DASHBOARD} ya no enlaza la revisión: el número excluido vuelve a ser "
+        assert SALES_QUEUE in source(DASHBOARD), (
+            f"{DASHBOARD} ya no enlaza la cola: el número excluido vuelve a ser "
             "un dato que nadie puede ir a comprobar (RF-26)."
         )
 
-    def test_the_review_screen_also_asks_for_what_was_discarded(self) -> None:
+    def test_the_sales_listing_also_asks_for_what_was_discarded(self) -> None:
         """Lo apartado espera una decisión; lo descartado, no — y las dos cosas se excluyen.
 
-        Si esta lectura desaparece, la pantalla vuelve a mostrar sólo la mitad de
-        lo que los indicadores dejaron afuera, y el enlace de arriba lleva a una
-        respuesta incompleta sin decirlo.
+        Si esta lectura desaparece, lo descartado deja de tener pantalla: el
+        enlace del tablero lleva a la cola, que sólo muestra lo que todavía
+        espera a alguien, y la otra mitad de lo excluido no se ve desde ningún
+        lado — sin que nada lo diga.
         """
-        assert "state=DISCARDED" in source(SALES_REVIEW), (
-            f"{SALES_REVIEW} dejó de pedir las descartadas: la mitad de lo que el "
+        assert "DISCARDED" in source(SALES_LISTING), (
+            f"{SALES_LISTING} dejó de ofrecer las descartadas: la mitad de lo que el "
             "tablero excluye vuelve a no verse desde ninguna pantalla (RF-26)."
         )

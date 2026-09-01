@@ -39,3 +39,20 @@ class RouteWrite(BaseModel):
     """
 
     role: Literal["OWNER", "PURCHASING"]
+
+
+class RouteTested(BaseModel):
+    """A dónde salió un aviso de prueba, para que se pueda verificar que llegó.
+
+    **Dice a cuántos teléfonos salió y no si llegó.** La entrega la hace el
+    worker contra un servicio de un tercero: contestarla acá obligaría a la
+    request a esperar esa llamada, que es exactamente lo que el resto de este
+    módulo evita. Lo que sí se puede afirmar en el acto es la mitad que más
+    falla —a quién iba dirigido y si había alguien— y esa se contesta.
+    """
+
+    kind: AlertKind
+    role: str
+    # Los últimos dígitos de cada número, que es lo que deja reconocer un
+    # teléfono propio sin publicar el número entero en una respuesta HTTP.
+    sent_to: list[str]

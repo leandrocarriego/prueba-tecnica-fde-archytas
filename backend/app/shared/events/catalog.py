@@ -1042,6 +1042,116 @@ class SaleRowsQuarantined(DomainEvent):
     cases: tuple[QuarantinedRow, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class HeldSale:
+    """One thing about the sales records that is waiting for a person.
+
+    Either a **group** — two or more records with the same code and something
+    different about them, none of which is added up until somebody says which
+    one is valid — or a **single record** that read whole and still cannot be
+    counted: it points at a product nobody knows, its total is wildly out of
+    line, or the parser could not read one of its fields.
+
+    `key` is what identifies the thing across the wall, and it is deliberately
+    two different shapes: the `code_key` for a group, because that is what a
+    decision is taken about, and the row id for a single record, because that
+    is what a correction is applied to. Whoever opens a case from this has to
+    send the same string back when it gets resolved, or the case never closes.
+    """
+
+    kind: str
+    key: str
+    code: str
+    reason: str
+    # How many records the thing is about. One for a broken record; two or more
+    # for a group, and the number is what tells a person how big the decision is
+    # before they open it.
+    versions: int = 1
+
+
+# ── lo que sigue esperando a una persona, reconciliado (011) ─────────────────
+#
+# Un caso de `triage` existe sólo si alguien lo publicó **en el momento en que
+# pasó**. Eso alcanza mientras todo lo que se aparta nace de una extracción, y
+# deja de alcanzar apenas hay algo que ya estaba apartado antes de que existiera
+# el evento que lo cuenta: una factura en revisión desde marzo, un proveedor sin
+# CUIT desde siempre, una venta repetida guardada antes de que `sales` aprendiera
+# a anunciarlo. Nadie los publicó nunca, así que para la cola no existen.
+#
+# El arreglo es el mismo mecanismo de siempre, con la dirección invertida:
+# alguien **pregunta en público** qué sigue pendiente, y el que tiene algo
+# contesta con su lista completa. Es la forma que ya usa el resumen diario, y por
+# la misma razón: quien pregunta no puede leer las tablas de los demás
+# (Artículo IV).
+
+
+@dataclass(frozen=True, slots=True)
+class PendingWorkRequested(DomainEvent):
+    """Alguien pregunta qué sigue esperando una decisión de una persona.
+
+    No lleva datos: es la pregunta. Cada módulo que tenga algo apartado contesta
+    publicando su propio `PendingWorkReported`, y el que no tenga nada no
+    contesta —lo cual también es una respuesta, porque una lista vacía cierra los
+    casos que hubieran quedado abiertos.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class PendingItem:
+    """Una cosa que espera a una persona, dicha para que la cola la muestre."""
+
+    kind: str
+    key: str
+    reason: str
+    # De qué área es, en las palabras del negocio, para que la cola lo recorte a
+    # quien corresponda. Viaja como string por lo mismo que el rol en las rutas
+    # de aviso: es vocabulario compartido, no el enum de un módulo.
+    section: str
+    # Lo que la pantalla necesita para dibujar el caso sin volver a preguntar:
+    # el número de la factura, el nombre del proveedor. Identificadores y
+    # etiquetas, nunca la entidad (`GEN-08`).
+    detail: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PendingWorkReported(DomainEvent):
+    """Todo lo que un módulo tiene esperando a una persona, como lista completa.
+
+    **La palabra que hace el trabajo es «completa».** No es un lote ni una
+    novedad: es el inventario de una clase de pendiente en este instante, y por
+    eso quien lo escucha puede hacer las dos mitades —abrir lo que falta y
+    **cerrar lo que sobra**—. Un caso abierto sobre una factura que ya se
+    resolvió en su pantalla deja de estar en la lista, y con eso se cierra solo.
+
+    `kinds` dice de qué clases habla el informe, y es lo que autoriza a cerrar:
+    sin él, un módulo que informa dos de sus tres clases haría desaparecer los
+    casos de la tercera. Un módulo que no tiene nada de una clase la nombra
+    igual, con la lista vacía — que es como se dice «de esto ya no queda nada».
+    """
+
+    kinds: tuple[str, ...]
+    items: tuple[PendingItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SalesHeld(DomainEvent):
+    """Sales records that came in and are waiting for a person (RF-13, RF-15).
+
+    The sibling of `SaleRowsQuarantined`, and the difference between them is
+    which side of the wall the record is on. That one is about a row `staging`
+    could not type at all; this one is about a record that made it into `core`
+    and still may not be added up.
+
+    Until this event existed, the second half was invisible from the one list of
+    what is pending: a repeated sale and a broken one lived only on the sales
+    screen, so the queue that promises to hold *everything* nobody could resolve
+    was missing two of the ways the platform sets something aside.
+    """
+
+    batch_id: int
+    cases: tuple[HeldSale, ...]
+
+
 # ── the daily digest, assembled across modules (007) ─────────────────────────
 #
 # The digest is one message about two modules' business — the messages still

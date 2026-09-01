@@ -16,6 +16,7 @@ from app.database import SessionFactory
 from app.logging import get_logger
 from app.modules.operations.service import SYNC_JOBS, OperationsService
 from app.shared.errors import ConflictError
+from app.shared.events import PendingWorkRequested, events
 from app.worker.bridge import async_task
 from app.worker.celery_app import celery_app
 
@@ -91,5 +92,37 @@ async def tick_extractions() -> dict[str, Any]:
 
 celery_app.conf.beat_schedule["extraction-tick"] = {
     "task": "operations.tick_extractions",
+    "schedule": timedelta(minutes=TICK_MINUTES),
+}
+
+
+@celery_app.task(name="operations.tick_pending_work")
+@async_task
+async def tick_pending_work() -> dict[str, Any]:
+    """Preguntar en público qué sigue esperando una decisión de una persona.
+
+    El latido que mantiene honesta la cola de pendientes. Todo lo demás la
+    alimenta **en el momento en que algo pasa**, lo cual es exacto para lo que
+    pasa desde que existe el evento que lo cuenta y ciego para todo lo que ya
+    estaba apartado antes: una factura en revisión desde marzo, un proveedor sin
+    CUIT desde siempre, una venta repetida guardada antes de que `sales`
+    aprendiera a anunciarlo. Nadie los publicó nunca, así que la cola decía que
+    no había nada mientras el padrón y las facturas decían que sí.
+
+    La pregunta no sabe quién contesta ni qué se hace con la respuesta —esto es
+    `operations` preguntando, no `operations` sabiendo de ventas—, y por eso
+    agregar un tercer módulo que tenga pendientes no se toca acá.
+
+    Es barata y es idempotente: quien la escucha abre sólo lo que falta y cierra
+    sólo lo que sobra, así que correrla de más no mueve nada.
+    """
+    async with SessionFactory() as session:
+        await events.publish(PendingWorkRequested(), session)
+        await session.commit()
+    return {"asked": True}
+
+
+celery_app.conf.beat_schedule["pending-work-tick"] = {
+    "task": "operations.tick_pending_work",
     "schedule": timedelta(minutes=TICK_MINUTES),
 }

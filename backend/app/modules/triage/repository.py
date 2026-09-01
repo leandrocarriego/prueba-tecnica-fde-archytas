@@ -172,6 +172,65 @@ class TriageRepository:
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
 
+    async def ensure_case(
+        self,
+        *,
+        kind: str,
+        reason: str,
+        payload: dict[str, Any],
+        fingerprint: str,
+        section: BusinessSection,
+    ) -> None:
+        """Make sure this case is listed, **without counting a re-arrival**.
+
+        The difference with `open_case` is the fact each one records.
+        `open_case` says *esto volvió a pasar* and bumps `occurrences`, which is
+        right for a row that arrives unreadable in three extractions in a row.
+        This one says *esto sigue pendiente*, which is the answer to a question
+        somebody asked, and re-asking it is not something happening again: a
+        reconciliation that ran every fifteen minutes would report an invoice
+        as having occurred ninety-six times by the end of the day.
+
+        So the conflict does nothing at all. A case already pending stays
+        exactly as it is —its `occurrences`, its `batch_id`, its `created_at`,
+        and therefore how long it has been waiting— and one that a person
+        already resolved is **not** re-opened here: the partial index only
+        covers pending rows, so a resolved case simply does not conflict, and
+        deciding whether it should come back is the caller's business and not a
+        side effect of an insert.
+        """
+        await self.session.execute(
+            insert(ExceptionCase)
+            .values(
+                kind=kind,
+                reason=reason,
+                payload=payload,
+                fingerprint=fingerprint,
+                batch_id=None,
+                section=section,
+                status=CaseStatus.PENDING,
+                occurrences=1,
+            )
+            .on_conflict_do_nothing(
+                index_elements=[ExceptionCase.fingerprint],
+                # Word for word like the index predicate, for the same reason as
+                # in `open_case`: PostgreSQL has to *prove* which index this is.
+                index_where=text("status = 'PENDING'"),
+            )
+        )
+
+    async def pending_of_kinds(self, kinds: tuple[str, ...]) -> list[ExceptionCase]:
+        """Every case still open under one of these kinds."""
+        if not kinds:
+            return []
+        result = await self.session.execute(
+            select(ExceptionCase).where(
+                ExceptionCase.kind.in_(kinds),
+                ExceptionCase.status == CaseStatus.PENDING,
+            )
+        )
+        return list(result.scalars().all())
+
     async def pending_by_fingerprint(self, fingerprint: str) -> ExceptionCase | None:
         """The case still open under this fingerprint, if there is one."""
         result = await self.session.execute(

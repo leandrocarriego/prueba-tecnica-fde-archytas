@@ -454,6 +454,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations/syncs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * En qué anda cada fuente de datos
+         * @description Owner only: es la pantalla donde se decide cada cuánto se consulta.
+         */
+        get: operations["list_syncs_api_v1_operations_syncs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/syncs/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Traer una fuente ahora
+         * @description Owner only.
+         *
+         *     Pedir una extracción a mano es golpear la puerta de un tercero, así que no
+         *     es una lectura que cualquier rol pueda hacer. Quién la pidió sale del token
+         *     y queda con la corrida; una segunda mientras hay una corriendo se contesta
+         *     con 409 en vez de abrir otra.
+         */
+        post: operations["request_sync_api_v1_operations_syncs__key__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/price-updates/status": {
         parameters: {
             query?: never;
@@ -1395,6 +1440,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decir que se está mirando el calendario
+         * @description Contar en el canal que esta persona tiene el calendario abierto (H5 de 006).
+         *
+         *     La otra mitad de «se actualiza en vivo». Hasta acá la pantalla decía qué
+         *     cambió y quién lo cambió, y no decía **quién más está mirando**, que es el
+         *     dato que cambia cómo se trabaja: mover un vencimiento sabiendo que del otro
+         *     lado hay alguien mirando la misma pantalla no es lo mismo que moverlo a
+         *     ciegas.
+         *
+         *     **Pide `WRITE` y no `READ`, y eso deja afuera a ventas: se anuncia quien
+         *     puede cambiar algo.** Nació pidiendo `READ` —anunciarse no escribe ningún
+         *     dato del negocio— y `tests/architecture/test_route_authorization.py` lo
+         *     frenó: un `POST` tiene que exigir el nivel que cambia, porque la alternativa
+         *     es que la regla dependa de que cada caso se juzgue a ojo. Debilitar el test
+         *     para dejar pasar éste habría sido cambiar una regla verificada por una
+         *     opinión (Artículo VI).
+         *
+         *     Y la consecuencia resulta ser la correcta: la presencia existe para que dos
+         *     personas no se pisen editando lo mismo, y quien tiene el calendario en sólo
+         *     lectura no puede pisar a nadie. Ventas ve quién está —el canal es de lectura
+         *     para los tres roles— y no aparece en la lista de los demás. La asimetría no
+         *     esconde ningún riesgo: nada de lo que ventas haga acá puede sorprender a
+         *     quien está moviendo un vencimiento.
+         *
+         *     **No hay registro de presencias en ninguna parte, y es deliberado.** Cada
+         *     navegador anuncia que está, cada tanto, y los demás lo escuchan; el que se
+         *     va deja de anunciarse y desaparece solo de las demás pantallas cuando se le
+         *     vence el turno. Una tabla de «quién está conectado» habría que limpiarla
+         *     cuando alguien cierra el navegador de golpe, que es justo el caso en que
+         *     nadie avisa — y una lista que se ensucia dice que hay gente mirando que no
+         *     está.
+         *
+         *     Viaja el nombre y el id, nada más: es lo que se dibuja. No es un registro de
+         *     auditoría —eso es el historial— y por eso no se guarda.
+         */
+        post: operations["announce_presence_api_v1_calendar_presence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/{due_date_id}": {
         parameters: {
             query?: never;
@@ -1699,6 +1796,48 @@ export interface paths {
         get: operations["list_routes_api_v1_alerts_routes_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/routes/{kind}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mandar un aviso de prueba de este tipo
+         * @description El dueño: probar un aviso es mandarle un WhatsApp a alguien.
+         *
+         *     **Por qué existe.** Un aviso se configura una vez y se comprueba el día que
+         *     hace falta, que es el peor día para descubrir que no llega: la sesión de
+         *     WhatsApp se desvinculó, el rol quedó sin nadie, alguien se dio de baja y
+         *     era el único con teléfono. Nada de eso falla ruidosamente — el aviso
+         *     simplemente no aparece, y del otro lado nadie sabe que tenía que aparecer.
+         *
+         *     **Sale a los destinatarios de verdad, no a quien aprieta el botón.** Es la
+         *     única forma de probar lo que se quiere probar: que el camino entero —el
+         *     tipo de aviso, el rol al que apunta, quién tiene ese rol, su teléfono y la
+         *     sesión de WhatsApp— termina en un teléfono encendido. Mandárselo a uno
+         *     mismo probaría el último tramo y ninguno de los anteriores. Por eso el
+         *     mensaje se identifica como prueba en su primera línea.
+         *
+         *     **Sale ahora, sin esperar la ventana horaria** (RF-42, RF-43). La ventana
+         *     existe para que un aviso automático no despierte a nadie a las tres de la
+         *     mañana; éste lo pidió una persona que está mirando la pantalla, y hacerlo
+         *     esperar al lunes sería no contestar la pregunta que hizo.
+         *
+         *     Sin nadie a quien mandárselo no se encola nada y se contesta por qué: es la
+         *     falla más común de las que esto viene a encontrar, y es la única que se
+         *     puede afirmar antes de intentar la entrega.
+         */
+        post: operations["test_route_api_v1_alerts_routes__kind__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3783,6 +3922,23 @@ export interface components {
             recipients: number;
         };
         /**
+         * RouteTested
+         * @description A dónde salió un aviso de prueba, para que se pueda verificar que llegó.
+         *
+         *     **Dice a cuántos teléfonos salió y no si llegó.** La entrega la hace el
+         *     worker contra un servicio de un tercero: contestarla acá obligaría a la
+         *     request a esperar esa llamada, que es exactamente lo que el resto de este
+         *     módulo evita. Lo que sí se puede afirmar en el acto es la mitad que más
+         *     falla —a quién iba dirigido y si había alguien— y esa se contesta.
+         */
+        RouteTested: {
+            kind: components["schemas"]["AlertKind"];
+            /** Role */
+            role: string;
+            /** Sent To */
+            sent_to: string[];
+        };
+        /**
          * RouteWrite
          * @description The role the owner wants a kind of alert to reach.
          *
@@ -3958,6 +4114,8 @@ export interface components {
             held_total: number;
             /** Pending Groups */
             pending_groups: number;
+            /** Pending Decisions */
+            pending_decisions: number;
         };
         /**
          * Section
@@ -4154,6 +4312,49 @@ export interface components {
             since?: string | null;
             /** Until */
             until?: string | null;
+        };
+        /**
+         * SyncRequested
+         * @description La respuesta a pedir una extracción a mano, para cualquiera de las seis.
+         */
+        SyncRequested: {
+            /** Key */
+            key: string;
+            /** Job Run Id */
+            job_run_id: number;
+        };
+        /**
+         * SyncSourceRead
+         * @description Una de las seis cosas que se traen del portal, y en qué anda.
+         *
+         *     `label` viaja desde el backend porque el catálogo de fuentes vive ahí: una
+         *     lista de nombres del lado de la pantalla sería una segunda lista para
+         *     mantener en paralelo, y agregar una fuente exigiría acordarse de las dos.
+         *
+         *     `interval_key` viaja porque es lo que deja poner el control del parámetro al
+         *     lado de la fuente que gobierna, sin que la pantalla tenga que saberse de
+         *     memoria qué parámetro es de cuál.
+         */
+        SyncSourceRead: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Interval Key */
+            interval_key: string;
+            /** Interval */
+            interval: number;
+            /** Unit */
+            unit: string;
+            /** Is Running */
+            is_running: boolean;
+            /** Last Run At */
+            last_run_at: string | null;
+            last_run_status: components["schemas"]["JobStatus"] | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Next Due At */
+            next_due_at: string | null;
         };
         /**
          * TokenStatus
@@ -5085,6 +5286,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CorrectionReasonRead"][];
+                };
+            };
+        };
+    };
+    list_syncs_api_v1_operations_syncs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncSourceRead"][];
+                };
+            };
+        };
+    };
+    request_sync_api_v1_operations_syncs__key__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Cuál de las seis fuentes */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncRequested"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6623,6 +6876,24 @@ export interface operations {
             };
         };
     };
+    announce_presence_api_v1_calendar_presence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     remove_due_date_api_v1_calendar__due_date_id__delete: {
         parameters: {
             query?: never;
@@ -7044,6 +7315,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RouteRead"][];
+                };
+            };
+        };
+    };
+    test_route_api_v1_alerts_routes__kind__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["AlertKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteTested"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

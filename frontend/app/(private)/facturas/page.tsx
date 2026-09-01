@@ -1,10 +1,11 @@
 import Link from 'next/link'
 
 import { NoPermission } from '@/components/common/NoPermission'
-import { ErrorState } from '@/components/ui/state'
 import { InvoiceFilters } from '@/components/purchases/InvoiceFilters'
 import { InvoiceTable } from '@/components/purchases/InvoiceTable'
+import { ErrorState } from '@/components/ui/state'
 import { readFromApi } from '@/lib/api/server'
+import { count } from '@/lib/format'
 import type { InvoiceList, SupplierList } from '@/lib/purchases/types'
 
 export const metadata = {
@@ -25,7 +26,54 @@ interface PageProps {
 }
 
 /**
- * Las facturas de compra, con los filtros de la H8 de 004 y la H1 de 005.
+ * Los cortes de la guía (`3f`), y qué filtro es cada uno.
+ *
+ * Son enlaces con el filtro puesto y no una pestaña que guarda estado: lo que
+ * se está mirando viaja en la URL, así que se comparte por chat con quien tiene
+ * que mirarlo y llega filtrado.
+ *
+ * **«Vencidas» no está**, y el diseño la dibuja. Sería *vencida y sin saldar*,
+ * y la API filtra por vencimiento o por estado de pago pero no por los dos a la
+ * vez: la pestaña traería también las vencidas ya pagadas, que es justamente el
+ * conjunto que a nadie le urge. Lo que vence sin recibo tiene su propia pantalla
+ * —el calendario— y ahí sí está contestado.
+ */
+const VIEWS = [
+  { id: 'todas', label: 'Todas', query: {} },
+  { id: 'revisar', label: 'Por revisar', query: { review_state: 'PENDING' } },
+  { id: 'sin-recibo', label: 'Sin recibo', query: { with_receipt: 'false' } },
+  { id: 'parciales', label: 'Parciales', query: { payment_state: 'PARCIAL' } },
+  { id: 'saldadas', label: 'Saldadas', query: { payment_state: 'SALDADA' } },
+] as const
+
+/** Qué corte está abierto, leído de los filtros que trae la URL. */
+function currentView(filters: Record<string, string | undefined>): string {
+  if (filters.review_state === 'PENDING') return 'revisar'
+  if (filters.with_receipt === 'false') return 'sin-recibo'
+  if (filters.payment_state === 'PARCIAL') return 'parciales'
+  if (filters.payment_state === 'SALDADA') return 'saldadas'
+  return 'todas'
+}
+
+function hrefFor(query: Record<string, string>): string {
+  const params = new URLSearchParams(query)
+  const text = params.toString()
+  return text ? `/facturas?${text}` : '/facturas'
+}
+
+/**
+ * Las facturas de compra (H8 de 004, H1 de 005), con la forma de la guía (`3f`).
+ *
+ * Encabezado con el estado de la carpeta, la fila de cortes con la cuenta
+ * encendida sobre el que espera trabajo, los filtros finos y la tabla.
+ *
+ * **Las tres puertas de ingreso del diseño no están, y no es un olvido.** La
+ * guía dibuja arriba tres tarjetas: arrastrar archivos, una casilla de mail y la
+ * descarga automática del portal. De las tres, la única que existe es la
+ * tercera: no hay carga de archivos ni casilla de correo en el backend, y
+ * dibujar una zona de arrastre que no recibe nada sería una promesa. Lo que sí
+ * está —la reconstrucción a mano de una fila que el portal publicó rota— vive
+ * en la cola de pendientes, que es donde se ve el problema.
  *
  * Los filtros van en la URL y no en el estado del componente a propósito: una
  * pantalla filtrada se comparte por chat con quien tiene que mirarla, y así
@@ -52,14 +100,16 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
     if (value) query.set(name, value)
   }
 
-  // El tercer pedido existe sólo por su `total`: cuántas facturas están sin
-  // recibo es una pregunta sobre el sistema, no sobre la página que se está
-  // mirando (RF-32). Contando `items` decía «46 sin recibo» cuando el límite
-  // de 200 recortaba la lista, y encima cambiaba al filtrar por otra cosa.
-  const [read, suppliers, missing] = await Promise.all([
+  // Los dos últimos pedidos existen sólo por su `total`: cuántas facturas
+  // esperan una decisión y cuántas están sin recibo son preguntas sobre el
+  // sistema, no sobre la página que se está mirando (RF-32). Contando `items`
+  // decían «46 sin recibo» cuando el límite de 200 recortaba la lista, y encima
+  // cambiaban al filtrar por otra cosa.
+  const [read, suppliers, missing, toReview] = await Promise.all([
     readFromApi<InvoiceList>(`/invoices?${query.toString()}`),
     readFromApi<SupplierList>('/suppliers'),
     readFromApi<InvoiceList>('/invoices?with_receipt=false&limit=1'),
+    readFromApi<InvoiceList>('/invoices?review_state=PENDING&limit=1'),
   ])
 
   // Un 403 y una caída del backend son dos frases distintas. Decirle «no tenés
@@ -70,59 +120,103 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
       return <NoPermission what="las facturas de compra" />
     }
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Facturas</h1>
-        <ErrorState title="No pudimos traer las facturas" />
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Facturas</h1>
+        <ErrorState title="No pudimos traer las facturas.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
       </div>
     )
   }
 
   const listing = read.data
   const withoutReceipt = missing.ok ? missing.data.total : null
+  const pending = toReview.ok ? toReview.data.total : 0
+  const view = currentView(filters)
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Facturas</h1>
-        <p className="text-sm text-muted-foreground">
-          {listing.total} facturas registradas
-          {withoutReceipt !== null && ` · ${withoutReceipt} sin recibo de recepción`}.
-        </p>
+    <div className="space-y-4">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-xl border border-border bg-card px-6 py-5">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Facturas</h1>
+          <p className="text-sm text-muted-foreground">
+            {count(listing.total)} registradas
+            {pending > 0 && ` · ${count(pending)} esperando una decisión tuya`}
+            {withoutReceipt !== null && ` · ${count(withoutReceipt)} sin recibo`}.
+          </p>
+        </div>
+
+        {/*
+          Las otras tres pantallas de la carpeta. Van acá, en contorno, y no
+          entre los cortes de abajo: un corte cambia lo que muestra esta tabla,
+          y esto lleva a otra pantalla. Mezclarlos hacía que la fila de nueve
+          enlaces no dijera cuáles eran de ida y cuáles de filtro.
+        */}
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { href: '/facturas/revision', label: 'Revisar apartadas' },
+            { href: '/facturas/pagos', label: 'Comprobantes por repartir' },
+            { href: '/facturas/incidentes', label: 'Incidentes de recibo' },
+          ].map(door => (
+            <Link
+              key={door.href}
+              className="inline-flex h-10 items-center rounded-md border border-input bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted"
+              href={door.href}
+            >
+              {door.label}
+            </Link>
+          ))}
+        </div>
       </header>
 
-      <nav className="flex flex-wrap gap-4 text-sm">
-        <Link className="text-link hover:underline" href="/facturas">
-          Todas
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas?payment_state=SIN_PAGOS">
-          Sin pagos
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas?payment_state=PARCIAL">
-          Pagadas a medias
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas?payment_state=SALDADA">
-          Saldadas
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas?with_receipt=false">
-          Sin recibo
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas/revision">
-          En revisión
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas/pagos">
-          Comprobantes por repartir
-        </Link>
-        <Link className="text-link hover:underline" href="/facturas/incidentes">
-          Incidentes de recibo
-        </Link>
-        <Link className="text-link hover:underline" href="/proveedores">
-          Proveedores
-        </Link>
-      </nav>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/*
+          La fila de cortes de la guía. El que espera trabajo lleva su cuenta
+          encendida, y en cero no se pinta: un ámbar con un cero al lado enseña
+          que el color no quiere decir nada.
+        */}
+        <nav
+          aria-label="Cortes de la lista"
+          className="flex gap-1 overflow-x-auto border-b border-border px-2"
+        >
+          {VIEWS.map(option => {
+            const current = option.id === view
+            const badge = option.id === 'revisar' && pending > 0
+            return (
+              <Link
+                key={option.id}
+                href={hrefFor(option.query)}
+                aria-current={current ? 'page' : undefined}
+                className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm transition-colors ${
+                  current
+                    ? 'border-foreground font-semibold text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {option.label}
+                {badge && (
+                  <span className="amount rounded-full bg-warn-surface px-1.5 py-0.5 text-[10px] font-semibold text-warn">
+                    {count(pending)}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
 
-      <InvoiceFilters suppliers={suppliers.ok ? suppliers.data.items : []} values={filters} />
+        <div className="border-b border-border px-4 py-3">
+          <InvoiceFilters suppliers={suppliers.ok ? suppliers.data.items : []} values={filters} />
+        </div>
 
-      <InvoiceTable invoices={listing.items} />
+        <div className="px-4 py-2">
+          <InvoiceTable invoices={listing.items} />
+        </div>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Si el número, el proveedor y el monto ya existen, la factura no entra dos veces: queda como
+        posible duplicada hasta que alguien decida.
+      </p>
     </div>
   )
 }

@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.purchases.service import (
+    INCOMPLETE_SUPPLIER,
     INVOICE_ENTITY,
+    INVOICE_IN_REVIEW,
     KEEP_MANUAL,
     KEEP_PORTAL,
     MATCH_THRESHOLD_KEY,
@@ -34,6 +36,8 @@ from app.shared.events import (
     InvoicesNormalized,
     InvoicesRegistered,
     PaymentsNormalized,
+    PendingWorkReported,
+    PendingWorkRequested,
     PurchaseOrdersNormalized,
     QuarantineCaseResolved,
     SuppliersNormalized,
@@ -315,3 +319,22 @@ async def apply_purchases_decision(event: QuarantineCaseResolved, session: Async
             actor_user_id=event.decided_by_user_id,
             occurred_at=event.decided_at,
         )
+
+
+@events.subscribe(PendingWorkRequested)
+async def report_pending_purchases(event: PendingWorkRequested, session: AsyncSession) -> None:
+    """Contestar qué facturas y qué proveedores siguen esperando a una persona.
+
+    Se contesta **siempre**, también cuando no queda nada: la lista vacía es la
+    frase «de esto ya no queda nada», y es lo que cierra el caso de una factura
+    que alguien resolvió en su pantalla. Callarse dejaría ese caso abierto para
+    siempre, que es la mentira que esta cola existe para no decir.
+    """
+    await events.publish(
+        PendingWorkReported(
+            kinds=(INVOICE_IN_REVIEW, INCOMPLETE_SUPPLIER),
+            items=await PurchasesService(session).pending_work(),
+        ),
+        session,
+    )
+    del event

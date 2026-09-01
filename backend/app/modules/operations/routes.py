@@ -49,6 +49,8 @@ from app.modules.operations.schemas import (
     PriceUpdateSettingsRead,
     PriceUpdateSettingsWrite,
     PriceUpdateStatusRead,
+    SyncRequested,
+    SyncSourceRead,
 )
 from app.modules.operations.service import OperationsService
 from app.quality import Quality
@@ -259,6 +261,52 @@ async def correction_reasons(service: OperationsDep) -> list[CorrectionReasonRea
     list and the rule that checks it come from the same place.
     """
     return service.correction_reasons()
+
+
+# --- Las seis fuentes, juntas --------------------------------------------
+#
+# Todo lo que la plataforma sabe lo trajo del portal, y hasta acá cada
+# extracción se administraba por su cuenta: cuatro parámetros de frecuencia
+# repartidos entre dieciséis tarjetas y un solo botón de «traerlo ahora», el de
+# la lista de precios, porque fue la primera que se construyó. Estas dos rutas
+# son el panel que las mira juntas.
+#
+# Van en `router` —el prefijo `/operations`— y bajo `SYSTEM_PARAMETERS`, que es
+# la sección de la pantalla donde viven: es el dueño el que decide cada cuánto
+# se le golpea la puerta a un sistema ajeno. La lista de precios conserva además
+# su propio botón en `/precios`, bajo `PRICES`, para que compras la siga
+# pudiendo pedir sin entrar a la configuración.
+
+
+@router.get(
+    "/syncs",
+    dependencies=[require_section(Section.SYSTEM_PARAMETERS)],
+    summary="En qué anda cada fuente de datos",
+)
+async def list_syncs(service: OperationsDep) -> list[SyncSourceRead]:
+    """Owner only: es la pantalla donde se decide cada cuánto se consulta."""
+    return await service.update_sources()
+
+
+@router.post(
+    "/syncs/{key}",
+    status_code=http_status.HTTP_202_ACCEPTED,
+    dependencies=[require_section(Section.SYSTEM_PARAMETERS, Level.WRITE)],
+    summary="Traer una fuente ahora",
+)
+async def request_sync(
+    key: Annotated[str, Path(description="Cuál de las seis fuentes")],
+    current_user: CurrentUser,
+    service: OperationsDep,
+) -> SyncRequested:
+    """Owner only.
+
+    Pedir una extracción a mano es golpear la puerta de un tercero, así que no
+    es una lectura que cualquier rol pueda hacer. Quién la pidió sale del token
+    y queda con la corrida; una segunda mientras hay una corriendo se contesta
+    con 409 en vez de abrir otra.
+    """
+    return await service.request_manual_sync(key, requested_by_user_id=current_user.id)
 
 
 # --- The price update ----------------------------------------------------

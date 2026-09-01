@@ -40,10 +40,12 @@ from app.modules.operations.schemas import (
     PriceUpdateSettingsRead,
     PriceUpdateSettingsWrite,
     PriceUpdateStatusRead,
+    SyncRequested,
+    SyncSourceRead,
 )
 from app.quality import Quality, get_quality
 from app.shared.corrections import REASON_LABELS, label_for
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
     AuditAction,
     BusinessParameterChanged,
@@ -97,6 +99,13 @@ STALL_THRESHOLD = 2
 
 ALREADY_RUNNING = "A price update is already running"
 
+# La negativa del panel de actualizaciones, y va en castellano porque la lee una
+# persona: la pantalla imprime el mensaje del backend tal cual, que es lo que
+# evita una segunda redacción del mismo hecho del lado del navegador. Nombra la
+# fuente porque en esa pantalla hay seis botones iguales, y «ya está corriendo»
+# a secas dejaría sin saber cuál.
+SYNC_ALREADY_RUNNING = "Ya se está trayendo {label}. Esperá a que termine."
+
 # A run that is still RUNNING long past the point where its task could still be
 # alive did not get slow: its worker is gone — a redeploy, an OOM, a reboot.
 # Nobody will ever close it, and while it is open `due_for_update` says no and
@@ -122,9 +131,15 @@ class SyncJob:
     `celery_task` is a **string** on purpose: the work belongs to `portal`, and
     one module never imports another (Artículo IV). A name over the broker is
     the same kind of contract an event is.
+
+    `label` is Spanish because it is read by a person, on the updates panel
+    (Artículo VIII). It lives next to the key rather than in the frontend so
+    that adding a source is one line and the screen does not have to be edited
+    to learn its name — a second list of names is a second thing to keep in step.
     """
 
     key: str
+    label: str
     task_name: str
     celery_task: str
     interval_key: str
@@ -145,6 +160,7 @@ class SyncJob:
 SYNC_JOBS: tuple[SyncJob, ...] = (
     SyncJob(
         key="invoices",
+        label="Facturas de compra",
         task_name="extract_invoices",
         celery_task="portal.extract_invoices",
         interval_key="invoice_sync.interval_hours",
@@ -152,6 +168,7 @@ SYNC_JOBS: tuple[SyncJob, ...] = (
     ),
     SyncJob(
         key="supplier_ledger",
+        label="Cuenta corriente de proveedores",
         task_name="extract_supplier_ledger",
         celery_task="portal.extract_supplier_ledger",
         interval_key="invoice_sync.interval_hours",
@@ -159,6 +176,7 @@ SYNC_JOBS: tuple[SyncJob, ...] = (
     ),
     SyncJob(
         key="purchase_orders",
+        label="Órdenes de compra",
         task_name="extract_purchase_orders",
         celery_task="portal.extract_purchase_orders",
         interval_key="invoice_sync.interval_hours",
@@ -166,6 +184,7 @@ SYNC_JOBS: tuple[SyncJob, ...] = (
     ),
     SyncJob(
         key="messages",
+        label="Mensajes del portal",
         task_name="extract_messages",
         celery_task="portal.extract_messages",
         interval_key="message_sync.interval_minutes",
@@ -174,12 +193,38 @@ SYNC_JOBS: tuple[SyncJob, ...] = (
     ),
     SyncJob(
         key="sales",
+        label="Ventas",
         task_name="extract_sales",
         celery_task="portal.extract_sales",
         interval_key="sales_sync.interval_hours",
         lock_key=0x9C1D_0006,
     ),
 )
+
+# La lista de precios, descrita como lo que es: una fuente más.
+#
+# **No está en `SYNC_JOBS`, y eso es a propósito.** `tick_extractions` recorre
+# esa tupla, y la lista de precios ya tiene su propio latido —`tick_price_update`,
+# que además detecta cuándo la actualización quedó interrumpida (RF-11 a RF-13)
+# y avisa una sola vez—. Meterla ahí la traería dos veces por intervalo.
+#
+# Lo que sí es cierto es que **tiene la misma forma**: un nombre de task, una
+# task de Celery, un parámetro de frecuencia y un lock. Por eso se declara con
+# el mismo tipo en vez de con un segundo tipo parecido: el panel de
+# actualizaciones y el disparo manual recorren las seis sin preguntar cuál es.
+PRICE_LIST = SyncJob(
+    key="prices",
+    label="Lista de precios",
+    task_name=PRICE_UPDATE_TASK,
+    celery_task=EXTRACTION_TASK_NAME,
+    interval_key=INTERVAL_HOURS_KEY,
+    lock_key=PRICE_UPDATE_LOCK_KEY,
+)
+
+# Las seis fuentes de las que se nutre la plataforma, para mirarlas juntas.
+# La lista de precios va primera porque es la que más se consulta.
+UPDATE_SOURCES: tuple[SyncJob, ...] = (PRICE_LIST, *SYNC_JOBS)
+UPDATE_BY_KEY: dict[str, SyncJob] = {source.key: source for source in UPDATE_SOURCES}
 
 SYNC_BY_KEY: dict[str, SyncJob] = {job.key: job for job in SYNC_JOBS}
 # Los nombres de task de las cinco, para que un handler pueda reconocer una
@@ -620,6 +665,87 @@ class OperationsService:
     async def record_sync_success(self, job_run_id: int) -> None:
         """Close a scheduled extraction as successful."""
         await self.complete_run(job_run_id, result={})
+
+    # --- Las seis fuentes, miradas juntas ---------------------------------
+
+    async def update_sources(self) -> list[SyncSourceRead]:
+        """En qué anda cada una de las seis cosas que se traen del portal.
+
+        Existe porque las frecuencias estaban repartidas: cuatro parámetros
+        entre dieciséis tarjetas, cada uno nombrado por lo suyo, y nada en la
+        pantalla decía que los cuatro contestan la misma pregunta. Acá se ven
+        juntas, con lo único que hace falta para decidir si tocar una: cuándo
+        corrió por última vez, cómo terminó, y cuándo vuelve a correr.
+
+        `next_due_at` en `None` no es «nunca»: es «todavía no corrió ninguna
+        vez», y entonces corre en el próximo latido. Son dos frases distintas y
+        la pantalla las dice distinto.
+        """
+        panel: list[SyncSourceRead] = []
+        for source in UPDATE_SOURCES:
+            spec = spec_for(source.interval_key)
+            every = self._as_int(await self.get_parameter_value(source.interval_key), spec.initial)
+            latest = await self.runs.latest(source.task_name, limit=1)
+            last = latest[0] if latest else None
+            last_success = await self.runs.last_successful(source.task_name)
+            started = None if last is None else last.started_at
+            panel.append(
+                SyncSourceRead(
+                    key=source.key,
+                    label=source.label,
+                    interval_key=source.interval_key,
+                    interval=every,
+                    unit=source.unit,
+                    is_running=await self.runs.running(source.task_name) is not None,
+                    last_run_at=started,
+                    last_run_status=None if last is None else last.status,
+                    last_success_at=None if last_success is None else last_success.finished_at,
+                    next_due_at=None if started is None else started + source.interval(every),
+                )
+            )
+        return panel
+
+    async def request_manual_sync(
+        self, key: str, *, requested_by_user_id: int | None = None
+    ) -> SyncRequested:
+        """Traer una de las seis ahora, sin esperar al latido.
+
+        Es lo que existía sólo para la lista de precios desde la 002 y nunca se
+        construyó para las otras cinco: no había endpoint, así que la única
+        forma de forzar una extracción era esperar al latido o entrar al worker.
+
+        La lista de precios sigue pasando por `request_price_update` y no por
+        `request_sync`: ese camino registra quién la pidió, dispara la task y
+        publica lo que la 002 espera que se publique. Duplicarlo acá para tener
+        un solo `if` sería un segundo camino que puede divergir del primero.
+
+        Una que ya está corriendo se contesta con un 409 en lugar de abrir una
+        segunda: la cuenta del portal es compartida con la gente del cliente, y
+        dos sesiones a nombre de la misma persona no es algo que se le haga al
+        sistema de un tercero (Artículo I).
+        """
+        source = UPDATE_BY_KEY.get(key)
+        if source is None:
+            raise ValidationError(
+                f"«{key}» no es una fuente de datos del sistema.",
+                details={"key": key, "known": sorted(UPDATE_BY_KEY)},
+            )
+
+        if source is PRICE_LIST:
+            requested = await self.request_price_update(requested_by_user_id=requested_by_user_id)
+            return SyncRequested(key=source.key, job_run_id=requested.job_run_id)
+
+        job_run_id = await self.request_sync(source, requested_by_user_id=requested_by_user_id)
+        if job_run_id is None:
+            running = await self.runs.running(source.task_name)
+            raise ConflictError(
+                SYNC_ALREADY_RUNNING.format(label=source.label.lower()),
+                details={
+                    "key": source.key,
+                    "job_run_id": None if running is None else running.id,
+                },
+            )
+        return SyncRequested(key=source.key, job_run_id=job_run_id)
 
     async def price_update_status(self) -> PriceUpdateStatusRead:
         """When the last successful update was, and whether it is interrupted."""

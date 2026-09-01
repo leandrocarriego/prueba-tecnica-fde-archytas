@@ -1,9 +1,7 @@
 import { NoPermission } from '@/components/common/NoPermission'
-import { AlertRoutes } from '@/components/notifications/AlertRoutes'
 import { ParameterCard } from '@/components/operations/ParameterCard'
 import { readFromApi } from '@/lib/api/server'
-import type { AlertRoute } from '@/lib/notifications/types'
-import type { Parameter } from '@/lib/operations/types'
+import type { Parameter, SyncSource } from '@/lib/operations/types'
 import { ErrorState } from '@/components/ui/state'
 import { Notice } from '@/components/ui/notice'
 
@@ -18,6 +16,19 @@ export const metadata = {
  * says there are no parameters hidden inside the screen of the functionality
  * that uses them. That is why `/precios/configuracion` redirects here instead
  * of still holding the two it used to.
+ *
+ * **Las frecuencias de consulta al portal no están acá, están en
+ * «Actualizaciones»**, que es la pestaña de al lado. No es una excepción a
+ * RF-01 sino su forma: los cuatro parámetros de cada cuánto se consulta seguían
+ * estando todos juntos, pero repartidos entre dieciséis tarjetas y cada uno
+ * nombrado por lo suyo, así que nada decía que los cuatro contestan la misma
+ * pregunta. Siguen en Configuración, a una pestaña de distancia, y no dentro de
+ * la pantalla de la funcionalidad que los usa, que es lo que RF-01 prohíbe.
+ *
+ * Es la primera pestaña de «Configuración» y no una pantalla suelta: el
+ * encabezado y la fila de pestañas los pone `layout.tsx`, y acá queda lo que es
+ * de los parámetros. La regla de RF-01 no se movió — los parámetros siguen
+ * estando todos juntos en un solo lugar.
  *
  * The list is the backend's — it is drawn from the catalog that also validates
  * the ranges, so what the screen offers and what the API accepts cannot drift
@@ -42,11 +53,14 @@ export const metadata = {
  * because "pedíselo al dueño" is advice nobody can act on when the API is down.
  */
 export default async function ParametersPage() {
-  const [read, routes] = await Promise.all([
+  const [read, sources] = await Promise.all([
     readFromApi<Parameter[]>('/operations/parameters'),
-    // Quién recibe cada tipo de aviso (RF-37 de 007). Misma sección de
-    // permisos que los parámetros, así que quien llega a una llega a la otra.
-    readFromApi<AlertRoute[]>('/alerts/routes'),
+    // Para saber **cuáles** son las frecuencias de consulta al portal, que se
+    // muestran en «Actualizaciones» al lado de la fuente que gobiernan. Se
+    // preguntan en vez de escribirse acá: una lista de claves copiada sería una
+    // lista para acordarse de corregir el día que aparezca otra fuente, y el
+    // costo de olvidarse es un parámetro que aparece dos veces o ninguna.
+    readFromApi<SyncSource[]>('/operations/syncs'),
   ])
 
   if (!read.ok) {
@@ -54,22 +68,20 @@ export default async function ParametersPage() {
       return <NoPermission what="los parámetros del sistema" />
     }
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
-        <ErrorState title="No pudimos traer los parámetros.">
-          Probá de nuevo en unos minutos.
-        </ErrorState>
-      </div>
+      <ErrorState title="No pudimos traer los parámetros.">
+        Probá de nuevo en unos minutos.
+      </ErrorState>
     )
   }
 
-  const parameters = read.data
+  const elsewhere = new Set(sources.ok ? sources.data.map(source => source.interval_key) : [])
+  const parameters = read.data.filter(parameter => !elsewhere.has(parameter.key))
   const waiting = parameters.filter(parameter => !parameter.has_effect).length
 
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
+        <h2 className="text-lg font-semibold">Parámetros del sistema</h2>
         <p className="text-sm text-muted-foreground">
           Estos valores los decidís vos y rigen para todo el equipo. Cada cambio queda registrado en
           el historial.
@@ -96,8 +108,6 @@ export default async function ParametersPage() {
           <ParameterCard key={parameter.key} parameter={parameter} />
         ))}
       </div>
-
-      {routes.ok && <AlertRoutes routes={routes.data} />}
     </div>
   )
 }

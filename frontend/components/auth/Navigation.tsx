@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation'
 import { logoutAction } from '@/app/actions/auth'
 import { canSee, type Permissions, type Section } from '@/lib/auth/permissions'
 import type { components } from '@/lib/api/types'
+import { isCurrentPath } from '@/lib/ui/current'
 import { cn } from '@/lib/utils'
 
 type UserRead = components['schemas']['UserRead']
@@ -65,7 +66,24 @@ interface Group {
 const GROUPS: ReadonlyArray<Group> = [
   {
     title: null,
-    entries: [{ href: '/tablero', label: 'Tablero', section: 'DASHBOARD' }],
+    entries: [
+      { href: '/tablero', label: 'Tablero', section: 'DASHBOARD' },
+      /*
+       * «Para decidir» va acá arriba, pegada al tablero, y no dentro de un
+       * grupo: **no es de un área**. Es la única cola de la plataforma —caen
+       * ahí los precios, las facturas, el padrón, el buzón y las ventas— y
+       * meterla bajo «Catálogo y datos», que es donde estaba, la hacía parecer
+       * una pantalla del catálogo. Con el tablero forman el par con el que se
+       * abre el día: qué pasó, y qué hay que decidir.
+       *
+       * No nombra sección. Pedía `PRICES`, que era cierto cuando en la cola
+       * sólo había precios y dejó de serlo cuando las ventas empezaron a caer
+       * ahí: le cerraba la puerta a Julián, el dueño de esa mitad. La pantalla
+       * recorta lo que *muestra* a las áreas que el que mira alcanza, en vez de
+       * cerrarse.
+       */
+      { href: '/revision', label: 'Para decidir', counter: 'triage' },
+    ],
   },
   {
     title: 'Compras',
@@ -74,7 +92,6 @@ const GROUPS: ReadonlyArray<Group> = [
       { href: '/facturas', label: 'Facturas', section: 'PURCHASE_INVOICES' },
       { href: '/ordenes', label: 'Órdenes de compra', section: 'PURCHASE_ORDERS' },
       { href: '/calendario', label: 'Calendario', section: 'CALENDAR' },
-      { href: '/mensajes', label: 'Mensajes', section: 'SUPPLIER_MESSAGES' },
     ],
   },
   {
@@ -87,55 +104,44 @@ const GROUPS: ReadonlyArray<Group> = [
        * aparece en el menú y se abre desde ahí—; en qué grupo vive no lo fija
        * la spec, y lo decidió el dueño.
        *
-       * `/ventas` redirige a `/ventas/revision`, que es la única pantalla que
-       * hay hoy: el `href` queda estable —el resaltado por prefijo marca la
-       * entrada desde cualquier pantalla de ventas— sin inventar una pantalla
-       * que la spec no pidió.
+       * `/ventas` es el listado de ventas, y desde que lo es no hay una segunda
+       * pantalla en el área: lo repetido y lo roto se decide en «Para decidir»,
+       * con todo lo demás que la plataforma aparta. El `href` marca la entrada
+       * desde cualquier ruta que empiece con `/ventas`.
        */
       { href: '/ventas', label: 'Ventas', section: 'SALES' },
       { href: '/precios', label: 'Catálogo y precios', section: 'PRICES' },
       { href: '/rubros', label: 'Rubros', section: 'PRODUCT_CATEGORIES' },
-      /*
-       * No nombra sección, igual que `/acciones` y `/historial`. Pedía
-       * `PRICES`, que era cierto cuando en la cola sólo había precios y dejó de
-       * serlo cuando las ventas empezaron a caer ahí: le cerraba la puerta a
-       * Julián, el dueño de esa mitad. La pantalla recorta lo que *muestra* a
-       * las áreas que el que mira alcanza, en vez de cerrarse.
-       */
-      { href: '/revision', label: 'Para decidir', counter: 'triage' },
     ],
   },
   {
     title: 'Sistema',
     entries: [
       /*
-       * Estas tres no nombran sección, igual que `/health`: cualquier sesión
-       * las alcanza. El historial recorta lo que *muestra* a las secciones que
-       * el que mira alcanza (RF-19) en vez de cerrar la puerta, y la pantalla
-       * de acciones lista las que esa persona puede correr, que para alguien
-       * sin ninguna es un vacío honesto.
+       * El historial no nombra sección, igual que `/health`: cualquier sesión
+       * lo alcanza. Recorta lo que *muestra* a las secciones que el que mira
+       * alcanza (RF-19) en vez de cerrar la puerta. Se llama «Actividad» en el
+       * menú —es lo que la persona viene a buscar—, y la ruta sigue siendo
+       * `/historial`, que es lo que la pantalla es por dentro.
        */
-      { href: '/acciones', label: 'Acciones' },
-      { href: '/historial', label: 'Historial' },
-      { href: '/accesos', label: 'Accesos', section: 'ACCESS_ADMIN' },
-      { href: '/accesos/actividad', label: 'Actividad', section: 'ACCESS_LOG' },
-      { href: '/configuracion', label: 'Parámetros', section: 'SYSTEM_PARAMETERS' },
+      { href: '/historial', label: 'Actividad' },
+      /*
+       * Una entrada para tres pantallas: los parámetros, los accesos y a quién
+       * le llega cada aviso viven adentro de `/configuracion`, en pestañas.
+       *
+       * Nombra `SYSTEM_PARAMETERS` y no las dos secciones que hay ahí adentro
+       * porque las dos son del dueño y de nadie más: quien alcanza una alcanza
+       * la otra, así que una entrada condicionada a la segunda mostraría
+       * exactamente las mismas veces. El día que eso deje de ser cierto, la que
+       * decide qué pestañas se ven es la pantalla —`configuracion/layout.tsx`
+       * las filtra por sección— y acá habría que quitar la sección, como en
+       * «Para decidir».
+       */
+      { href: '/configuracion', label: 'Configuración', section: 'SYSTEM_PARAMETERS' },
       { href: '/health', label: 'Salud' },
     ],
   },
 ]
-
-/** La entrada más específica que coincide con la ruta actual queda marcada. */
-function isCurrent(pathname: string, href: string, all: ReadonlyArray<string>): boolean {
-  if (pathname !== href && !pathname.startsWith(`${href}/`)) return false
-  return !all.some(
-    other => other !== href && other.length > href.length && isPrefix(pathname, other)
-  )
-}
-
-function isPrefix(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`)
-}
 
 export function Navigation({
   user,
@@ -161,7 +167,7 @@ export function Navigation({
   // menú cerrado, el nombre de la sección es lo único que lo dice.
   const aqui = groups
     .flatMap(group => group.entries)
-    .find(entry => isCurrent(pathname, entry.href, hrefs))
+    .find(entry => isCurrentPath(pathname, entry.href, hrefs))
 
   return (
     <aside className="flex w-full flex-none flex-col bg-primary text-primary-foreground md:sticky md:top-0 md:h-dvh md:w-60">
@@ -217,10 +223,10 @@ export function Navigation({
                    * la consecuencia del clic, no de haber navegado.
                    */
                   onClick={() => setOpen(false)}
-                  aria-current={isCurrent(pathname, entry.href, hrefs) ? 'page' : undefined}
+                  aria-current={isCurrentPath(pathname, entry.href, hrefs) ? 'page' : undefined}
                   className={cn(
                     'block rounded-md px-2.5 py-1.5 text-[13.5px] transition-colors',
-                    isCurrent(pathname, entry.href, hrefs)
+                    isCurrentPath(pathname, entry.href, hrefs)
                       ? 'bg-white/10 font-semibold text-white'
                       : 'text-white/65 hover:bg-white/5 hover:text-white'
                   )}

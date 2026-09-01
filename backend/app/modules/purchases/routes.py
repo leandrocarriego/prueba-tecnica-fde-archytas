@@ -58,7 +58,7 @@ from app.modules.purchases.schemas import (
     SupplierTotalsRead,
 )
 from app.modules.purchases.service import PurchasesService, today_here
-from app.shared.live import bus
+from app.shared.live import announce, bus
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -553,6 +553,59 @@ async def read_calendar(
     )
     await _name_whoever_touched_the_calendar(read.items, directory)
     return read
+
+
+@calendar_router.post(
+    "/presence",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[require_section(Section.CALENDAR, Level.WRITE)],
+    summary="Decir que se está mirando el calendario",
+)
+async def announce_presence(current_user: CurrentUser, session: Session) -> None:
+    """Contar en el canal que esta persona tiene el calendario abierto (H5 de 006).
+
+    La otra mitad de «se actualiza en vivo». Hasta acá la pantalla decía qué
+    cambió y quién lo cambió, y no decía **quién más está mirando**, que es el
+    dato que cambia cómo se trabaja: mover un vencimiento sabiendo que del otro
+    lado hay alguien mirando la misma pantalla no es lo mismo que moverlo a
+    ciegas.
+
+    **Pide `WRITE` y no `READ`, y eso deja afuera a ventas: se anuncia quien
+    puede cambiar algo.** Nació pidiendo `READ` —anunciarse no escribe ningún
+    dato del negocio— y `tests/architecture/test_route_authorization.py` lo
+    frenó: un `POST` tiene que exigir el nivel que cambia, porque la alternativa
+    es que la regla dependa de que cada caso se juzgue a ojo. Debilitar el test
+    para dejar pasar éste habría sido cambiar una regla verificada por una
+    opinión (Artículo VI).
+
+    Y la consecuencia resulta ser la correcta: la presencia existe para que dos
+    personas no se pisen editando lo mismo, y quien tiene el calendario en sólo
+    lectura no puede pisar a nadie. Ventas ve quién está —el canal es de lectura
+    para los tres roles— y no aparece en la lista de los demás. La asimetría no
+    esconde ningún riesgo: nada de lo que ventas haga acá puede sorprender a
+    quien está moviendo un vencimiento.
+
+    **No hay registro de presencias en ninguna parte, y es deliberado.** Cada
+    navegador anuncia que está, cada tanto, y los demás lo escuchan; el que se
+    va deja de anunciarse y desaparece solo de las demás pantallas cuando se le
+    vence el turno. Una tabla de «quién está conectado» habría que limpiarla
+    cuando alguien cierra el navegador de golpe, que es justo el caso en que
+    nadie avisa — y una lista que se ensucia dice que hay gente mirando que no
+    está.
+
+    Viaja el nombre y el id, nada más: es lo que se dibuja. No es un registro de
+    auditoría —eso es el historial— y por eso no se guarda.
+    """
+    await announce(
+        session,
+        "presence",
+        {
+            "screen": "calendar",
+            "user_id": current_user.id,
+            "name": f"{current_user.name} {current_user.last_name or ''}".strip(),
+        },
+    )
+    await session.commit()
 
 
 async def _name_whoever_touched_the_calendar(

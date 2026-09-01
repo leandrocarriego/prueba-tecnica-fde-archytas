@@ -336,3 +336,19 @@ export async function dismissRepeat(orderId: number): Promise<ActionResult<Purch
   if (result.ok) revalidatePath('/ordenes')
   return result
 }
+
+/**
+ * Decir que esta persona tiene el calendario abierto (H5 de 006).
+ *
+ * Se llama cada tanto mientras la pantalla está a la vista. No revalida nada ni
+ * devuelve nada útil: lo único que hace es que los demás navegadores se enteren
+ * de que hay alguien más mirando, por el mismo canal por el que ya viajan los
+ * cambios.
+ *
+ * Un fallo se traga a propósito. Que no se pueda anunciar la presencia no puede
+ * romper el calendario: la pantalla sigue andando y lo único que se pierde es
+ * saber quién más está del otro lado.
+ */
+export async function announceCalendarPresence(): Promise<void> {
+  await call<void>('/calendar/presence', { method: 'POST' })
+}

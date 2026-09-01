@@ -35,7 +35,7 @@ vi.mock('@/app/actions/purchases', () => ({
   removeDueDate: vi.fn(),
 }))
 vi.mock('@/components/purchases/useLiveCalendar', () => ({
-  useLiveCalendar: () => ({ state: 'en-vivo', lastChange: null }),
+  useLiveCalendar: () => ({ state: 'en-vivo', lastChange: null, viewers: [] }),
 }))
 
 const mover = vi.mocked(moveDueDate)

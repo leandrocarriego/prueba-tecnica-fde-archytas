@@ -36,12 +36,16 @@ from app.modules.sales.schemas import (
 )
 from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import (
+    HeldSale,
     NormalizedSale,
+    PendingItem,
     QuarantinedSourceReopened,
     QuarantinedSourceResolved,
+    SalesHeld,
     events,
 )
 from app.shared.parameters import initial_value
+from app.shared.sections import BusinessSection
 
 logger = get_logger(__name__)
 
@@ -64,8 +68,26 @@ DISCARDED_BY_DECISION = "Se descartó al elegir otra versión de esta venta"
 # `staging` row it was opened with: rebuilding it any other way would close a
 # case nobody resolved.
 UNREADABLE_SALE_ROW = "unreadable_sale_row"
-RESOLVED_IN_SALES = "la pantalla de ventas"
-REOPENED_IN_SALES = "la pantalla de ventas"
+# Where the work happens, for the person who reads the closed case later.
+# It used to say «la pantalla de ventas», and that stopped being true when
+# the deciding moved into the queue: `/ventas` is a list now, and a case
+# that names a screen where nothing can be decided sends somebody nowhere.
+RESOLVED_IN_REVIEW = "la cola de pendientes"
+REOPENED_IN_REVIEW = "la cola de pendientes"
+
+# The two kinds of case a record that made it into `core` opens, and that
+# `triage` shows in the one list of what is pending. They are `triage`'s words
+# for them, like `UNREADABLE_SALE_ROW` above: this module names them so it can
+# say out loud what it set aside, and it still never touches `triage`.
+REPEATED_SALE = "repeated_sale"
+BROKEN_SALE = "broken_sale"
+# Where a broken record's case went when a twin turned it into a group. It is
+# not a person's doing, and the closed case says so rather than crediting one.
+GROUPED_WITH_A_TWIN = "la cola, al aparecer otra venta con el mismo código"
+# Lo que se lee cuando un registro quedó apartado sin motivo escrito. No
+# debería pasar —todo lo que se aparta se aparta por algo— y si pasa, la cola
+# lo dice así en vez de mostrar un renglón en blanco.
+NO_REASON_GIVEN = "Apartada sin motivo registrado"
 
 NO_SUCH_SALE = "No encontramos esa venta"
 NOT_HELD = "Esa venta no está apartada"
@@ -98,6 +120,11 @@ class SalesService:
         known = await self.sales.known_products()
         threshold = Decimal(str(await self._setting(OUTLIER_KEY)))
         merged = held = counted = 0
+        # What this batch left waiting for a person, to be said out loud once
+        # the rows have their ids. Collected instead of announced row by row
+        # because a repeated sale is **one** thing to decide, however many
+        # versions of it arrived in the same batch.
+        waiting: list[Sale] = []
 
         for row in sales:
             if row.reason is not None:
@@ -107,7 +134,11 @@ class SalesService:
                 # has no code to group by, and one missing its date or its total
                 # is not a repetition of anybody until a person completes it.
                 # Correcting it is `correct_sale`, and from there it counts.
-                await self.sales.add(self._sale_of(row, state=SaleState.HELD, reason=row.reason))
+                waiting.append(
+                    await self.sales.add(
+                        self._sale_of(row, state=SaleState.HELD, reason=row.reason)
+                    )
+                )
                 held += 1
                 continue
 
@@ -142,12 +173,95 @@ class SalesService:
             )
             counted += int(sale.state is SaleState.COUNTED)
             held += int(sale.state is SaleState.HELD)
+            if sale.state is SaleState.HELD:
+                waiting.append(sale)
 
         await self.session.flush()
+        await self._announce_held(batch_id=batch_id, records=waiting)
         logger.info(
             "Sales registered",
             extra={"batch_id": batch_id, "counted": counted, "held": held, "merged": merged},
         )
+
+    async def _announce_held(self, *, batch_id: int, records: Sequence[Sale]) -> None:
+        """Say what came in and is waiting for a person (RF-06 of 011).
+
+        Announced and not called, like every other thing this module tells the
+        rest of the platform: `sales` may not touch `triage` (Artículo IV), so
+        what leaves here is identifiers and a label and whoever cares listens.
+
+        **What travels is one case per decision, not one per row.** Two versions
+        of the same sale are a single question — *which of these is the valid
+        one* — and sending two would put the same decision in front of a person
+        twice. So the records of this batch are grouped the way the review queue
+        groups them: by `code_key` when there is one and a twin to go with it,
+        on their own otherwise.
+
+        The grouping is asked of the database rather than of the batch, because
+        the twin may have arrived a week ago: a record held alone in March and
+        repeated in April is a group in April, and the case it opened when it
+        was alone stops being true right then. That one is closed here, and
+        `GROUPED_WITH_A_TWIN` says it was the queue and not a person who closed
+        it.
+        """
+        if not records:
+            return
+
+        cases: list[HeldSale] = []
+        alone: list[Sale] = []
+        seen: set[str] = set()
+
+        for record in records:
+            if not record.code_key:
+                # No code is no group, however many of them arrive: they would
+                # all share the empty key and the screen would ask somebody
+                # which of a pile of unrelated records «is the valid one».
+                alone.append(record)
+                continue
+            if record.code_key in seen:
+                continue
+            seen.add(record.code_key)
+
+            siblings = [
+                sale
+                for sale in await self.sales.with_code_key(record.code_key)
+                if sale.state is SaleState.HELD
+            ]
+            if len(siblings) < 2:
+                alone.append(record)
+                continue
+
+            cases.append(
+                HeldSale(
+                    kind=REPEATED_SALE,
+                    key=record.code_key,
+                    code=record.code,
+                    reason=DUPLICATE_WITH_DIFFERENCES,
+                    versions=len(siblings),
+                )
+            )
+            for sibling in siblings:
+                await events.publish(
+                    QuarantinedSourceResolved(
+                        kind=BROKEN_SALE,
+                        key=str(sibling.id),
+                        resolved_where=GROUPED_WITH_A_TWIN,
+                    ),
+                    self.session,
+                )
+
+        cases.extend(
+            HeldSale(
+                kind=BROKEN_SALE,
+                key=str(record.id),
+                code=record.code,
+                reason=record.reason or "",
+                versions=1,
+            )
+            for record in alone
+        )
+
+        await events.publish(SalesHeld(batch_id=batch_id, cases=tuple(cases)), self.session)
 
     @staticmethod
     def _sale_of(row: NormalizedSale, *, state: SaleState, reason: str | None) -> Sale:
@@ -269,6 +383,44 @@ class SalesService:
             held=sum(len(records) for records in grouped.values()),
         )
 
+    async def pending_work(self) -> tuple[PendingItem, ...]:
+        """Todo lo que ventas tiene esperando a una persona, como lista completa.
+
+        La respuesta a la pregunta que alguien hace en público cada tanto. Es
+        **completa a propósito**: quien la escucha la usa para abrir lo que falta
+        y cerrar lo que sobra, y una lista parcial le haría cerrar casos que
+        siguen vivos.
+
+        Sale de la misma cola que mira la pantalla —`review_queue`— y no de una
+        consulta propia, para que no puedan discrepar: si un día la pantalla
+        agrupa distinto, el informe agrupa igual, porque es el mismo código.
+        """
+        queue = await self.review_queue()
+        items = [
+            PendingItem(
+                kind=REPEATED_SALE,
+                key=group.code_key,
+                reason=DUPLICATE_WITH_DIFFERENCES,
+                section=BusinessSection.SALES.value,
+                detail=(
+                    ("code", group.versions[0].code if group.versions else group.code_key),
+                    ("versions", str(len(group.versions))),
+                ),
+            )
+            for group in queue.groups
+        ]
+        items.extend(
+            PendingItem(
+                kind=BROKEN_SALE,
+                key=str(sale.id),
+                reason=sale.reason or NO_REASON_GIVEN,
+                section=BusinessSection.SALES.value,
+                detail=(("code", sale.code),),
+            )
+            for sale in queue.broken
+        )
+        return tuple(items)
+
     async def resolved_groups(self, *, limit: int = 50) -> list[ResolvedGroup]:
         """The cases a person already decided (RF-34, RF-35, RF-36 of 009).
 
@@ -343,6 +495,11 @@ class SalesService:
             ],
             held_total=await self.sales.count_sales(state=SaleState.HELD),
             pending_groups=queue.pending_groups,
+            # Las dos formas en que una venta espera a alguien, sumadas: un
+            # grupo de repetidas es **una** decisión aunque tenga cuatro
+            # versiones, y una apartada suelta es otra. Es exactamente lo que
+            # muestra `/revision?area=SALES`, que es adonde lleva el aviso.
+            pending_decisions=queue.pending_groups + len(queue.broken),
         )
 
     # --- Deciding ----------------------------------------------------------
@@ -377,6 +534,15 @@ class SalesService:
             sale.resolved_at = now
         await self.session.flush()
         await self._announce_resolved(records)
+        # And the case the group itself opened. It is keyed by the `code_key`
+        # and not by a row, because that is what was decided: one question about
+        # however many versions there were.
+        await events.publish(
+            QuarantinedSourceResolved(
+                kind=REPEATED_SALE, key=code_key, resolved_where=RESOLVED_IN_REVIEW
+            ),
+            self.session,
+        )
         await self.session.commit()
         logger.info("Sales group resolved", extra={"code_key": code_key, "action": action})
         return [SaleRead.model_validate(sale) for sale in records]
@@ -406,7 +572,7 @@ class SalesService:
                 QuarantinedSourceResolved(
                     kind=UNREADABLE_SALE_ROW,
                     key=str(sale.staging_row_id),
-                    resolved_where=RESOLVED_IN_SALES,
+                    resolved_where=RESOLVED_IN_REVIEW,
                 ),
                 self.session,
             )
@@ -427,6 +593,15 @@ class SalesService:
             sale.resolved_at = None
         await self.session.flush()
         await self._announce_reopened(records)
+        # The mirror of the line in `resolve_group`, and it is here for the rule
+        # that made its sibling exist: *hay una sola verdad sobre si algo sigue
+        # pendiente*, and it has to hold in both directions.
+        await events.publish(
+            QuarantinedSourceReopened(
+                kind=REPEATED_SALE, key=code_key, reopened_where=REOPENED_IN_REVIEW
+            ),
+            self.session,
+        )
         await self.session.commit()
         return [SaleRead.model_validate(sale) for sale in records]
 
@@ -451,7 +626,7 @@ class SalesService:
                 QuarantinedSourceReopened(
                     kind=UNREADABLE_SALE_ROW,
                     key=str(sale.staging_row_id),
-                    reopened_where=REOPENED_IN_SALES,
+                    reopened_where=REOPENED_IN_REVIEW,
                 ),
                 self.session,
             )
@@ -495,5 +670,16 @@ class SalesService:
             sale.reason = None
         await self.session.flush()
         await self._announce_resolved([sale])
+        # **Only if the correction actually fixed it.** A record whose product
+        # still does not exist stays held, so its case stays open: closing it
+        # here would empty the queue of something nobody resolved, which is the
+        # one thing the queue exists not to do (Artículo II).
+        if sale.state is SaleState.COUNTED:
+            await events.publish(
+                QuarantinedSourceResolved(
+                    kind=BROKEN_SALE, key=str(sale.id), resolved_where=RESOLVED_IN_REVIEW
+                ),
+                self.session,
+            )
         await self.session.commit()
         return SaleRead.model_validate(sale)

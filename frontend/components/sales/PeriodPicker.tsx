@@ -12,6 +12,10 @@ import { Input } from '@/components/ui/input'
  * Sin eso, cambiar el período de los precios reseteaba el de la facturación —
  * que es exactamente lo que RF-05 dice que no puede pasar.
  *
+ * `keep` es opcional porque una pantalla con **un solo** corte no tiene ningún
+ * período ajeno que preservar, y obligarla a escribir `keep={{}}` sería pedirle
+ * que declare que no tiene vecinos.
+ *
  * La forma es la del control de período de la guía visual (`3b`): un bloque
  * compacto, arriba a la derecha del corte que gobierna, con los rótulos en
  * versalita y el botón en contorno. El naranja no está acá: elegir un período
@@ -22,7 +26,7 @@ export function PeriodPicker({
   toName,
   from,
   to,
-  keep,
+  keep = {},
   /** Qué corte gobierna, para quien lo lee con un lector de pantalla. */
   label,
 }: {
@@ -30,7 +34,7 @@ export function PeriodPicker({
   toName: string
   from?: string
   to?: string
-  keep: Record<string, string | undefined>
+  keep?: Record<string, string | undefined>
   label: string
 }) {
   return (

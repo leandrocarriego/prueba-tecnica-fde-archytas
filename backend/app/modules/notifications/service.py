@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 from app.config import settings
 from app.logging import get_logger
 from app.modules.notifications.client import Delivery, WhatsAppChannel
+from app.modules.notifications.models import AlertKind
 
 logger = get_logger(__name__)
 
@@ -326,3 +327,55 @@ def daily_digest_message(*, pending_messages: int, stalled_orders: int, lines: l
         if pending
     ]
     return "\n".join([header, "", *lines[:10], *(["", *where] if where else [])])
+
+
+# --- Probar un aviso antes de que haga falta ------------------------------
+
+# La franja que encabeza un envío de prueba.
+#
+# Va **adentro del mensaje** y no en un metadato: lo que llega al teléfono es un
+# WhatsApp suelto, sin pantalla alrededor que lo califique, y un aviso de prueba
+# que se lee igual que uno de verdad hace que alguien salga a resolver una
+# factura que no existe. Es la primera línea porque en la notificación del
+# celular se ve el principio y no el final.
+TEST_BANNER = "🧪 PRUEBA — la pidió alguien desde Configuración. No hay nada que resolver."
+
+# Los datos con los que se arma cada ejemplo. Inventados y visiblemente
+# inventados: un número de factura que no puede existir y un proveedor que se
+# llama como lo que es.
+SAMPLE_SUPPLIER = "Proveedor de Prueba S.A."
+SAMPLE_INVOICE = "FC-0000-PRUEBA"
+
+
+def test_message(kind: str) -> str:
+    """Un ejemplo de un aviso, dicho con las mismas palabras que el de verdad.
+
+    **Reusa el redactor real de cada aviso en vez de escribir un texto aparte.**
+    Es lo único que hace que la prueba pruebe algo: si el ejemplo tuviera su
+    propia redacción, llegaría bien el día que el aviso verdadero llega roto, y
+    el botón estaría certificando su propio texto.
+
+    Lo que sí es propio es la franja de arriba y la ausencia de enlaces a datos
+    concretos — no hay una factura #0 a la que mandar a nadie.
+    """
+    if kind == AlertKind.PAYMENT_CLAIM:
+        body = payment_claim_message(
+            supplier=SAMPLE_SUPPLIER,
+            subject="Reclamo de pago (ejemplo)",
+            body="Este es el aspecto que tiene un reclamo del portal cuando llega de verdad.",
+        )
+    elif kind == AlertKind.DUE_SOON:
+        body = due_soon_message(
+            number=SAMPLE_INVOICE,
+            supplier=SAMPLE_SUPPLIER,
+            due_on="—",
+            days_ahead=2,
+        )
+    elif kind == AlertKind.DAILY_DIGEST:
+        body = daily_digest_message(pending_messages=0, stalled_orders=0, lines=[])
+    else:
+        # Un tipo de aviso que existe en el enum y todavía no tiene redactor. Se
+        # manda igual, diciendo lo único cierto: que la ruta hasta el teléfono
+        # funciona. Callarse dejaría el botón sin contestar nada.
+        body = f"Cordillera: aviso de tipo {kind}."
+    return f"{TEST_BANNER}\n\n{body}"

@@ -47,14 +47,19 @@ export function CategorySpendCard({ categories }: { categories: CategoryList }) 
             <Share
               key={item.id}
               label={item.name}
-              reading={`${percent(Number(item.spend), total)} %`}
+              reading={<Reading amount={item.spend} pct={percent(Number(item.spend), total)} />}
               share={(Number(item.spend) / total) * 100}
             />
           ))}
           {unclassified > 0 && (
             <Share
               label="Sin rubro asignado"
-              reading={`${percent(unclassified, total)} %`}
+              reading={
+                <Reading
+                  amount={categories.spend_unclassified}
+                  pct={percent(unclassified, total)}
+                />
+              }
               share={(unclassified / total) * 100}
               excluded
             />
@@ -75,6 +80,24 @@ export function CategorySpendCard({ categories }: { categories: CategoryList }) 
         </Link>
       )}
     </section>
+  )
+}
+
+/**
+ * Lo que se lee a la derecha de cada barra: **cuánta plata, y qué porción**.
+ *
+ * El porcentaje solo no alcanza. «Herramientas 35 %» no se puede llevar a una
+ * conversación con el proveedor ni comparar con nada: para saber de cuánto se
+ * está hablando había que ir hasta el pie de la tarjeta, leer el total y hacer
+ * la cuenta. El importe va primero porque es la pregunta —cuánto gasté acá— y
+ * la porción atrás, que es el contexto.
+ */
+function Reading({ amount, pct }: { amount: string; pct: number }) {
+  return (
+    <>
+      <Money value={amount} as="span" />
+      <span className="ml-1.5 text-muted-foreground">{pct} %</span>
+    </>
   )
 }
 

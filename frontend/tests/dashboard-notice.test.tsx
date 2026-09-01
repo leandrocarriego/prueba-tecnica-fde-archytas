@@ -37,6 +37,7 @@ function dashboard(excluded: number): SalesDashboard {
     by_month: [],
     held_total: 0,
     pending_groups: 0,
+    pending_decisions: 0,
   } as SalesDashboard
 }
 
@@ -63,10 +64,11 @@ describe('el tablero', () => {
     const importe = screen.getByText('$ 1.234.567')
 
     expect(comesBefore(aviso, importe), 'el aviso tiene que ir arriba del número').toBe(true)
-    // RF-15: un aviso sin salida es sólo una queja.
+    // RF-15: un aviso sin salida es sólo una queja. La salida es la cola, que
+    // es donde se decide desde que `/ventas` pasó a ser un listado.
     expect(screen.getByRole('link', { name: 'Ver cuáles' })).toHaveAttribute(
       'href',
-      '/ventas/revision'
+      '/revision?area=SALES'
     )
   })
 

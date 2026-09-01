@@ -74,6 +74,8 @@ function dibujar(items: Case[]) {
       mayCorrect={false}
       categories={[]}
       suppliers={[]}
+      salesQueue={null}
+      mayResolveSales={false}
     />
   )
 }
@@ -130,6 +132,8 @@ describe('la cola de pendientes', () => {
         mayCorrect={false}
         categories={[]}
         suppliers={[]}
+        salesQueue={null}
+        mayResolveSales={false}
       />
     )
 
