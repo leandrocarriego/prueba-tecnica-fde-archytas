@@ -352,3 +352,18 @@ export async function dismissRepeat(orderId: number): Promise<ActionResult<Purch
 export async function announceCalendarPresence(): Promise<void> {
   await call<void>('/calendar/presence', { method: 'POST' })
 }
+
+/**
+ * Decir que se dejó de mirar el calendario.
+ *
+ * Sin esto, el que se va tarda el vencimiento del turno —más de un minuto— en
+ * desaparecer de las otras pantallas, que durante ese rato dicen que hay
+ * alguien mirando algo que nadie está mirando.
+ *
+ * Se traga el fallo por la misma razón que la de arriba, y con más motivo: esto
+ * corre mientras la pantalla se está yendo, y no queda nadie a quien contarle
+ * que no salió.
+ */
+export async function leaveCalendarPresence(): Promise<void> {
+  await call<void>('/calendar/presence/leaving', { method: 'POST' })
+}

@@ -1492,6 +1492,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/presence/leaving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decir que se dejó de mirar el calendario
+         * @description Contar en el canal que esta persona cerró el calendario.
+         *
+         *     **El turno vencido no alcanza, y por eso existe esto.** Sin despedida, el
+         *     que se va tarda hasta el vencimiento del turno en desaparecer de las otras
+         *     pantallas —más de un minuto—, y en ese rato las demás dicen que hay alguien
+         *     mirando algo que nadie está mirando. Eso es exactamente lo que la presencia
+         *     viene a evitar: mover un vencimiento creyendo que hay compañía es tan malo
+         *     como moverlo creyendo que no la hay.
+         *
+         *     **Y el turno sigue estando**, porque una despedida es lo primero que se
+         *     pierde: un navegador que se cierra de golpe, una pestaña que el sistema
+         *     operativo mata, una red que se corta. El aviso resuelve el caso normal en el
+         *     acto y el vencimiento sigue cubriendo el resto. Ninguno de los dos sobra.
+         *
+         *     `POST` y no `DELETE` aunque suene a borrar: no hay nada que borrar —no
+         *     existe registro de presencias— y `navigator.sendBeacon`, que es lo único
+         *     que un navegador entrega mientras se está cerrando, sólo sabe hacer `POST`.
+         */
+        post: operations["announce_leaving_api_v1_calendar_presence_leaving_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/{due_date_id}": {
         parameters: {
             query?: never;
@@ -1986,6 +2022,13 @@ export interface paths {
          * What the business invoiced, and what was left out of the number
          * @description The owner and sales (RF-03 to RF-07, RF-25 to RF-28 of 009).
          *
+         *     **Two sections y no una**, igual que el corte de compras de al lado y por
+         *     la misma razón. `DASHBOARD` decía «esta persona tiene tablero» y estaba
+         *     haciendo, de prestado, el trabajo de decir «esta persona puede ver las
+         *     ventas» — cierto sólo mientras compras no tuviera tablero. Desde que lo
+         *     tiene, `SALES` es lo que mantiene el RF-08 de la 009 en pie: quien compra
+         *     entra al tablero y no ve la facturación.
+         *
          *     Each cut takes its own window, which is RF-05: choosing a period here
          *     changes this number and no other.
          */
@@ -2416,6 +2459,16 @@ export interface components {
             spend_unclassified: string;
             /** Spend Total */
             spend_total: string;
+            /**
+             * Revenue Unclassified
+             * @default 0
+             */
+            revenue_unclassified: string;
+            /**
+             * Revenue Total
+             * @default 0
+             */
+            revenue_total: string;
         };
         /**
          * CategoryRead
@@ -2430,6 +2483,11 @@ export interface components {
             product_count: number;
             /** Spend */
             spend: string;
+            /**
+             * Revenue
+             * @default 0
+             */
+            revenue: string;
             /** Aliases */
             aliases: components["schemas"]["CategoryAliasRead"][];
         };
@@ -2935,6 +2993,8 @@ export interface components {
             payment_state: string;
             /** Portal Payment Status */
             portal_payment_status?: string | null;
+            /** Portal Paid */
+            portal_paid?: string | null;
             /**
              * Payment State Disagrees
              * @default false
@@ -6884,6 +6944,24 @@ export interface operations {
         };
     };
     announce_presence_api_v1_calendar_presence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    announce_leaving_api_v1_calendar_presence_leaving_post: {
         parameters: {
             query?: never;
             header?: never;

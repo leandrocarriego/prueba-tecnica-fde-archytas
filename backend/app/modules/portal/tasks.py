@@ -19,7 +19,7 @@ from celery import Task
 from app.database import SessionFactory
 from app.logging import get_logger
 from app.modules.portal.service import PortalService
-from app.shared.errors import ExtractionError
+from app.shared.errors import ExtractionError, PortalShapeError
 from app.shared.events import JobRunFailed, JobRunSucceeded, events
 from app.worker.bridge import async_task
 from app.worker.celery_app import celery_app
@@ -149,6 +149,17 @@ async def _run_section(
         async with SessionFactory() as session:
             service = PortalService(session)
             document_id = await getattr(service, method)(job_run_id=job_run_id)
+    except PortalShapeError as error:
+        # The page does not have the columns this platform reads. That is not
+        # bad timing and it will not be different in five minutes, so it is
+        # recorded now with the reason. Retrying it kept the run `RUNNING` for
+        # the length of the retries — which is what the owner saw as a «Traer
+        # ahora» that stayed disabled — and, when the worker was replaced by a
+        # deploy in between, the retry chain was lost and the run was swept away
+        # with «its worker never came back»: a sentence that names the symptom
+        # and buries the cause.
+        await _report_failure(job_run_id, task_name, error.message)
+        raise
     except ExtractionError as error:
         attempts = int(getattr(task.request, "retries", 0) or 0)
         if attempts < MAX_RETRIES:

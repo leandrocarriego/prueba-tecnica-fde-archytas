@@ -169,7 +169,10 @@ async def correct_sale(
 
 @dashboard_router.get(
     "/sales",
-    dependencies=[require_section(Section.DASHBOARD, Level.READ)],
+    dependencies=[
+        require_section(Section.DASHBOARD, Level.READ),
+        require_section(Section.SALES, Level.READ),
+    ],
     summary="What the business invoiced, and what was left out of the number",
 )
 async def sales_dashboard(
@@ -178,6 +181,13 @@ async def sales_dashboard(
     until: Annotated[date | None, Query(description="Up to this date")] = None,
 ) -> SalesDashboard:
     """The owner and sales (RF-03 to RF-07, RF-25 to RF-28 of 009).
+
+    **Two sections y no una**, igual que el corte de compras de al lado y por
+    la misma razón. `DASHBOARD` decía «esta persona tiene tablero» y estaba
+    haciendo, de prestado, el trabajo de decir «esta persona puede ver las
+    ventas» — cierto sólo mientras compras no tuviera tablero. Desde que lo
+    tiene, `SALES` es lo que mantiene el RF-08 de la 009 en pie: quien compra
+    entra al tablero y no ve la facturación.
 
     Each cut takes its own window, which is RF-05: choosing a period here
     changes this number and no other.

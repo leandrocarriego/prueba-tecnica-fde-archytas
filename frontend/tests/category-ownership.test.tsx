@@ -69,6 +69,7 @@ const UN_RUBRO: Category = {
   name: 'Herramientas',
   product_count: 12,
   spend: '0',
+  revenue: '0',
   aliases: [],
 }
 
@@ -82,6 +83,8 @@ const LISTADO = {
   // El gasto no cambia qué botones ofrece la matriz: ceros alcanzan.
   spend_unclassified: '0',
   spend_total: '0',
+  revenue_unclassified: '0',
+  revenue_total: '0',
 }
 
 const UNA_FORMA_ESCRITA: Case = {

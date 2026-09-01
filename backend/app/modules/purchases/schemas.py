@@ -258,6 +258,15 @@ class InvoiceRead(BaseModel):
     paid_pct: int = 0
     payment_state: str = "SIN_PAGOS"
     portal_payment_status: str | None = None
+    # Cuánto dice el portal que se pagó. Se guarda en `core.invoice` desde la
+    # 004 y **no salía de ahí**, así que la pantalla sabía que los dos no
+    # coincidían y no podía decir en qué: mostraba «$0» y una píldora que decía
+    # «el portal informa otro estado», que es un acertijo y no un dato.
+    #
+    # No compite con `paid`: el estado de pago lo siguen calculando los pagos
+    # imputados y sólo ellos (RF-45 de 005). Esto es lo que informa el origen,
+    # dicho al lado y nombrado como suyo.
+    portal_paid: Decimal | None = None
     payment_state_disagrees: bool = False
     is_inconsistent: bool = False
     receipt_issued: bool = False

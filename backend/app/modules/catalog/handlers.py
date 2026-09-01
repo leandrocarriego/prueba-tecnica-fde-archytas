@@ -5,6 +5,7 @@ person resolved a case, the owner moved a parameter: each of those is a fact
 this module reacts to, in the transaction of whoever published it.
 """
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,12 +24,15 @@ from app.modules.catalog.service import (
 from app.shared.errors import ValidationError
 from app.shared.events import (
     BusinessParameterChanged,
+    DailyDigestContribution,
+    DailyDigestRequested,
     PriceHistoryNormalized,
     PriceListNormalized,
     PurchaseOrdersNormalized,
     QuarantineCaseResolved,
     QuarantineRuleRedecided,
     QuarantineRuleRevoked,
+    SalesNormalized,
     events,
 )
 
@@ -36,6 +40,41 @@ logger = get_logger(__name__)
 
 INCORPORATE = "incorporate"
 DISCONTINUE = "discontinue"
+
+# Cuántos productos nuevos nombra el resumen uno por uno.
+DIGEST_LINES = 5
+
+# Desde cuándo cuenta «nuevo» para el resumen: el día anterior. No se guarda
+# cuándo salió el último resumen, y no hace falta — sale una vez por día, así
+# que la ventana es un día. Guardar la marca sería un estado más que mantener
+# para contestar la misma pregunta.
+DIGEST_WINDOW = timedelta(days=1)
+
+
+@events.subscribe(DailyDigestRequested)
+async def contribute_to_the_digest(event: DailyDigestRequested, session: AsyncSession) -> None:
+    """Say which products entered the catalog since yesterday.
+
+    Es la única de las tres cosas nuevas del resumen que **no es una tarea**: no
+    hay nada que resolver porque un producto haya entrado. Es lo que pasó, y es
+    lo que alguien quiere saber sin tener que ir a buscarlo — sobre todo porque
+    un producto entra al catálogo por una decisión de una persona (RF-30) y no
+    por una corrida automática, así que esta línea también cuenta lo que hizo el
+    equipo ayer.
+    """
+    service = CatalogService(session)
+    entered = await service.products_first_seen_since(datetime.now(UTC) - DIGEST_WINDOW)
+    await events.publish(
+        DailyDigestContribution(
+            source="new_products",
+            pending=len(entered),
+            lines=tuple(
+                f"• {product.code} — {product.description}" for product in entered[:DIGEST_LINES]
+            ),
+        ),
+        session,
+    )
+    del event
 
 
 def _price_of(decision: dict[str, object]) -> Decimal | None:
@@ -121,6 +160,21 @@ async def record_order_spend(event: PurchaseOrdersNormalized, session: AsyncSess
     its own projection, which is what the rubros screen adds up by rubro.
     """
     await CatalogService(session).record_order_spend(event.orders)
+
+
+@events.subscribe(SalesNormalized)
+async def record_sale_revenue(event: SalesNormalized, session: AsyncSession) -> None:
+    """Keep this module's «ventas por rubro» fed by the sales that were typed.
+
+    El gemelo exacto del handler de arriba, por el otro lado del negocio.
+    `sales` es dueño de los montos y este módulo no lee su tabla (Artículo IV):
+    reacciona a que un lote de ventas se normalizó y mantiene su proyección, que
+    es lo que la pantalla de rubros suma.
+
+    Existe porque el tablero del vendedor mostraba **gasto** por rubro, que es
+    una respuesta sobre lo que se compra puesta delante de quien vende.
+    """
+    await CatalogService(session).record_sale_revenue(event.sales)
 
 
 @events.subscribe(QuarantineCaseResolved)

@@ -601,9 +601,20 @@ export function CalendarGrid({
       ? null
       : `${lastChange.actorName || 'Alguien'} ${VERBOS[lastChange.action] ?? 'cambió'} un vencimiento`
 
-  // Los demás, no uno mismo: el canal devuelve también el propio anuncio, y
-  // dibujarse a sí mismo entre «los que también están mirando» es raro de leer.
+  /*
+    Quiénes están mirando, **uno mismo incluido**.
+
+    Se filtraba el propio anuncio, y eso dejaba la pregunta más básica sin
+    contestar: si no me veo, no sé si el resto me ve. La lista pasaba de vacía a
+    tener a otro sin que nada dijera que yo también estoy ahí, y quien mira no
+    tiene forma de distinguir «soy el único» de «esto no anda».
+
+    Uno mismo va **primero y dicho como propio**: la frase habla de «los demás»,
+    así que mezclarse entre ellos con el nombre de pila sería peor que no estar.
+  */
+  const yo = viewers.find(one => one.id === viewerId) ?? null
   const otros = viewers.filter(one => one.id !== viewerId)
+  const presentes = yo === null ? otros : [{ ...yo, name: 'Vos' }, ...otros]
 
   const semanas = weeksOf(calendar.since, calendar.until)
 
@@ -687,11 +698,12 @@ export function CalendarGrid({
                   ? 'Conectando…'
                   : 'Sin conexión en vivo'}
               {otros.length > 0 && ` · ${frasePresentes(otros)}`}
+              {otros.length === 0 && yo !== null && ' · Sos el único mirando esta pantalla'}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <Avatares viewers={otros} />
+            <Avatares viewers={presentes} />
             {canEdit && (
               /*
                 En tinta y no en naranja: `/calendario` es pantalla de decisión y
@@ -1083,9 +1095,19 @@ function Avatares({ viewers }: { viewers: { id: number; name: string }[] }) {
         <span
           key={one.id}
           title={one.name}
-          className="flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-[10px] font-semibold text-primary-foreground"
+          /*
+            El propio círculo va en contorno y los demás en tinta llena: la
+            lista tiene que decir cuál soy yo sin que haya que leer los nombres,
+            y en una fila de círculos iguales el propio se pierde.
+          */
+          className={cn(
+            'flex size-7 items-center justify-center rounded-full border-2 border-card text-[10px] font-semibold',
+            one.name === 'Vos'
+              ? 'bg-card text-foreground ring-1 ring-border'
+              : 'bg-primary text-primary-foreground'
+          )}
         >
-          {iniciales(one.name)}
+          {one.name === 'Vos' ? 'VOS' : iniciales(one.name)}
         </span>
       ))}
     </span>

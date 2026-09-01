@@ -10,6 +10,11 @@ is not what it claims to be — a missing sheet, missing columns, no table. That
 is a technical failure of the extraction, not a data problem, and it has to be
 visible in `operations` instead of quietly producing zero rows.
 
+A page whose **shape** is wrong raises `PortalShapeError`, which is the same
+thing plus one fact the runner needs: it will fail identically on the next
+attempt, so it is reported at once rather than retried for a quarter of an
+hour while the run sits there saying «Corriendo ahora».
+
 Both are tested against the files pinned in `tests/fixtures/portal/`, never
 against the live portal (`TEST-03`).
 """
@@ -24,7 +29,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from app.shared.errors import ExtractionError
+from app.shared.errors import ExtractionError, PortalShapeError
 
 # --- The daily file ------------------------------------------------------
 
@@ -158,7 +163,7 @@ def parse_price_list(content: bytes) -> list[ParsedPriceRow]:
     header = [_cell_text(cell).strip() for cell in rows[0]]
     missing = [column for column in REQUIRED_COLUMNS if column not in header]
     if missing:
-        raise ExtractionError(
+        raise PortalShapeError(
             "The daily file does not have the expected columns",
             details={"missing": missing, "found": header},
         )
@@ -319,7 +324,7 @@ def parse_product_history(content: bytes) -> list[ParsedHistoryPoint]:
     if not parser.found:
         # No table at all: the portal changed and this parser stopped
         # understanding what it reads. That is a technical failure.
-        raise ExtractionError("The history screen has no table of prices")
+        raise PortalShapeError("The history screen has no table of prices")
 
     if not parser.rows:
         # The table is there and publishes no price: the product has no history
@@ -482,7 +487,7 @@ def _blocks_of(content: bytes, *, section: str) -> list[Table | Heading]:
         # No table at all: the portal changed and this parser stopped
         # understanding what it reads. A technical failure of the extraction,
         # visible in `operations`, not a data problem.
-        raise ExtractionError("The screen has no table", details={"section": section})
+        raise PortalShapeError("The screen has no table", details={"section": section})
     return parser.blocks
 
 
@@ -501,6 +506,7 @@ AMOUNT_NOT_A_NUMBER = "El monto no es un número"
 NEGATIVE_AMOUNT = "El monto no puede ser negativo"
 INVALID_DATE = "La fecha no corresponde a un día que exista"
 NEGATIVE_QUANTITY = "La cantidad no puede ser negativa"
+QUANTITY_NOT_A_NUMBER = "La cantidad no es un número"
 MISSING_CODE_OF_SALE = "El registro no trae código de venta"
 
 
@@ -547,12 +553,18 @@ def _read_iso_date(text: str) -> tuple[date | None, str | None]:
 
 
 def _read_count(text: str) -> tuple[int | None, str | None]:
-    """Interpret a plain count, refusing a negative one (RF-19 of 009)."""
+    """Interpret a plain count, refusing a negative one (RF-19 of 009).
+
+    A cell that is not a number says so **about the quantity**. It used to
+    answer «el monto no es un número», which is the sentence a person then read
+    in the queue about a row whose amount was perfectly fine — sending them to
+    check the wrong column of the right row.
+    """
     cleaned = text.strip().replace(".", "")
     if not cleaned:
         return None, None
     if not cleaned.lstrip("-").isdigit():
-        return None, AMOUNT_NOT_A_NUMBER
+        return None, QUANTITY_NOT_A_NUMBER
     quantity = int(cleaned)
     if quantity < 0:
         return None, NEGATIVE_QUANTITY
@@ -622,7 +634,7 @@ def parse_invoices(content: bytes) -> list[ParsedInvoiceRow]:
     table = tables[0]
     missing = [name for name in INVOICE_COLUMNS if name not in table.headers]
     if missing:
-        raise ExtractionError(
+        raise PortalShapeError(
             "The invoices screen does not have the expected columns",
             details={"missing": missing, "found": list(table.headers)},
         )
@@ -747,7 +759,7 @@ def parse_supplier_ledger(content: bytes) -> tuple[list[ParsedSupplier], list[Pa
     tables = [block for block in blocks if isinstance(block, Table)]
     summary = tables[0]
     if "Proveedor" not in summary.headers:
-        raise ExtractionError(
+        raise PortalShapeError(
             "The register does not have the expected columns",
             details={"found": list(summary.headers)},
         )
@@ -902,7 +914,7 @@ def parse_purchase_orders(content: bytes) -> list[ParsedPurchaseOrder]:
     table = _tables_of(content, section="purchase-orders")[0]
     missing = [name for name in ORDER_COLUMNS if name not in table.headers]
     if missing:
-        raise ExtractionError(
+        raise PortalShapeError(
             "The purchase orders screen does not have the expected columns",
             details={"missing": missing, "found": list(table.headers)},
         )
@@ -1003,7 +1015,7 @@ def parse_messages(content: bytes) -> list[ParsedMessage]:
     table = _tables_of(content, section="messages")[0]
     missing = [name for name in MESSAGE_COLUMNS if name not in table.headers]
     if missing:
-        raise ExtractionError(
+        raise PortalShapeError(
             "The inbox does not have the expected columns",
             details={"missing": missing, "found": list(table.headers)},
         )
@@ -1048,7 +1060,25 @@ def parse_messages(content: bytes) -> list[ParsedMessage]:
 
 # --- The sales screen (009) ----------------------------------------------
 
-SALE_COLUMNS = ("Codigo", "Fecha", "Total")
+# The headers **as the portal writes them**, abbreviations and dots included.
+#
+# They used to be `Codigo` and `Cantidad`, which the sales screen has never
+# published: it says `Cod. Venta` and `Cant.`, the same way the invoices screen
+# says `Nro. Factura` and the orders one says `Nro. OC`. So this parser raised
+# «the sales screen does not have the expected columns» on every run since the
+# platform was deployed, and not one sale was ever read in production.
+#
+# It passed its own tests all along because its fixture is the only one in
+# `tests/fixtures/portal/` that was **derived instead of captured** — its own
+# README says so — and whoever derived it invented the column names. The
+# anomalies in it are real and well modelled; the headers were not.
+SALE_COLUMNS = ("Cod. Venta", "Fecha", "Total")
+
+# The two columns the screen publishes and this parser does not read. Named
+# here rather than left implicit: `Cliente` is a customer of the client, which
+# 009 does not model, and `P. Unit.` is `Total / Cant.` — a number that cannot
+# disagree with itself is not worth a column that could.
+SALE_COLUMNS_IGNORED = ("Cliente", "P. Unit.")
 
 # Two records are the same sale when their codes differ only in spelling:
 # spaces, dashes and case. Nothing else is collapsed — a code that differs in a
@@ -1059,6 +1089,34 @@ SALE_CODE_NOISE = re.compile(r"[\s\-_.]+")
 def sale_code_key(code: str) -> str:
     """The sale code with the differences of spelling removed (RF-10 of 009)."""
     return SALE_CODE_NOISE.sub("", code).casefold()
+
+
+# `p73` on the sales screen is `COR-0073` in the catalog, and they are the same
+# product. It is not a guess and it is worth writing down how it was settled:
+# the description of `COR-0073` is «Medicion - Articulo 73», and the unit prices
+# this screen publishes for `p1`, `p5` and `p62` — 48210, 92375 and 56870 — are
+# the catalog price of `COR-0001`, `COR-0005` and `COR-0062` to the peso.
+#
+# The invoices and the purchase orders screens write the code in full (`COR-0057
+# - Tornillos - Articulo 57`) and this one abbreviates, so it gets its own
+# reader instead of loosening `PRODUCT_CODE`. Loosening it would make a stray
+# «p12» inside the free text of any other screen look like a product.
+SALE_PRODUCT_CODE = re.compile(r"^\s*p(\d{1,4})\s*$", re.IGNORECASE)
+
+
+def _sale_product_code(text: str) -> str | None:
+    """The catalog code of the product a sale names, or nothing.
+
+    Nothing rather than a guess: a cell this does not recognise leaves the sale
+    without a product — a sale that no total by rubro can count, and still a
+    sale. Inventing a code would put somebody's money under the wrong heading,
+    which is worse than leaving it uncounted and visible.
+
+    It falls back to the full form so that a screen that one day writes the code
+    out is read by the same function, and not by a second one nobody updates.
+    """
+    match = SALE_PRODUCT_CODE.match(text)
+    return f"COR-{int(match.group(1)):04d}" if match else _product_code_in(text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1091,17 +1149,17 @@ def parse_sales(content: bytes) -> list[ParsedSale]:
     table = _tables_of(content, section="sales")[0]
     missing = [name for name in SALE_COLUMNS if name not in table.headers]
     if missing:
-        raise ExtractionError(
+        raise PortalShapeError(
             "The sales screen does not have the expected columns",
             details={"missing": missing, "found": list(table.headers)},
         )
 
     parsed: list[ParsedSale] = []
     for offset, row in enumerate(table.rows, start=1):
-        code = table.column(row, "Codigo").strip()
+        code = table.column(row, "Cod. Venta").strip()
         sold_on, date_reason = _read_iso_date(table.column(row, "Fecha"))
         total, amount_reason = _read_money(table.column(row, "Total"))
-        quantity, quantity_reason = _read_count(table.column(row, "Cantidad"))
+        quantity, quantity_reason = _read_count(table.column(row, "Cant."))
         product = table.column(row, "Producto").strip()
 
         parsed.append(
@@ -1111,7 +1169,7 @@ def parse_sales(content: bytes) -> list[ParsedSale]:
                 code=code or None,
                 code_key=sale_code_key(code) if code else None,
                 sold_on=sold_on,
-                product_code=_product_code_in(product),
+                product_code=_sale_product_code(product),
                 quantity=quantity,
                 total=total,
                 reason=(None if code else MISSING_CODE_OF_SALE)

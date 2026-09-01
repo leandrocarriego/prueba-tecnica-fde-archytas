@@ -20,6 +20,7 @@ from app.modules.notifications.delivery import AlertRouter
 from app.modules.notifications.models import AlertKind
 from app.modules.notifications.service import (
     DIGEST_TIME_KEY,
+    DigestPart,
     NotificationService,
     daily_digest_message,
 )
@@ -154,23 +155,25 @@ async def daily_digest() -> dict[str, Any]:
             if not await _is_the_hour(session):
                 return {"sent": False, "reason": "not the configured hour"}
             await events.publish(DailyDigestRequested(on_date=datetime.now(UTC).date()), session)
-            pending = sum(part.pending for part in collected if part.source == "messages")
-            stalled = sum(part.pending for part in collected if part.source == "purchase_orders")
-            lines = [line for part in collected for line in part.lines]
+            # Cada contribución se pasa entera, con su `source`: quién la
+            # contó es lo que deja escribirla bajo su propio título y con el
+            # enlace de su pantalla. Antes se sumaban dos `source` por nombre y
+            # las líneas de todos se mezclaban en una sola lista, así que el
+            # resumen no podía decir de qué era cada renglón — y un módulo que
+            # contribuyera algo nuevo se perdía sin que nada lo notara.
+            parts = [DigestPart(part.source, part.pending, part.lines) for part in collected]
             phones = await AlertRouter(session).phones_for(AlertKind.DAILY_DIGEST)
             await session.commit()
     finally:
         events.unsubscribe(DailyDigestContribution, collect)
 
-    message = daily_digest_message(pending_messages=pending, stalled_orders=stalled, lines=lines)
+    message = daily_digest_message(parts)
     for phone in phones:
         send_alert.delay(phone, message)
 
-    logger.info(
-        "Daily digest sent",
-        extra={"messages": pending, "orders": stalled, "recipients": len(phones)},
-    )
-    return {"pending_messages": pending, "stalled_orders": stalled, "recipients": len(phones)}
+    counts = {part.source: part.total for part in parts}
+    logger.info("Daily digest sent", extra={"counts": counts, "recipients": len(phones)})
+    return {"counts": counts, "recipients": len(phones)}
 
 
 async def _is_the_hour(session: AsyncSession) -> bool:

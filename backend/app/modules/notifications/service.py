@@ -5,6 +5,7 @@ the task. It is in Spanish because it is read by a person, like every other
 user-facing string (Artículo VIII).
 """
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import NamedTuple
 from urllib.parse import urlencode
@@ -102,6 +103,9 @@ INVOICES_SCREEN = "facturas"
 INBOX_SCREEN = "mensajes"
 ORDERS_SCREEN = "ordenes"
 PRICE_LOG_SCREEN = "precios/historial"
+CALENDAR_SCREEN = "calendario"
+REVIEW_SCREEN = "revision"
+PRICES_SCREEN = "precios"
 
 
 def _link(screen: str, entity_id: object = None, **query: str) -> str:
@@ -252,12 +256,14 @@ def due_soon_message(
     se le puede emitir el recibo, y el enlace es lo que hace que eso sea una
     acción y no una tarea que hay que ir a buscar entre cuatrocientas filas.
 
-    `invoice_id` es opcional porque un aviso sin referencia sigue siendo un
-    aviso: sin él se manda el mismo mensaje, sin la línea del enlace. Prometer
-    una dirección que apunte a `/facturas/None` sería peor que no prometerla.
+    `invoice_id` es opcional, y sin él el enlace **no desaparece: se acorta al
+    listado**. Antes el aviso se quedaba sin ninguna línea que lleve a algún
+    lado, que es la única versión peor que una dirección aproximada. Lo que hay
+    que evitar es prometer `/facturas/None`, y `/facturas` no es eso: es la
+    pantalla donde está la factura, sin decir cuál.
     """
     when = "hoy" if days_ahead == 0 else f"en {days_ahead} día{'s' if days_ahead != 1 else ''}"
-    where = "" if invoice_id is None else f"\nEmitilo acá: {_link(INVOICES_SCREEN, invoice_id)}"
+    where = f"\nEmitilo acá: {_link(INVOICES_SCREEN, invoice_id)}"
     return (
         "📄 Cordillera: una factura vence sin recibo de recepción.\n"
         f"Factura {number}, de {supplier}.\n"
@@ -297,36 +303,113 @@ def message_due_message(*, supplier: str, subject: str, body: str) -> str:
     ).strip()
 
 
-def daily_digest_message(*, pending_messages: int, stalled_orders: int, lines: list[str]) -> str:
+class DigestTopic(NamedTuple):
+    """Cómo se lee en el resumen lo que contestó un módulo."""
+
+    label: str
+    screen: str
+    call: str
+    # Si un número distinto de cero significa que alguien tiene algo que hacer.
+    # Los productos nuevos son noticia y no tarea: que hayan entrado doce no
+    # deja nada pendiente, y por eso no impiden decir «no hay nada pendiente».
+    is_pending: bool = True
+
+
+# Qué cuenta el resumen, en el orden en que se lee.
+#
+# Los tres primeros son los que el resumen no decía y son la razón por la que
+# nadie lo abría: contaba mensajes del buzón y órdenes trabadas —que están
+# bien— y se callaba las tres cosas por las que alguien mira el sistema a la
+# mañana: qué vence, qué hay que decidir y qué entró.
+#
+# El `source` es el que publica cada módulo en su `DailyDigestContribution`, y
+# es todo lo que hace falta para que un módulo nuevo aparezca acá: una fila en
+# esta tabla y su handler. Ninguno de ellos sabe que el resumen existe.
+DIGEST_TOPICS: dict[str, DigestTopic] = {
+    "due_soon": DigestTopic("Vencimientos próximos", CALENDAR_SCREEN, "Mirá el calendario"),
+    "decisions": DigestTopic("Decisiones para tomar", REVIEW_SCREEN, "Resolvelas acá"),
+    "new_products": DigestTopic(
+        "Productos nuevos", PRICES_SCREEN, "Miralos en la lista", is_pending=False
+    ),
+    "messages": DigestTopic("Mensajes sin resolver", INBOX_SCREEN, "Mirá la bandeja"),
+    "purchase_orders": DigestTopic("Órdenes estancadas", ORDERS_SCREEN, "Mirá las órdenes"),
+}
+
+# Cuántas líneas de detalle entran por tema. Cinco es lo que cada módulo manda,
+# y el corte se repite acá porque el resumen es de todos y no de ninguno: un
+# módulo que un día mande cuarenta no se lleva puesto el mensaje entero.
+DIGEST_LINES_PER_TOPIC = 5
+
+
+class DigestPart(NamedTuple):
+    """Lo que contestó un módulo, como lo recibe el redactor.
+
+    `total` y no `count`: `NamedTuple` hereda de `tuple`, que ya tiene un
+    método `count`, y un campo con ese nombre lo pisaría.
+    """
+
+    source: str
+    total: int
+    lines: tuple[str, ...] = ()
+
+
+def _topic_of(source: str) -> DigestTopic:
+    """Cómo se lee un `source`, incluso uno que esta tabla no conoce.
+
+    Un módulo que empiece a contribuir algo nuevo aparece igual, con su propio
+    nombre y sin enlace, en vez de desaparecer del resumen. Que se lea feo es
+    una señal de que falta una fila en `DIGEST_TOPICS`; que no se lea sería un
+    dato apartado en silencio, y eso es lo único que el Artículo II prohíbe.
+    """
+    return DIGEST_TOPICS.get(source) or DigestTopic(source, "", "")
+
+
+def daily_digest_message(parts: Sequence[DigestPart]) -> str:
     """The summary of what is still open, once a day (RF-35 of 007).
 
     A summary of nothing is still worth sending: it is the difference between
     "there is nothing pending" and "the digest stopped working", and only one of
-    those is good news.
+    those is good news. That is why **every** module that answered gets its
+    line in the header, zero included: a count that disappears when it is zero
+    cannot be told from a module that stopped answering.
+
+    El detalle, en cambio, es sólo de los temas que no dan cero — con su enlace,
+    que es lo que convierte el resumen en algo que se puede empezar a resolver
+    desde el teléfono y no en una lista de números.
     """
-    header = (
-        "🗒️ Cordillera — resumen del día\n"
-        f"Mensajes sin resolver: {pending_messages}.\n"
-        f"Órdenes estancadas: {stalled_orders}."
-    )
-    if not lines and pending_messages == 0 and stalled_orders == 0:
-        # Sin enlace, y a propósito: un día sin nada pendiente no tiene adónde
-        # mandar a nadie. Un enlace acá enseñaría que el enlace no significa
-        # «hay algo para hacer», que es exactamente lo que significa en los
-        # otros tres avisos.
-        return f"{header}\nNo hay nada pendiente."
-    # Una dirección por cuenta, y sólo la de las cuentas que no dan cero: el
-    # resumen cuenta dos cosas que se resuelven en dos pantallas distintas, y
-    # un enlace único tendría que apuntar a una de las dos o a ninguna.
-    where = [
-        line
-        for line, pending in (
-            (f"Mensajes: {_link(INBOX_SCREEN)}", pending_messages),
-            (f"Órdenes: {_link(ORDERS_SCREEN)}", stalled_orders),
-        )
-        if pending
+    answered = {part.source: part for part in parts}
+    # El orden es el de la tabla, y lo que no esté en la tabla va al final: se
+    # lee siempre igual, sin depender de en qué orden contestaron los módulos.
+    ordered = [
+        (source, _topic_of(source))
+        for source in [*DIGEST_TOPICS, *(s for s in answered if s not in DIGEST_TOPICS)]
+        if source in answered
     ]
-    return "\n".join([header, "", *lines[:10], *(["", *where] if where else [])])
+
+    header = ["🗒️ Cordillera — resumen del día"]
+    header += [f"{topic.label}: {answered[source].total}." for source, topic in ordered]
+
+    nothing_waiting = not any(
+        answered[source].total and topic.is_pending for source, topic in ordered
+    )
+    if nothing_waiting and not any(answered[source].total for source, _ in ordered):
+        # Sin enlace, y a propósito: un día sin nada que mirar no tiene adónde
+        # mandar a nadie. Un enlace acá enseñaría que el enlace no significa
+        # «hay algo para hacer», que es lo que significa en todos los demás.
+        return "\n".join([*header, "", "No hay nada pendiente."])
+
+    blocks: list[str] = []
+    for source, topic in ordered:
+        part = answered[source]
+        if not part.total:
+            continue
+        block = [topic.label, *part.lines[:DIGEST_LINES_PER_TOPIC]]
+        if topic.screen:
+            block.append(f"{topic.call}: {_link(topic.screen)}")
+        blocks.append("\n".join(block))
+
+    tail = ["No hay nada pendiente."] if nothing_waiting else []
+    return "\n\n".join(["\n".join(header), *blocks, *tail])
 
 
 # --- Probar un aviso antes de que haga falta ------------------------------
@@ -346,6 +429,26 @@ TEST_BANNER = "🧪 PRUEBA — la pidió alguien desde Configuración. No hay na
 SAMPLE_SUPPLIER = "Proveedor de Prueba S.A."
 SAMPLE_INVOICE = "FC-0000-PRUEBA"
 
+# Un día con algo de cada cosa, para que la prueba muestre el resumen entero:
+# los cinco temas en el encabezado, el detalle de los que no dan cero y el
+# enlace de cada uno. Los ceros están a propósito — así se ve que un tema sin
+# nada sigue apareciendo contado, que es lo que distingue «no hay nada» de «el
+# resumen se dejó de armar».
+SAMPLE_DIGEST: tuple[DigestPart, ...] = (
+    DigestPart(
+        "due_soon",
+        2,
+        (
+            f"• {SAMPLE_INVOICE} — {SAMPLE_SUPPLIER}: vence en 2 días",
+            f"• FC-0000-PRUEBA-2 — {SAMPLE_SUPPLIER}: vence en 3 días",
+        ),
+    ),
+    DigestPart("decisions", 3, ("• Ejemplo de un caso esperando una decisión (3)",)),
+    DigestPart("new_products", 1, ("• COR-0000 — Producto de prueba",)),
+    DigestPart("messages", 0),
+    DigestPart("purchase_orders", 0),
+)
+
 
 def test_message(kind: str) -> str:
     """Un ejemplo de un aviso, dicho con las mismas palabras que el de verdad.
@@ -355,8 +458,14 @@ def test_message(kind: str) -> str:
     propia redacción, llegaría bien el día que el aviso verdadero llega roto, y
     el botón estaría certificando su propio texto.
 
-    Lo que sí es propio es la franja de arriba y la ausencia de enlaces a datos
-    concretos — no hay una factura #0 a la que mandar a nadie.
+    Lo propio es la franja de arriba y que los enlaces lleven a la **pantalla**
+    y no a un dato inventado: no hay una factura #0 a la que mandar a nadie, y
+    una prueba sin ningún enlace no probaría la mitad del aviso que importa.
+
+    Las cifras del resumen son de ejemplo por la misma razón. Un resumen de
+    prueba armado con los números de hoy no diría cómo se ve el aviso el día que
+    haya algo: los días que no hay nada —que son la mayoría— saldría la frase
+    corta y sin un solo enlace, que es justo lo que se quiere probar.
     """
     if kind == AlertKind.PAYMENT_CLAIM:
         body = payment_claim_message(
@@ -372,7 +481,7 @@ def test_message(kind: str) -> str:
             days_ahead=2,
         )
     elif kind == AlertKind.DAILY_DIGEST:
-        body = daily_digest_message(pending_messages=0, stalled_orders=0, lines=[])
+        body = daily_digest_message(SAMPLE_DIGEST)
     else:
         # Un tipo de aviso que existe en el enum y todavía no tiene redactor. Se
         # manda igual, diciendo lo único cierto: que la ruta hasta el teléfono

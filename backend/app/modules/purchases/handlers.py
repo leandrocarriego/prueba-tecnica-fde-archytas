@@ -57,6 +57,13 @@ WATCHED_PARAMETERS = frozenset(
 DIGEST_LINES = 5
 
 
+def _in_days(days: int) -> str:
+    """«hoy», «en 1 día», «en 3 días». Lo lee una persona, así que va en español."""
+    if days == 0:
+        return "hoy"
+    return f"en {days} día" if days == 1 else f"en {days} días"
+
+
 @events.subscribe(SuppliersNormalized)
 async def remember_register(event: SuppliersNormalized, session: AsyncSession) -> None:
     """Record the supplier register as `/estado-cuenta` publishes it (RF-08)."""
@@ -143,6 +150,40 @@ async def contribute_to_the_digest(event: DailyDigestRequested, session: AsyncSe
                 f"• {order.number} — {order.supplier_name or order.supplier_text}: "
                 f"{order.status_text} hace {order.days_in_status} días"
                 for order in stalled[:DIGEST_LINES]
+            ),
+        ),
+        session,
+    )
+    del event
+
+
+@events.subscribe(DailyDigestRequested)
+async def contribute_due_dates_to_the_digest(
+    event: DailyDigestRequested, session: AsyncSession
+) -> None:
+    """Say which invoices are about to fall due without their receipt.
+
+    **Es lo primero que alguien quiere saber a la mañana**, y el resumen no lo
+    decía: contaba mensajes del buzón y órdenes trabadas, que es lo que la 007
+    le pidió, y el vencimiento —que ya tenía su propio aviso el día que caía—
+    no aparecía en ningún lado hasta ese día.
+
+    Es la misma consulta que arma el aviso de `DUE_SOON`, y con la misma
+    ventana: un vencimiento que el resumen anuncia y el aviso no, o al revés,
+    serían dos plataformas contando la misma factura de dos maneras.
+
+    Un handler propio y no una línea más en el de las órdenes: son dos hechos
+    distintos, se cuentan por separado y se miran en dos pantallas distintas.
+    """
+    service = PurchasesService(session)
+    due = await service.invoices_due_soon()
+    await events.publish(
+        DailyDigestContribution(
+            source="due_soon",
+            pending=len(due),
+            lines=tuple(
+                f"• {invoice.number} — {invoice.supplier_text}: vence {_in_days(days)}"
+                for invoice, days in due[:DIGEST_LINES]
             ),
         ),
         session,

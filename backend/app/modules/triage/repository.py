@@ -231,6 +231,24 @@ class TriageRepository:
         )
         return list(result.scalars().all())
 
+    async def pending_by_reason(self, limit: int) -> list[tuple[str, int]]:
+        """The commonest reasons cases are waiting for, most first.
+
+        Agrupa por el **motivo** y no por la clase de caso a propósito: el
+        motivo ya está guardado en la fila, ya está en castellano y ya es lo que
+        una persona lee en la cola. Un mapa de `kind` a nombre legible sería una
+        segunda copia del vocabulario que la pantalla ya tiene, y una copia que
+        se desincroniza es una copia que miente.
+        """
+        result = await self.session.execute(
+            select(ExceptionCase.reason, func.count())
+            .where(ExceptionCase.status == CaseStatus.PENDING)
+            .group_by(ExceptionCase.reason)
+            .order_by(func.count().desc())
+            .limit(limit)
+        )
+        return [(reason, int(total)) for reason, total in result.all()]
+
     async def pending_by_fingerprint(self, fingerprint: str) -> ExceptionCase | None:
         """The case still open under this fingerprint, if there is one."""
         result = await self.session.execute(
