@@ -29,17 +29,26 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.models import User
-from app.modules.purchases.models import Invoice, InvoiceReviewState, RecordOrigin
+from app.modules.purchases.models import (
+    Invoice,
+    InvoiceReviewState,
+    OrderReviewState,
+    PurchaseOrder,
+    RecordOrigin,
+)
 from app.modules.purchases.service import DISPUTED_BY_PORTAL, PurchasesService
 from app.modules.triage.models import CaseStatus, ExceptionCase
 from app.modules.triage.service import (
     DISPUTED_INVOICE,
+    DISPUTED_ORDER,
     INVOICE_ORIGIN,
+    ORDER_ORIGIN,
     UNREADABLE_INVOICE_ROW,
+    UNREADABLE_ORDER_ROW,
     TriageService,
 )
-from app.shared.errors import ConflictError
-from app.shared.events import NormalizedInvoice
+from app.shared.errors import ConflictError, NotFoundError
+from app.shared.events import NormalizedInvoice, NormalizedPurchaseOrder
 from app.shared.sections import BusinessSection
 from tests.factories.purchases_factory import SupplierFactory
 
@@ -301,3 +310,363 @@ class TestWhenThePortalFinallyPublishesIt:
         cases = await cases_of(session, DISPUTED_INVOICE)
         assert len(cases) == 2
         assert Decimal(cases[-1].payload["published"]["total"]) == Decimal("171000")
+
+
+class TestTheOrderHalf:
+    """Lo mismo sobre una orden de compra, que no es lo mismo en un punto.
+
+    Una orden cargada a mano **no se puede cronometrar en su estado**: la
+    plataforma no la vio llegar, así que lo único cierto es hace cuánto se
+    emitió (RF-49 de 007). Fingir que el reloj arrancó cuando alguien la
+    escribió sería inventar una antigüedad.
+    """
+
+    async def an_unreadable_order_row(self, session: AsyncSession) -> ExceptionCase:
+        """El pendiente que abre una fila de órdenes que nadie pudo interpretar."""
+        await TriageService(session).open_case(
+            kind=UNREADABLE_ORDER_ROW,
+            section=BusinessSection.PURCHASING,
+            reason="La fila de órdenes no se pudo interpretar",
+            payload={"staging_row_id": 9, "excerpt": "OC 4417  ???", "origin": ORDER_ORIGIN},
+            key="9",
+        )
+        result = await session.execute(
+            select(ExceptionCase).where(ExceptionCase.kind == UNREADABLE_ORDER_ROW)
+        )
+        case = result.scalars().first()
+        assert case is not None
+        return case
+
+    async def stored_order(self, session: AsyncSession) -> PurchaseOrder:
+        """La orden, como quedó en `core`."""
+        found = (
+            (await session.execute(select(PurchaseOrder).where(PurchaseOrder.number == "OC-4417")))
+            .scalars()
+            .first()
+        )
+        assert found is not None
+        return found
+
+    async def test_a_row_nobody_could_read_becomes_an_order(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """La persona la escribe mirando el papel, y la orden entra."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        case = await self.an_unreadable_order_row(session)
+
+        # Act
+        await TriageService(session).resolve(
+            case.id,
+            decision={
+                "action": "load",
+                "number": "OC-4417",
+                "ordered_on": "2026-08-25",
+                "supplier_id": supplier.id,
+                "product_text": "Caños de 3/4",
+                "quantity": 40,
+                "amount": "90000",
+            },
+            user_id=owner.id,
+            remember=False,
+            visible=EVERY_AREA,
+        )
+
+        # Assert
+        order = await self.stored_order(session)
+        assert order.origin is RecordOrigin.MANUAL
+        assert order.amount == Decimal("90000")
+        assert order.review_state is OrderReviewState.RESOLVED
+        # La plataforma no la vio llegar: no se le puede contar el tiempo en su
+        # estado, y se dice como eso en vez de inventarlo (RF-49 de 007).
+        assert order.observed_from_start is False
+
+    async def test_the_portal_publishing_it_later_asks_which_values_stay(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Y el estado sí se actualiza: es un hecho del portal, no está en discusión."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        purchases = PurchasesService(session)
+        await purchases.register_order_by_hand(
+            number="OC-4417",
+            ordered_on=date(2026, 8, 25),
+            supplier_id=supplier.id,
+            amount=Decimal("90000"),
+            actor_user_id=owner.id,
+        )
+
+        # Act — el portal publica la fila, ya legible, con otro importe.
+        await purchases.register_orders(
+            batch_id=1,
+            orders=(
+                NormalizedPurchaseOrder(
+                    staging_row_id=9,
+                    number="OC-4417",
+                    ordered_on=date(2026, 8, 25),
+                    supplier_text=SUPPLIER,
+                    product_code=None,
+                    product_text="Caños de 3/4",
+                    quantity=40,
+                    amount=Decimal("96000"),
+                    status_text="En preparación",
+                ),
+            ),
+        )
+
+        # Assert
+        order = await self.stored_order(session)
+        assert order.review_state is OrderReviewState.PENDING
+        assert order.review_reason == DISPUTED_BY_PORTAL
+        assert order.amount == Decimal("90000")
+        assert order.status_text == "En preparación"
+
+        result = await session.execute(
+            select(ExceptionCase).where(ExceptionCase.kind == DISPUTED_ORDER)
+        )
+        cases = list(result.scalars().all())
+        assert len(cases) == 1
+        assert Decimal(cases[0].payload["published"]["importe"]) == Decimal("96000")
+
+    async def test_keeping_the_portal_values_writes_them(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Contestada la pregunta, la orden deja de estar apartada."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        purchases = PurchasesService(session)
+        await purchases.register_order_by_hand(
+            number="OC-4417",
+            ordered_on=date(2026, 8, 25),
+            supplier_id=supplier.id,
+            amount=Decimal("90000"),
+            actor_user_id=owner.id,
+        )
+        await purchases.register_orders(
+            batch_id=1,
+            orders=(
+                NormalizedPurchaseOrder(
+                    staging_row_id=9,
+                    number="OC-4417",
+                    ordered_on=date(2026, 8, 26),
+                    supplier_text=SUPPLIER,
+                    product_code=None,
+                    product_text="Caños de 3/4",
+                    quantity=40,
+                    amount=Decimal("96000"),
+                    status_text="En preparación",
+                ),
+            ),
+        )
+        result = await session.execute(
+            select(ExceptionCase).where(ExceptionCase.kind == DISPUTED_ORDER)
+        )
+        case = result.scalars().first()
+        assert case is not None
+
+        # Act
+        await TriageService(session).resolve(
+            case.id,
+            decision={"keep": "portal"},
+            user_id=owner.id,
+            remember=False,
+            visible=EVERY_AREA,
+        )
+
+        # Assert
+        order = await self.stored_order(session)
+        assert order.amount == Decimal("96000")
+        assert order.ordered_on == date(2026, 8, 26)
+        assert order.origin is RecordOrigin.PORTAL
+        assert order.review_state is OrderReviewState.RESOLVED
+
+
+class TestWhatArrivesBrokenDoesNotWriteAnything:
+    """Las guardas, que son la mitad silenciosa de dejar cargar datos a mano.
+
+    Una decisión llega del navegador, pasa por la cola y vuelve meses después:
+    todo lo que trae se convierte sin confiar. Lo que no se puede convertir no
+    pisa nada — escribir basura sobre un dato bueno es peor que no aplicar la
+    decisión — y lo que no se puede hacer se rechaza con una frase, no con un
+    error de integridad.
+    """
+
+    async def test_a_supplier_outside_the_register_is_refused(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """El padrón es cerrado: una factura no lo amplía (H2 y H4 de la 004)."""
+        purchases = PurchasesService(session)
+        with pytest.raises(NotFoundError):
+            await purchases.register_invoice_by_hand(
+                number=NUMBER,
+                issued_on=date(2026, 8, 30),
+                total=Decimal("152400"),
+                supplier_id=9999,
+                actor_user_id=owner.id,
+            )
+        with pytest.raises(NotFoundError):
+            await purchases.register_order_by_hand(
+                number="OC-9999",
+                ordered_on=date(2026, 8, 25),
+                supplier_id=9999,
+                actor_user_id=owner.id,
+            )
+
+    async def test_an_order_number_already_registered_is_refused(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Con una frase, y no con el error del índice único."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        purchases = PurchasesService(session)
+        await purchases.register_order_by_hand(
+            number="OC-4417",
+            ordered_on=date(2026, 8, 25),
+            supplier_id=supplier.id,
+            actor_user_id=owner.id,
+        )
+
+        # Act & Assert
+        with pytest.raises(ConflictError):
+            await purchases.register_order_by_hand(
+                number="OC-4417",
+                ordered_on=date(2026, 8, 25),
+                supplier_id=supplier.id,
+                actor_user_id=owner.id,
+            )
+
+    async def test_a_dispute_whose_record_is_gone_is_not_an_error(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """La decisión ya quedó guardada del lado de la cola; acá no hay a qué aplicarla."""
+        await PurchasesService(session).settle_manual_dispute(
+            entity="invoice",
+            entity_id=9999,
+            keep="portal",
+            published={"fecha": "2026-08-30", "total": "160000"},
+            actor_user_id=owner.id,
+        )
+
+    async def test_values_that_are_not_values_do_not_overwrite_good_ones(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Lo que no se puede convertir se deja como estaba."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        purchases = PurchasesService(session)
+        invoice = await purchases.register_invoice_by_hand(
+            number=NUMBER,
+            issued_on=date(2026, 8, 30),
+            total=Decimal("152400"),
+            supplier_id=supplier.id,
+            actor_user_id=owner.id,
+        )
+        order = await purchases.register_order_by_hand(
+            number="OC-4417",
+            ordered_on=date(2026, 8, 25),
+            supplier_id=supplier.id,
+            amount=Decimal("90000"),
+            actor_user_id=owner.id,
+        )
+
+        # Act — «queda lo del portal», pero lo del portal llegó ilegible.
+        await purchases.settle_manual_dispute(
+            entity="invoice",
+            entity_id=invoice.id,
+            keep="portal",
+            published={"fecha": "el martes", "total": "un montón"},
+            actor_user_id=owner.id,
+        )
+        await purchases.settle_manual_dispute(
+            entity="purchase_order",
+            entity_id=order.id,
+            keep="portal",
+            published={"fecha": "2026-08-26", "importe": "ni idea"},
+            actor_user_id=owner.id,
+        )
+
+        # Assert — los datos buenos siguen ahí; sólo se escribió lo convertible.
+        assert (await stored(session)).total == Decimal("152400")
+        assert (await stored(session)).issued_on == date(2026, 8, 30)
+        moved = (
+            (await session.execute(select(PurchaseOrder).where(PurchaseOrder.number == "OC-4417")))
+            .scalars()
+            .first()
+        )
+        assert moved is not None
+        assert moved.ordered_on == date(2026, 8, 26)
+        assert moved.amount is None
+
+    async def test_the_portal_republishing_the_same_values_says_nothing(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Coincidir no es discutir: no se abre ningún caso."""
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        purchases = PurchasesService(session)
+        await purchases.register_invoice_by_hand(
+            number=NUMBER,
+            issued_on=date(2026, 8, 30),
+            total=Decimal("152400"),
+            supplier_id=supplier.id,
+            actor_user_id=owner.id,
+        )
+
+        # Act — el portal publica exactamente lo mismo que escribió la persona.
+        await purchases.register_invoices(batch_id=1, invoices=(portal_row(152400),))
+
+        # Assert
+        invoice = await stored(session)
+        assert invoice.review_state is InvoiceReviewState.RESOLVED
+        assert await cases_of(session, DISPUTED_INVOICE) == []
+
+    async def test_an_incomplete_load_writes_nothing(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Media factura no es una factura: sin los cuatro campos no entra nada.
+
+        La pantalla no deja confirmar sin ellos, y por eso mismo esto no se
+        puede quedar en la pantalla: la decisión viaja por un evento, y lo que
+        llega incompleto no puede escribir un registro a medias.
+        """
+        # Arrange
+        supplier = await SupplierFactory.create(
+            session, legal_name=SUPPLIER, tax_id="30-71042588-4", payment_term_days=30
+        )
+        service = TriageService(session)
+        case = await an_unreadable_row(session)
+
+        # Act — sin total.
+        await service.resolve(
+            case.id,
+            decision={
+                "action": "load",
+                "number": NUMBER,
+                "issued_on": "2026-08-30",
+                "supplier_id": supplier.id,
+            },
+            user_id=owner.id,
+            remember=False,
+            visible=EVERY_AREA,
+        )
+
+        # Assert — el caso se cerró con lo que la persona decidió, y no entró
+        # ninguna factura a medias.
+        found = (
+            (await session.execute(select(Invoice).where(Invoice.number == NUMBER)))
+            .scalars()
+            .first()
+        )
+        assert found is None
