@@ -7,7 +7,13 @@
 -->
 
 **Estado:** Aprobado · **Feature:** 011-set-aside-visibility · **Fecha:** 2026-08-31
-**Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-31
+**Aprobada por:** Leandro Carriego — FDE · **Fecha de aprobación:** 2026-08-31 *(tercera firma)*
+
+> **Por qué van tres.** La primera cayó con la enmienda sobre RF-20, que achicó el alcance: el
+> cierre automático se prometía con un comprobante de pago y sólo puede darse con una venta. La
+> segunda cayó con RF-24, que lo **agranda**: el cierre automático pasa a tener vuelta atrás. Las dos
+> veces se volvió a firmar por la misma razón — lo que el cliente había leído dejó de ser lo que
+> iba a recibir. Esta firma es sobre el texto con RF-20 acotado y RF-24 incluido.
 
 ## Problema
 
@@ -21,7 +27,7 @@ falta no se nota: **hay cosas que el sistema aparta y que no llegan a ninguna pe
 pierden —quedan guardadas y contadas— pero nadie las ve nunca, que para quien tiene que decidir es
 lo mismo que si se hubieran perdido.
 
-Hoy, cuando el sistema no puede interpretar algo, pasa una de tres cosas según de dónde venga:
+Hoy, cuando el sistema no puede interpretar algo, pasa una de dos cosas según de dónde venga:
 
 | De dónde viene lo apartado | Llega a la pantalla de revisión |
 |---|---|
@@ -30,10 +36,10 @@ Hoy, cuando el sistema no puede interpretar algo, pasa una de tres cosas según 
 | Una fila del padrón de proveedores | **No** |
 | Un comprobante de pago que no se pudo interpretar | **No** |
 | Un mensaje del buzón del portal | **No** |
-| Una orden de compra | **No** |
+| Una orden de compra | **Sí** *(desde la 007 — ver Enmiendas)* |
 | Una venta | **No** |
 
-Las cinco últimas se apartan igual que las tres primeras, y ahí se quedan. El sistema hizo bien lo
+Las cuatro últimas se apartan igual que las que sí llegan, y ahí se quedan. El sistema hizo bien lo
 difícil —no adivinó— y no hizo lo fácil: avisar.
 
 Es además la diferencia entre un total en el que se puede confiar y uno que no: el brief promete que
@@ -51,8 +57,8 @@ resolvió en otro lado.
 | Actor | Qué hace con esta feature |
 |---|---|
 | El sistema | Cada vez que aparta algo por no poder interpretarlo, lo pone en la lista de pendientes con el motivo y con lo que alcanzó a leer |
-| Marcela — compras | Ve lo apartado que es de su área —proveedores, pagos, órdenes, mensajes— y lo resuelve o lo da por revisado |
-| Julián — ventas | Ve lo apartado que es de su área —precios y ventas— y hace lo mismo |
+| Marcela — compras | Ve lo apartado que es de su área —proveedores, pagos, órdenes, mensajes y **precios**— y lo resuelve o lo da por revisado |
+| Julián — ventas | Ve lo apartado que es de su área —ventas y rubros— y hace lo mismo |
 | El dueño | Ve todo, y ve cuánto hace que algo espera |
 
 ## Supuestos
@@ -95,9 +101,9 @@ tal como llegó, de qué pantalla del portal salió y cuándo se leyó.
 Como **dueño**, quiero que cada persona vea en la lista lo que es de su área, para que nadie tenga
 que filtrar entre cosas que no le tocan ni pueda tocar lo que no le corresponde.
 
-**Cómo se prueba que anda:** Marcela abre la lista y ve lo de proveedores, pagos, órdenes y mensajes;
-Julián ve lo de precios y ventas; el dueño ve todo; y ninguno de los dos puede resolver un pendiente
-del área del otro.
+**Cómo se prueba que anda:** Marcela abre la lista y ve lo de proveedores, pagos, órdenes, mensajes
+y precios; Julián ve lo de ventas y rubros; el dueño ve todo; y ninguno de los dos puede resolver un
+pendiente del área del otro.
 
 ### H4 — Saber cuánto hace que algo espera
 Como **dueño**, quiero ver cuántos pendientes hay y desde cuándo, para darme cuenta si la lista se
@@ -107,12 +113,21 @@ está abandonando antes de que sea un problema.
 viejo; con un pendiente de hace dos semanas sin resolver, se ve señalado como demorado.
 
 ### H5 — Que la lista no mienta cuando el trabajo se hizo en otra pantalla
-Como **Marcela**, quiero que un pendiente desaparezca de la lista cuando ya lo resolví en la pantalla
+Como **Julián**, quiero que un pendiente desaparezca de la lista cuando ya lo resolví en la pantalla
 que le corresponde, para no tener que cerrarlo dos veces ni dudar de cuál de las dos tiene razón.
 
-**Cómo se prueba que anda:** se reparte un comprobante que estaba esperando desde la pantalla de
-comprobantes; el pendiente que lo anunciaba deja de figurar entre los pendientes, sin que nadie lo
-cierre a mano.
+**Cómo se prueba que anda:** se corrige desde la pantalla de ventas una venta que estaba esperando;
+el pendiente que la anunciaba deja de figurar entre los pendientes, sin que nadie lo cierre a mano. Y
+si después esa resolución se deshace, el pendiente vuelve a figurar, tampoco a mano (RF-24).
+
+**Por qué las ventas y no los comprobantes de pago.** Un origen puede cerrarse solo únicamente si lo
+que se apartó **vuelve a aparecer** en una pantalla propia donde alguien lo resuelve, y hoy eso pasa
+nada más que con las ventas: una venta que no se pudo interpretar igual queda listada en la pantalla
+de ventas, y ahí se la corrige. Un comprobante de pago que no se pudo interpretar, en cambio, no
+llega a ser un pago: se queda apartado —que es exactamente el silencio que esta feature viene a
+romper abriéndole un pendiente— y por lo tanto **no aparece en la pantalla de comprobantes**. Lo que
+se reparte ahí son los comprobantes que sí se pudieron leer, y ésos nunca tuvieron pendiente. Ver
+*Fuera de alcance*.
 
 ## Requisitos funcionales
 
@@ -121,7 +136,7 @@ cierre a mano.
 | RF-01 | Cuando el sistema aparte una fila del padrón de proveedores por no poder interpretarla, debe registrarla como pendiente de revisión. | H1 |
 | RF-02 | Cuando el sistema aparte un comprobante de pago por no poder interpretarlo, debe registrarlo como pendiente de revisión. | H1 |
 | RF-03 | Cuando el sistema aparte un mensaje del buzón por no poder interpretarlo, debe registrarlo como pendiente de revisión. | H1 |
-| RF-04 | Cuando el sistema aparte una orden de compra por no poder interpretarla, debe registrarla como pendiente de revisión. | H1 |
+| RF-04 | Cuando el sistema aparte una orden de compra por no poder interpretarla, debe registrarla como pendiente de revisión. *(Ya cumplido desde la 007; esta feature lo verifica y no lo deja caer.)* | H1 |
 | RF-05 | Cuando el sistema aparte una venta por no poder interpretarla, debe registrarla como pendiente de revisión. | H1 |
 | RF-06 | El sistema debe mostrar en un solo lugar todo lo que quedó pendiente de revisión, cualquiera sea su origen. | H1 |
 | RF-07 | Si el sistema aparta varias veces lo mismo por el mismo motivo, entonces debe mostrarlo como un solo pendiente e informar cuántas veces llegó. | H1 |
@@ -137,10 +152,11 @@ cierre a mano.
 | RF-17 | Si un pendiente lleva sin resolverse más días que los configurados, entonces el sistema debe señalarlo como demorado. | H4 |
 | RF-18 | El sistema debe permitir al dueño definir a partir de cuántos días un pendiente se considera demorado. | H4 |
 | RF-19 | Mientras el dueño no configure otro valor, el sistema debe considerar demorado un pendiente de más de siete días. | H4 |
-| RF-20 | Cuando lo que originó un pendiente se resuelva en otra pantalla, el sistema debe dejar de contarlo entre los pendientes. | H5 |
+| RF-20 | Cuando lo que originó un pendiente se resuelva en la pantalla propia de ese origen, el sistema debe dejar de contarlo entre los pendientes, sin que nadie lo cierre a mano. Hoy el único origen que tiene esa pantalla es **las ventas** (ver *Fuera de alcance*). | H5 |
 | RF-21 | Cuando un pendiente deje de contarse por haberse resuelto en otra pantalla, el sistema debe registrar que se resolvió así y conservarlo consultable. | H5 |
 | RF-22 | El sistema debe permitir filtrar los pendientes por el área de la que provienen. | H3 |
 | RF-23 | El sistema debe conservar los pendientes ya resueltos y permitir consultarlos, sin límite de tiempo. | H1 |
+| RF-24 | Cuando se deshaga, en la pantalla propia del origen, el trabajo que había hecho dejar de contar un pendiente, el sistema debe volver a contarlo entre los pendientes. | H5 |
 
 ## Reglas de negocio
 
@@ -153,8 +169,10 @@ cierre a mano.
   exactamente lo que ya les pasó con el buzón del portal.
 - **Lo apartado se muestra a quien puede hacer algo con eso.** Una lista llena de cosas ajenas se
   deja de mirar igual que una lista larga.
-- **Hay una sola verdad sobre si algo sigue pendiente.** Si el trabajo se hizo en otra pantalla, la
-  lista lo refleja **sola**: dos lugares que dicen cosas distintas sobre lo mismo obligan a
+- **Hay una sola verdad sobre si algo sigue pendiente, y vale en las dos direcciones.** Si el
+  trabajo se hizo en otra pantalla, la lista lo refleja **sola**; y si ese trabajo se deshace, la
+  lista lo vuelve a mostrar, también sola. Una lista que sabe cerrar y no sabe reabrir dice la
+  verdad sólo mientras nadie se arrepienta: dos lugares que dicen cosas distintas sobre lo mismo obligan a
   desconfiar de los dos. Se decidió el cierre automático y no el manual (2026-08-31): pedirle a
   alguien que cierre a mano algo que ya resolvió es trabajo doble, y el día que se olvide la lista
   vuelve a mentir. La constancia de quién lo resolvió no se pierde — la tiene la pantalla donde el
@@ -170,7 +188,7 @@ cierre a mano.
 - [ ] **RF-01** — Con una fila del padrón que no se puede interpretar, aparece un pendiente que lo dice.
 - [ ] **RF-02** — Con un comprobante de pago ilegible, aparece un pendiente que lo dice.
 - [ ] **RF-03** — Con un mensaje del buzón ilegible, aparece un pendiente que lo dice.
-- [ ] **RF-04** — Con una orden de compra ilegible, aparece un pendiente que lo dice.
+- [ ] **RF-04** — Con una orden de compra ilegible, aparece un pendiente que lo dice *(verificación de lo ya construido)*.
 - [ ] **RF-05** — Con una venta ilegible, aparece un pendiente que lo dice.
 - [ ] **RF-06** — Las cinco se ven en la misma pantalla, sin entrar a cinco lugares distintos.
 - [ ] **RF-07** — Cien filas rotas iguales figuran como un pendiente que dice «llegó 100 veces».
@@ -178,7 +196,7 @@ cierre a mano.
 - [ ] **RF-09** — Cada pendiente dice por qué el sistema no pudo resolverlo solo.
 - [ ] **RF-10** — De cada pendiente se lee el pedazo de información tal como llegó.
 - [ ] **RF-11** — Cada pendiente dice de qué pantalla del portal salió y cuándo se leyó.
-- [ ] **RF-12** — Julián no ve entre sus pendientes los de proveedores ni los de pagos.
+- [ ] **RF-12** — Julián no ve entre sus pendientes los de proveedores, los de pagos ni los de precios.
 - [ ] **RF-13** — Si Julián intenta resolver un pendiente de compras, el sistema no se lo permite.
 - [ ] **RF-14** — El dueño abre la lista y ve los de todas las áreas.
 - [ ] **RF-15** — La pantalla dice cuántos pendientes hay sin resolver.
@@ -186,10 +204,11 @@ cierre a mano.
 - [ ] **RF-17** — Un pendiente de hace dos semanas figura señalado como demorado.
 - [ ] **RF-18** — El dueño cambia los días y el señalamiento pasa a usar el valor nuevo.
 - [ ] **RF-19** — Sin tocar nada, un pendiente de ocho días figura demorado y uno de seis no.
-- [ ] **RF-20** — Repartido un comprobante desde su pantalla, su pendiente deja de contarse, sin que nadie lo cierre.
-- [ ] **RF-21** — Ese pendiente dice que se resolvió al repartirse, y se lo puede seguir consultando.
-- [ ] **RF-22** — El dueño pide ver sólo lo de compras y la lista deja de mostrarle lo de precios.
+- [ ] **RF-20** — Corregida una venta desde la pantalla de ventas, su pendiente deja de contarse, sin que nadie lo cierre.
+- [ ] **RF-21** — Ese pendiente dice que se resolvió en la pantalla de ventas, y se lo puede seguir consultando.
+- [ ] **RF-22** — El dueño pide ver sólo lo de ventas y la lista deja de mostrarle lo de proveedores y pagos.
 - [ ] **RF-23** — Un pendiente resuelto hace un año se sigue encontrando, con quién lo resolvió y cuándo.
+- [ ] **RF-24** — Deshecha desde la pantalla de ventas la resolución de una venta, su pendiente vuelve a figurar entre los pendientes, sin que nadie lo reabra.
 
 ## Fuera de alcance
 
@@ -203,6 +222,13 @@ cierre a mano.
   se le avisa y por qué canal es materia de los avisos (**P8**).
 - **Rehacer la pantalla de revisión.** Se usa la que ya existe.
 
+- **Que un comprobante de pago retenido abra su propio pendiente.** Es lo que haría falta para que un
+  comprobante pudiera cerrarse solo al repartirse, y es una feature aparte: hay que decidir qué se
+  considera «retenido», y hay que medir cuántos abriría el primer día antes de soltarlo, porque una
+  lista inundada se abandona, que es el fracaso exacto que esta feature quiere evitar. Lo que **sí**
+  entrega esta feature del lado de los pagos es lo que promete RF-02: un comprobante que no se pudo
+  interpretar deja de quedar en silencio y abre su pendiente.
+
 ## Decisiones tomadas
 
 Las tres preguntas que esta spec dejó abiertas al escribirse se resolvieron el **2026-08-31**, y
@@ -215,3 +241,15 @@ quedan acá para que se vea qué se decidió y por qué:
 | ¿Cuánto se conserva un pendiente resuelto? | **Para siempre**, fuera de la vista de pendientes pero consultable (RF-23) |
 
 **No quedan preguntas abiertas**, así que la spec está lista para la firma del cliente.
+
+## Enmiendas
+
+Correcciones al documento posteriores a la firma. Una enmienda que **cambiara el alcance** exigiría
+volver a firmar; las que están acá no lo cambian, y por eso la firma del 2026-08-31 sigue valiendo.
+
+| Fecha | Qué se corrigió | Por qué no cambia el alcance |
+|---|---|---|
+| 2026-08-31 | **Los pendientes de precios son de Marcela, no de Julián.** Esta spec los había puesto del lado de ventas, en la tabla de actores, en el «cómo se prueba» de H3 y en dos criterios de aceptación. Contradice a `PROJECT_BRIEF.md`, que dice de Marcela, con las palabras del cliente, que sobre los precios de lista *«sí puede pedir la lista sin esperar al próximo ciclo y **resolver lo que el sistema haya apartado**»*, y que enumera lo de Julián sin los precios: *«ventas duplicadas o con datos rotos, productos sin rubro»*. Se corrigieron los cuatro lugares | **No cambia el alcance, lo restaura.** Nada de lo prometido deja de entregarse: los mismos pendientes, en la misma pantalla, con el mismo filtro. Lo único que cambia es de quién es cada uno, y vuelve a ser lo que el cliente ya había acordado en el brief — que además es lo que el sistema hace hoy y lo que fija `test_permissions.py`. Una spec que se hubiera firmado como estaba habría movido una pantalla de mano sin que el cliente se enterara |
+| 2026-08-31 | **El cierre automático no tenía vuelta atrás (RF-24, nuevo).** La pantalla de ventas permite deshacer una resolución y devolver la venta a su cola; el pendiente que se había cerrado solo se quedaba cerrado, así que la lista pasaba a decir que no había nada que revisar sobre algo que sí volvía a estar en revisión. Se agregó RF-24 con su criterio de aceptación, se extendió el «cómo se prueba» de H5 y la regla de negocio pasó a decir que vale **en las dos direcciones** | **Agranda el alcance, y por eso hay que volver a firmar.** No lo pedía ningún requisito: sale de la regla de negocio ya firmada —«hay una sola verdad sobre si algo sigue pendiente»—, que sin esto se cumple sólo mientras nadie se arrepienta. Construirlo sin escribirlo lo dejaría como una capacidad que nadie pidió y que el próximo control marcaría como tal |
+| 2026-08-31 | **El cierre automático se prometía con un comprobante de pago, y sólo puede darse con una venta.** RF-20, su criterio de aceptación y el «cómo se prueba» de H5 usaban de ejemplo un comprobante repartido desde la pantalla de comprobantes. Es irrealizable, y no por cómo se construyó: un comprobante que el sistema no pudo interpretar **nunca llega a esa pantalla** —se queda apartado, que es el silencio que esta feature rompe abriéndole un pendiente—, así que los que se reparten ahí son los legibles, y ésos nunca tuvieron pendiente. Se cambió el ejemplo a una venta corregida, H5 pasó a ser de Julián, RF-20 dice a qué orígenes alcanza hoy, y se agregó a *Fuera de alcance* el pendiente del comprobante retenido, que es lo que haría falta para cumplirlo del lado de pagos | **Cambia el alcance, y por eso hay que volver a firmar.** Es la única enmienda de esta spec que achica lo prometido: quien leyó «repartido un comprobante, su pendiente deja de contarse» leyó una capacidad que esta entrega no trae. Se registra en vez de resolverse sola porque la decisión entre construirlo y acotarlo **es del cliente** (`/converge` del 2026-08-31, hallazgo H-01) |
+| 2026-08-31 | La tabla del problema decía que una orden de compra apartada **no** llega a la pantalla de revisión. Es falso: llega desde la 007. Se corrigió la fila y se anotó RF-04 como ya cumplido | Lo prometido no se toca —RF-04 sigue siendo un requisito de esta feature y se verifica con un test—; lo que se achica es el trabajo por construir, de cinco orígenes a cuatro. Nada de lo firmado deja de entregarse |

@@ -24,11 +24,12 @@ fronteras entre módulos y cumplimiento de las convenciones de `CONVENTIONS.md`.
 
 - La pregunta de este gate es **"¿está bien escrito?"**. La pregunta *"¿es lo que se acordó?"* es
   de `converge`, y son gates distintos.
-- Recorrer `CONVENTIONS.md` → *Índice de Blockers*: **17 hallazgos sobre 32 convenciones**. Citar
+- Recorrer `CONVENTIONS.md` → *Índice de Blockers*: **18 hallazgos sobre 34 convenciones**. Citar
   por identificador (`"esto viola PY-06"`), sin copiar el texto de la regla.
-- Cinco convenciones ya las verifica un test que rompe el build (`GEN-02`, `GEN-03`, `GEN-09`,
-  `PY-09`, `TEST-05`): si la suite corrió y pasó, no se revisan a ojo. **Si no corrió, el review
-  no arranca.**
+- Siete convenciones ya las verifica un test que rompe el build (`GEN-02`, `GEN-03`, `GEN-09`,
+  `PY-09`, `TEST-05`, `UI-01`, `UI-02`): si la suite corrió y pasó, no se revisan a ojo. **Si no
+  corrió, el review no arranca.** Las dos del diseño están en la suite del frontend (`npm test`),
+  así que "la suite" son las dos.
 - Un Blocker frena el merge: se arregla, o el changeset no pasa. No hay excepción de agente.
 - Terminar con un veredicto explícito —**aprobado** o **bloqueado**— y, si está bloqueado, la
   lista de Blockers por identificador.
@@ -36,8 +37,9 @@ fronteras entre módulos y cumplimiento de las convenciones de `CONVENTIONS.md`.
 Rol: `agents/roles/code_reviewer.md`. Sin argumento, se revisa la rama actual contra `main`.
 
 ## Precondiciones
-- **La suite corrió y pasó.** Cinco convenciones las verifica un test que rompe el build
-  (`GEN-02`, `GEN-03`, `GEN-09`, `PY-09`, `TEST-05`): si no corrió, el review no arranca.
+- **La suite corrió y pasó**, la del backend y la del frontend. Siete convenciones las verifica un
+  test que rompe el build (`GEN-02`, `GEN-03`, `GEN-09`, `PY-09`, `TEST-05`, `UI-01`, `UI-02`): si
+  no corrió, el review no arranca.
 - El `Tester` ya pasó: el reviewer verifica que existan tests, no los escribe.
 
 ## Pasos (ORDEN OBLIGATORIO) — el checklist de revisión
@@ -106,6 +108,7 @@ cd backend && uv run mypy app                                                   
 cd backend && uv run pytest                                # GEN-02, GEN-03, PY-09, TEST-05
 cd frontend && npx tsc --noEmit                                                    # TS-01
 cd frontend && npm run lint && npm run format:check                        # TS-02, TS-06
+cd frontend && npm test                                                    # UI-01, UI-02
 ```
 
 Si algo de eso está en rojo, el review se frena ahí: son Blockers que el `Developer` tenía que
@@ -117,10 +120,17 @@ Después, área por área — el detalle y el comando de cada una están en `CON
 |---|---|---|
 | Python | `PY-01` … `PY-10` | `PY-01`, `PY-02`, `PY-04`, `PY-05`, `PY-06`, `PY-08`, `PY-09`, `PY-10` |
 | TypeScript y frontend | `TS-01` … `TS-09` | `TS-01`, `TS-02`, `TS-06` |
+| Diseño de interfaz | `UI-01` … `UI-10` | `UI-01`, `UI-02` |
 | Manejo de errores | `ERR-01` … `ERR-07` | `ERR-03`, `ERR-04`, `ERR-05` |
 | Configuración y secretos | `SEC-01` … `SEC-05` | `SEC-01`, `SEC-02` |
 | Dependencias | `DEP-01` … `DEP-04` | `DEP-01`, `DEP-02`, `DEP-03` |
 | Git y commits | `GIT-01` … `GIT-04` | `GIT-01`, `GIT-03` |
+
+En el frontend, `UI-01` y `UI-02` las decide la suite; el resto de los `UI-*` se mira a ojo y son
+justamente los que sostienen el sistema: una sola acción de acento por pantalla (`UI-05`), los
+estados dibujados con la píldora (`UI-03`), la plata en mono tabular (`UI-04`) y el aviso arriba
+del número que califica (`UI-07`). **Si el changeset toca una pantalla, se abre `docs/design/` y se
+compara.**
 
 Los que más se escapan porque **ninguna herramienta los detecta**, y por eso hay que mirarlos a
 mano: `PY-03` (imports dentro de funciones — el `select` de Ruff no lo cubre), `PY-04` (mypy corre

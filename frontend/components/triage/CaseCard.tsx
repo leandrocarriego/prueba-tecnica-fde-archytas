@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/toast'
 import { formatMoment, formatPrice } from '@/lib/catalog/format'
 import type { Category } from '@/lib/catalog/types'
-import { caseKindLabel, type Case } from '@/lib/triage/types'
+import { ACKNOWLEDGE_ONLY_KINDS, caseKindLabel, type Case } from '@/lib/triage/types'
 
 interface CaseCardProps {
   item: Case
@@ -126,10 +126,25 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
           <p className="text-sm text-muted-foreground">{caseKindLabel(item.kind)}</p>
           <h3 className="font-medium">{item.reason}</h3>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {formatMoment(item.created_at)}
-          {item.occurrences > 1 && ` · se repitió ${item.occurrences} veces`}
-        </p>
+        <div className="text-right text-sm text-muted-foreground">
+          <p>
+            {formatMoment(item.created_at)}
+            {item.occurrences > 1 && ` · se repitió ${item.occurrences} veces`}
+          </p>
+          {/*
+            Cuánto hace que espera, y si eso ya es demasiado (RF-16, RF-17). El
+            número lo calcula el backend contra el parámetro que el dueño mueve
+            (RF-18), así que la pantalla no decide nada acá: lo muestra.
+          */}
+          {item.status === 'PENDING' && (
+            <p className={item.is_stale ? 'font-medium text-warn' : undefined}>
+              {item.waiting_days === 0
+                ? 'Llegó hoy'
+                : `Espera hace ${item.waiting_days} ${item.waiting_days === 1 ? 'día' : 'días'}`}
+              {item.is_stale && ' · demorado'}
+            </p>
+          )}
+        </div>
       </header>
 
       <dl className="grid gap-1 text-sm sm:grid-cols-2">
@@ -155,6 +170,31 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
           <div>
             <dt className="inline text-muted-foreground">Forma escrita: </dt>
             <dd className="inline font-mono">{payloadText(item, 'category_text')}</dd>
+          </div>
+        )}
+        {/*
+          De qué pantalla del portal salió y cuándo se leyó (RF-11). Es lo que
+          evita que resolver un pendiente empiece por salir a buscar el dato, y
+          desde la 011 lo traen **todas** las clases: el requisito dice «cada
+          pendiente», y uno solo que no lo dijera obligaría a quien mira la
+          lista a saber de antemano cuáles lo traen.
+
+          Se sigue dibujando condicionado por dos razones que no son la misma:
+          los pendientes abiertos antes de esta corrección no tienen el dato en
+          su `payload` y nadie se lo va a inventar hacia atrás, y un rubro que
+          volvió a la cola porque alguien revocó su regla no salió de ninguna
+          lectura, así que no dice cuándo se leyó.
+        */}
+        {payloadText(item, 'origin') && (
+          <div>
+            <dt className="inline text-muted-foreground">Salió de: </dt>
+            <dd className="inline">{payloadText(item, 'origin')}</dd>
+          </div>
+        )}
+        {payloadText(item, 'read_at') && (
+          <div>
+            <dt className="inline text-muted-foreground">Se leyó: </dt>
+            <dd className="inline">{formatMoment(payloadText(item, 'read_at'))}</dd>
           </div>
         )}
         {payloadText(item, 'excerpt') && (
@@ -255,28 +295,23 @@ export function CaseCard({ item, mayCorrect, categories }: CaseCardProps) {
         )}
 
         {/*
-          Una fila de `/facturas` que no se pudo interpretar. Lo único que se
-          puede hacer es verla y darla por revisada: una factura nace de una
-          fila que el portal publicó, y cargarla a mano desde acá sería
-          exactamente lo que la spec firmada dejó fuera de alcance. Lo que la
-          cola aporta es que **exista**: hasta ahora se perdía en silencio.
-        */}
-        {item.kind === 'unreadable_invoice_row' && (
-          <Button disabled={saving} onClick={() => decide({ action: 'ignore' })}>
-            Dar la fila por revisada
-          </Button>
-        )}
+          Las seis clases que sólo se pueden dar por revisadas: facturas (004),
+          órdenes (007) y las cuatro que agrega la 011 —padrón, comprobantes,
+          buzón y ventas—. Una factura, una orden o una venta nacen de una fila
+          que el portal publicó, y cargarlas a mano desde acá es exactamente lo
+          que la spec firmada dejó fuera de alcance.
 
-        {/*
-          Lo mismo, en la pantalla de órdenes de compra. Una orden nace de una
-          fila que el portal publicó, así que cargarla a mano desde acá sería
-          cargar un pedido a mano y ningún requisito lo pide. Lo que la cola
-          aporta es que el pedido perdido **exista**, que es literalmente el
-          problema por el que la 007 se firmó.
+          Estaban escritas una por una, con el mismo botón repetido, y con
+          cuatro más eso pasa de repetición a copia. Lo que las junta no es que
+          se parezcan: es que comparten el motivo —el origen es de sólo lectura—
+          y ese motivo está escrito una vez, en `ACKNOWLEDGE_ONLY_KINDS`.
+
+          Lo que la cola aporta es que **existan**: hasta la 011, cuatro de las
+          seis se perdían en silencio.
         */}
-        {item.kind === 'unreadable_order_row' && (
+        {ACKNOWLEDGE_ONLY_KINDS.includes(item.kind) && (
           <Button disabled={saving} onClick={() => decide({ action: 'ignore' })}>
-            Dar la fila por revisada
+            Darlo por revisado
           </Button>
         )}
       </div>

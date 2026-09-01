@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -22,6 +23,13 @@ type UserRead = components['schemas']['UserRead']
  * tinta grafito, agrupada por área del negocio. Lo que no se puede ver no
  * aparece —ni el grupo, si le quedó todo afuera—, en vez de mostrar un botón
  * que devuelve error.
+ *
+ * **En una pantalla angosta la barra se pliega** (RF-41 de la 006). Apilada
+ * entera medía 832px sobre un teléfono de 664px: la primera pantalla era el
+ * menú y había que desplazarse una pantalla y media para ver la sección que se
+ * vino a consultar. Plegada deja una franja con dónde está parada la persona y
+ * el botón que abre el resto. Desde `md` no cambia nada: la barra sigue fija a
+ * la izquierda, y ahí no hay nada que plegar.
  */
 interface Entry {
   href: string
@@ -55,7 +63,14 @@ const GROUPS: ReadonlyArray<Group> = [
     entries: [
       { href: '/precios', label: 'Catálogo y precios', section: 'PRICES' },
       { href: '/rubros', label: 'Rubros', section: 'PRODUCT_CATEGORIES' },
-      { href: '/revision', label: 'Revisar esto', section: 'PRICES' },
+      /*
+       * No nombra sección, igual que `/acciones` y `/historial`. Pedía
+       * `PRICES`, que era cierto cuando en la cola sólo había precios y dejó de
+       * serlo cuando las ventas empezaron a caer ahí: le cerraba la puerta a
+       * Julián, el dueño de esa mitad. La pantalla recorta lo que *muestra* a
+       * las áreas que el que mira alcanza, en vez de cerrarse.
+       */
+      { href: '/revision', label: 'Revisar esto' },
     ],
   },
   {
@@ -92,6 +107,7 @@ function isPrefix(pathname: string, href: string): boolean {
 
 export function Navigation({ user, permissions }: { user: UserRead; permissions: Permissions }) {
   const pathname = usePathname()
+  const [open, setOpen] = useState(false)
 
   const groups = GROUPS.map(group => ({
     ...group,
@@ -100,63 +116,102 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
 
   const hrefs = groups.flatMap(group => group.entries.map(entry => entry.href))
   const fullName = `${user.name}${user.last_name ? ` ${user.last_name}` : ''}`
+  // Dónde está parada la persona, para decirlo en la franja plegada: con el
+  // menú cerrado, el nombre de la sección es lo único que lo dice.
+  const aqui = groups
+    .flatMap(group => group.entries)
+    .find(entry => isCurrent(pathname, entry.href, hrefs))
 
   return (
-    <aside className="flex w-60 flex-none flex-col bg-primary text-primary-foreground md:sticky md:top-0 md:h-dvh">
-      <Link href="/" className="flex items-center gap-3 px-5 py-5">
-        <span className="flex size-9 flex-none items-center justify-center rounded-lg border-2 border-brand text-sm font-bold">
-          FC
-        </span>
-        <span className="leading-tight">
-          <span className="block text-sm font-semibold">Cordillera</span>
-          <span className="block text-[11px] text-white/45">Gestión interna</span>
-        </span>
-      </Link>
-
-      <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-5">
-        {groups.map((group, index) => (
-          <div key={group.title ?? `group-${index}`} className="space-y-0.5">
-            {group.title ? (
-              <p className="section-label px-2 pb-1.5 pt-1 text-white/35">{group.title}</p>
-            ) : null}
-            {group.entries.map(entry => (
-              <Link
-                key={entry.href}
-                href={entry.href}
-                aria-current={isCurrent(pathname, entry.href, hrefs) ? 'page' : undefined}
-                className={cn(
-                  'block rounded-md px-2.5 py-1.5 text-[13.5px] transition-colors',
-                  isCurrent(pathname, entry.href, hrefs)
-                    ? 'bg-white/10 font-semibold text-white'
-                    : 'text-white/65 hover:bg-white/5 hover:text-white'
-                )}
-              >
-                {entry.label}
-              </Link>
-            ))}
-          </div>
-        ))}
-      </nav>
-
-      {/* RF-03: mientras alguien trabaja, la pantalla dice quién. */}
-      <div className="border-t border-white/10 px-3 py-3">
-        <Link
-          href="/mi-cuenta"
-          className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-white/5"
-        >
-          <span className="flex size-8 flex-none items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold">
-            {initials(fullName)}
+    <aside className="flex w-full flex-none flex-col bg-primary text-primary-foreground md:sticky md:top-0 md:h-dvh md:w-60">
+      <div className="flex items-center justify-between gap-3 px-5 py-5">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="flex size-9 flex-none items-center justify-center rounded-lg border-2 border-brand text-sm font-bold">
+            FC
           </span>
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{fullName}</span>
+          <span className="leading-tight">
+            <span className="block text-sm font-semibold">Cordillera</span>
+            <span className="block text-[11px] text-white/45">
+              {/* Plegada, la franja dice la sección; desplegada y en escritorio, el producto. */}
+              <span className="md:hidden">{aqui?.label ?? 'Gestión interna'}</span>
+              <span className="hidden md:inline">Gestión interna</span>
+            </span>
+          </span>
         </Link>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="mt-1 w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-[13px] text-white/50 hover:bg-white/5 hover:text-white"
+        <button
+          type="button"
+          onClick={() => setOpen(current => !current)}
+          aria-expanded={open}
+          aria-controls="menu-principal"
+          className="cursor-pointer rounded-md border border-white/15 px-3 py-1.5 text-[13px] text-white/75 hover:bg-white/5 hover:text-white md:hidden"
+        >
+          {open ? 'Cerrar' : 'Menú'}
+        </button>
+      </div>
+
+      {/*
+        Plegado en un teléfono, siempre abierto desde `md`: la barra de
+        escritorio no tiene botón, así que no puede quedar cerrada sin salida.
+      */}
+      <div
+        id="menu-principal"
+        className={cn('min-h-0 flex-1 flex-col md:flex', open ? 'flex' : 'hidden')}
+      >
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-5">
+          {groups.map((group, index) => (
+            <div key={group.title ?? `group-${index}`} className="space-y-0.5">
+              {group.title ? (
+                <p className="section-label px-2 pb-1.5 pt-1 text-white/35">{group.title}</p>
+              ) : null}
+              {group.entries.map(entry => (
+                <Link
+                  key={entry.href}
+                  href={entry.href}
+                  /*
+                   * Elegir algo cierra el menú: en un teléfono, quedarse
+                   * abierto tapa exactamente la pantalla que la persona acaba
+                   * de pedir. Va sobre cada enlace y no sobre el contenedor
+                   * —que es un `div`, y un `div` con `onClick` no se alcanza
+                   * con el teclado— ni en un efecto que mire la ruta: cerrar es
+                   * la consecuencia del clic, no de haber navegado.
+                   */
+                  onClick={() => setOpen(false)}
+                  aria-current={isCurrent(pathname, entry.href, hrefs) ? 'page' : undefined}
+                  className={cn(
+                    'block rounded-md px-2.5 py-1.5 text-[13.5px] transition-colors',
+                    isCurrent(pathname, entry.href, hrefs)
+                      ? 'bg-white/10 font-semibold text-white'
+                      : 'text-white/65 hover:bg-white/5 hover:text-white'
+                  )}
+                >
+                  {entry.label}
+                </Link>
+              ))}
+            </div>
+          ))}
+        </nav>
+
+        {/* RF-03: mientras alguien trabaja, la pantalla dice quién. */}
+        <div className="border-t border-white/10 px-3 py-3">
+          <Link
+            href="/mi-cuenta"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-white/5"
           >
-            Cerrar sesión
-          </button>
-        </form>
+            <span className="flex size-8 flex-none items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold">
+              {initials(fullName)}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{fullName}</span>
+          </Link>
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="mt-1 w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-[13px] text-white/50 hover:bg-white/5 hover:text-white"
+            >
+              Cerrar sesión
+            </button>
+          </form>
+        </div>
       </div>
     </aside>
   )

@@ -56,5 +56,5 @@ export function variationTone(value: string | number | null | undefined): string
   if (value === null || value === undefined) return 'text-muted-foreground'
   const amount = typeof value === 'string' ? Number(value) : value
   if (Number.isNaN(amount) || amount === 0) return 'text-muted-foreground'
-  return amount > 0 ? 'text-red-600' : 'text-emerald-600'
+  return amount > 0 ? 'text-danger' : 'text-ok'
 }

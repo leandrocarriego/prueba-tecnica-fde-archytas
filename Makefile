@@ -122,6 +122,7 @@ clean: ## Borrar contenedores, volúmenes y recursos huérfanos
 
 test: ## Ejecutar todos los tests
 	cd backend && uv run pytest
+	cd frontend && npm test
 
 # --no-cov on the subsets: `--cov-fail-under=80` lives in pyproject's addopts and
 # measures the WHOLE suite, so applying it to a slice fails even when every test
@@ -132,6 +133,11 @@ test-unit: ## Ejecutar solo los tests unitarios
 
 test-integration: ## Ejecutar solo los tests de integración
 	cd backend && uv run pytest -m integration --no-cov
+
+# Los dos tests de pantalla de la 006: lo que el backend no puede demostrar
+# —el control de mes y el recorte por día— porque no sabe nada de ninguno.
+test-frontend: ## Ejecutar los tests de pantalla del frontend
+	cd frontend && npm test
 
 test-cov: ## Ejecutar los tests con reporte de cobertura
 	cd backend && uv run pytest --cov=app --cov-report=html --cov-report=term-missing

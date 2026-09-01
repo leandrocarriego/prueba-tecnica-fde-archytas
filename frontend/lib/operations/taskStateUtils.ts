@@ -10,10 +10,10 @@ const LABELS: Record<JobStatus, string> = {
 }
 
 const COLORS: Record<JobStatus, string> = {
-  PENDING: 'text-slate-500',
-  RUNNING: 'text-blue-600',
-  SUCCEEDED: 'text-emerald-600',
-  FAILED: 'text-red-600',
+  PENDING: 'text-muted-foreground',
+  RUNNING: 'text-info',
+  SUCCEEDED: 'text-ok',
+  FAILED: 'text-danger',
 }
 
 /** Spanish label for a run state, falling back to the raw value. */
@@ -23,5 +23,5 @@ export function getJobStatusLabel(status: JobStatus | string): string {
 
 /** Tailwind text colour for a run state. */
 export function getJobStatusColor(status: JobStatus | string): string {
-  return COLORS[status as JobStatus] ?? 'text-slate-500'
+  return COLORS[status as JobStatus] ?? 'text-muted-foreground'
 }

@@ -10,7 +10,12 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.models import User, UserRole
+from app.modules.ingestion.service import IngestionService
 from tests.conftest import API_PREFIX, authorization_header
+from tests.factories.portal_factory import (
+    sales_page_bytes,
+    supplier_ledger_with_a_broken_payment,
+)
 from tests.factories.user_factory import DEFAULT_PASSWORD, UserFactory
 
 # No password: the owner hands out accesses, not credentials (RF-44). The phone
@@ -444,3 +449,157 @@ class TestTheOrdersAndTheInboxAreNotForSales:
         assert allowed.status_code == 200
         assert isinstance(allowed.json(), list)
         assert refused.status_code == 403
+
+
+@pytest.mark.integration
+@pytest.mark.database
+@pytest.mark.portal
+class TestEachOneSeesTheirOwnPendingThings:
+    """H3 de la 011: la cola de revisión es una sola y cada uno ve su parte.
+
+    Es la clase de test que la feature más necesita, porque el modo de fallar es
+    silencioso: hasta la 011 la puerta decía quién entraba, y ahora entra
+    cualquiera con sesión y lo que recorta es el **servicio**. Una puerta cerrada
+    se prueba sola —el 403 salta—; un filtro que se olvida no salta, sólo muestra
+    de más.
+
+    El reparto lo fijó el Lead el 2026-08-31 contra `PROJECT_BRIEF.md`: los siete
+    `kind` que existían antes de la 011 nacen de la ingesta del portal y son de
+    compras, los precios incluidos —el brief dice de Marcela que sobre los
+    precios de lista «sí puede … resolver lo que el sistema haya apartado»—. El
+    primero de ventas lo trae esta feature: las ventas que no se pudieron leer.
+    """
+
+    @staticmethod
+    async def both_areas_have_something(session: AsyncSession) -> None:
+        """Un pendiente de compras y otro de ventas, para que el filtro tenga qué filtrar."""
+        service = IngestionService(session)
+        await service.normalize_supplier_ledger(
+            raw_document_id=1, content=supplier_ledger_with_a_broken_payment()
+        )
+        await service.normalize_sales(raw_document_id=2, content=sales_page_bytes())
+        await session.commit()
+
+    async def test_purchasing_sees_purchasing_and_not_sales(
+        self, session: AsyncSession, purchasing_client: AsyncClient
+    ) -> None:
+        """RF-12 de un lado."""
+        # Arrange
+        await self.both_areas_have_something(session)
+
+        # Act
+        body = (await purchasing_client.get(f"{API_PREFIX}/triage/cases?limit=200")).json()
+
+        # Assert
+        assert {item["section"] for item in body["items"]} == {"PURCHASING"}
+
+    async def test_sales_sees_sales_and_not_purchasing(
+        self, session: AsyncSession, sales_client: AsyncClient
+    ) -> None:
+        """RF-12 del otro. Es lo que la 011 le agrega a Julián: sus ventas apartadas."""
+        # Arrange
+        await self.both_areas_have_something(session)
+
+        # Act
+        body = (await sales_client.get(f"{API_PREFIX}/triage/cases?limit=200")).json()
+
+        # Assert
+        assert {item["section"] for item in body["items"]} == {"SALES"}
+
+    async def test_the_owner_sees_both(
+        self, session: AsyncSession, owner_client: AsyncClient
+    ) -> None:
+        """RF-14."""
+        # Arrange
+        await self.both_areas_have_something(session)
+
+        # Act
+        body = (await owner_client.get(f"{API_PREFIX}/triage/cases?limit=200")).json()
+
+        # Assert
+        assert {item["section"] for item in body["items"]} == {"PURCHASING", "SALES"}
+
+    async def test_nobody_resolves_what_is_not_theirs(
+        self, session: AsyncSession, sales_client: AsyncClient, owner_client: AsyncClient
+    ) -> None:
+        """RF-13, y con el id en la mano.
+
+        No alcanza con que el listado no lo muestre: un id es adivinable, y una
+        restricción que se apoya en que la pantalla omita algo no es una
+        restricción.
+        """
+        # Arrange
+        await self.both_areas_have_something(session)
+        listed = (await owner_client.get(f"{API_PREFIX}/triage/cases?limit=200")).json()
+        of_purchasing = next(item for item in listed["items"] if item["section"] == "PURCHASING")
+
+        # Act
+        response = await sales_client.post(
+            f"{API_PREFIX}/triage/cases/{of_purchasing['id']}/resolution",
+            json={"decision": {"action": "ignore"}, "remember": False},
+        )
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_the_owner_narrows_the_list_to_one_area(
+        self, session: AsyncSession, owner_client: AsyncClient
+    ) -> None:
+        """RF-22: el filtro por área, que es del dueño porque es el único que ve dos."""
+        # Arrange
+        await self.both_areas_have_something(session)
+
+        # Act
+        body = (await owner_client.get(f"{API_PREFIX}/triage/cases?limit=200&section=SALES")).json()
+
+        # Assert
+        assert {item["section"] for item in body["items"]} == {"SALES"}
+
+    async def test_the_filter_narrows_and_never_widens(
+        self, session: AsyncSession, sales_client: AsyncClient
+    ) -> None:
+        """RF-22 tiene un piso, y este es el test que lo pone.
+
+        Se rechaza en vez de contestar una lista vacía: una lista vacía se lee
+        como «no hay nada en compras», que es otra afirmación y es mentira.
+        """
+        # Arrange
+        await self.both_areas_have_something(session)
+
+        # Act
+        response = await sales_client.get(f"{API_PREFIX}/triage/cases?section=PURCHASING")
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_the_three_reach_the_screen(
+        self,
+        purchasing_client: AsyncClient,
+        sales_client: AsyncClient,
+        owner_client: AsyncClient,
+    ) -> None:
+        """RF-06: la puerta no es lo que recorta, y por eso está abierta para los tres.
+
+        Con la cola vacía y sin nada que ver, los tres tienen que entrar igual.
+        Que a alguno le responda 403 sería la 011 al revés: una lista sola a la
+        que no todos llegan es otra vez un lugar más al que hay que acordarse de
+        entrar.
+        """
+        # Act / Assert
+        for client in (purchasing_client, sales_client, owner_client):
+            assert (await client.get(f"{API_PREFIX}/triage/cases")).status_code == 200
+
+    async def test_the_rules_stay_where_they_were(self, sales_client: AsyncClient) -> None:
+        """Abrir la cola no abrió las reglas aprendidas, y es deliberado.
+
+        Toda regla aprendida es de precios —las cuatro `kind` que la 011 agrega
+        van con `remember=False` porque aprender quedó fuera de alcance—, así que
+        `/triage/rules` sigue pidiendo `PRICES`. Es también lo que obliga a la
+        pantalla a condicionar ese pedido: sin condición, para quien no alcanza
+        `PRICES` es un 403 que `rules ?? []` disfraza de lista vacía.
+        """
+        # Act
+        response = await sales_client.get(f"{API_PREFIX}/triage/rules")
+
+        # Assert
+        assert response.status_code == 403

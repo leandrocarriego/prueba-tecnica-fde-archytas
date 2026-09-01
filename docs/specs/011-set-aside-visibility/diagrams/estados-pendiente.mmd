@@ -10,5 +10,6 @@ stateDiagram-v2
     Demorado --> Revisado: Una persona lo da por revisado
     Pendiente --> Resuelto: Se resuelve lo que lo originó,<br/>en la pantalla que le corresponde
     Demorado --> Resuelto: Se resuelve lo que lo originó
+    Resuelto --> Pendiente: Se deshace ese trabajo en la pantalla<br/>que le corresponde, y vuelve a la lista
     Revisado --> [*]: Sale de la lista y queda consultable
     Resuelto --> [*]: Sale de la lista y queda consultable

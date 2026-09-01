@@ -365,6 +365,16 @@ class Payment(Base):
     reference: Mapped[str | None] = mapped_column(String(255), default=None)
     supplier_text: Mapped[str | None] = mapped_column(String(255), default=None)
     review_reason: Mapped[str | None] = mapped_column(String(200), default=None)
+    # The `staging` row this voucher was typed from. Null on a payment somebody
+    # typed by hand, which came from a person and not from a reading.
+    #
+    # `Invoice` and `Sale` have carried this since their own features; the
+    # payment did not, and its absence was only ever felt now: 011 needs the
+    # screen that resolves something to be able to name **which reading** it
+    # resolved, in the same words the reading used when it set the row aside.
+    # Without it a module can say "a payment moved" and nothing can tell which
+    # of them.
+    staging_row_id: Mapped[int | None] = mapped_column(Integer, default=None)
     created_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     voided_by_user_id: Mapped[int | None] = mapped_column(Integer, default=None)

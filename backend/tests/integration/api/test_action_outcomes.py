@@ -35,6 +35,7 @@ from app.modules.triage.models import ExceptionCase
 from app.modules.triage.service import UNREADABLE_ROW, TriageService
 from app.shared.corrections import CorrectionReason
 from app.shared.parameters import spec_for
+from app.shared.sections import BusinessSection
 from tests.conftest import API_PREFIX
 from tests.factories.catalog_factory import ProductFactory
 
@@ -134,6 +135,7 @@ async def a_pending_row(
     correction.corrected_at = corrected_at
     await TriageService(session).open_case(
         kind=UNREADABLE_ROW,
+        section=BusinessSection.PURCHASING,
         reason="La fila no se pudo leer",
         payload={"product_code": product.code, "excerpt": f"{product.code};;;"},
         key=product.code,
@@ -635,6 +637,7 @@ class TestALoadAStandingCorrectionDoesNotLetThrough:
         )
         await TriageService(session).open_case(
             kind=UNREADABLE_ROW,
+            section=BusinessSection.PURCHASING,
             reason="La fila no se pudo leer",
             payload={"product_code": code, "excerpt": f"{code};;;"},
             key=code,
@@ -677,6 +680,7 @@ class TestALoadAStandingCorrectionDoesNotLetThrough:
         # Arrange
         await TriageService(session).open_case(
             kind=UNREADABLE_ROW,
+            section=BusinessSection.PURCHASING,
             reason="La fila no se pudo leer",
             payload={"product_code": product.code, "excerpt": f"{product.code};;;"},
             key=product.code,

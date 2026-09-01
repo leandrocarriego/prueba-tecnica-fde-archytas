@@ -1,9 +1,32 @@
 """HTTP routes for the triage module.
 
-The review queue belongs to whoever handles purchasing — it is Marcela's screen
-in the spec — and to the owner, who is admitted everywhere. Nothing here is
-public: `require_section()` comes from `identity.dependencies`, the one file
-that crosses a module boundary.
+**The queue is everybody's, and each person sees their own part of it.** Until
+011 the two case routes asked for `Section.PRICES, WRITE`, which was right while
+the only thing in the queue was the price list and stopped being right the day
+the sales rows started opening cases: it locked the screen against the one
+person the sales half belongs to.
+
+So they now declare what is actually true — *you have to be signed in* — and the
+fine-grained permission moves into the service, where it belongs: which area a
+case is about is a fact of the **row**, and a `Depends` runs before any row is
+read. `PY-09` asks every route to declare its authorisation and both still do;
+it is the same shape the history of `operations` already has, and neither route
+is public.
+
+**Most of the queue stays purchasing's, and that is the point rather than an
+accident.** The seven kinds that predate 011 all come out of the portal
+ingestion, and resolving what the ingestion sets aside is Marcela's work — the
+prices included, which is what the brief says of her in the client's own words.
+What changes is that the queue can now hold a case that is *not* hers, and the
+door stops being the thing that decides.
+
+The three `/rules` routes do **not** open, deliberately: every learned rule is a
+rule about prices — the four kinds 011 adds pass `remember=False`, because
+learning is out of scope — so they stay where they were, and opening them would
+only add one more surface to leak an area through.
+
+`require_section()` and `visible_sections()` both come from
+`identity.dependencies`, the one file that crosses a module boundary.
 """
 
 from typing import Annotated
@@ -18,6 +41,7 @@ from app.modules.identity.dependencies import (
     CurrentUser,
     Level,
     Section,
+    VisibleSections,
     require_section,
 )
 from app.modules.triage.models import CaseStatus
@@ -30,6 +54,7 @@ from app.modules.triage.schemas import (
 )
 from app.modules.triage.service import TriageService
 from app.shared.errors import DomainError
+from app.shared.sections import BusinessSection
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
@@ -49,42 +74,54 @@ LimitParam = Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE, description="Rows per 
 StatusParam = Annotated[CaseStatus | None, Query(description="Filter by state")]
 KindParam = Annotated[str | None, Query(max_length=50, description="Filter by kind of case")]
 BatchParam = Annotated[int | None, Query(description="Only the cases of one run")]
+SectionParam = Annotated[
+    BusinessSection | None, Query(description="Only the cases of one area of the business")
+]
 
 router = APIRouter(prefix="/triage", tags=["Triage"])
 
 
-@router.get(
-    "/cases",
-    dependencies=[require_section(Section.PRICES, Level.WRITE)],
-    summary="What the update set aside",
-)
+@router.get("/cases", summary="What the platform set aside")
 async def list_cases(
     service: TriageDep,
+    visible: VisibleSections,
     skip: SkipParam = 0,
     limit: LimitParam = DEFAULT_PAGE_SIZE,
     status_filter: StatusParam = CaseStatus.PENDING,
     kind: KindParam = None,
     batch_id: BatchParam = None,
+    section: SectionParam = None,
 ) -> CaseList:
-    """The owner and purchasing: this is the screen where the queue is emptied."""
+    """Anybody signed in, and each of them sees the areas they reach (RF-12).
+
+    `VisibleSections` is a dependency and not a parameter the caller may send:
+    it is read off the token, so no query string can widen it. `section` can
+    only ever narrow it.
+    """
     return await service.list_cases(
-        skip=skip, limit=limit, status=status_filter, kind=kind, batch_id=batch_id
+        skip=skip,
+        limit=limit,
+        status=status_filter,
+        kind=kind,
+        batch_id=batch_id,
+        visible=visible,
+        section=section,
     )
 
 
-@router.post(
-    "/cases/{case_id}/resolution",
-    dependencies=[require_section(Section.PRICES, Level.WRITE)],
-    summary="Decide what to do with a case",
-)
+@router.post("/cases/{case_id}/resolution", summary="Decide what to do with a case")
 async def resolve_case(
     case_id: int,
     payload: ResolutionRequest,
     current_user: CurrentUser,
     service: TriageDep,
     directory: ActorDirectoryDep,
+    visible: VisibleSections,
 ) -> CaseRead:
-    """The owner and purchasing.
+    """Anybody signed in, for a case of an area they reach — and no other.
+
+    Resolving somebody else's area is refused with a 403 by the service, because
+    the area is a fact of the case and only the case knows it (RF-13).
 
     Who decided is taken from the token, never from the body: RF-32 asks for the
     person who took the decision, and a body could name somebody else. The name
@@ -107,6 +144,7 @@ async def resolve_case(
             user_id=current_user.id,
             user_name=current_user.name,
             remember=payload.remember,
+            visible=visible,
         )
     except DomainError as refusal:
         await _name_whoever_corrected(refusal, directory)

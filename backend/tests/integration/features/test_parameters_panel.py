@@ -79,6 +79,7 @@ STARTING_VALUES: dict[str, Any] = {
     "alerts.window_end": "18:00",
     "sales_sync.interval_hours": 24,
     "sales.outlier_threshold_pct": "300",
+    "triage.stale_days": 7,
 }
 
 # Keys that are not parameters. Four of them look like a credential, which is

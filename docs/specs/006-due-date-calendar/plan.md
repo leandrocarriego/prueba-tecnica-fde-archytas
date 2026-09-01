@@ -355,13 +355,13 @@ cada uno de esos tiene su entrada en *Deriva contra la spec firmada*.
 
 | Riesgo | Impacto | Cómo se mitiga |
 |---|---|---|
-| **El canal en vivo (H5) todavía no existe.** Hasta que esté, dos personas pueden mirar el mismo calendario y decidir sobre fotos distintas | Alto — es un tercio de la promesa firmada | Ya no es un riesgo sin plan: el diseño está cerrado (*La H5: el canal en vivo*) y desglosado en las tareas 31 a 36. **El humano decidió el 2026-08-31 no poner un cartel provisorio** que avisara que la pantalla no se actualiza sola: sería superficie que el cliente no firmó, y la ventana en que serviría es la que tarde en construirse el canal. El riesgo se acepta durante esa ventana |
-| **`_sync_due_date` no pisa una entrada movida a mano.** Si el portal corrige el vencimiento de una factura que alguien ya reprogramó, el dato nuevo del portal se ignora en silencio | Medio | Es deliberado (RF-20: una decisión de una persona no la deshace una lectura). El riesgo es que **nadie se entera** del desacuerdo. El mecanismo existe y `purchases` ya lo usa para el padrón (`CorrectionConflicted`, `service.py:305`); acá no se aplicó |
-| **El cruce factura ↔ entrada usa dos ventanas distintas.** Una factura vencida reprogramada a otro mes pierde su proveedor, su estado de pago y su marca de vencida-sin-recibo | Medio | Sin mitigar. Es la deriva D1, abajo |
+| ~~**El canal en vivo (H5) todavía no existe.**~~ | — | **Cerrado el 2026-08-31**: el canal está construido y testeado. Queda su descendiente, que es el riesgo de siempre de un canal: que el mensaje no cruce del otro worker. Está listado para el Tester |
+| **`_sync_due_date` no pisa una entrada movida a mano.** Si el portal corrige el vencimiento de una factura que alguien ya reprogramó, el dato nuevo del portal se ignora en silencio | Medio | **Sigue abierto.** Es deliberado (RF-20: una decisión de una persona no la deshace una lectura), y el riesgo es que **nadie se entera** del desacuerdo. El mecanismo existe y `purchases` ya lo usa para el padrón (`CorrectionConflicted`); acá no se aplicó, y ningún RF firmado lo pide |
+| ~~**El cruce factura ↔ entrada usa dos ventanas distintas.**~~ | — | **Cerrado el 2026-08-31** (deriva D1): `calendar()` busca las facturas por las entradas que va a mostrar, y lo sostiene `TestAnOverdueOneMovedToAnotherMonth` |
 | **Migración compartida entre cuatro features.** Un rollback de la 006 no se puede hacer solo: `0011` se lleva puestas también 004, 005 y 007 | Medio | Se acepta: las cuatro se entregan juntas. Si alguna se difiere, la migración hay que partirla antes del merge |
-| **La cobertura de la feature descansa en 8 tests de integración de servicio.** No hay ni un test de ruta, ni uno de permisos de calendario más allá de la matriz | Medio | `TEST-05` (80%) lo mide sobre `app/` entera, así que esta feature puede quedar floja sin que el umbral se entere. Está listado para el Tester |
+| ~~**La cobertura descansa en 8 tests de integración de servicio.**~~ | — | **Cerrado el 2026-08-31**: cinco tests de ruta que llaman como ventas, y 21 de pantalla que cubren lo que el backend no puede ver —la grilla, el control de mes, el recorte y la barra plegable— |
 | **Todo el calendario cuelga de `today_here()`.** Un test que fije un mes concreto empieza a fallar el día que ese mes queda en el pasado | Bajo | Los tests existentes ya trabajan con una ventana relativa a hoy (`test_due_date_calendar.py:23-31`); la convención hay que sostenerla |
-| **La pantalla confunde una caída del backend con una negativa de permiso.** Lee con `fetchFromApi` (`calendario/page.tsx:40`) y devuelve `<NoPermission>` ante cualquier `null` (`:44-46`), y `fetchFromApi` colapsa 401/403, 404, 500 y timeout en el mismo `null` | Medio — con la API caída, al **dueño** le dice «No tenés permiso · Tu acceso no llega al calendario de vencimientos … pedíselo al dueño»: un consejo sobre el que nadie puede actuar, sobre un permiso que nunca faltó | Sin mitigar. El arreglo es leer `readFromApi`, que dice cuál de los tres fue; el docstring de `fetchFromApi` lo pide con todas las letras —*"una pantalla que renderiza una negativa … tiene que leer `readFromApi`, porque `null` acá es también lo que parece un timeout"*, `frontend/lib/api/server.ts:85-87`—. La regla está fijada por un test de arquitectura, pero **sólo para las pantallas de la 003** (`backend/tests/architecture/test_screen_reads.py`, `SCREENS` en `:65`), que no alcanza al calendario. **Este plan no autoriza el cambio**: es hallazgo, igual que la deriva |
+| ~~**La pantalla confunde una caída del backend con una negativa de permiso.**~~ | — | **Cerrado**: la pantalla lee con `readFromApi` y distingue la negativa (`<NoPermission>`) de la caída («No pudimos traer el calendario»). Lo que **sigue abierto** es que la regla la fija un test de arquitectura sólo para las pantallas de la 003 (`test_screen_reads.py`), que no alcanza al calendario: nada impide que la próxima pantalla vuelva a `fetchFromApi` |
 
 ## Deriva contra la spec firmada (para `/converge`)
 
@@ -371,20 +371,29 @@ firmó.** Se anota, no se arregla acá: qué corregir —el código o el acuerdo
 
 ### Requisitos firmados sin correlato en el código
 
-| # | RF | Qué falta | Dónde |
+**Ninguno, desde el 2026-08-31.** Las doce derivas `D0`–`D11` que esta sección enumeraba están
+cerradas, y así es como se cerró cada una. Se deja la lista y no se borra: qué faltaba, y por qué,
+es lo que le explica al próximo por qué el código tiene la forma que tiene.
+
+| # | RF | Qué faltaba | Cómo se cerró |
 |---|---|---|---|
-| D0 | **RF-31 a RF-36** | La H5 entera: no hay canal en vivo, ni aviso de desconexión, ni indicación de quién hizo el cambio recibido. **Desde el 2026-08-31 tiene diseño y tareas** (31 a 36); sigue siendo deriva hasta que esté construida | No existe. Anotado en `frontend/app/(private)/calendario/page.tsx:26-29` |
-| D1 | RF-30, y de refilón RF-02, RF-09, RF-39 | Los campos que vienen de la factura se buscan en un diccionario armado con `due_between(since, until)` —facturas cuyo `due_on` cae en la ventana—, no con las facturas de las entradas que se van a mostrar. Una factura **vencida** reprogramada a otro mes tiene la entrada en una ventana y el `due_on` en otra, y vuelve sin proveedor, sin `receipt_issued`, sin `is_overdue_without_receipt` y sin `payment_state`. RF-30 pide justo lo contrario: que siga señalada como vencida sin recibo aunque su fecha ahora sea otra. **Matiz que importa al evaluar:** el ejemplo firmado del criterio RF-30 —vence el 10, se reprograma el 12 para el 20— cae entero dentro de un mes, así que el criterio **tal como está escrito pasa**; lo que falla es el requisito cuando la fecha nueva cruza el borde de la ventana | `backend/app/modules/purchases/service.py:1562` y `:1577` |
-| D2 | RF-16 | Corregir un vencimiento cargado a mano **no registra nada**: ni quién, ni cuándo, ni el valor anterior. El servicio recibe `actor_user_id` y lo descarta con un `del`. El mecanismo existe y se usa a tres pantallas de distancia (`ManualChangeRecorded` → `operations`, `service.py:1946-1960`) | `backend/app/modules/purchases/service.py:1632` |
-| D3 | RF-19 | **No se puede arrastrar.** Mover se hace con dos `window.prompt` encadenados —fecha y motivo—, y H4 es la historia que lo pide por su nombre. Es el mismo camino que rompe RF-42, por otro motivo: ver D11 | `frontend/components/purchases/CalendarGrid.tsx:49-65` |
-| D4 | RF-15 | El endpoint `PATCH` y la Server Action `editDueDate` existen, y **ninguna pantalla las llama**: no hay botón de corregir. Corregir un monto mal cargado hoy es borrar y volver a cargar | `frontend/app/actions/purchases.ts:245-256`, sin uso en `app/` ni en `components/` |
-| D5 | RF-05 | No hay control para avanzar ni retroceder de mes. La ventana se cambia editando la URL a mano; los tres enlaces de la pantalla son "Este mes", "Sólo sin recibo" y "Esconder las saldadas" | `frontend/app/(private)/calendario/page.tsx:57-67` |
-| D6 | RF-01, RF-08 | La pantalla **no es un calendario**: es una lista de días agrupados, y sólo aparecen los días que tienen algo. RF-08 —"indicar cuántos hay y permitir verlos todos" cuando un día no entra en pantalla— no tiene implementación, porque no hay recorte que lo dispare | `frontend/components/purchases/CalendarGrid.tsx:73-149` |
-| D7 | RF-21, y la prueba de H4 | El historial de una tarjeta muestra `de → a` y el motivo, pero **no muestra quién movió**. Está guardado (`due_date_change.actor_user_id`) y viaja en el schema; la pantalla no lo resuelve a un nombre. La prueba de H4 dice "se ve que originalmente vencía el 10 **y quién lo movió**" | `frontend/components/purchases/CalendarGrid.tsx:105-114` |
-| D8 | RF-31 (parcial) | De los cuatro verbos que RF-31 nombra, `DueDateChanged` sólo se publica en dos: `add_due_date` y `edit_due_date` no publican nada. Cuando se construya la H5, agregar y corregir no llegarían a las otras pantallas aunque el canal existiera | `service.py:1597-1613` y `:1615-1633` |
-| D9 | RF-33 | `remove_due_date` publica con `actor_name=""` fijo: el nombre no llega desde la ruta, que sí lo tiene (`current_user.name`). `move_due_date` sí lo pasa | `service.py:1725`, contra `routes.py:544-551` |
-| D10 | RF-13 | Quién cargó el vencimiento y cuándo **se guardan y nunca salen**. El servicio los escribe (`service.py:1608`, sobre `models.py:457-458`), pero `DueDateRead` no expone `created_by_user_id` ni `created_at` —no están en su lista de campos—, así que el dato no llega al navegador y ninguna tarjeta lo muestra. El criterio firmado dice *"Ese vencimiento figura con el nombre de Marcela y la fecha en que lo cargó"* (`spec.md:210`): **no se puede verificar en pantalla**. Es el mismo defecto que D7 —guardado, no mostrado— un escalón más abajo: en RF-21 el dato al menos viaja en el schema | `backend/app/modules/purchases/schemas.py:280-298` y `frontend/components/purchases/CalendarGrid.tsx:96-104` |
-| D11 | RF-42, y la prueba de H8 | **No hay selector de fecha en el camino de mover.** La única forma es `window.prompt('Fecha nueva (aaaa-mm-dd)', entry.on_date)`: la persona **escribe** la fecha como texto. H8 se prueba *"reprogramando un vencimiento eligiendo la fecha nueva de un selector, sin arrastrarlo"* (`spec.md:121`; el criterio de RF-42 está en `:239`). El propio componente demuestra que el patrón está a mano —el formulario de alta usa `<Input type="date">` (`CalendarGrid.tsx:168-173`)—, así que es la deriva más barata de cerrar de toda la lista. **Ojo con el docstring del componente** (`CalendarGrid.tsx:15-16`), que afirma lo contrario: dice que mover se hace *"eligiendo la fecha nueva, que es RF-42"* | `frontend/components/purchases/CalendarGrid.tsx:49-65`, contra `:168-173` |
+| D0 | RF-31 a RF-36 | La H5 entera: ni canal en vivo, ni aviso de desconexión, ni quién hizo el cambio | SSE sobre `GET /calendar/stream` con `LISTEN`/`NOTIFY`, y `useLiveCalendar.ts` del lado de la pantalla |
+| D1 | RF-30, y de refilón RF-02, RF-09, RF-39 | Los campos de la factura se buscaban por ventana de fechas, así que una factura vencida reprogramada a otro mes volvía sin proveedor ni estado | `calendar()` los busca **por las facturas de las entradas** (`service.py:2011`), no por fecha |
+| D2 | RF-16 | Corregir no registraba nada: el servicio recibía el actor y lo descartaba | `edit_due_date` publica `ManualChangeRecorded` por campo, con el valor anterior (`service.py:2089`) |
+| D3 | RF-19 | No se podía arrastrar: mover eran dos `window.prompt` encadenados | Tarjetas y chips `draggable`, y cada día —celda de la grilla o fila de la lista— es zona de caída |
+| D4 | RF-15 | El `PATCH` y su Server Action existían y ninguna pantalla los llamaba | Botón «Corregir» en la tarjeta, con su formulario |
+| D5 | RF-05 | No había control de mes: la ventana se cambiaba editando la URL | `windowFor` en `lib/purchases/calendar.ts`, con test |
+| D6 | RF-01, RF-08 | La pantalla no era un calendario: una lista de los días con algo, y sin recorte | El recorte primero, y después la **grilla del mes** (`weeksOf`), donde un día vacío existe igual |
+| D7 | RF-21 | El historial no decía quién movió | La ruta resuelve los nombres (`_name_whoever_touched_the_calendar`) y la tarjeta los muestra |
+| D8 | RF-31 | Agregar y corregir no publicaban nada | Los cuatro verbos publican `DueDateChanged` |
+| D9 | RF-33 | `remove_due_date` publicaba con el nombre vacío | La ruta le pasa `current_user.name`, como los otros tres |
+| D10 | RF-13 | Quién cargó el vencimiento se guardaba y nunca salía | `DueDateRead` expone `created_by_*` y la tarjeta lo escribe |
+| D11 | RF-42 | No había selector de fecha: la fecha se escribía a mano en un `prompt` | `<Input type="date">` con motivo opcional, verificado a mano en un teléfono |
+
+Las dos que encontró `/converge` el 2026-08-31 (`converge.md`) se cerraron el mismo día: **RF-02**,
+el proveedor que el backend calculaba y ninguna pantalla mostraba, y **RF-41**, que no fallaba por
+el calendario sino por el menú del shell —832px de alto sobre un teléfono de 664px—. La barra se
+pliega desde entonces, y **esa decisión la tomó el humano**, no este plan.
 
 ### Código sin requisito firmado
 
@@ -394,115 +403,112 @@ de calendario que la spec no pida.
 ### Requisitos cumplidos que conviene no dar por obvios
 
 - **RF-34 está cumplido sin canal en vivo.** Es de la H5 por redacción, pero no depende de ella: la
-  tabla de movimientos lo resuelve. Si el humano decide diferir la H5, RF-34 **no se va con ella**.
+  tabla de movimientos lo resuelve.
 - **RF-37 y RF-38** salen de la matriz de `identity`, que ya los tenía por RF-34 de la 002. La 006 no
-  agregó permisos: declaró niveles.
-- **RF-41** (consultar desde el teléfono) no tiene código propio: la pantalla usa las utilidades
-  responsive de Tailwind (`flex-wrap`, `max-w-4xl`) y nunca se probó en un teléfono. No es una deriva
-  demostrable sin abrirlo en uno; es lo primero que el Tester tiene que verificar a mano. **La otra
-  mitad de H8 sí es demostrable sin teléfono**, y falla: RF-42 pide mover eligiendo la fecha de un
-  selector, y no hay selector (D11).
+  agregó permisos: declaró niveles. Desde el 2026-08-31 hay además un test que llama a las cinco
+  rutas como ventas, porque un permiso declarado y un permiso aplicado no son lo mismo.
+- **RF-41** no tiene código propio en el calendario, y por eso fue el último en cerrarse: no era
+  demostrable sin abrirlo en un teléfono, y hasta que alguien lo abrió, nadie sabía que lo que
+  estorbaba era el menú. El acta está en `evidence/README.md`.
 
 ## Contexto de traspaso
 
-**Para el Developer** — Empezá por **la H5**, que es lo único grande que falta, y arrancá por el
-backend que ya está: `DueDateChanged` se publica y nadie lo escucha, así que el trabajo es el
-transporte y el suscriptor, no el dominio. **Las dos decisiones que este plan antes te delegaba ya
-están tomadas** y su justificación está en *La H5: el canal en vivo* — no las reabras sin leer esa
-sección: **SSE** sobre `GET /calendar/stream`, **`LISTEN`/`NOTIFY` de Postgres** para cruzar los dos
-workers de uvicorn, y un **Route Handler de Next** que pone el `Bearer` desde la cookie porque
-`EventSource` no manda headers.
+**Estado, al 2026-08-31.** La feature está construida, verificada y convergida (`converge.md`,
+segunda corrida). Lo que sigue no es un plan de trabajo: es lo que el próximo tiene que saber antes
+de tocar este código.
 
-Tres cosas que se rompen si las hacés distinto:
+**Para el Developer** — Lo que **no** hay que tocar, porque es una decisión tomada y testeada:
 
-- **El `NOTIFY` va en la transacción del publicador, y ahí está bien.** Es transaccional: si la
-  transacción aborta, nadie recibe nada. Eso es lo que hace que `GEN-09` se cumpla sin acoplar el
-  movimiento de un vencimiento a la conexión de otra persona. Si en algún momento te tienta cambiarlo
-  por un `POST` a un servicio de sockets, ese `POST` **sí** es I/O de red dentro de la transacción.
-- **Empezá por D8 y D9, no por el transporte.** `add_due_date` y `edit_due_date` no publican
-  `DueDateChanged`, y `remove_due_date` lo publica con `actor_name` vacío. Con el canal construido y
-  eso sin cerrar, agregar y corregir no llegarían a nadie y el resto no diría quién fue: se vería
-  como un bug del canal y no lo sería.
+- **La guarda `if not entry.was_rescheduled` de `_sync_due_date`.** Es lo que impide que la próxima
+  lectura del portal deshaga la reprogramación de una persona. Se ve como un olvido de
+  sincronización y no lo es.
+- **Las tres líneas de `was_overdue` en `move_due_date`.** Ahí vive toda la diferencia entre
+  RF-26/RF-27 y RF-28/RF-30, y las tres columnas del «después» funcionan **por no escribir**
+  `invoice.due_on`. Cualquier refactor que «simplifique» eso reabre el recibo de una factura vencida
+  con sólo mover una tarjeta.
+- **`original_due_on` de `core.invoice` no es la fuente de RF-29.** Está, se muestra, y el calendario
+  no la usa. No la conectes «para arreglar» nada sin leer `data-model.md` primero.
+- **El `NOTIFY` va en la transacción del publicador, y ahí está bien.** Si la transacción aborta,
+  nadie recibe nada: es lo que hace que `GEN-09` se cumpla sin acoplar el movimiento de un
+  vencimiento a la conexión de otra persona. Cambiarlo por un `POST` a un servicio de sockets mete
+  I/O de red dentro de la transacción.
+- **RF-25 se pregunta con un diálogo de la aplicación, no con `window.confirm`.**
+  `components/ui/confirm-dialog.tsx`, sobre `@radix-ui/react-dialog` —que ya era dependencia y no
+  usaba nadie—. No es un `Dialog` genérico a propósito: se pasa la pregunta y las dos respuestas, y
+  no hay siete formas de armar mal el mismo diálogo. **Cerrarlo por `Escape` o por el fondo es
+  decir que no**, y hay un test que lo fija: es lo que más se rompe de una confirmación. La guía
+  visual todavía no tiene una entrada para el diálogo — es deuda de la 012, no de esta feature.
+- **RF-25 se reconoce por un código, no por el texto del mensaje.** El backend manda
+  `details.code = "DUE_DATE_MOVING_INTO_THE_PAST"` y la pantalla pregunta por eso
+  (`MOVING_INTO_THE_PAST`, en `lib/purchases/calendar.ts`). Hasta el review de la 006 se comparaba
+  el castellano —`message.includes('ya pasó')`—, y eso hacía de la redacción un contrato que nadie
+  declaró: reescribir el mensaje mataba la confirmación en silencio y dejaba un movimiento legítimo
+  como error. Los dos extremos están comentados, uno apuntando al otro, y hay un test que usa un
+  mensaje **distinto** a propósito.
 - **Al reconectar se relee el calendario entero**, no se recuperan mensajes perdidos. La verdad está
   en la base a una consulta de distancia, y una cola por sesión es infraestructura para una promesa
   que la spec no hace.
-
-Lo que **no** hay que tocar, porque es una decisión tomada y testeada:
-
-- **La guarda `if not entry.was_rescheduled` de `_sync_due_date` (`service.py:1547-1549`).** Es lo que
-  impide que la próxima lectura del portal deshaga la reprogramación de una persona. Se ve como un
-  olvido de sincronización y no lo es.
-- **Las tres líneas de `was_overdue` en `move_due_date` (`service.py:1681-1683`).** Ahí vive toda la
-  diferencia entre RF-26/RF-27 y RF-28/RF-30, y las tres columnas del "después" funcionan **por no
-  escribir** `invoice.due_on`. Cualquier refactor que "simplifique" eso reabre el recibo de una
-  factura vencida con sólo mover una tarjeta.
-- **`original_due_on` de `core.invoice` no es la fuente de RF-29.** Está, se muestra, y el calendario
-  no la usa. No la conectes "para arreglar" nada sin leer `data-model.md` primero.
+- **La pantalla dibuja las dos vistas a la vez y el CSS elige.** La grilla del mes desde `md`, los
+  días uno debajo del otro en un teléfono. No es duplicación: es la misma tarjeta
+  (`DueDateCard`) en dos formas, y unificarlas en una sola vista rompe RF-01 o rompe RF-41 —siete
+  columnas no entran en 390px, y una lista no muestra el día en que no vence nada.
 
 Compartís `purchases` con la 004 y la 005. **De esta feature son**: `DueDate`, `DueDateChange`,
-`DueDateOrigin`, los siete métodos de repositorio bajo `# --- The calendar ---`
-(`repository.py:543-586`), el bloque `# --- The calendar of due dates (006) ---` del servicio
-(`service.py:1520-1744`), los seis schemas `DueDate*` y `CalendarRead`, el `calendar_router`
-(`routes.py:471-574`) y las dos tablas de la migración `0011`. Todo lo demás que toques ahí es de
-otra feature y de otra sesión.
+`DueDateOrigin`, los métodos de repositorio bajo `# --- The calendar ---`, el bloque
+`# --- The calendar of due dates (006) ---` del servicio, los seis schemas `DueDate*` y
+`CalendarRead`, el `calendar_router` y las dos tablas de la migración `0011`. Del lado del
+frontend: `CalendarGrid.tsx`, `useLiveCalendar.ts`, `lib/purchases/calendar.ts`, la pantalla
+`(private)/calendario` y el Route Handler `app/api/calendar/stream`. Todo lo demás que toques ahí es
+de otra feature.
 
-**Para el Tester** — Los ocho tests que hay
-(`backend/tests/integration/features/test_due_date_calendar.py`) cubren el corazón de la H4 y poco
-más. Lo que **de verdad** se puede romper, en orden:
+**Para el Tester** — La suite de la feature son 13 tests de integración
+(`backend/tests/integration/features/test_due_date_calendar.py`) y 21 de pantalla
+(`frontend/tests/`). Lo que **de verdad** se puede romper, en orden:
 
 1. **Reprogramar una factura ya vencida.** Si después de moverla se puede emitir el recibo, se
-   implementó RF-26 donde iba RF-28. Está testeado (`test_rescheduling_one_that_already_fell_due_changes_none_of_that`),
-   y es el test que nunca hay que debilitar: es también la defensa de RF-34 de la 005.
-2. **El caso que ningún test toca: mover una vencida a otro mes** y pedir el calendario del mes
-   nuevo. Es la deriva D1. Un test que mueva de fin de mes al siguiente y verifique que la tarjeta
-   sigue trayendo `is_overdue_without_receipt=True` falla hoy.
-3. **Los filtros con entradas cargadas a mano.** `without_receipt` y `hide_settled` se piensan para
-   facturas, y una entrada manual (sin recibo posible y sin estado de pago) **pasa los dos filtros**.
-   Ningún test lo fija; decidí con el Lead si eso es lo que la spec quiere antes de escribir el assert.
-4. **Los permisos por ruta.** `test_route_authorization.py` verifica que las cuatro escrituras pidan
-   `WRITE`, y `test_permissions.py` que ventas tenga `READ`. **No hay ningún test que haga una
-   request real como ventas y espere 403** sobre el calendario: RF-38 hoy está probado por
-   construcción, no por comportamiento.
-5. **Idempotencia de `_sync_due_date`.** Llamarlo dos veces sobre la misma factura no debe crear dos
-   entradas —lo garantiza `uq_due_date_invoice`— y no debe pisar una fecha movida a mano. Lo segundo
-   no tiene test.
-6. **El canal en vivo, cuando exista.** Lo que de verdad se rompe no es que el mensaje llegue: es
-   que llegue **desde el otro worker**. Un test que publique y escuche en el mismo proceso pasa
-   siempre y no prueba nada — el despliegue corre con `--workers 2`. Y el caso que hay que fijar
-   antes que ninguno: **una transacción que aborta no notifica a nadie**.
-7. **El reloj.** Todo cuelga de `today_here()`, que es Buenos Aires. Los tests existentes usan una
-   ventana relativa a hoy a propósito (`test_due_date_calendar.py:23-31`): no fijes un mes concreto,
-   empieza a fallar solo.
+   implementó RF-26 donde iba RF-28. Está testeado
+   (`test_rescheduling_one_that_already_fell_due_changes_none_of_that`), y es el test que nunca hay
+   que debilitar: es también la defensa de RF-34 de la 005.
+2. **Mover una vencida a otro mes** y pedir el calendario del mes nuevo. Era la deriva D1, está
+   cerrada y la fija `TestAnOverdueOneMovedToAnotherMonth`. Si alguien «optimiza» `calendar()`
+   volviendo a buscar las facturas por ventana de fechas, ese test es el que avisa.
+3. **El canal en vivo desde el otro worker.** Lo que de verdad se rompe no es que el mensaje llegue:
+   es que llegue desde el otro proceso —el despliegue corre con `--workers 2`—. Y el caso que hay
+   que sostener antes que ninguno: **una transacción que aborta no notifica a nadie**. Desde el
+   review de la 006 los dos tienen test propio, contra la base de verdad y con una conexión que
+   escucha aparte: `tests/integration/features/test_the_live_channel.py`, doce tests que dejan
+   `app/shared/live.py` al 100%. Antes de eso el transporte entero —`LiveBus`, la ruta del stream—
+   no tenía ninguno y el archivo quedaba al 50%; `announce` sólo estaba probado por el evento de
+   dominio, que demuestra que **se anuncia**, no que viaje.
+4. **El reloj.** Todo cuelga de `today_here()`, que es Buenos Aires. Los tests usan una ventana
+   relativa a hoy a propósito: un mes fijo empieza a fallar solo el día que queda en el pasado.
+5. **Lo que ningún test puede sostener: el teléfono.** RF-41 no tiene código propio en el calendario
+   y se cumple por la barra plegable del shell. Los tests fijan su conducta; que se **vea** se
+   verifica a mano, y el acta está en `evidence/README.md`. Si alguien vuelve a tocar
+   `Navigation.tsx`, hay que volver a abrirlo en un teléfono.
 
-Nada de esto necesita HTML fijado ni el portal: la feature **no extrae nada**. Si un test de calendario
-pide el portal, está mal escrito.
+Nada de esto necesita HTML fijado ni el portal: la feature **no extrae nada**. Si un test de
+calendario pide el portal, está mal escrito.
 
 **Para el Code-Reviewer** — Cuatro lugares, en este orden:
 
-1. **`service.py:1554-1595` (`calendar`).** Ahí está la deriva D1, y ahí está el único lugar donde el
-   render de una factura y el de una entrada del calendario se cruzan. Mirá que las dos consultas usen
-   la misma ventana.
-2. **`service.py:1615-1633` (`edit_due_date`).** El `del actor_user_id` de la línea 1632 es un
-   parámetro aceptado y tirado: es la deriva D2 (RF-16 sin registro) y roza `ERR-01` en espíritu. El
-   módulo ya publica `ManualChangeRecorded` en `correct_supplier` (`service.py:1946-1960`); comparalos.
+1. **`calendar()` en el servicio.** Es el único lugar donde el render de una factura y el de una
+   entrada del calendario se cruzan, y donde vivió la deriva D1 durante toda la construcción.
+2. **`edit_due_date`.** Publica `ManualChangeRecorded` por campo con el valor anterior, que es
+   RF-16 entero. El módulo hace lo mismo en `correct_supplier`: comparalos.
 3. **Las fronteras y el catálogo.** `GEN-02`: el único import que cruza en toda la feature es
-   `app.modules.identity.dependencies` en `routes.py:22`, que es la excepción. `GEN-08`: los dos
+   `app.modules.identity.dependencies` en `routes.py`, que es la excepción. `GEN-08`: los dos
    eventos están en `shared/events/catalog.py`, en pasado, `frozen`, y llevan ids y no modelos —
    verificalo, porque `DueDateChanged` lleva `actor_name`, que es un valor plano y no una entidad, y
-   es fácil "mejorarlo" pasando el `User`.
+   es fácil «mejorarlo» pasando el `User`.
 4. **`PY-09` en las cinco rutas.** No alcanza con que declaren sección: las cuatro escrituras tienen
-   que pedir `Level.WRITE`. Lo verifica un test, pero es la línea donde RF-38 se rompería sin ruido.
+   que pedir `Level.WRITE`. Lo verifica un test de arquitectura, y desde el 2026-08-31 también uno
+   de comportamiento que llama a las cinco como ventas.
 
-Y dos más que parecen de forma, aunque una no lo es. **`TS-09`**: los textos de `CalendarGrid.tsx`
-van en español y están. **`TS-08`**: la pantalla resuelve **vacío** (`No vence nada en este período`,
-`CalendarGrid.tsx:73-76`) y el **error de una escritura** (el cartel rojo, `:69-71`); **no resuelve
-"cargando"** —los `window.prompt` del movimiento son bloqueantes y el `busy` sólo deshabilita
-botones—; y, lo que de verdad cuenta, **no resuelve el error de la lectura**: lee con `fetchFromApi`
-(`calendario/page.tsx:40`) y devuelve `<NoPermission>` ante cualquier `null` (`:44-46`), así que una
-caída del backend se le muestra al dueño como una negativa de permiso. Está en *Riesgos*, con la
-línea del docstring de `fetchFromApi` que lo prohíbe (`frontend/lib/api/server.ts:85-87`) y el test
-de la 003 que fija la regla para otras pantallas y no para ésta.
-
-**Lo que este plan no autoriza.** Nada de la sección *Deriva* es una tarea aprobada, y tampoco lo es
-el arreglo del último riesgo —pasar la pantalla a `readFromApi`—. Son hallazgos para `/converge`, y
-quien decide si se corrige el código o se enmienda la spec es el humano.
+Y dos de forma, aunque una no lo es. **`TS-09`**: los textos de `CalendarGrid.tsx` van en español y
+están. **`TS-08`**: la pantalla resuelve **vacío**, el **error de una escritura**, el **error de la
+lectura** —`readFromApi` distingue una negativa de una caída, así que un backend caído ya no se le
+muestra al dueño como falta de permiso— y, desde el review de la 006, **«cargando»**: `move()`
+pasa por el guard de `busy` como el resto —antes era el único que no, así que el botón seguía
+habilitado y la tarjeta arrastrable durante todo el viaje, y soltarla dos veces mandaba dos
+`PUT`— y mientras la escritura viaja la pantalla lo dice en lugar de sólo congelarse.

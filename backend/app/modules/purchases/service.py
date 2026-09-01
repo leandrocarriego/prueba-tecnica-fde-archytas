@@ -18,6 +18,7 @@ specs rather than from taste.
 """
 
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -87,6 +88,7 @@ from app.shared.events import (
     NormalizedSupplier,
     PaymentReviewCase,
     PaymentsNeedingReview,
+    QuarantinedSourceResolved,
     ReceiptIssued,
     ReceiptVoided,
     RegisteredInvoice,
@@ -129,6 +131,22 @@ OUTSIDE_REGISTER = "El proveedor no está en el padrón"
 DUPLICATE_WITH_ANOTHER_TOTAL = "Ya había una factura con ese número y otro monto"
 FILE_DISAGREES = "El archivo de la factura no coincide con lo que informa el portal"
 FILE_UNREADABLE = "No se pudo leer el archivo de la factura"
+# What 011 needs said out loud when a voucher that was waiting stops waiting.
+# The kind is `triage`'s word for the case an unreadable payment row opens, and
+# the key is the `staging` row it was opened with.
+#
+# **Today this closes nothing, and that is worth writing down rather than
+# discovering.** A voucher the parser could not type never becomes a `Payment`
+# at all — it stays quarantined in `staging`, which is exactly the silence 011
+# closes by opening a case for it — so the vouchers that move through the two
+# screens below are the *readable* ones, which never had a case. The
+# announcement is still made: it costs nothing, it is the true statement that a
+# reading was dealt with, and the handler on the other side treats "no case
+# found" as the ordinary outcome. The day a held voucher opens a case of its
+# own, this already says so.
+UNREADABLE_PAYMENT_ROW = "unreadable_payment_row"
+RESOLVED_IN_PAYMENTS = "la pantalla de comprobantes"
+
 VOUCHER_WITHOUT_INVOICE = "El comprobante no dice a qué factura corresponde"
 VOUCHER_UNKNOWN_INVOICE = "El comprobante menciona una factura que no tenemos registrada"
 VOUCHER_SEVERAL_INVOICES = "El comprobante cubre más de una factura"
@@ -158,6 +176,13 @@ SPLIT_CROSSES_SUPPLIERS = "Un comprobante no se reparte entre facturas de dos pr
 SPLIT_IS_ANOTHER_SUPPLIER = "Esas facturas son de otro proveedor, no del que pagó"
 INVOICE_FROM_A_LIST_IS_NOT_REMOVED = "Un vencimiento que viene de una factura no se elimina"
 MOVING_INTO_THE_PAST = "La fecha nueva ya pasó"
+
+# The refusal above is the only one the screen has to *recognise* rather than
+# just show: it is what RF-25 turns into a question instead of an error. It
+# travels as a code in `details` because the alternative — matching the Spanish
+# text on the other side — makes the wording of a message a contract nobody
+# declared, and rewording it would kill the confirmation in silence.
+MOVING_INTO_THE_PAST_CODE = "DUE_DATE_MOVING_INTO_THE_PAST"
 
 # What the portal calls the same three, so the two can be compared (RF-46).
 PORTAL_STATES: dict[str, str] = {
@@ -1519,6 +1544,7 @@ class PurchasesService:
                     reference=", ".join(row.references) or None,
                     supplier_text=row.supplier_text,
                     review_reason=reason,
+                    staging_row_id=row.staging_row_id,
                 )
             )
             if payment.state is PaymentState.PENDING:
@@ -1561,6 +1587,7 @@ class PurchasesService:
         is logged, so it is visible that they moved on their own.
         """
         imputed = 0
+        moved: list[Payment] = []
         for payment in await self.purchases.pending_payments():
             if payment.review_reason != VOUCHER_UNKNOWN_INVOICE:
                 continue
@@ -1569,9 +1596,11 @@ class PurchasesService:
             payment.invoice_id = invoice.id
             payment.state = PaymentState.IMPUTED
             payment.review_reason = None
+            moved.append(payment)
             imputed += 1
         if imputed:
             await self.session.flush()
+            await self._announce_resolved(moved)
             logger.info(
                 "Held vouchers imputed to a newly registered invoice",
                 extra={"invoice_id": invoice.id, "payments": imputed},
@@ -1703,9 +1732,34 @@ class PurchasesService:
         payment.voided_at = datetime.now(UTC)
         payment.review_reason = None
         await self.session.flush()
+        await self._announce_resolved([payment])
         await self.session.commit()
         logger.info("Voucher split", extra={"payment_id": payment_id, "parts": len(created)})
         return [PaymentRead.model_validate(item) for item in created]
+
+    async def _announce_resolved(self, payments: Sequence[Payment]) -> None:
+        """Say that a voucher that was waiting has been dealt with (RF-20 of 011).
+
+        Announced and not called: `purchases` may not touch `triage`
+        (Artículo IV), so this states a fact in public — identifiers and a
+        label, never the record — and whoever cares listens. See
+        `UNREADABLE_PAYMENT_ROW` for why nothing listening closes anything yet.
+
+        A voucher somebody typed has no `staging_row_id` and is skipped: it came
+        from a person, not from a reading, so there is no reading to declare
+        resolved.
+        """
+        for payment in payments:
+            if payment.staging_row_id is None:
+                continue
+            await events.publish(
+                QuarantinedSourceResolved(
+                    kind=UNREADABLE_PAYMENT_ROW,
+                    key=str(payment.staging_row_id),
+                    resolved_where=RESOLVED_IN_PAYMENTS,
+                ),
+                self.session,
+            )
 
     async def _one_supplier_only(self, payment: Payment, invoices: list[Invoice]) -> None:
         """A voucher covers invoices of **one** supplier, and it is a signed assumption.
@@ -2096,7 +2150,12 @@ class PurchasesService:
         today = today_here()
         if on_date < today and not confirm_past:
             raise ConflictError(
-                MOVING_INTO_THE_PAST, details={"due_date_id": due_date_id, "on_date": str(on_date)}
+                MOVING_INTO_THE_PAST,
+                details={
+                    "code": MOVING_INTO_THE_PAST_CODE,
+                    "due_date_id": due_date_id,
+                    "on_date": str(on_date),
+                },
             )
 
         previous = entry.on_date

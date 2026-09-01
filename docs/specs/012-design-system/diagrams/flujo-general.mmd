@@ -1,0 +1,40 @@
+---
+title: Un solo idioma visual — de punta a punta
+---
+sequenceDiagram
+    autonumber
+    participant Sistema as El sistema
+    actor Duenio as El dueño
+    actor Marcela as Marcela, compras
+    actor Julian as Julián, ventas
+
+    Note over Sistema,Julian: La promesa que atraviesa el proyecto: si algo no se puede resolver solo, avisá.<br/>Un aviso sólo cumple esa promesa si se distingue de un adorno de un vistazo
+
+    Sistema->>Sistema: Presenta todas las pantallas con la misma paleta, tipografía,<br/>espaciados y radios de la guía acordada
+    Sistema->>Sistema: Un solo fondo de aplicación y un solo color de tarjeta
+
+    Duenio->>Sistema: Abre la plataforma para ingresar
+    Sistema-->>Duenio: Le presenta el ingreso con la misma identidad visual que el resto,<br/>igual que la invitación y la recuperación de contraseña
+
+    Duenio->>Sistema: Entra y abre el tablero
+    Sistema-->>Duenio: Le muestra el menú a la izquierda, agrupado por área,<br/>con la sección actual señalada y su nombre y la salida siempre visibles
+
+    alt Un indicador dejó registros afuera por dudosos
+        Sistema-->>Duenio: Pone el aviso por encima del número, con el enlace para ir a resolverlo
+    else No dejó ninguno afuera
+        Sistema-->>Duenio: Lo dice con todas las letras, en vez de no mostrar nada
+    end
+
+    Marcela->>Sistema: Recorre facturas, pagos y órdenes
+    Sistema-->>Marcela: Dibuja cada estado con la misma pastilla y el mismo color en todas las pantallas
+    Sistema-->>Marcela: Muestra importes, fechas y códigos en ancho fijo, con las cifras en columna
+    Note over Sistema,Marcela: Lo leído del origen y todavía sin confirmar se distingue a simple vista<br/>de lo que ya confirmó una persona
+
+    Marcela->>Sistema: Abre Revisar esto, que es una lista de casos para decidir
+    Sistema-->>Marcela: No pinta ningún botón naranja: cada caso ofrece su acción en tinta o contorno
+
+    Julian->>Sistema: Entra con su acceso y mira el menú
+    Sistema-->>Julian: Lista Ventas y el catálogo, y no ofrece las secciones que no puede abrir
+    Note over Sistema,Julian: El grupo que queda sin ninguna sección visible tampoco aparece
+
+    Note over Sistema,Julian: En cada pantalla hay como mucho un botón naranja, y es el que resuelve<br/>la tarea principal: el naranja significa una sola cosa, acá decidís vos

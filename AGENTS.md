@@ -33,6 +33,11 @@ rompe el build, un documento no.
 
 6. **`docs/PROJECT_BRIEF.md`** - el alcance acordado con el cliente. Leerlo antes de definir o planificar una feature.
 
+   **`docs/design/`** - el sistema de diseño acordado ("taller ordenado"): paleta, tipografía,
+   estados, componentes y las pantallas de alta fidelidad. Es la fuente de **qué significa** cada
+   señal visual; `frontend/app/globals.css` es su implementación y `CONVENTIONS.md` → `UI-*` su
+   enforcement. Se abre antes de escribir o tocar cualquier pantalla.
+
 7. **`docs/FDE_ASSESSMENT.md`** - el relevamiento técnico preliminar del FDE: hipótesis de solución
    por problema, decisiones transversales sin cerrar y orden sugerido de construcción. **No es
    autoridad**: es contexto útil antes de la primera spec de cada problema, y queda por debajo de
@@ -269,11 +274,12 @@ la verifica. Si una convención no está ahí, no es una convención del proyect
 Lo que gobierna este documento es el enforcement:
 - Violar una convención marcada como **Blocker** frena el review: se arregla o el changeset no pasa
   (`agents/skills/review_feature.md`).
-- Cinco convenciones no dependen de que alguien las lea, porque las verifica un test que rompe el
+- Siete convenciones no dependen de que alguien las lea, porque las verifica un test que rompe el
   build: `GEN-02` y `GEN-03` (fronteras entre módulos), `GEN-09` (un handler que falla no se
-  silencia), `PY-09` (autorización de rutas) y `TEST-05` (cobertura). Las cuatro primeras las
-  frena el pre-commit; la cobertura y la suite completa, el CI. El resto depende del `Developer`
-  que las aplica y del `Code-Reviewer` que las recorre.
+  silencia), `PY-09` (autorización de rutas), `TEST-05` (cobertura) y `UI-01` y `UI-02` (ningún
+  color escrito a mano en la UI). Las cuatro primeras las frena el pre-commit; la cobertura, las
+  dos del diseño y la suite completa, el CI. El resto depende del `Developer` que las aplica y del
+  `Code-Reviewer` que las recorre.
 - Las reglas del dominio (INVIOLABLES) de más arriba y las fronteras entre módulos siguen siendo de
   este documento y de `ARCHITECTURE.md`; `CONVENTIONS.md` las referencia, no las reemplaza.
 
@@ -294,6 +300,10 @@ La convención de ramas y el formato de los mensajes están en `CONVENTIONS.md` 
   no importa de `modules/` (`GEN-03`), no hay ciclos de eventos (`GEN-05`), y los eventos nuevos
   respetan el catálogo y la transacción del publicador (`GEN-08`, `GEN-09`).
 - Los modelos de base de datos están sincronizados con las tablas (`DB-01`).
+- **Toda pantalla nueva o tocada aplica el sistema de diseño** (`UI-*`): los colores salen de los
+  tokens y no se escriben a mano (`UI-01`, `UI-02`, verificadas por test), los estados usan la
+  píldora (`UI-03`), la plata va en mono tabular (`UI-04`) y hay una sola acción de acento por
+  pantalla (`UI-05`).
 - Las tasks nuevas son idempotentes (`PY-07`, `TEST-04`).
 - Ninguna convención de `CONVENTIONS.md` marcada como **Blocker** quedó violada.
 - `plan.md` tiene su sección de **Contexto de traspaso** y sigue siendo verdad.

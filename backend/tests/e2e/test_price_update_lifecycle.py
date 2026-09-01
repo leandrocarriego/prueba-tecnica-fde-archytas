@@ -171,8 +171,19 @@ class TestThePriceUpdateLifecycle:
         unknown = next(item for item in queue["items"] if item["kind"] == "unknown_product")
         assert unknown["payload"]["product_code"] == UNKNOWN_CODE
 
-        # Sales does not get to decide about it.
-        assert (await sales_client.get(f"{TRIAGE}/cases")).status_code == 403
+        # Sales reaches the screen and none of this is on it. Until 011 the
+        # door was shut on Julián, and it had to open — the queue holds his own
+        # sales rows now — so what says the queue is Marcela's is no longer the
+        # door but what comes back through it.
+        his = await sales_client.get(f"{TRIAGE}/cases")
+        assert his.status_code == 200
+        assert his.json()["total"] == 0
+        # And he cannot decide about one either, id in hand.
+        refused = await sales_client.post(
+            f"{TRIAGE}/cases/{unknown['id']}/resolution",
+            json={"decision": {"action": "incorporate"}},
+        )
+        assert refused.status_code == 403
 
         # --- Marcela decides (RF-30, RF-32, RF-33) ------------------------
         resolved = await purchasing_client.post(

@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.catalog.models import Correction, CorrectionStatus, Product
 from app.modules.catalog.service import CatalogService
+from app.modules.identity.dependencies import visible_sections
 from app.modules.identity.models import User
 from app.modules.operations.schemas import AuditEntryRead
 from app.modules.operations.service import OperationsService
@@ -144,12 +145,32 @@ async def a_case_decided_by(
     be asked at all.
     """
     service = TriageService(session)
-    await service.open_case(kind=kind, reason="Para esta prueba", payload=payload, key=str(payload))
+    await service.open_case(
+        kind=kind,
+        # Every kind this helper is called with comes out of the portal
+        # ingestion, and resolving what the ingestion sets aside is purchasing's
+        # work — the prices included, which is what the brief says of Marcela.
+        # It is spelled out rather than defaulted for the same reason the
+        # service refuses a default: the area is what decides who ever sees the
+        # case.
+        section=BusinessSection.PURCHASING,
+        reason="Para esta prueba",
+        payload=payload,
+        key=str(payload),
+    )
     case_id = await session.scalar(select(ExceptionCase.id).order_by(ExceptionCase.id.desc()))
     assert case_id is not None
     await session.commit()
     await service.resolve(
-        case_id, decision=decision, user_id=user.id, user_name=user.name, remember=remember
+        case_id,
+        decision=decision,
+        user_id=user.id,
+        user_name=user.name,
+        remember=remember,
+        # Las áreas de **este** usuario y no todas: este helper lo llaman
+        # pruebas con los tres roles, y darle el conjunto entero taparía
+        # justamente el 403 que RF-13 pide.
+        visible=visible_sections(user),
     )
 
 
@@ -269,7 +290,7 @@ class TestALogThatFailsTakesTheChangeWithIt:
         assert history.price == Decimal("1000")
 
     async def test_it_leaves_no_correction_behind_either(
-        self, session: AsyncSession, broken_log: None
+        self, owner: User, purchasing_user: User, session: AsyncSession, broken_log: None
     ) -> None:
         """The row that keeps the portal's value goes back with the edit.
 
@@ -312,7 +333,6 @@ class TestWhoSeesWhichChanges:
         session: AsyncSession,
         owner: User,
         purchasing_user: User,
-        sales_user: User,
         owner_client: AsyncClient,
         sales_client: AsyncClient,
     ) -> None:
@@ -349,10 +369,10 @@ class TestWhoSeesWhichChanges:
 
     async def test_the_owner_sees_the_changes_of_all_three(
         self,
+        sales_user: User,
         owner_client: AsyncClient,
         owner: User,
         purchasing_user: User,
-        sales_user: User,
         three_changes: None,
     ) -> None:
         """RF-18: the owner reaches every section, so the history is everybody's."""
@@ -429,6 +449,7 @@ class TestWhoSeesWhichChanges:
 
     async def test_the_filter_also_covers_the_history_of_one_datum(
         self,
+        owner: User,
         sales_client: AsyncClient,
         owner_client: AsyncClient,
         session: AsyncSession,
@@ -511,7 +532,10 @@ class TestReadingTheHistory:
         ]
 
     async def test_a_line_says_who_changed_it_when_and_what_it_said_before(
-        self, owner_client: AsyncClient, session: AsyncSession, sales_user: User
+        self,
+        owner_client: AsyncClient,
+        session: AsyncSession,
+        sales_user: User,
     ) -> None:
         """RF-09 and RF-10: the author, the moment, and the value that was there."""
         # Arrange
@@ -554,7 +578,7 @@ class TestReadingTheHistory:
         assert entry["reason_detail"] == "la factura del proveedor dice 1200"
 
     async def test_an_unknown_reason_code_still_reads_as_something(
-        self, owner_client: AsyncClient, session: AsyncSession, owner: User
+        self, sales_user: User, owner_client: AsyncClient, session: AsyncSession, owner: User
     ) -> None:
         """RF-12 for a line the list has outlived: append-only means old codes stay."""
         # Arrange
@@ -786,7 +810,7 @@ class TestALoadIsWrittenDownToo:
     """
 
     async def test_incorporating_a_product_leaves_its_line(
-        self, session: AsyncSession, sales_user: User
+        self, purchasing_user: User, session: AsyncSession
     ) -> None:
         """RF-09: *«Después de que Marcela carga algo a mano, ese dato muestra su nombre»*.
 
@@ -797,7 +821,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNKNOWN_PRODUCT,
             payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
             decision={"action": "incorporate", "price": "1500"},
@@ -812,11 +836,11 @@ class TestALoadIsWrittenDownToo:
         assert entry.field == "description"
         assert entry.old_value is None
         assert entry.new_value == "Bulón hexagonal 8mm"
-        assert entry.actor_user_id == sales_user.id
+        assert entry.actor_user_id == purchasing_user.id
         assert entry.section is BusinessSection.SALES
 
     async def test_incorporating_leaves_one_line_even_when_the_person_typed_the_amount(
-        self, session: AsyncSession, sales_user: User
+        self, purchasing_user: User, session: AsyncSession
     ) -> None:
         """One decision, one line — the amount of a load is not a second one.
 
@@ -837,7 +861,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNKNOWN_PRODUCT,
             payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
             decision={"action": "incorporate", "price": "1500"},
@@ -853,7 +877,7 @@ class TestALoadIsWrittenDownToo:
         ]
 
     async def test_the_line_is_dated_by_the_decision_and_not_by_a_later_clock(
-        self, session: AsyncSession, sales_user: User
+        self, purchasing_user: User, session: AsyncSession
     ) -> None:
         """RF-09 asks for *cuándo*, and the queue behind a person is not part of it.
 
@@ -865,7 +889,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNKNOWN_PRODUCT,
             payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
             decision={"action": "incorporate", "price": "1500"},
@@ -877,7 +901,9 @@ class TestALoadIsWrittenDownToo:
         )
         assert (await the_log(session))[0].occurred_at == decided_at
 
-    async def test_a_load_asks_for_no_reason(self, session: AsyncSession, sales_user: User) -> None:
+    async def test_a_load_asks_for_no_reason(
+        self, purchasing_user: User, session: AsyncSession
+    ) -> None:
         """RF-11 is written about a datum *«existente»*, and a load creates one.
 
         A reason is what somebody's disagreement with a value is about, and
@@ -888,7 +914,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNKNOWN_PRODUCT,
             payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
             decision={"action": "incorporate", "price": "1500"},
@@ -901,7 +927,10 @@ class TestALoadIsWrittenDownToo:
         assert entry.reason_label is None
 
     async def test_the_product_leads_to_the_line_that_says_who_loaded_it(
-        self, session: AsyncSession, owner_client: AsyncClient, sales_user: User
+        self,
+        purchasing_user: User,
+        session: AsyncSession,
+        owner_client: AsyncClient,
     ) -> None:
         """RF-15 on top of RF-09: the screen of the datum links this by type and id.
 
@@ -912,7 +941,7 @@ class TestALoadIsWrittenDownToo:
         # Arrange
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNKNOWN_PRODUCT,
             payload={"product_code": LOADED_CODE, "description": "Bulón hexagonal 8mm"},
             decision={"action": "incorporate", "price": "1500"},
@@ -928,11 +957,11 @@ class TestALoadIsWrittenDownToo:
         assert response.status_code == 200
         entry = response.json()[0]
         assert entry["action"] == AuditAction.CREATED.value
-        assert entry["actor_name"] == sales_user.name
+        assert entry["actor_name"] == purchasing_user.name
         assert entry["occurred_at"] is not None
 
     async def test_pricing_an_unreadable_row_leaves_a_line_on_the_price(
-        self, session: AsyncSession, sales_user: User
+        self, purchasing_user: User, session: AsyncSession
     ) -> None:
         """The other load: the row could not be read, and the amount is now a person's.
 
@@ -947,7 +976,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNREADABLE_ROW,
             payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
             decision={"price": "1500"},
@@ -964,7 +993,7 @@ class TestALoadIsWrittenDownToo:
         assert (await CatalogService(session).price_history(product.id)).price == Decimal("1500")
 
     async def test_a_price_that_had_nothing_before_it_says_so(
-        self, session: AsyncSession, sales_user: User
+        self, purchasing_user: User, session: AsyncSession
     ) -> None:
         """RF-10 keeps the value that was there, and here there was none."""
         # Arrange
@@ -974,7 +1003,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNREADABLE_ROW,
             payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
             decision={"price": "1500"},
@@ -987,7 +1016,7 @@ class TestALoadIsWrittenDownToo:
         assert Decimal(entry.new_value) == Decimal("1500")
 
     async def test_confirming_the_amount_already_in_force_is_still_a_load(
-        self, session: AsyncSession, sales_user: User
+        self, purchasing_user: User, session: AsyncSession
     ) -> None:
         """Somebody typing the number that was already there took a decision.
 
@@ -1004,7 +1033,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNREADABLE_ROW,
             payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
             decision={"price": "1000"},
@@ -1017,7 +1046,7 @@ class TestALoadIsWrittenDownToo:
         assert Decimal(entry.old_value) == Decimal(entry.new_value) == Decimal("1000")
 
     async def test_an_amount_a_correction_holds_back_is_refused_and_the_case_stays_open(
-        self, session: AsyncSession, sales_user: User
+        self, sales_user: User, purchasing_user: User, session: AsyncSession
     ) -> None:
         """A load that cannot land is refused out loud, not filed as resolved.
 
@@ -1063,7 +1092,7 @@ class TestALoadIsWrittenDownToo:
         with pytest.raises(ConflictError) as refused:
             await a_case_decided_by(
                 session,
-                sales_user,
+                purchasing_user,
                 kind=UNREADABLE_ROW,
                 payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
                 decision={"price": "1500"},
@@ -1090,7 +1119,7 @@ class TestALoadIsWrittenDownToo:
         assert len(await TriageService(session).list_rules(kind=UNREADABLE_ROW)) == rules_before
 
     async def test_confirming_the_amount_a_correction_holds_leaves_its_line(
-        self, session: AsyncSession, sales_user: User
+        self, sales_user: User, purchasing_user: User, session: AsyncSession
     ) -> None:
         """The same number as the correction is not a contradiction, so it lands.
 
@@ -1125,7 +1154,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNREADABLE_ROW,
             payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
             decision={"price": "1200"},
@@ -1147,7 +1176,7 @@ class TestALoadIsWrittenDownToo:
         assert case is not None and case.status is CaseStatus.RESOLVED
 
     async def test_a_correction_on_another_field_does_not_hold_the_amount_back(
-        self, session: AsyncSession, sales_user: User
+        self, sales_user: User, purchasing_user: User, session: AsyncSession
     ) -> None:
         """The refusal is about the price, and the description is not the price.
 
@@ -1175,7 +1204,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNREADABLE_ROW,
             payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
             decision={"price": "1500"},
@@ -1189,7 +1218,7 @@ class TestALoadIsWrittenDownToo:
         ]
 
     async def test_a_correction_that_was_undone_no_longer_holds_the_amount_back(
-        self, session: AsyncSession, sales_user: User
+        self, sales_user: User, purchasing_user: User, session: AsyncSession
     ) -> None:
         """What holds an amount back is a correction **in force**, and this one is not.
 
@@ -1219,7 +1248,7 @@ class TestALoadIsWrittenDownToo:
         # Act
         await a_case_decided_by(
             session,
-            sales_user,
+            purchasing_user,
             kind=UNREADABLE_ROW,
             payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
             decision={"price": "1500"},
@@ -1233,7 +1262,7 @@ class TestALoadIsWrittenDownToo:
         assert Decimal(newest.new_value) == Decimal("1500")
 
     async def test_a_correction_the_portal_contradicted_still_holds_the_amount_back(
-        self, session: AsyncSession, sales_user: User
+        self, sales_user: User, purchasing_user: User, session: AsyncSession
     ) -> None:
         """A conflict is a correction waiting for a person, not one that gave up.
 
@@ -1270,7 +1299,7 @@ class TestALoadIsWrittenDownToo:
         with pytest.raises(ConflictError):
             await a_case_decided_by(
                 session,
-                sales_user,
+                purchasing_user,
                 kind=UNREADABLE_ROW,
                 payload={"product_code": LOADED_CODE, "excerpt": "COR-CARGA;;;"},
                 decision={"price": "1500"},

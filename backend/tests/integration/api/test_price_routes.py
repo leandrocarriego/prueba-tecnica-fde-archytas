@@ -235,7 +235,15 @@ class TestTheSettings:
 
 
 class TestTheReviewScreen:
-    """H7 and H8 over HTTP: the queue belongs to purchasing and to the owner."""
+    """H7 and H8 over HTTP, and H3 of 011 on top of them.
+
+    The price queue is purchasing's — the brief says so of Marcela in the
+    client's own words — and since 011 the *door* is no longer what says so.
+    The route asks for a session and the service narrows what comes back to the
+    areas the person reaches, which is a stronger promise than the 403 it
+    replaces: a closed door proves nobody got in, and this has to prove that
+    somebody who **did** get in still sees none of it.
+    """
 
     async def test_purchasing_sees_what_was_set_aside(
         self, purchasing_client: AsyncClient, a_list_was_extracted: None
@@ -254,10 +262,60 @@ class TestTheReviewScreen:
         assert body["total"] == 9
         assert all(item["reason"] for item in body["items"])
 
-    async def test_sales_does_not(self, sales_client: AsyncClient) -> None:
-        """It is Marcela's screen, and the owner's."""
+    async def test_sales_reaches_the_screen_and_sees_none_of_it(
+        self, sales_client: AsyncClient, a_list_was_extracted: None
+    ) -> None:
+        """RF-12: Julián opens the queue and the price cases are not in it.
+
+        Until 011 this was a 403 at the door, and the door had to go: the queue
+        holds Julián's sales rows now too, so closing it would hide his own
+        work from him. What replaces it is narrower and harder — he gets in,
+        and purchasing's nine cases are still none of his business.
+        """
         # Act
         response = await sales_client.get(f"{TRIAGE}/cases")
+
+        # Assert
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 0
+        assert body["items"] == []
+        # And the screen offers him only his own area to filter by, so the
+        # filter cannot be used to go looking.
+        assert body["sections"] == ["SALES"]
+
+    async def test_sales_may_not_resolve_a_case_of_purchasing(
+        self, sales_client: AsyncClient, purchasing_client: AsyncClient, a_list_was_extracted: None
+    ) -> None:
+        """RF-13: not seeing it is not enough — knowing its id must not help.
+
+        The id is guessable and the refusal cannot rest on the listing hiding
+        it. This is the assertion that says the permission is real and not a
+        screen that omits things.
+        """
+        # Arrange
+        case = (await purchasing_client.get(f"{TRIAGE}/cases")).json()["items"][0]
+
+        # Act
+        response = await sales_client.post(
+            f"{TRIAGE}/cases/{case['id']}/resolution",
+            json={"decision": {"action": "ignore"}, "remember": False},
+        )
+
+        # Assert
+        assert response.status_code == 403
+
+    async def test_asking_for_an_area_somebody_does_not_reach_is_refused(
+        self, sales_client: AsyncClient
+    ) -> None:
+        """RF-22 has a floor: the filter narrows, it never widens.
+
+        Refused rather than answered with an empty page, because an empty page
+        reads as «no hay nada en compras», which is a different statement and an
+        untrue one.
+        """
+        # Act
+        response = await sales_client.get(f"{TRIAGE}/cases", params={"section": "PURCHASING"})
 
         # Assert
         assert response.status_code == 403

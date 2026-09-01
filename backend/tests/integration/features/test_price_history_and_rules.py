@@ -23,11 +23,18 @@ from app.modules.ingestion.models import ResolutionRuleProjection
 from app.modules.triage.models import CaseStatus, ExceptionCase
 from app.modules.triage.service import UNKNOWN_PRODUCT, TriageService
 from app.shared.events import NormalizedHistoryPoint
+from app.shared.sections import BusinessSection
 from tests.factories.catalog_factory import ProductFactory
 
 pytestmark = [pytest.mark.integration, pytest.mark.database]
 
 A_MOMENT = datetime(2026, 3, 15, 12, 0, tzinfo=UTC)
+
+
+# Lo que el dueño alcanza, que es todo. Se escribe y no se da por sentado porque
+# `resolve` no acepta un default: qué áreas puede tocar alguien es cosa de quien
+# llama, y un default sería la cola creyéndole a cualquiera (RF-13 de 011).
+EVERY_AREA = frozenset(BusinessSection)
 
 
 async def points_of(session: AsyncSession, product: Product) -> list[PricePoint]:
@@ -145,6 +152,7 @@ class TestRevokingARule:
         service = TriageService(session)
         await service.open_case(
             kind=UNKNOWN_PRODUCT,
+            section=BusinessSection.PURCHASING,
             reason="El producto no está entre los conocidos",
             payload={"product_code": "COR-0999", "description": "Producto nuevo", "price": "1000"},
             key="COR-0999",
@@ -156,7 +164,9 @@ class TestRevokingARule:
             .first()
         )
         assert opened is not None
-        await service.resolve(opened.id, decision={"action": "incorporate"}, user_id=owner.id)
+        await service.resolve(
+            opened.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
+        )
         return opened
 
     async def test_the_case_it_resolved_goes_back_to_pending(

@@ -1,0 +1,19 @@
+---
+title: Una pantalla — las tres caras que siempre se ven igual
+---
+stateDiagram-v2
+    [*] --> Cargando
+    state "Cargando" as Cargando
+    state "Con contenido" as ConContenido
+    state "Sin resultados" as Vacia
+    state "Con error" as Error
+
+    Cargando --> ConContenido: hay datos para mostrar
+    Cargando --> Vacia: no hay ningún resultado
+    Cargando --> Error: no se pudo traer
+
+    note right of Error
+        Cargando, sin resultados y con error
+        se dibujan con la misma forma en
+        todas las secciones de la plataforma
+    end note

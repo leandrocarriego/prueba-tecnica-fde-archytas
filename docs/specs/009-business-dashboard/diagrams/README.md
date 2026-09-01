@@ -319,4 +319,3 @@ flowchart TD
     S --> T["Recalcula los indicadores con lo que esa persona declaró válido"]
     T --> Q
 ```
-

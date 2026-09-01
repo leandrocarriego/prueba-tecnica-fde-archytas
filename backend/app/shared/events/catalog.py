@@ -1044,3 +1044,95 @@ class DailyDigestContribution(DomainEvent):
     source: str
     pending: int
     lines: tuple[str, ...] = ()
+
+
+# ── what the platform sets aside and nobody heard about (011) ────────────────
+#
+# Three of the four events below fill the same hole in three different places:
+# `ingestion` quarantined a row in `staging` and told nobody, so nothing counted
+# it, nothing showed it and nobody ever decided about it. That is the one thing
+# the Artículo II forbids — setting a datum aside in silence is discarding it
+# with extra steps — and it is what the whole 011 exists to close.
+#
+# They are the same shape as the four quarantine events that already work, and
+# deliberately so: `tuple[QuarantinedRow, ...]`, built by the same
+# `_quarantined_of` helper, consumed by the same generic queue. A feature that
+# had to invent a shape here would be a feature that had misunderstood the one
+# that came before.
+
+
+@dataclass(frozen=True, slots=True)
+class SupplierRowsQuarantined(DomainEvent):
+    """Rows of the supplier register that could not be typed."""
+
+    raw_document_id: int
+    cases: tuple[QuarantinedRow, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentRowsQuarantined(DomainEvent):
+    """Payment records that could not be typed."""
+
+    batch_id: int
+    raw_document_id: int
+    cases: tuple[QuarantinedRow, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MessageRowsQuarantined(DomainEvent):
+    """Messages of the portal inbox that could not be typed."""
+
+    batch_id: int
+    raw_document_id: int
+    cases: tuple[QuarantinedRow, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantinedSourceResolved(DomainEvent):
+    """What opened a case got resolved on the screen it belongs to (RF-20).
+
+    The fourth is not about opening a case but about **closing one honestly**.
+    A payment held in review and a sale nobody could add up both have their own
+    screen, and the work usually gets done there. Asking the person to close the
+    triage case afterwards is the same work twice, and the day they forget, the
+    list of pending things is lying.
+
+    So whoever resolves it says so out loud, and `triage` listens. It carries
+    identifiers and a label and never the entity (`GEN-08`), and the publisher
+    does not know who is listening — which is what keeps `purchases` and `sales`
+    from ever having to import `triage` (Artículo IV).
+
+    `resolved_where` is for the person reading the closed case later: it says on
+    which screen the work happened. **No name of a person travels**, and that is
+    the decision the spec took: the record of who did the work belongs to the
+    screen where it was done, and copying it here would create a second version
+    of it that can drift.
+    """
+
+    # The `kind` of the case to close, and the same key its fingerprint was
+    # built from — not a reconstruction: a key rebuilt loosely would close a
+    # case nobody resolved.
+    kind: str
+    key: str
+    resolved_where: str
+
+
+@dataclass(frozen=True, slots=True)
+class QuarantinedSourceReopened(DomainEvent):
+    """The work that had closed a case got undone on its own screen (RF-24).
+
+    The mirror of `QuarantinedSourceResolved`, and the reason it exists is that
+    a rule the client signed only holds in both directions: *hay una sola
+    verdad sobre si algo sigue pendiente*. A queue that knows how to close
+    itself and not how to reopen tells the truth exactly until somebody changes
+    their mind — and the sales screen lets them, because 009 promised it
+    (RF-35).
+
+    Same shape and same discipline as its sibling: identifiers and nothing
+    else, the publisher does not know who listens, and the key is the one the
+    case was opened with rather than a reconstruction.
+    """
+
+    kind: str
+    key: str
+    reopened_where: str

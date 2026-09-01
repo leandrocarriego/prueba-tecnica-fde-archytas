@@ -779,7 +779,15 @@ def parse_supplier_ledger(content: bytes) -> tuple[list[ParsedSupplier], list[Pa
         name = summary.column(row, "Proveedor").strip()
         if not name:
             continue
-        balance, _ = _read_money(summary.column(row, "Saldo actual"))
+        # El motivo **viaja**. Hasta la 011 esta línea decía `balance, _`: un
+        # saldo que no se podía interpretar se guardaba como `None` y la fila
+        # quedaba marcada legible, así que nunca iba a cuarentena, nunca abría
+        # caso y nadie se enteraba de que el padrón había publicado un número
+        # ilegible. Es exactamente lo que el Artículo II prohíbe —descartar en
+        # silencio— un nivel más abajo de donde la 011 lo vino a cerrar: la
+        # feature agregó el evento y el suscriptor, y el evento no podía
+        # dispararse porque acá se tiraba el único dato que lo dispara (RF-01).
+        balance, balance_reason = _read_money(summary.column(row, "Saldo actual"))
         card = cards.get(name, {})
         suppliers.append(
             ParsedSupplier(
@@ -791,6 +799,7 @@ def parse_supplier_ledger(content: bytes) -> tuple[list[ParsedSupplier], list[Pa
                 phone=card.get("phone"),
                 payment_term_days=card.get("payment_term_days"),
                 balance=balance,
+                reason=balance_reason,
             )
         )
 

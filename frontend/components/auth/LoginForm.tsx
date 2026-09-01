@@ -33,7 +33,7 @@ function SubmitButton({ branding }: { branding: ReturnType<typeof useBranding> }
       className="w-full cursor-pointer rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
       style={{
         backgroundColor: branding.colors.primary,
-        color: '#ffffff',
+        color: branding.colors.primaryForeground,
       }}
       onMouseEnter={e => {
         if (!pending) {
@@ -118,14 +118,7 @@ export function LoginForm({ className, renderLogo, renderFooter }: LoginFormProp
       <CardContent>
         <form action={loginAction} className="space-y-5">
           {error && (
-            <div
-              className="p-3 rounded-lg text-sm"
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#dc2626',
-              }}
-            >
+            <div className="rounded-lg border border-danger-border bg-danger-surface p-3 text-sm text-danger">
               {error}
             </div>
           )}

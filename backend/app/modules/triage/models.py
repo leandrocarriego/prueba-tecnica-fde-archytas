@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.shared.sections import BusinessSection
 
 OPERATIONS_SCHEMA = "operations"
 
@@ -45,11 +46,26 @@ class ExceptionCase(Base):
             postgresql_where=text("status = 'PENDING'"),
         ),
         Index("ix_exception_status_kind", "status", "kind"),
+        # The query the review screen makes: everything pending of the areas
+        # this person reaches (RF-12, RF-22).
+        Index("ix_exception_section_status", "section", "status"),
         {"schema": OPERATIONS_SCHEMA},
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[str] = mapped_column(String(50))
+    # Which part of the business this case belongs to, so the queue can show it
+    # to the person who can do something about it (RF-12). It is **written by
+    # whoever opens the case**, not deduced from `kind` when reading: the
+    # publisher is the only one who knows, and the day a kind changes owner —
+    # which already happened to the rubros in 010 — a lookup table far from it
+    # would show the case to the wrong person without anything failing.
+    section: Mapped[BusinessSection] = mapped_column(
+        # `create_type=False` in the migration: `operations.section` is the
+        # same type `operations.manual_change` already uses. One vocabulary,
+        # one type.
+        Enum(BusinessSection, name="section", schema=OPERATIONS_SCHEMA)
+    )
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     # What the person reads (RF-26), so it is written in Spanish.
     reason: Mapped[str] = mapped_column(String(200))
@@ -74,6 +90,29 @@ class ExceptionCase(Base):
 
     def __repr__(self) -> str:
         return f"<ExceptionCase id={self.id} kind={self.kind} status={self.status}>"
+
+
+class TriageSetting(Base):
+    """The business parameters this module reads, as its own projection.
+
+    `triage.stale_days` says from how many days a pending case counts as
+    delayed (RF-18 of 011). It is copied here rather than asked for because
+    `operations` owns the parameters and this module may not import it: the
+    projection is fed by `BusinessParameterChanged`, which is the shape
+    `sales` and `purchases` already use for exactly this.
+    """
+
+    __tablename__ = "triage_setting"
+    __table_args__ = {"schema": OPERATIONS_SCHEMA}
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[Any] = mapped_column(JSONB)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<TriageSetting key={self.key}>"
 
 
 class ResolutionRule(Base):

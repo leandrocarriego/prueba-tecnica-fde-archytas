@@ -14,6 +14,8 @@ export type AuthLayout = 'centered' | 'split-screen' | 'full-width'
 export interface BrandingColors {
   primary: string
   primaryHover: string
+  /** El texto que va encima de `primary`. Es paleta, no un blanco cualquiera. */
+  primaryForeground: string
   secondary?: string
   background: string
   cardBackground: string
@@ -91,6 +93,7 @@ export const brandingConfig: AuthBrandingConfig = {
     // cambia la paleta, se cambian los dos.
     primary: '#C24B15', // acento obra
     primaryHover: '#A63F11',
+    primaryForeground: '#FFFFFF',
     background: '#F4F2ED', // papel
     cardBackground: '#FFFFFF',
     text: '#16191C', // tinta

@@ -153,4 +153,3 @@ flowchart TD
 
     L["A compras le muestra los rubros entre las secciones a las que entra"]
 ```
-

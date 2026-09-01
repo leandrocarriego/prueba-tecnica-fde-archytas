@@ -27,6 +27,7 @@ from app.modules.triage.service import (
 )
 from app.shared.corrections import CorrectionReason
 from app.shared.errors import ConflictError
+from app.shared.sections import BusinessSection
 from tests.factories.portal_factory import FakePortal, broken_list_bytes, price_list_with
 
 pytestmark = [pytest.mark.integration, pytest.mark.database, pytest.mark.portal]
@@ -34,6 +35,12 @@ pytestmark = [pytest.mark.integration, pytest.mark.database, pytest.mark.portal]
 UNKNOWN_CODE = "COR-0999"
 FIRST_PRODUCT = "COR-0001"
 BROKEN_ROW_CODE = "COR-0007"
+
+
+# Lo que el dueño alcanza, que es todo. Se escribe y no se da por sentado porque
+# `resolve` no acepta un default: qué áreas puede tocar alguien es cosa de quien
+# llama, y un default sería la cola creyéndole a cualquiera (RF-13 de 011).
+EVERY_AREA = frozenset(BusinessSection)
 
 
 async def seed_two_runs(session: AsyncSession) -> None:
@@ -73,7 +80,7 @@ class TestResolvingAnUnknownProduct:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert
@@ -91,7 +98,7 @@ class TestResolvingAnUnknownProduct:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert
@@ -109,6 +116,7 @@ class TestResolvingAnUnknownProduct:
         service = TriageService(session)
         await service.open_case(
             kind="unreadable_history",
+            section=BusinessSection.PURCHASING,
             reason="No se pudo leer el historial publicado",
             payload={"product_code": "COR-0001"},
             key="COR-0001",
@@ -118,7 +126,11 @@ class TestResolvingAnUnknownProduct:
 
         # Act
         resolved = await service.resolve(
-            case.id, decision={"action": "ignore"}, user_id=owner.id, user_name=owner.name
+            case.id,
+            decision={"action": "ignore"},
+            user_id=owner.id,
+            visible=EVERY_AREA,
+            user_name=owner.name,
         )
 
         # Assert
@@ -141,6 +153,7 @@ class TestResolvingAnUnknownProduct:
             case.id,
             decision={"action": "incorporate"},
             user_id=owner.id,
+            visible=EVERY_AREA,
             user_name=owner.name,
         )
 
@@ -160,7 +173,7 @@ class TestResolvingAnUnknownProduct:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Act: the same list again, with one price moved so the file is new.
@@ -180,7 +193,7 @@ class TestResolvingAnUnknownProduct:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "ignore"}, user_id=owner.id
+            case.id, decision={"action": "ignore"}, user_id=owner.id, visible=EVERY_AREA
         )
         await PortalService(
             session,
@@ -201,7 +214,7 @@ class TestResolvingAnUnknownProduct:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "ignore"}, user_id=owner.id
+            case.id, decision={"action": "ignore"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert
@@ -229,6 +242,7 @@ class TestResolvingAnUnreadableRow:
             case.id,
             decision={"product_code": BROKEN_ROW_CODE, "price": "78914"},
             user_id=owner.id,
+            visible=EVERY_AREA,
         )
 
         # Assert
@@ -253,6 +267,7 @@ class TestResolvingAnUnreadableRow:
             case.id,
             decision={"product_code": BROKEN_ROW_CODE, "price": "78914"},
             user_id=owner.id,
+            visible=EVERY_AREA,
         )
 
         # Act
@@ -285,7 +300,7 @@ class TestResolvingAProductThatStoppedComing:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "discontinue"}, user_id=owner.id
+            case.id, decision={"action": "discontinue"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert
@@ -306,7 +321,9 @@ class TestResolvingAProductThatStoppedComing:
         case = (await pending(session, MISSING_PRODUCT))[0]
 
         # Act
-        await TriageService(session).resolve(case.id, decision={"action": "keep"}, user_id=owner.id)
+        await TriageService(session).resolve(
+            case.id, decision={"action": "keep"}, user_id=owner.id, visible=EVERY_AREA
+        )
 
         # Assert
         found = await product(session, FIRST_PRODUCT)
@@ -348,7 +365,7 @@ class TestResolvingAProductThatStoppedComing:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "discontinue"}, user_id=owner.id
+            case.id, decision={"action": "discontinue"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Assert
@@ -373,7 +390,7 @@ class TestTheRules:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Act
@@ -399,7 +416,11 @@ class TestTheRules:
 
         # Act
         await TriageService(session).resolve(
-            case.id, decision={"action": "ignore"}, user_id=owner.id, remember=False
+            case.id,
+            decision={"action": "ignore"},
+            user_id=owner.id,
+            visible=EVERY_AREA,
+            remember=False,
         )
 
         # Assert
@@ -413,7 +434,7 @@ class TestTheRules:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
         rule = (await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT))[0]
 
@@ -431,7 +452,7 @@ class TestTheRules:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
         rule = (await TriageService(session).list_rules())[0]
         await TriageService(session).revoke_rule(rule.id, user_id=owner.id)
@@ -455,7 +476,7 @@ class TestTheRules:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
         rule = (await TriageService(session).list_rules(kind=UNKNOWN_PRODUCT))[0]
 
@@ -475,7 +496,7 @@ class TestTheRules:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "incorporate"}, user_id=owner.id
+            case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
         )
         rule = (await TriageService(session).list_rules())[0]
         await TriageService(session).revoke_rule(rule.id, user_id=owner.id)
@@ -490,13 +511,13 @@ class TestTheRules:
         await seed_two_runs(session)
         case = (await pending(session, UNKNOWN_PRODUCT))[0]
         await TriageService(session).resolve(
-            case.id, decision={"action": "ignore"}, user_id=owner.id
+            case.id, decision={"action": "ignore"}, user_id=owner.id, visible=EVERY_AREA
         )
 
         # Act / Assert
         with pytest.raises(ConflictError):
             await TriageService(session).resolve(
-                case.id, decision={"action": "incorporate"}, user_id=owner.id
+                case.id, decision={"action": "incorporate"}, user_id=owner.id, visible=EVERY_AREA
             )
 
 
