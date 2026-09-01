@@ -202,9 +202,16 @@ class SalesService:
         # Y lo que cuenta, que es la otra mitad. Se publica siempre, también
         # vacío: quien mantiene una proyección de lo vendido necesita las bajas
         # aunque no haya altas.
+        # Las dos listas tienen que ser disjuntas, y no lo son solas: una venta
+        # que este mismo lote contó y después apartó —porque más abajo llegó su
+        # repetida— está en las dos. Quien las reciba aplicaría el alta y la
+        # baja en algún orden, y el orden decidiría el total.
+        leaving = set(dropped)
         await events.publish(
             SalesCounted(
-                batch_id=batch_id, counted=tuple(adding), no_longer_counted=tuple(dropped)
+                batch_id=batch_id,
+                counted=tuple(one for one in adding if one.staging_row_id not in leaving),
+                no_longer_counted=tuple(leaving),
             ),
             self.session,
         )
