@@ -45,9 +45,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("staging_row_id"),
         schema="core",
     )
-    op.create_index(
-        "ix_order_spend_product_code", "order_spend", ["product_code"], schema="core"
-    )
+    op.create_index("ix_order_spend_product_code", "order_spend", ["product_code"], schema="core")
 
 
 def downgrade() -> None:

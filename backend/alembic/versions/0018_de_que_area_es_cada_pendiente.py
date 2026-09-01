@@ -110,7 +110,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_exception_section_status", table_name="exception", schema="operations"
-    )
+    op.drop_index("ix_exception_section_status", table_name="exception", schema="operations")
     op.drop_column("exception", "section", schema="operations")
