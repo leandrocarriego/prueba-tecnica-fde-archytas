@@ -1,0 +1,102 @@
+✅ RF-20 · /login sigue clara con el SO en oscuro (body = rgb(244, 242, 237))
+✅ RF-11 · /login tiene una sola acción
+✅ RF-11 · y esa acción es la de acento (rgb(194, 75, 21))
+✅ RF-20 · la invitación también
+✅ RF-05 · la invitación es la misma tarjeta
+✅ RF-11 · después de guardar queda la salida
+✅ RF-05 · recuperar la clave, misma tarjeta
+✅ RF-24 · la raíz cae en el tablero (quedó en http://localhost:3100/tablero)
+✅ RF-03 · la barra lista las dieciséis secciones
+✅ RF-06 · la píldora vencida aparece en /facturas
+✅ RF-06 · y en /calendario
+✅ RF-06 · y en la ficha del proveedor
+✅ RF-06 · y las tres son idénticas ({"color": "rgb(163, 43, 30)", "fondo": "rgb(251, 234, 231)", "borde": "rgb(239, 206, 200)"})
+✅ RF-10 · la columna tiene cifras de distinto largo ([7, 11])
+✅ RF-10 · y todas terminan en la misma vertical ({943})
+✅ RF-09 · en mono tabular ("IBM Plex Mono")
+✅ RF-08 · la ficha muestra las dos grafías (2)
+✅ RF-08 · sólo la que reconoció el sistema va punteada ([{'texto': 'T012 METALURGICA DEL VALLE S.A.', 'borde': 'dashed'}])
+✅ RF-13 · en /facturas ningún botón usa el azul de dato ([])
+✅ RF-13 · en /facturas/9001 ningún botón usa el azul de dato ([])
+✅ RF-13 · en /facturas/pagos ningún botón usa el azul de dato ([])
+✅ RF-13 · en /ordenes ningún botón usa el azul de dato ([])
+✅ RF-13 · en /proveedores/9001 ningún botón usa el azul de dato ([])
+✅ RF-21 · /revision no tiene ningún naranja ([])
+✅ RF-13 · /revision no usa el azul para actuar ([])
+✅ RF-21 · /calendario no tiene ningún naranja ([])
+✅ RF-13 · /calendario no usa el azul para actuar ([])
+✅ RF-21 · /facturas/revision no tiene ningún naranja ([])
+✅ RF-13 · /facturas/revision no usa el azul para actuar ([])
+✅ RF-21 · /facturas/incidentes no tiene ningún naranja ([])
+✅ RF-13 · /facturas/incidentes no usa el azul para actuar ([])
+✅ RF-21 · /ventas/revision no tiene ningún naranja ([])
+✅ RF-13 · /ventas/revision no usa el azul para actuar ([])
+✅ RF-21 · /proveedores/grafias no tiene ningún naranja ([])
+✅ RF-13 · /proveedores/grafias no usa el azul para actuar ([])
+✅ RF-21 · /rubros/sin-clasificar no tiene ningún naranja ([])
+✅ RF-13 · /rubros/sin-clasificar no usa el azul para actuar ([])
+✅ RF-21 · /rubros/equivalencias no tiene ningún naranja ([])
+✅ RF-13 · /rubros/equivalencias no usa el azul para actuar ([])
+✅ RF-21 · /acciones no tiene ningún naranja ([])
+✅ RF-13 · /acciones no usa el azul para actuar ([])
+✅ RF-01 · Tablero (/tablero) renderiza
+✅ RF-02/RF-20 · Tablero sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Tablero usa como mucho un naranja ([])
+✅ RF-01 · Proveedores (/proveedores) renderiza
+✅ RF-02/RF-20 · Proveedores sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Proveedores usa como mucho un naranja ([])
+✅ RF-01 · Facturas (/facturas) renderiza
+✅ RF-02/RF-20 · Facturas sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Facturas usa como mucho un naranja ([])
+✅ RF-01 · Órdenes de compra (/ordenes) renderiza
+✅ RF-02/RF-20 · Órdenes de compra sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Órdenes de compra usa como mucho un naranja ([])
+✅ RF-01 · Calendario (/calendario) renderiza
+✅ RF-02/RF-20 · Calendario sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Calendario usa como mucho un naranja ([])
+✅ RF-01 · Mensajes (/mensajes) renderiza
+✅ RF-02/RF-20 · Mensajes sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Mensajes usa como mucho un naranja ([])
+✅ RF-01 · Ventas (/ventas) renderiza
+✅ RF-02/RF-20 · Ventas sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Ventas usa como mucho un naranja ([])
+✅ RF-01 · Catálogo y precios (/precios) renderiza
+✅ RF-02/RF-20 · Catálogo y precios sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Catálogo y precios usa como mucho un naranja (['Actualizar ahora'])
+✅ RF-01 · Rubros (/rubros) renderiza
+✅ RF-02/RF-20 · Rubros sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Rubros usa como mucho un naranja (['Agregar'])
+✅ RF-01 · Revisar esto (/revision) renderiza
+✅ RF-02/RF-20 · Revisar esto sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Revisar esto usa como mucho un naranja ([])
+✅ RF-01 · Acciones (/acciones) renderiza
+✅ RF-02/RF-20 · Acciones sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Acciones usa como mucho un naranja ([])
+✅ RF-01 · Historial (/historial) renderiza
+✅ RF-02/RF-20 · Historial sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Historial usa como mucho un naranja ([])
+✅ RF-01 · Accesos (/accesos) renderiza
+✅ RF-02/RF-20 · Accesos sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Accesos usa como mucho un naranja (['Dar de alta e invitar'])
+✅ RF-01 · Actividad (/accesos/actividad) renderiza
+✅ RF-02/RF-20 · Actividad sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Actividad usa como mucho un naranja ([])
+✅ RF-01 · Parámetros (/configuracion) renderiza
+✅ RF-02/RF-20 · Parámetros sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Parámetros usa como mucho un naranja ([])
+✅ RF-01 · Salud (/health) renderiza
+✅ RF-02/RF-20 · Salud sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Salud usa como mucho un naranja ([])
+✅ RF-01 · Mi cuenta (/mi-cuenta) renderiza
+✅ RF-02/RF-20 · Mi cuenta sobre el mismo papel (rgb(244, 242, 237))
+✅ RF-11 · Mi cuenta usa como mucho un naranja (['Cambiar la clave'])
+✅ ninguna pantalla se rompió al renderizar ([])
+✅ RF-22 · Ventas ve su sección (['Tablero', 'Calendario', 'Ventas', 'Catálogo y precios', 'Rubros', 'Revisar esto', 'Acciones', 'Historial', 'Salud'])
+✅ RF-17 · no ve Facturas
+✅ RF-17 · no ve Órdenes de compra
+✅ RF-17 · no ve Accesos
+✅ RF-17 · no ve Parámetros
+✅ RF-18 · ningún título de grupo quedó sin entradas debajo ([])
+✅ RF-04 · el nombre de quien trabaja está a la vista
+
+100 verificaciones en verde · 0 en rojo

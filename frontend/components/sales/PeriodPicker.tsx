@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 /**
  * El período de **un** corte, sin tocar el de los demás (RF-05 de 009).
@@ -31,21 +32,11 @@ export function PeriodPicker({
       )}
       <label className="flex flex-col gap-1">
         Desde
-        <input
-          className="rounded border px-2 py-1 text-sm text-foreground"
-          type="date"
-          name={fromName}
-          defaultValue={from ?? ''}
-        />
+        <Input type="date" name={fromName} defaultValue={from ?? ''} />
       </label>
       <label className="flex flex-col gap-1">
         Hasta
-        <input
-          className="rounded border px-2 py-1 text-sm text-foreground"
-          type="date"
-          name={toName}
-          defaultValue={to ?? ''}
-        />
+        <Input type="date" name={toName} defaultValue={to ?? ''} />
       </label>
       <Button type="submit" variant="outline">
         Ver este período

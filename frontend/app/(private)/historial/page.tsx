@@ -9,6 +9,10 @@ import { standingCorrections } from '@/lib/catalog/corrections'
 import type { CorrectionInForce } from '@/lib/catalog/types'
 import { isKnownEntityType } from '@/lib/operations/audit'
 import type { AuditEntry, AuditEntryList } from '@/lib/operations/types'
+import { ErrorState } from '@/components/ui/state'
+import { Button } from '@/components/ui/button'
+import { Input, selectClassName } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 
 type UserList = components['schemas']['UserList']
 
@@ -204,15 +208,18 @@ export default async function HistoryPage({
   // anything reaches the API, because there is nothing to ask it.
   if (ofOneDatum && datumPath === null) {
     return (
-      <main className="mx-auto max-w-6xl space-y-6 p-8">
+      <div className="space-y-6">
         <Header />
-        <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
-          El enlace pide el historial de un dato que esta pantalla no conoce.{' '}
-          <Link className="underline underline-offset-2" href="/historial">
-            Ver todo el historial
-          </Link>
-        </p>
-      </main>
+        <Notice
+          tone="warn"
+          title="El enlace pide el historial de un dato que esta pantalla no conoce."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/historial">Ver todo el historial</Link>
+            </Button>
+          }
+        />
+      </div>
     )
   }
 
@@ -242,13 +249,13 @@ export default async function HistoryPage({
     mayUndo && page !== null ? await undoableIn(page.items) : new Map<string, number>()
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-8">
+    <div className="space-y-6">
       <Header />
 
       {ofOneDatum ? (
         <p className="text-sm">
           Mostrando sólo los cambios de un dato.{' '}
-          <Link className="underline underline-offset-2" href="/historial">
+          <Link className="text-link hover:underline" href="/historial">
             Ver todo el historial
           </Link>
         </p>
@@ -260,37 +267,28 @@ export default async function HistoryPage({
           again starts at the first row, which is where the answer to a new
           question is.
         */
-        <form className="flex flex-wrap items-end gap-4 rounded border p-4" method="get">
+        <form
+          className="flex flex-wrap items-end gap-4 rounded-lg border border-border bg-card p-4"
+          method="get"
+        >
           <div className="space-y-1">
             <label className="block text-sm font-medium" htmlFor="desde">
               Desde
             </label>
-            <input
-              className="rounded border px-3 py-2 text-sm"
-              id="desde"
-              name="desde"
-              type="date"
-              defaultValue={filters.desde ?? ''}
-            />
+            <Input id="desde" name="desde" type="date" defaultValue={filters.desde ?? ''} />
           </div>
           <div className="space-y-1">
             <label className="block text-sm font-medium" htmlFor="hasta">
               Hasta
             </label>
-            <input
-              className="rounded border px-3 py-2 text-sm"
-              id="hasta"
-              name="hasta"
-              type="date"
-              defaultValue={filters.hasta ?? ''}
-            />
+            <Input id="hasta" name="hasta" type="date" defaultValue={filters.hasta ?? ''} />
           </div>
           <div className="space-y-1">
             <label className="block text-sm font-medium" htmlFor="persona">
               Persona
             </label>
             <select
-              className="rounded border px-3 py-2 text-sm"
+              className={selectClassName}
               id="persona"
               name="persona"
               defaultValue={filters.persona ?? ''}
@@ -306,11 +304,12 @@ export default async function HistoryPage({
                 : session && <option value={String(session.user.id)}>Sólo mis cambios</option>}
             </select>
           </div>
-          <button className="rounded border px-4 py-2 text-sm hover:bg-muted" type="submit">
+          {/* Filtrar no es la tarea: leer el historial lo es (`RF-11`). */}
+          <Button type="submit" variant="outline">
             Filtrar
-          </button>
+          </Button>
           {(filters.desde || filters.hasta || filters.persona) && (
-            <Link className="text-sm text-muted-foreground underline" href="/historial">
+            <Link className="text-sm text-link hover:underline" href="/historial">
               Limpiar
             </Link>
           )}
@@ -318,19 +317,19 @@ export default async function HistoryPage({
       )}
 
       {page === null ? (
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer el historial. Probá de nuevo en unos minutos.
-        </p>
+        <ErrorState title="No pudimos traer el historial.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
       ) : (
         <>
           {page.items.length > 0 && (
             <p className="text-sm text-muted-foreground">{countLabel(page)}</p>
           )}
           {undoable === null && (
-            <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
-              No pudimos traer las correcciones que se pueden deshacer. El historial es el de
-              siempre; para deshacer una corrección, entrá al dato o probá de nuevo en unos minutos.
-            </p>
+            <Notice tone="warn" title="No pudimos traer las correcciones que se pueden deshacer.">
+              El historial es el de siempre; para deshacer una corrección, entrá al dato o probá de
+              nuevo en unos minutos.
+            </Notice>
           )}
           <AuditTable items={page.items} undoable={undoable ?? undefined} />
           {!ofOneDatum && (current > 1 || page.skip + page.items.length < page.total) && (
@@ -355,6 +354,6 @@ export default async function HistoryPage({
           )}
         </>
       )}
-    </main>
+    </div>
   )
 }

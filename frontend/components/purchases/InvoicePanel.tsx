@@ -4,11 +4,15 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { issueReceipt, registerPayment, voidPayment, voidReceipt } from '@/app/actions/purchases'
+import { Day, Money } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 import { formatMoment } from '@/lib/catalog/format'
-import { day, money } from '@/lib/format'
 import type { Invoice, Payment, Receipt } from '@/lib/purchases/types'
+import { isUnconfirmedPayment, paymentTone, pill } from '@/lib/ui/tone'
 
 /**
  * Lo que se hace sobre una factura: cargar un pago, y emitir o anular su recibo.
@@ -80,16 +84,12 @@ export function InvoicePanel({
 
   return (
     <div className="space-y-6">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Pagos imputados</h2>
         {payments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no tiene ningún pago imputado.</p>
+          <Empty title="Todavía no tiene ningún pago imputado." />
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b text-left text-muted-foreground">
@@ -104,12 +104,23 @@ export function InvoicePanel({
             <tbody>
               {payments.map(payment => (
                 <tr key={payment.id} className="border-b">
-                  <td className="py-2">{day(payment.paid_on)}</td>
-                  <td className="py-2 text-right">{money(payment.amount)}</td>
+                  <Day value={payment.paid_on} cell className="py-2 text-left" />
+                  <Money value={payment.amount} cell className="py-2" />
                   <td className="py-2">
-                    {payment.origin === 'PORTAL' ? 'Del portal' : 'Cargado a mano'}
+                    {/*
+                     * `RF-08`: lo cargado a mano va punteado. Un pago del
+                     * portal lo informó el origen; uno a mano lo escribió una
+                     * persona y todavía no volvió publicado.
+                     */}
+                    <Badge tone={pill('neutral', isUnconfirmedPayment(payment.origin))}>
+                      {payment.origin === 'PORTAL' ? 'Del portal' : 'Cargado a mano'}
+                    </Badge>
                   </td>
-                  <td className="py-2">{payment.state === 'VOIDED' ? 'Sin efecto' : 'Imputado'}</td>
+                  <td className="py-2">
+                    <Badge tone={paymentTone(payment.state)}>
+                      {payment.state === 'VOIDED' ? 'Sin efecto' : 'Imputado'}
+                    </Badge>
+                  </td>
                   {canPay && (
                     <td className="py-2 text-right">
                       {payment.origin === 'MANUAL' && payment.state !== 'VOIDED' && (
@@ -155,19 +166,29 @@ export function InvoicePanel({
               <span className="mb-1 block text-muted-foreground">Comprobante</span>
               <Input value={reference} onChange={event => setReference(event.target.value)} />
             </label>
-            <Button type="submit" disabled={busy}>
+            {/* La tarea de esta pantalla, y por eso el único naranja (`RF-11`). */}
+            <Button type="submit" variant="brand" disabled={busy}>
               Registrar pago
             </Button>
           </form>
         )}
 
+        {/* El aviso lleva su salida: `RF-15`, y `UI-07` en el review. */}
         {warning && (
-          <div className="space-y-2 rounded border border-warn-border bg-warn-surface p-3 text-sm text-warn">
-            <p>{warning}</p>
-            <Button type="button" variant="outline" disabled={busy} onClick={() => void pay(true)}>
-              Registrarlo igual
-            </Button>
-          </div>
+          <Notice
+            tone="warn"
+            title={warning}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void pay(true)}
+              >
+                Registrarlo igual
+              </Button>
+            }
+          />
         )}
       </section>
 

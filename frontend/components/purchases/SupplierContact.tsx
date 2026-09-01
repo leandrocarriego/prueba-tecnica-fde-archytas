@@ -1,4 +1,5 @@
 import { SupplierCorrection } from '@/components/purchases/SupplierCorrection'
+import { Badge } from '@/components/ui/badge'
 import type { CorrectionReason } from '@/lib/operations/types'
 import { isConflicted, markFor, SUPPLIER_FIELD_LABELS } from '@/lib/purchases/corrections'
 import type { Supplier, SupplierCorrectionMark } from '@/lib/purchases/types'
@@ -67,13 +68,19 @@ export function SupplierContact({
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="text-base font-medium">
               {shown(supplier, field)}
+              {/* `RF-08`: corregido a mano es un dato que no confirmó el portal. */}
+              {mark && (
+                <Badge tone="draft" className="ml-2">
+                  Corregido
+                </Badge>
+              )}
               {mark && (
                 <span className="block text-xs font-normal text-muted-foreground">
                   Corregido a mano · el portal decía {asText(mark.portal_value, field)}
                 </span>
               )}
               {isConflicted(mark) && (
-                <span className="mt-1 block rounded bg-danger-surface px-2 py-0.5 text-xs text-danger">
+                <span className="mt-1 block text-xs font-normal text-danger">
                   El portal ahora informa {asText(mark?.conflict_value, field)}. Se conserva{' '}
                   {SUPPLIER_FIELD_LABELS[field] ?? 'el dato'} corregido.
                 </span>

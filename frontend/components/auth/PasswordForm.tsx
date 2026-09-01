@@ -4,17 +4,20 @@ import { useState } from 'react'
 import { useFormStatus } from 'react-dom'
 
 import type { ActionResult } from '@/app/actions/access'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 
+/**
+ * Guardar la clave es la tarea de las tres pantallas que usan este formulario,
+ * así que es el naranja de cada una (`RF-11`).
+ */
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus()
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full cursor-pointer rounded bg-primary px-4 py-2 text-white disabled:opacity-50"
-    >
-      {pending ? 'Guardando...' : label}
-    </button>
+    <Button type="submit" variant="brand" disabled={pending} className="w-full">
+      {pending ? 'Guardando…' : label}
+    </Button>
   )
 }
 
@@ -46,43 +49,42 @@ export function PasswordForm({
   const [result, setResult] = useState<ActionResult | null>(null)
 
   if (singleUse && result?.ok) {
-    return <p className="text-sm text-ok">{result.message}</p>
+    return <Notice tone="ok" title={result.message} />
   }
 
   return (
     <form action={async formData => setResult(await action(formData))} className="space-y-3">
       {asksCurrentPassword && (
-        <input
+        <Input
           name="current_password"
           type="password"
           required
           placeholder="Tu clave de ahora"
-          className="w-full rounded border px-3 py-2"
+          aria-label="Tu clave de ahora"
         />
       )}
-      <input
+      <Input
         name="new_password"
         type="password"
         required
         minLength={8}
         placeholder="Clave nueva"
-        className="w-full rounded border px-3 py-2"
+        aria-label="Clave nueva"
       />
-      <input
+      <Input
         name="repeat_password"
         type="password"
         required
         minLength={8}
         placeholder="Repetí la clave nueva"
-        className="w-full rounded border px-3 py-2"
+        aria-label="Repetí la clave nueva"
       />
       <p className="text-xs text-muted-foreground">Al menos 8 caracteres.</p>
 
       <SubmitButton label={label} />
 
-      {result && (
-        <p className={`text-sm ${result.ok ? 'text-ok' : 'text-danger'}`}>{result.message}</p>
-      )}
+      {/* Lo que contestó el servidor: verde si guardó, rojo si no. */}
+      {result && <Notice tone={result.ok ? 'ok' : 'danger'} title={result.message} />}
     </form>
   )
 }

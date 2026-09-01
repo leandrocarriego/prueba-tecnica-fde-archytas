@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { correctProduct } from '@/app/actions/corrections'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, selectClassName } from '@/components/ui/input'
 import type { CorrectionReason } from '@/lib/operations/types'
 
 interface CorrectionDialogProps {
@@ -134,7 +134,7 @@ export function CorrectionDialog({
   return (
     <div className={open ? 'space-y-3' : 'inline-flex flex-wrap items-center gap-3'}>
       {open ? (
-        <form className="space-y-4 rounded border bg-white p-4" onSubmit={onSubmit}>
+        <form className="space-y-4 rounded-lg border border-border bg-card p-4" onSubmit={onSubmit}>
           <p className="text-sm font-medium">Corregir {fieldLabel}</p>
 
           <div className="space-y-1">
@@ -171,7 +171,7 @@ export function CorrectionDialog({
               Motivo
             </label>
             <select
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className={selectClassName}
               id={`reason-${field}`}
               required
               value={reasonCode}
@@ -203,8 +203,8 @@ export function CorrectionDialog({
             <Button type="submit" disabled={saving || !reasonCode}>
               {saving ? 'Guardando…' : 'Corregir'}
             </Button>
-            <button
-              className="cursor-pointer text-sm text-muted-foreground underline"
+            <Button
+              variant="ghost"
               onClick={() => {
                 setOpen(false)
                 setMessage(null)
@@ -213,12 +213,14 @@ export function CorrectionDialog({
               type="button"
             >
               Cancelar
-            </button>
+            </Button>
           </div>
         </form>
       ) : (
-        <button
-          className="cursor-pointer text-sm underline underline-offset-2"
+        // Abre el formulario que corrige: contorno, no azul de enlace (`RF-13`).
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => {
             setOpen(true)
             // The verdict of the previous correction is cleared on the way in:
@@ -229,7 +231,7 @@ export function CorrectionDialog({
           type="button"
         >
           Corregir {fieldLabel}
-        </button>
+        </Button>
       )}
       <Outcome message={message} />
     </div>

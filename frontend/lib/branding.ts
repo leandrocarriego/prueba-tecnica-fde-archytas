@@ -86,21 +86,25 @@ export interface AuthBrandingConfig {
  */
 export const brandingConfig: AuthBrandingConfig = {
   colors: {
-    // La paleta de la guía visual (`docs/design/`): tinta grafito como acción
-    // neutra, naranja de obra como la única acción llena, papel cálido de
-    // fondo. Los valores están duplicados acá y en `app/globals.css` porque
-    // estas pantallas los necesitan como string para estilos en línea; si se
-    // cambia la paleta, se cambian los dos.
-    primary: '#C24B15', // acento obra
-    primaryHover: '#A63F11',
-    primaryForeground: '#FFFFFF',
-    background: '#F4F2ED', // papel
-    cardBackground: '#FFFFFF',
-    text: '#16191C', // tinta
-    textSecondary: '#6E7278',
-    border: '#E2DED6',
-    error: '#A32B1E',
-    success: '#2E6B4F',
+    // La paleta de la guía visual (`docs/design/`), **por referencia**: cada
+    // color es el token de `app/globals.css`, no una copia de su valor.
+    //
+    // Antes acá estaban los seis hex escritos de nuevo, con la advertencia de
+    // que si se cambiaba la paleta había que cambiar los dos lugares. Una
+    // advertencia no es un mecanismo: el día que cambie el naranja, las
+    // pantallas de sesión iban a quedar con el viejo y nadie se iba a enterar
+    // hasta verlas. `var(--brand)` sirve igual como string en un estilo en
+    // línea, y ya no hay dos fuentes que puedan discrepar (`UI-01`).
+    primary: 'var(--brand)',
+    primaryHover: 'var(--brand-hover)',
+    primaryForeground: 'var(--brand-foreground)',
+    background: 'var(--background)',
+    cardBackground: 'var(--card)',
+    text: 'var(--foreground)',
+    textSecondary: 'var(--muted-foreground)',
+    border: 'var(--border)',
+    error: 'var(--destructive)',
+    success: 'var(--ok)',
   },
   logo: {
     text: 'Cordillera',

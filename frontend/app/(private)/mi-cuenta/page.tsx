@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { changeOwnPassword } from '@/app/actions/access'
 import { getSession } from '@/app/actions/auth'
 import { PasswordForm } from '@/components/auth/PasswordForm'
+import { Code } from '@/components/ui/amount'
+import { Card } from '@/components/ui/card'
 
 const ROLES: Record<string, string> = {
   OWNER: 'Dueño',
@@ -18,7 +20,7 @@ export default async function MyAccountPage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg space-y-8 px-6 py-10">
+    <div className="max-w-lg space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Mi cuenta</h1>
         <p className="text-muted-foreground">
@@ -32,16 +34,16 @@ export default async function MyAccountPage() {
         <dt className="text-muted-foreground">Entrás con</dt>
         <dd>{session.user.email}</dd>
         <dt className="text-muted-foreground">Te escribimos a</dt>
-        <dd>{session.user.phone}</dd>
+        <Code value={session.user.phone} as="dd" />
       </dl>
 
-      <section className="space-y-3 rounded border p-4">
+      <Card className="space-y-3 p-5">
         <h2 className="font-medium">Cambiar mi clave</h2>
         <p className="text-xs text-muted-foreground">
           Al cambiarla se cierran las sesiones que tengas abiertas en otros navegadores.
         </p>
         <PasswordForm action={changeOwnPassword} label="Cambiar la clave" asksCurrentPassword />
-      </section>
-    </main>
+      </Card>
+    </div>
   )
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { NoPermission } from '@/components/common/NoPermission'
+import { ErrorState } from '@/components/ui/state'
 import { InvoiceFilters } from '@/components/purchases/InvoiceFilters'
 import { InvoiceTable } from '@/components/purchases/InvoiceTable'
 import { readFromApi } from '@/lib/api/server'
@@ -69,12 +70,10 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
       return <NoPermission what="las facturas de compra" />
     }
     return (
-      <main className="mx-auto max-w-6xl space-y-6 p-8">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold">Facturas</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer las facturas. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer las facturas" />
+      </div>
     )
   }
 
@@ -82,7 +81,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
   const withoutReceipt = missing.ok ? missing.data.total : null
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 p-8">
+    <div className="space-y-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Facturas</h1>
         <p className="text-sm text-muted-foreground">
@@ -92,31 +91,31 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
       </header>
 
       <nav className="flex flex-wrap gap-4 text-sm">
-        <Link className="underline" href="/facturas">
+        <Link className="text-link hover:underline" href="/facturas">
           Todas
         </Link>
-        <Link className="underline" href="/facturas?payment_state=SIN_PAGOS">
+        <Link className="text-link hover:underline" href="/facturas?payment_state=SIN_PAGOS">
           Sin pagos
         </Link>
-        <Link className="underline" href="/facturas?payment_state=PARCIAL">
+        <Link className="text-link hover:underline" href="/facturas?payment_state=PARCIAL">
           Pagadas a medias
         </Link>
-        <Link className="underline" href="/facturas?payment_state=SALDADA">
+        <Link className="text-link hover:underline" href="/facturas?payment_state=SALDADA">
           Saldadas
         </Link>
-        <Link className="underline" href="/facturas?with_receipt=false">
+        <Link className="text-link hover:underline" href="/facturas?with_receipt=false">
           Sin recibo
         </Link>
-        <Link className="underline" href="/facturas/revision">
+        <Link className="text-link hover:underline" href="/facturas/revision">
           En revisión
         </Link>
-        <Link className="underline" href="/facturas/pagos">
+        <Link className="text-link hover:underline" href="/facturas/pagos">
           Comprobantes por repartir
         </Link>
-        <Link className="underline" href="/facturas/incidentes">
+        <Link className="text-link hover:underline" href="/facturas/incidentes">
           Incidentes de recibo
         </Link>
-        <Link className="underline" href="/proveedores">
+        <Link className="text-link hover:underline" href="/proveedores">
           Proveedores
         </Link>
       </nav>
@@ -124,6 +123,6 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
       <InvoiceFilters suppliers={suppliers.ok ? suppliers.data.items : []} values={filters} />
 
       <InvoiceTable invoices={listing.items} />
-    </main>
+    </div>
   )
 }

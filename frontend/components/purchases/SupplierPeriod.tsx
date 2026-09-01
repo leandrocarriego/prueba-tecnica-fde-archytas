@@ -1,3 +1,6 @@
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+
 /**
  * El período sobre el que se pide el total de un proveedor (RF-22 de 004).
  *
@@ -30,33 +33,25 @@ export function SupplierPeriod({
     <form className="flex flex-wrap items-end gap-3 text-sm" action={`/proveedores/${supplierId}`}>
       <label>
         <span className="mb-1 block text-muted-foreground">Desde</span>
-        <input
-          className="rounded border px-3 py-1.5"
-          name="since"
-          type="date"
-          defaultValue={since ?? ''}
-        />
+        <Input name="since" type="date" defaultValue={since ?? ''} />
       </label>
       <label>
         <span className="mb-1 block text-muted-foreground">Hasta</span>
-        <input
-          className="rounded border px-3 py-1.5"
-          name="until"
-          type="date"
-          defaultValue={until ?? ''}
-        />
+        <Input name="until" type="date" defaultValue={until ?? ''} />
       </label>
-      <button className="rounded border px-3 py-1.5 hover:bg-muted" type="submit">
+      {/* Acotar el período no es la tarea de la ficha: leerla lo es. */}
+      <Button type="submit" variant="outline">
         Ver el período
-      </button>
+      </Button>
+      {/* Los dos atajos son navegación —cambian lo que se mira, no los datos—. */}
       <a
-        className="underline text-muted-foreground"
+        className="text-link hover:underline"
         href={`/proveedores/${supplierId}?since=${year}-01-01&until=${year}-12-31`}
       >
         Año en curso
       </a>
       {(since || until) && (
-        <a className="underline text-muted-foreground" href={`/proveedores/${supplierId}`}>
+        <a className="text-link hover:underline" href={`/proveedores/${supplierId}`}>
           Todo
         </a>
       )}

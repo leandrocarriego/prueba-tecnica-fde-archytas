@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { splitPayment } from '@/app/actions/purchases'
+import { Code, Day, Money } from '@/components/ui/amount'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { day, money } from '@/lib/format'
+import { Notice } from '@/components/ui/notice'
+import { Empty } from '@/components/ui/state'
 import type { Invoice, Payment } from '@/lib/purchases/types'
 
 /**
@@ -80,21 +83,24 @@ function VoucherCard({ payment, invoices }: { payment: Payment; invoices: Invoic
   }
 
   return (
-    <article className="space-y-4 rounded border p-4">
+    <Card className="space-y-4 p-5">
       <header className="space-y-1">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-medium">{money(payment.amount)}</h2>
-          <span className="text-sm text-muted-foreground">Pagado el {day(payment.paid_on)}</span>
+          <Money value={payment.amount} as="div" className="text-lg font-medium" />
+          <span className="text-sm text-muted-foreground">
+            Pagado el <Day value={payment.paid_on} />
+          </span>
         </div>
         <p className="text-sm text-muted-foreground">
           {payment.supplier_text || 'Sin proveedor identificado'}
           {payment.reference && ` · ${payment.reference}`}
         </p>
-        {payment.review_reason && (
-          <p className="rounded border border-warn-border bg-warn-surface p-2 text-sm text-warn">
-            {payment.review_reason}
-          </p>
-        )}
+        {/*
+         * Por qué quedó apartado, arriba del reparto que lo resuelve: el aviso
+         * va antes que el número que califica (`RF-14`), y su salida es el
+         * formulario de abajo.
+         */}
+        {payment.review_reason && <Notice tone="warn" title={payment.review_reason} />}
       </header>
 
       {/*
@@ -103,10 +109,9 @@ function VoucherCard({ payment, invoices }: { payment: Payment; invoices: Invoic
         supuesto firmado dice que un comprobante cubre facturas de uno solo.
       */}
       {invoices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Todavía no hay facturas de este proveedor donde imputarlo. Cuando entren, van a aparecer
-          acá.
-        </p>
+        <Empty title="Todavía no hay facturas de este proveedor donde imputarlo.">
+          Cuando entren, van a aparecer acá.
+        </Empty>
       ) : (
         <>
           <table className="w-full text-sm">
@@ -123,13 +128,13 @@ function VoucherCard({ payment, invoices }: { payment: Payment; invoices: Invoic
               {invoices.map(invoice => (
                 <tr key={invoice.id} className="border-b">
                   <td className="py-2">
-                    <Link className="underline" href={`/facturas/${invoice.id}`}>
-                      {invoice.number}
+                    <Link className="text-link hover:underline" href={`/facturas/${invoice.id}`}>
+                      <Code value={invoice.number} />
                     </Link>
                   </td>
-                  <td className="py-2">{invoice.due_on ? day(invoice.due_on) : '—'}</td>
-                  <td className="py-2 text-right">{money(invoice.total)}</td>
-                  <td className="py-2 text-right">{money(invoice.balance)}</td>
+                  <Day value={invoice.due_on} cell className="py-2 text-left" />
+                  <Money value={invoice.total} cell className="py-2" />
+                  <Money value={invoice.balance} cell className="py-2" />
                   <td className="py-2 text-right">
                     <Input
                       className="w-28 text-right"
@@ -146,27 +151,37 @@ function VoucherCard({ payment, invoices }: { payment: Payment; invoices: Invoic
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm">
-              Repartido {money(assigned)} de {money(payment.amount)}.{' '}
+              Repartido <Money value={assigned} /> de <Money value={payment.amount} />.{' '}
               {exact ? (
                 <span className="text-ok">Cierra exacto.</span>
               ) : (
                 <span className="text-muted-foreground">
-                  {left > 0 ? `Falta repartir ${money(left)}.` : `Te pasaste por ${money(-left)}.`}
+                  {left > 0 ? (
+                    <>
+                      Falta repartir <Money value={left} />.
+                    </>
+                  ) : (
+                    <>
+                      Te pasaste por <Money value={-left} />.
+                    </>
+                  )}
                 </span>
               )}
             </p>
-            <Button type="button" disabled={busy || !exact} onClick={() => void confirm()}>
+            {/* Repartir es la tarea de esta pantalla: su único naranja (`RF-11`). */}
+            <Button
+              type="button"
+              variant="brand"
+              disabled={busy || !exact}
+              onClick={() => void confirm()}
+            >
               Confirmar el reparto
             </Button>
           </div>
         </>
       )}
 
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
-    </article>
+      {error && <Notice tone="danger" title={error} />}
+    </Card>
   )
 }

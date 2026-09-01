@@ -4,9 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { dropAlias } from '@/app/actions/purchases'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatMoment } from '@/lib/catalog/format'
 import type { Supplier, SupplierAlias } from '@/lib/purchases/types'
+import { isUnconfirmedSupplierAlias, pill } from '@/lib/ui/tone'
+import { Notice } from '@/components/ui/notice'
 
 /**
  * Las grafías guardadas, y el botón que deja una sin efecto.
@@ -48,11 +52,7 @@ export function SpellingList({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       <table className="w-full text-sm">
         <thead className="border-b text-left text-muted-foreground">
@@ -66,7 +66,16 @@ export function SpellingList({
         <tbody>
           {aliases.map(alias => (
             <tr key={alias.id} className="border-b align-top">
-              <td className="py-2 font-mono">{alias.text_original}</td>
+              <td className="py-2">
+                {/*
+                 * `RF-08`: la que reconoció el sistema va punteada; la que
+                 * asignó una persona, no. Es la misma píldora que la ficha del
+                 * proveedor, porque es el mismo dato.
+                 */}
+                <Badge tone={pill('neutral', isUnconfirmedSupplierAlias(alias.source))}>
+                  <Code value={alias.text_original} />
+                </Badge>
+              </td>
               <td className="py-2">{names.get(alias.supplier_id) ?? '—'}</td>
               <td className="py-2 text-muted-foreground">
                 {alias.source === 'OBSERVED'

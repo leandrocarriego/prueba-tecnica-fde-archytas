@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getSession } from '@/app/actions/auth'
 import { CaseCard } from '@/components/triage/CaseCard'
 import { RuleList } from '@/components/triage/RuleList'
+import { Empty, ErrorState } from '@/components/ui/state'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
 import { formatMoment } from '@/lib/catalog/format'
@@ -67,18 +68,18 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
 
   if (cases === null) {
     return (
-      <main className="mx-auto max-w-4xl space-y-4 p-8">
+      <div className="space-y-4">
         <h1 className="text-2xl font-bold">Revisión</h1>
-        <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
-          No pudimos traer los pendientes. Probá de nuevo en un momento.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer los pendientes.">
+          Probá de nuevo en un momento.
+        </ErrorState>
+      </div>
     )
   }
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/precios">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/precios">
         « Volver a la lista de precios
       </Link>
 
@@ -131,10 +132,9 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
 
       <section className="space-y-3">
         {cases.items.length === 0 ? (
-          <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-            Nada apartado. Cuando el sistema no pueda resolver algo solo, va a aparecer acá con el
-            motivo.
-          </p>
+          <Empty title="Nada apartado.">
+            Cuando el sistema no pueda resolver algo solo, va a aparecer acá con el motivo.
+          </Empty>
         ) : (
           cases.items.map(item => (
             <CaseCard
@@ -157,6 +157,6 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
           <RuleList rules={rules ?? []} />
         </section>
       )}
-    </main>
+    </div>
   )
 }

@@ -7,11 +7,15 @@ import { SupplierContact } from '@/components/purchases/SupplierContact'
 import { SupplierPeriod } from '@/components/purchases/SupplierPeriod'
 import { notFound } from 'next/navigation'
 
+import { Code, Decimal, Money } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { ErrorState } from '@/components/ui/state'
 import { readFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
-import { count, decimal, money } from '@/lib/format'
+import { count } from '@/lib/format'
 import type { CorrectionReason } from '@/lib/operations/types'
 import type { InvoiceList, Supplier, SupplierTotals } from '@/lib/purchases/types'
+import { isUnconfirmedSupplierAlias, pill } from '@/lib/ui/tone'
 
 export const metadata = {
   title: 'Proveedor — Plataforma Cordillera',
@@ -67,14 +71,12 @@ export default async function SupplierPage({
     }
     if (read.failure === 'missing') notFound()
     return (
-      <main className="mx-auto max-w-5xl space-y-6 p-8">
-        <Link className="text-sm text-muted-foreground underline" href="/proveedores">
+      <div className="space-y-6">
+        <Link className="text-sm text-link hover:underline" href="/proveedores">
           « Volver al padrón
         </Link>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer este proveedor. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer este proveedor" />
+      </div>
     )
   }
 
@@ -90,15 +92,19 @@ export default async function SupplierPage({
     : null
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/proveedores">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/proveedores">
         « Volver al padrón
       </Link>
 
       <header className="space-y-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold">{supplier.legal_name}</h1>
-          <p className="text-sm text-muted-foreground">{supplier.tax_id ?? 'CUIT: falta'}</p>
+          <Code
+            value={supplier.tax_id ?? 'CUIT: falta'}
+            as="div"
+            className="text-sm text-muted-foreground"
+          />
         </div>
         <SupplierContact
           supplier={supplier}
@@ -126,20 +132,25 @@ export default async function SupplierPage({
           </p>
           <ul className="flex flex-wrap gap-2">
             {(supplier.aliases ?? []).map(alias => (
-              <li
-                key={alias.id}
-                className="rounded bg-secondary px-2 py-0.5 font-mono text-xs"
-                title={
-                  alias.source === 'OBSERVED'
-                    ? 'Reconocida por el sistema'
-                    : 'Asignada por una persona'
-                }
-              >
-                {alias.text_original}
+              <li key={alias.id}>
+                {/*
+                 * `RF-08`: la que reconoció el sistema va punteada, la que
+                 * asignó una persona no. La diferencia se ve sin leer el título.
+                 */}
+                <Badge
+                  tone={pill('neutral', isUnconfirmedSupplierAlias(alias.source))}
+                  title={
+                    alias.source === 'OBSERVED'
+                      ? 'Reconocida por el sistema'
+                      : 'Asignada por una persona'
+                  }
+                >
+                  {alias.text_original}
+                </Badge>
               </li>
             ))}
           </ul>
-          <Link className="text-sm underline" href="/proveedores/grafias">
+          <Link className="text-sm text-link hover:underline" href="/proveedores/grafias">
             Ver las grafías guardadas
           </Link>
         </div>
@@ -152,22 +163,26 @@ export default async function SupplierPage({
           <dl className="grid gap-4 text-sm sm:grid-cols-4">
             <div>
               <dt className="text-muted-foreground">Facturado</dt>
-              <dd className="text-lg font-medium">{money(totals.invoiced)}</dd>
+              <Money value={totals.invoiced} as="dd" className="text-lg font-medium" />
             </div>
             <div>
               <dt className="text-muted-foreground">Pagado</dt>
-              <dd className="text-lg font-medium">{money(totals.paid)}</dd>
+              <Money value={totals.paid} as="dd" className="text-lg font-medium" />
             </div>
             <div>
               <dt className="text-muted-foreground">Se le debe</dt>
-              <dd className="text-lg font-medium">{money(totals.owed)}</dd>
+              <Money value={totals.owed} as="dd" className="text-lg font-medium" />
             </div>
             <div>
               <dt className="text-muted-foreground">Atraso promedio</dt>
               <dd className="text-lg font-medium">
-                {totals.average_delay_days === null
-                  ? 'sin atrasos'
-                  : `${decimal(totals.average_delay_days)} días`}
+                {totals.average_delay_days === null ? (
+                  'sin atrasos'
+                ) : (
+                  <>
+                    <Decimal value={totals.average_delay_days} /> días
+                  </>
+                )}
               </dd>
             </div>
           </dl>
@@ -200,8 +215,8 @@ export default async function SupplierPage({
                 {totals.aging.map(bucket => (
                   <tr key={bucket.label} className="border-b">
                     <td className="py-2">{bucket.label}</td>
-                    <td className="py-2 text-right">{money(bucket.amount)}</td>
-                    <td className="py-2 text-right text-muted-foreground">
+                    <Money value={bucket.amount} cell className="py-2" />
+                    <td className="amount py-2 text-right text-muted-foreground">
                       {count(bucket.invoices)} facturas
                     </td>
                   </tr>
@@ -216,6 +231,6 @@ export default async function SupplierPage({
         <h2 className="text-lg font-medium">Sus facturas</h2>
         <InvoiceTable invoices={invoices.ok ? invoices.data.items : []} />
       </section>
-    </main>
+    </div>
   )
 }

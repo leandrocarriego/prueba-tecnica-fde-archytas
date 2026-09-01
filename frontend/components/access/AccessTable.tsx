@@ -9,6 +9,11 @@ import {
   type ActionResult,
   type UserRead,
 } from '@/app/actions/access'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { selectClassName } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
+import type { BadgeTone } from '@/lib/ui/tone'
 
 const ROLES: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'OWNER', label: 'Dueño' },
@@ -16,12 +21,18 @@ const ROLES: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'SALES', label: 'Ventas' },
 ]
 
-/** The four states of an access, derived on the backend and only shown here. */
-function stateOf(user: UserRead): { label: string; tone: string } {
-  if (!user.is_active) return { label: 'Desactivado', tone: 'pill' }
-  if (!user.activated_at) return { label: 'Invitado', tone: 'pill pill-warn' }
-  if (user.locked_until) return { label: 'Bloqueado', tone: 'pill pill-danger' }
-  return { label: 'Activo', tone: 'pill pill-ok' }
+/**
+ * The four states of an access, derived on the backend and only shown here.
+ *
+ * El tono es el de `Badge` y ya no la clase escrita a mano: éste era uno de los
+ * dos archivos que dibujaban `.pill` por su cuenta, que es cómo un estado
+ * termina viéndose distinto en dos pantallas (`UI-03`).
+ */
+function stateOf(user: UserRead): { label: string; tone: BadgeTone } {
+  if (!user.is_active) return { label: 'Desactivado', tone: 'neutral' }
+  if (!user.activated_at) return { label: 'Invitado', tone: 'warn' }
+  if (user.locked_until) return { label: 'Bloqueado', tone: 'danger' }
+  return { label: 'Activo', tone: 'ok' }
 }
 
 export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; viewerId: number }) {
@@ -34,15 +45,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
 
   return (
     <div className="space-y-4">
-      {result && (
-        <p
-          className={`rounded border px-4 py-2 text-sm ${
-            result.ok ? 'border-ok-border bg-ok-surface' : 'border-danger-border bg-danger-surface'
-          }`}
-        >
-          {result.message}
-        </p>
-      )}
+      {result && <Notice tone={result.ok ? 'ok' : 'danger'} title={result.message} />}
 
       <table className="w-full text-left text-sm">
         <thead className="border-b text-muted-foreground">
@@ -72,7 +75,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
                     defaultValue={access.role}
                     disabled={pending || isViewer}
                     onChange={event => run(() => changeRole(access.id, event.target.value))}
-                    className="rounded border px-2 py-1 disabled:opacity-50"
+                    className={selectClassName}
                   >
                     {ROLES.map(role => (
                       <option key={role.value} value={role.value}>
@@ -82,7 +85,7 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
                   </select>
                 </td>
                 <td>
-                  <span className={tone}>{label}</span>
+                  <Badge tone={tone}>{label}</Badge>
                 </td>
                 <td className="py-3 text-right">
                   {isViewer ? (
@@ -90,23 +93,25 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
                     // screen does not offer it. The backend refuses it anyway.
                     <span className="text-xs text-muted-foreground">Sos vos</span>
                   ) : access.is_active ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={pending}
                       onClick={() => run(() => deactivateAccess(access.id))}
-                      className="cursor-pointer rounded border px-3 py-1 hover:bg-muted disabled:opacity-50"
                     >
                       Desactivar
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={pending}
                       onClick={() => run(() => reactivateAccess(access.id))}
-                      className="cursor-pointer rounded border px-3 py-1 hover:bg-muted disabled:opacity-50"
                     >
                       Reactivar
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>

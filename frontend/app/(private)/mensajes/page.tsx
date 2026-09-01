@@ -6,6 +6,8 @@ import { MessageList } from '@/components/messaging/MessageList'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
 import type { Assignee, MessageList as MessageListRead } from '@/lib/messaging/types'
+import { Button } from '@/components/ui/button'
+import { selectClassName } from '@/components/ui/input'
 
 export const metadata = {
   title: 'Mensajes — Plataforma Cordillera',
@@ -50,7 +52,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
   }
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
+    <div className="space-y-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Mensajes</h1>
         <p className="text-sm text-muted-foreground">
@@ -59,22 +61,22 @@ export default async function MessagesPage({ searchParams }: PageProps) {
       </header>
 
       <nav className="flex flex-wrap gap-4 text-sm">
-        <Link className="underline" href="/mensajes">
+        <Link className="text-link hover:underline" href="/mensajes">
           Todos
         </Link>
-        <Link className="underline" href="/mensajes?estado=PENDING">
+        <Link className="text-link hover:underline" href="/mensajes?estado=PENDING">
           Pendientes
         </Link>
-        <Link className="underline" href="/mensajes?tipo=PAYMENT_CLAIM">
+        <Link className="text-link hover:underline" href="/mensajes?tipo=PAYMENT_CLAIM">
           Reclamos de pago
         </Link>
-        <Link className="underline" href="/mensajes?tipo=DUE_SOON">
+        <Link className="text-link hover:underline" href="/mensajes?tipo=DUE_SOON">
           Vencimientos
         </Link>
-        <Link className="underline" href="/mensajes?tipo=LOW_STOCK">
+        <Link className="text-link hover:underline" href="/mensajes?tipo=LOW_STOCK">
           Stock bajo
         </Link>
-        <Link className="underline" href="/mensajes?tipo=UNCLASSIFIED">
+        <Link className="text-link hover:underline" href="/mensajes?tipo=UNCLASSIFIED">
           Sin clasificar
         </Link>
       </nav>
@@ -89,7 +91,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
         {filters.estado && <input name="estado" type="hidden" value={filters.estado} />}
         <label htmlFor="proveedor">Proveedor</label>
         <select
-          className="rounded border p-2"
+          className={selectClassName}
           defaultValue={filters.proveedor ?? ''}
           id="proveedor"
           name="proveedor"
@@ -101,9 +103,10 @@ export default async function MessagesPage({ searchParams }: PageProps) {
             </option>
           ))}
         </select>
-        <button className="rounded border px-3 py-2" type="submit">
+        {/* Filtrar no es la tarea: leer el buzón lo es (`RF-11`). */}
+        <Button type="submit" variant="outline">
           Filtrar
-        </button>
+        </Button>
       </form>
 
       <MessageList
@@ -111,6 +114,6 @@ export default async function MessagesPage({ searchParams }: PageProps) {
         assignees={assignees ?? []}
         canEdit={canEdit(session?.permissions ?? {}, 'SUPPLIER_MESSAGES')}
       />
-    </main>
+    </div>
   )
 }

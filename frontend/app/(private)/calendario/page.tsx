@@ -3,10 +3,11 @@ import Link from 'next/link'
 import { getSession } from '@/app/actions/auth'
 import { CalendarGrid } from '@/components/purchases/CalendarGrid'
 import { NoPermission } from '@/components/common/NoPermission'
+import { Day } from '@/components/ui/amount'
+import { ErrorState } from '@/components/ui/state'
 import { readFromApi } from '@/lib/api/server'
 import { windowFor } from '@/lib/purchases/calendar'
 import { canEdit } from '@/lib/auth/permissions'
-import { day } from '@/lib/format'
 import type { Calendar } from '@/lib/purchases/types'
 
 export const metadata = {
@@ -49,23 +50,22 @@ export default async function CalendarPage({ searchParams }: PageProps) {
       return <NoPermission what="el calendario de vencimientos" />
     }
     return (
-      <main className="mx-auto max-w-4xl space-y-4 p-8">
+      <div className="space-y-4">
         <h1 className="text-2xl font-bold">Calendario</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer el calendario. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer el calendario." />
+      </div>
     )
   }
 
   const calendar = read.data
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
+    <div className="space-y-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Calendario</h1>
         <p className="text-sm text-muted-foreground">
-          Del {day(calendar.since)} al {day(calendar.until)} · {calendar.items.length} vencimientos.
+          Del <Day value={calendar.since} /> al <Day value={calendar.until} /> ·{' '}
+          {calendar.items.length} vencimientos.
         </p>
       </header>
 
@@ -76,24 +76,24 @@ export default async function CalendarPage({ searchParams }: PageProps) {
         con un mes que la pantalla supuso.
       */}
       <nav className="flex flex-wrap items-center gap-4 text-sm">
-        <Link className="underline" href={windowFor(calendar.since, -1, filters)}>
+        <Link className="text-link hover:underline" href={windowFor(calendar.since, -1, filters)}>
           « Mes anterior
         </Link>
-        <Link className="underline" href="/calendario">
+        <Link className="text-link hover:underline" href="/calendario">
           Este mes
         </Link>
-        <Link className="underline" href={windowFor(calendar.since, 1, filters)}>
+        <Link className="text-link hover:underline" href={windowFor(calendar.since, 1, filters)}>
           Mes siguiente »
         </Link>
-        <Link className="underline" href="/calendario?sin_recibo=1">
+        <Link className="text-link hover:underline" href="/calendario?sin_recibo=1">
           Sólo sin recibo
         </Link>
-        <Link className="underline" href="/calendario?saldadas=no">
+        <Link className="text-link hover:underline" href="/calendario?saldadas=no">
           Esconder las saldadas
         </Link>
       </nav>
 
       <CalendarGrid calendar={calendar} canEdit={canEdit(session?.permissions ?? {}, 'CALENDAR')} />
-    </main>
+    </div>
   )
 }

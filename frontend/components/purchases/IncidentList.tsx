@@ -8,8 +8,13 @@ import { closeIncident } from '@/app/actions/purchases'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatMoment } from '@/lib/catalog/format'
-import { day } from '@/lib/format'
+
 import type { Incident } from '@/lib/purchases/types'
+import { Empty } from '@/components/ui/state'
+import { Day } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
+import { Notice } from '@/components/ui/notice'
 
 /**
  * Los incidentes, y la única cosa que se hace con uno: cerrarlo diciendo qué
@@ -23,9 +28,9 @@ import type { Incident } from '@/lib/purchases/types'
 export function IncidentList({ incidents }: { incidents: Incident[] }) {
   if (incidents.length === 0) {
     return (
-      <p className="rounded border border-dashed p-8 text-center text-muted-foreground">
-        Nada por resolver. Cuando una factura se pase de su fecha sin recibo, va a aparecer acá.
-      </p>
+      <Empty title="Nada por resolver.">
+        Cuando una factura se pase de su fecha sin recibo, va a aparecer acá.
+      </Empty>
     )
   }
 
@@ -59,10 +64,10 @@ function IncidentCard({ incident }: { incident: Incident }) {
   const isClosed = incident.closed_at !== null
 
   return (
-    <article className="space-y-3 rounded border p-4">
+    <Card className="space-y-3 p-5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-medium">
-          <Link className="underline" href={`/facturas/${incident.invoice_id}`}>
+          <Link className="text-link hover:underline" href={`/facturas/${incident.invoice_id}`}>
             {incident.invoice_number ?? `Factura ${incident.invoice_id}`}
           </Link>
           {incident.supplier_name && (
@@ -71,7 +76,11 @@ function IncidentCard({ incident }: { incident: Incident }) {
             </span>
           )}
         </h3>
-        <span className="text-sm text-muted-foreground">Vencida el {day(incident.opened_on)}</span>
+        <span className="flex items-center gap-2 text-sm text-muted-foreground">
+          Vencida el <Day value={incident.opened_on} />
+          {/* El estado del incidente, dicho como estado (`RF-06`). */}
+          <Badge tone={isClosed ? 'ok' : 'warn'}>{isClosed ? 'Cerrado' : 'Abierto'}</Badge>
+        </span>
       </header>
 
       {isClosed ? (
@@ -105,11 +114,7 @@ function IncidentCard({ incident }: { incident: Incident }) {
         </div>
       )}
 
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
-    </article>
+      {error && <Notice tone="danger" title={error} />}
+    </Card>
   )
 }

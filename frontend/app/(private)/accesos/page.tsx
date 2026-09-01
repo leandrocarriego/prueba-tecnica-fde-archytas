@@ -18,7 +18,7 @@ export default async function AccessesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-8 px-6 py-10">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Accesos</h1>
         <p className="text-muted-foreground">
@@ -28,6 +28,6 @@ export default async function AccessesPage() {
 
       <NewAccessForm />
       <AccessTable accesses={accesses.items} viewerId={session.user.id} />
-    </main>
+    </div>
   )
 }

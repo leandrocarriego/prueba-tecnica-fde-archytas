@@ -4,12 +4,16 @@ import { notFound } from 'next/navigation'
 import { getSession } from '@/app/actions/auth'
 import { NoPermission } from '@/components/common/NoPermission'
 import { InvoicePanel } from '@/components/purchases/InvoicePanel'
+import { Day, Money } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { Notice } from '@/components/ui/notice'
+import { ErrorState } from '@/components/ui/state'
 import { readFromApi } from '@/lib/api/server'
 import { formatMoment } from '@/lib/catalog/format'
 import { canEdit } from '@/lib/auth/permissions'
-import { day, money } from '@/lib/format'
 import { paymentStateLabel, reviewStateLabel, warningsFor } from '@/lib/purchases/labels'
 import type { Invoice, Payment, Receipt } from '@/lib/purchases/types'
+import { invoicePaymentTone, invoiceReviewTone } from '@/lib/ui/tone'
 
 export const metadata = {
   title: 'Factura — Plataforma Cordillera',
@@ -38,14 +42,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
     }
     if (read.failure === 'missing') notFound()
     return (
-      <main className="mx-auto max-w-4xl space-y-6 p-8">
-        <Link className="text-sm text-muted-foreground underline" href="/facturas">
+      <div className="space-y-6">
+        <Link className="text-sm text-link hover:underline" href="/facturas">
           « Volver a las facturas
         </Link>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer esta factura. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer esta factura" />
+      </div>
     )
   }
 
@@ -55,8 +57,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
   const permissions = session?.permissions ?? {}
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/facturas">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/facturas">
         « Volver a las facturas
       </Link>
 
@@ -64,34 +66,34 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
         <h1 className="text-2xl font-bold">Factura {invoice.number}</h1>
         <p className="text-sm text-muted-foreground">
           {invoice.supplier_name ?? `${invoice.supplier_text} (sin identificar)`} ·{' '}
-          {day(invoice.issued_on)} · vence {day(invoice.due_on)}
+          <Day value={invoice.issued_on} /> · vence <Day value={invoice.due_on} />
         </p>
+        {/* Lo que anda mal, arriba de los números que califica (`RF-14`). */}
         {warnings.map(warning => (
-          <p
-            key={warning}
-            className="rounded border border-warn-border bg-warn-surface p-3 text-sm text-warn"
-          >
-            {warning}
-          </p>
+          <Notice key={warning} tone="warn" title={warning} />
         ))}
       </header>
 
       <dl className="grid gap-4 text-sm sm:grid-cols-4">
         <div>
           <dt className="text-muted-foreground">Monto</dt>
-          <dd className="text-lg font-medium">{money(invoice.total)}</dd>
+          <Money value={invoice.total} as="dd" className="text-lg font-medium" />
         </div>
         <div>
           <dt className="text-muted-foreground">Pagado</dt>
-          <dd className="text-lg font-medium">{money(invoice.paid)}</dd>
+          <Money value={invoice.paid} as="dd" className="text-lg font-medium" />
         </div>
         <div>
           <dt className="text-muted-foreground">Saldo</dt>
-          <dd className="text-lg font-medium">{money(invoice.balance)}</dd>
+          <Money value={invoice.balance} as="dd" className="text-lg font-medium" />
         </div>
         <div>
           <dt className="text-muted-foreground">Estado</dt>
-          <dd className="text-lg font-medium">{paymentStateLabel(invoice.payment_state)}</dd>
+          <dd className="mt-1">
+            <Badge tone={invoicePaymentTone(invoice.payment_state)}>
+              {paymentStateLabel(invoice.payment_state)}
+            </Badge>
+          </dd>
         </div>
       </dl>
 
@@ -106,7 +108,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
               para no perder la factura que se estaba mirando.
             */}
             <a
-              className="text-sm underline"
+              className="text-sm text-link hover:underline"
               href={`/api/proxy/invoices/${invoice.id}/file`}
               rel="noreferrer"
               target="_blank"
@@ -132,8 +134,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
         primer día y no salía en la respuesta, así que ninguna pantalla podía
         decirlo — que es lo que el criterio firmado pide leer.
       */}
-      <p className="text-sm text-muted-foreground">
-        Revisión: {reviewStateLabel(invoice.review_state)}
+      <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+        Revisión:{' '}
+        <Badge tone={invoiceReviewTone(invoice.review_state)}>
+          {reviewStateLabel(invoice.review_state)}
+        </Badge>
         {invoice.resolved_at &&
           ` · la resolvió ${invoice.resolved_by_name ?? 'alguien que ya no tiene cuenta'} el ${formatMoment(invoice.resolved_at)}`}
         {invoice.arrival_count > 1 && ` · llegó ${invoice.arrival_count} veces`}
@@ -146,6 +151,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ invoic
         canPay={canEdit(permissions, 'PAYMENTS')}
         canIssue={canEdit(permissions, 'RECEIPTS')}
       />
-    </main>
+    </div>
   )
 }

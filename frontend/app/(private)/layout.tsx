@@ -30,9 +30,23 @@ export default async function PrivateLayout({ children }: { children: React.Reac
    * decide es `Navigation`; acá sólo se la ubica.
    */
   return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
+    <div className="flex min-h-dvh flex-col bg-background md:flex-row">
       <Navigation user={session.user} permissions={session.permissions} />
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1">
+        {/*
+         * El fondo de aplicación y el ancho de la columna los pone el shell, y
+         * **ninguna pantalla pone el suyo** (`RF-01`, `RF-02`). Antes cada una
+         * elegía: `max-w-2xl` en salud, `max-w-6xl` en facturas, `max-w-5xl` en
+         * proveedores, y pasar de una a otra movía el contenido de lugar. Que
+         * sea una sola decisión, tomada acá, es lo que hace que la plataforma
+         * se sienta una sola aplicación y no dieciséis pantallas parecidas.
+         *
+         * Una pantalla que necesita una columna más angosta —un formulario— la
+         * angosta **adentro**, sobre su tarjeta: eso es la forma de un
+         * contenido, no el ancho de la aplicación.
+         */}
+        <main className="mx-auto w-full max-w-6xl p-6 md:p-8">{children}</main>
+      </div>
     </div>
   )
 }

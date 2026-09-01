@@ -4,6 +4,9 @@ import { ParameterRow } from '@/components/operations/ParameterRow'
 import { readFromApi } from '@/lib/api/server'
 import type { AlertRoute } from '@/lib/notifications/types'
 import type { Parameter } from '@/lib/operations/types'
+import { ErrorState } from '@/components/ui/state'
+import { Card } from '@/components/ui/card'
+import { Notice } from '@/components/ui/notice'
 
 export const metadata = {
   title: 'Parámetros del sistema — Plataforma Cordillera',
@@ -47,12 +50,12 @@ export default async function ParametersPage() {
       return <NoPermission what="los parámetros del sistema" />
     }
     return (
-      <main className="mx-auto max-w-3xl space-y-6 p-8">
+      <div className="max-w-3xl space-y-6">
         <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer los parámetros. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer los parámetros.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
+      </div>
     )
   }
 
@@ -60,7 +63,7 @@ export default async function ParametersPage() {
   const waiting = parameters.filter(parameter => !parameter.has_effect).length
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <div className="max-w-3xl space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
         <p className="text-sm text-muted-foreground">
@@ -69,23 +72,28 @@ export default async function ParametersPage() {
         </p>
       </header>
 
+      {/* El aviso va arriba de los parámetros que califica (`RF-14`). */}
       {waiting > 0 && (
-        <p className="rounded border border-warn-border bg-warn-surface p-4 text-sm text-warn">
-          {waiting === 1
-            ? 'Hay un parámetro que todavía no tiene efecto: '
-            : `Hay ${waiting} parámetros que todavía no tienen efecto: `}
-          se guardan y quedan listos, pero la funcionalidad que los usa todavía no está construida.
+        <Notice
+          tone="warn"
+          title={
+            waiting === 1
+              ? 'Hay un parámetro que todavía no tiene efecto'
+              : `Hay ${waiting} parámetros que todavía no tienen efecto`
+          }
+        >
+          Se guardan y quedan listos, pero la funcionalidad que los usa todavía no está construida.
           Cuando se construya, va a encontrar el valor que hayas elegido.
-        </p>
+        </Notice>
       )}
 
-      <section className="rounded border">
+      <Card>
         {parameters.map(parameter => (
           <ParameterRow key={parameter.key} parameter={parameter} />
         ))}
-      </section>
+      </Card>
 
       {routes.ok && <AlertRoutes routes={routes.data} />}
-    </main>
+    </div>
   )
 }

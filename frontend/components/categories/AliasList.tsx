@@ -8,6 +8,10 @@ import { revokeRule } from '@/app/actions/triage'
 import { Button } from '@/components/ui/button'
 import { formatMoment } from '@/lib/catalog/format'
 import type { Category, CategoryAlias, Rule } from '@/lib/catalog/types'
+import { Notice } from '@/components/ui/notice'
+import { Code } from '@/components/ui/amount'
+import { Badge } from '@/components/ui/badge'
+import { isUnconfirmedCategoryAlias, pill } from '@/lib/ui/tone'
 
 /**
  * Las equivalencias guardadas: qué forma escrita significa qué rubro (RF-27).
@@ -53,11 +57,7 @@ export function AliasList({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <p className="rounded border border-danger-border bg-danger-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      )}
+      {error && <Notice tone="danger" title={error} />}
 
       <table className="w-full text-sm">
         <thead className="border-b text-left text-muted-foreground">
@@ -73,7 +73,15 @@ export function AliasList({
             const rule = alias.rule_id === null ? undefined : byRule.get(alias.rule_id)
             return (
               <tr key={alias.id} className="border-b align-top">
-                <td className="py-2 font-mono">{alias.text_original}</td>
+                <td className="py-2">
+                  {/*
+                   * `RF-08`: la aprendida de una decisión va punteada frente a
+                   * la sembrada en la puesta en marcha, que es la que vino dada.
+                   */}
+                  <Badge tone={pill('neutral', isUnconfirmedCategoryAlias(alias.source))}>
+                    <Code value={alias.text_original} />
+                  </Badge>
+                </td>
                 <td className="py-2">{byCategory.get(alias.category_id) ?? '—'}</td>
                 <td className="py-2 text-muted-foreground">
                   {rule?.created_by_name ?? 'Sembrado en la puesta en marcha'}

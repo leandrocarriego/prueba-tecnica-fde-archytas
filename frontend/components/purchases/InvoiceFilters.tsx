@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button'
+import { Input, selectClassName } from '@/components/ui/input'
 import type { Supplier } from '@/lib/purchases/types'
 
 /** Cómo se puede ordenar la lista, en las palabras que se leen (RF-45 de 004). */
@@ -39,18 +41,13 @@ export function InvoiceFilters({
     <form className="flex flex-wrap items-end gap-3" action="/facturas">
       <label className="text-sm">
         <span className="mb-1 block text-muted-foreground">Número, CUIT o proveedor</span>
-        <input
-          className="rounded border px-3 py-1.5"
-          name="q"
-          defaultValue={values.q ?? ''}
-          maxLength={255}
-        />
+        <Input name="q" defaultValue={values.q ?? ''} maxLength={255} />
       </label>
 
       <label className="text-sm">
         <span className="mb-1 block text-muted-foreground">Proveedor</span>
         <select
-          className="rounded border px-3 py-1.5"
+          className={selectClassName}
           name="supplier_id"
           defaultValue={values.supplier_id ?? ''}
         >
@@ -65,28 +62,18 @@ export function InvoiceFilters({
 
       <label className="text-sm">
         <span className="mb-1 block text-muted-foreground">Emitidas desde</span>
-        <input
-          className="rounded border px-3 py-1.5"
-          name="issued_from"
-          type="date"
-          defaultValue={values.issued_from ?? ''}
-        />
+        <Input name="issued_from" type="date" defaultValue={values.issued_from ?? ''} />
       </label>
 
       <label className="text-sm">
         <span className="mb-1 block text-muted-foreground">Hasta</span>
-        <input
-          className="rounded border px-3 py-1.5"
-          name="issued_to"
-          type="date"
-          defaultValue={values.issued_to ?? ''}
-        />
+        <Input name="issued_to" type="date" defaultValue={values.issued_to ?? ''} />
       </label>
 
       <label className="text-sm">
         <span className="mb-1 block text-muted-foreground">Ordenar por</span>
         <select
-          className="rounded border px-3 py-1.5"
+          className={selectClassName}
           name="order"
           defaultValue={values.order ?? 'issued_desc'}
         >
@@ -98,9 +85,11 @@ export function InvoiceFilters({
         </select>
       </label>
 
-      <button className="rounded border px-3 py-1.5 text-sm hover:bg-muted" type="submit">
+      {/* Buscar no es la tarea principal de la pantalla —leer las facturas lo
+          es—, así que va en contorno y no en naranja (`RF-11`). */}
+      <Button type="submit" variant="outline">
         Buscar
-      </button>
+      </Button>
     </form>
   )
 }

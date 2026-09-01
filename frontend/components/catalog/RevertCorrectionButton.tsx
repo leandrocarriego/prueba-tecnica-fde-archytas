@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { revertCorrection } from '@/app/actions/corrections'
 import { useToast } from '@/components/ui/toast'
+import { Button } from '@/components/ui/button'
 
 /**
  * Undo a correction and give the datum back the portal's value (RF-30, RF-31).
@@ -68,14 +69,14 @@ export function RevertCorrectionButton({ correctionId }: { correctionId: number 
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <button
-        className="cursor-pointer text-sm underline underline-offset-2 disabled:opacity-50"
-        disabled={working}
-        onClick={onClick}
-        type="button"
-      >
+      {/*
+        `RF-13`: esto **modifica** el dato —devuelve el valor del portal—, así
+        que va en contorno y nunca en el azul de enlace, que es el color de lo
+        que sólo informa. Antes se veía como un enlace subrayado.
+      */}
+      <Button variant="outline" size="sm" disabled={working} onClick={onClick} type="button">
         {working ? 'Deshaciendo…' : 'Volver al valor del portal'}
-      </button>
+      </Button>
       <span aria-live="polite" className="text-sm text-danger" role="status">
         {error ?? ''}
       </span>

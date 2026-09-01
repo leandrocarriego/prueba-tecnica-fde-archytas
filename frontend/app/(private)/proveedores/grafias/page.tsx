@@ -6,6 +6,7 @@ import { SpellingList } from '@/components/purchases/SpellingList'
 import { readFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
 import type { SupplierAlias, SupplierList } from '@/lib/purchases/types'
+import { ErrorState } from '@/components/ui/state'
 
 export const metadata = {
   title: 'Grafías de proveedores — Plataforma Cordillera',
@@ -35,20 +36,20 @@ export default async function SpellingsPage() {
       return <NoPermission what="el padrón de proveedores" />
     }
     return (
-      <main className="mx-auto max-w-4xl space-y-6 p-8">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold">Grafías</h1>
-        <p className="rounded border border-danger-border bg-danger-surface p-4 text-sm text-danger">
-          No pudimos traer las grafías guardadas. Probá de nuevo en unos minutos.
-        </p>
-      </main>
+        <ErrorState title="No pudimos traer las grafías guardadas.">
+          Probá de nuevo en unos minutos.
+        </ErrorState>
+      </div>
     )
   }
 
   const aliases = read.data
 
   return (
-    <main className="mx-auto max-w-4xl space-y-8 p-8">
-      <Link className="text-sm text-muted-foreground underline" href="/proveedores">
+    <div className="space-y-8">
+      <Link className="text-sm text-link hover:underline" href="/proveedores">
         « Volver al padrón
       </Link>
 
@@ -64,6 +65,6 @@ export default async function SpellingsPage() {
         suppliers={suppliers.data.items}
         canEdit={canEdit(session?.permissions ?? {}, 'SUPPLIERS')}
       />
-    </main>
+    </div>
   )
 }

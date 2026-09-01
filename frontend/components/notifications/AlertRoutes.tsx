@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 
 import { setAlertRoute } from '@/app/actions/alerts'
 import { ALERT_KINDS, ALERT_ROLES, type AlertRoute } from '@/lib/notifications/types'
+import { Card } from '@/components/ui/card'
+import { selectClassName } from '@/components/ui/input'
 
 /**
  * Quién recibe cada tipo de aviso (RF-37 de 007).
@@ -46,7 +48,7 @@ export function AlertRoutes({ routes }: { routes: AlertRoute[] }) {
         </p>
       </header>
 
-      <div className="rounded border">
+      <Card>
         {routes.map(route => (
           <div
             key={route.kind}
@@ -66,7 +68,7 @@ export function AlertRoutes({ routes }: { routes: AlertRoute[] }) {
             <label className="flex items-center gap-2 text-sm">
               <span className="sr-only">Quién recibe {ALERT_KINDS[route.kind] ?? route.kind}</span>
               <select
-                className="rounded border p-2"
+                className={selectClassName}
                 disabled={saving === route.kind}
                 value={route.role}
                 onChange={event => choose(route, event.target.value)}
@@ -80,7 +82,7 @@ export function AlertRoutes({ routes }: { routes: AlertRoute[] }) {
             </label>
           </div>
         ))}
-      </div>
+      </Card>
 
       <p aria-live="polite" className={`text-sm ${message?.ok === false ? 'text-danger' : ''}`}>
         {message?.text ?? ''}
