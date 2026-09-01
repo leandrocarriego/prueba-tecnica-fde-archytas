@@ -494,3 +494,81 @@ class CorrectionRead(BaseModel):
     corrected_at: datetime
     status: str
     conflict_value: Any | None = None
+
+
+# --- The owner's dashboard (the purchases cut) -------------------------------
+
+
+class UpcomingDue(BaseModel):
+    """One invoice about to fall due, as the dashboard lists it.
+
+    The balance travels beside the total because they are different questions:
+    the total is what the invoice was for, the balance is what is still owed on
+    it. A calendar that shows the total of a half-paid invoice is telling
+    somebody to pay it twice.
+    """
+
+    invoice_id: int
+    number: str
+    supplier_name: str | None
+    # The name as the portal wrote it, for the invoices nobody could attribute
+    # yet: they still fall due, and hiding them until somebody resolves the
+    # supplier would be the platform deciding not to warn (Artículo II).
+    supplier_text: str
+    total: Decimal
+    balance: Decimal
+    due_on: date
+    # Negative is already overdue. Computed here and not in the browser: the day
+    # this business runs on is Buenos Aires, and a phone in another zone would
+    # count a different number of days.
+    days_left: int
+    receipt_issued: bool
+    # Todavía sin confirmar por una persona: la factura está en revisión, así
+    # que su vencimiento avisa pero su importe no es una afirmación de esta
+    # plataforma. La pantalla lo dibuja punteado, que es lo que el punteado
+    # significa en toda la aplicación.
+    in_review: bool = False
+
+
+class PurchasesDashboard(BaseModel):
+    """What is owed, what falls due next and what was ordered and never arrived.
+
+    The four cuts of the owner's dashboard that are about purchases, and none of
+    them takes a window: «cuánto debo» and «qué vence esta semana» are questions
+    about today, and a period control over them would be a control that changes
+    nothing (RF-05 gives a window to the cuts that have one).
+
+    What is **left out** travels with the number, like everywhere else: an
+    invoice in review or one paid beyond its total does not add to the debt, and
+    how many there are is reported rather than buried (RF-23 of 004, RF-16 and
+    RF-28 of 005).
+
+    **A sum and a warning are not the same question**, and this cut answers both
+    with different rules. `owed` is a sum, so it only adds up what the platform
+    can vouch for. `due_soon`, `overdue` and `upcoming` are warnings, and they
+    include the invoices in review: a due date arrives whether or not somebody
+    resolved who the supplier is, and hiding it until then would be deciding not
+    to warn. What travels marked is the amount (`in_review`), not the date.
+    """
+
+    # --- What is owed to suppliers
+    owed: Decimal
+    open_invoices: int
+    excluded_in_review: int
+    excluded_inconsistent: int
+
+    # --- What falls due within the week
+    due_soon_days: int
+    due_soon: int
+    due_soon_without_receipt: int
+    overdue: int
+
+    # --- What was ordered and has not arrived
+    orders_pending: int
+    orders_stalled: int
+    # The parameter the owner set, so the screen can say «con más de N días»
+    # instead of hard-coding a number the owner can change (RF-10 of 007).
+    stalled_days: int
+
+    # --- The next few due dates, in the order they fall
+    upcoming: list[UpcomingDue]

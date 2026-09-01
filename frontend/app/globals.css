@@ -253,4 +253,20 @@
     border-style: dashed;
     border-color: var(--draft-border);
   }
+
+  /*
+   * El rayado de "esto quedó afuera del número".
+   *
+   * Es la misma señal que la guía dibuja en la barra de agosto del tablero y en
+   * el renglón «sin rubro asignado»: una porción que existe, que se mide, y que
+   * **no está sumada** en el dato de al lado. Va rayada y no de un color liso a
+   * propósito — un liso más se leería como una categoría más.
+   */
+  .hatch-excluded {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--warn-surface) 0 4px,
+      var(--warn-border) 4px 8px
+    );
+  }
 }

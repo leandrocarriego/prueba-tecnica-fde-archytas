@@ -203,7 +203,7 @@ Cuando eso parece imposible —cuando dos módulos necesitan leerse mutuamente t
 siempre significa que son en realidad uno solo, y la respuesta es corregir la frontera, no agregar
 el import. Escalá al `Backend-Architect` antes de romper la regla.
 
-Hoy hay cuatro proyecciones, y cada una existe por una lectura que no podía ser un evento:
+Hoy hay cinco proyecciones, y cada una existe por una lectura que no podía ser un evento:
 
 | Proyección | La mantiene | Alimentada por | Contesta |
 |---|---|---|---|
@@ -211,6 +211,7 @@ Hoy hay cuatro proyecciones, y cada una existe por una lectura que no podía ser
 | `core.category_alias` | `catalog` | los mismos, más `QuarantineRuleRedecided` | ¿a qué rubro corresponde esta forma escrita? |
 | `core.messaging_supplier` | `messaging` | `SuppliersNormalized` | ¿quién de los proveedores mandó este mensaje? |
 | `core.sales_product` | `sales` | `ProductsRegistered` | ¿existe el producto que esta venta menciona? |
+| `core.order_spend` | `catalog` | `PurchaseOrdersNormalized` | ¿cuánto se gastó en cada rubro? |
 
 Y cuatro tablas de parámetros —`catalog_setting`, `purchase_setting`, `sales_setting`,
 `notification_setting`— por lo mismo: los parámetros son de `operations`, y cada módulo guarda los

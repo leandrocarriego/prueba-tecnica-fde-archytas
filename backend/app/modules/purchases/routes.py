@@ -49,6 +49,7 @@ from app.modules.purchases.schemas import (
     PaymentWrite,
     PurchaseOrderList,
     PurchaseOrderRead,
+    PurchasesDashboard,
     ReceiptRead,
     SupplierAliasRead,
     SupplierContactWrite,
@@ -89,6 +90,7 @@ receipts_router = APIRouter(prefix="/receipts", tags=["Receipts"])
 incidents_router = APIRouter(prefix="/receipt-incidents", tags=["Receipts"])
 calendar_router = APIRouter(prefix="/calendar", tags=["Calendar"])
 orders_router = APIRouter(prefix="/purchase-orders", tags=["Purchase orders"])
+purchases_dashboard_router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 # --- The invoices (004, 005) ---------------------------------------------
@@ -792,3 +794,30 @@ async def invoice_file(invoice_id: int, service: PurchasesDep) -> Response:
         media_type=document.content_type,
         headers={"Content-Disposition": f'inline; filename="{document.filename}"'},
     )
+
+
+# --- The purchases cut of the owner's dashboard (013) --------------------
+
+
+@purchases_dashboard_router.get(
+    "/purchases",
+    dependencies=[
+        require_section(Section.DASHBOARD, Level.READ),
+        require_section(Section.PURCHASE_INVOICES, Level.READ),
+    ],
+    summary="What is owed, what falls due next and what never arrived",
+)
+async def purchases_dashboard(service: PurchasesDep) -> PurchasesDashboard:
+    """The owner, and only the owner.
+
+    **Two sections and not one**, which is the whole authorisation decision of
+    this endpoint. `DASHBOARD` keeps purchasing out of the tablero (RF-08 of
+    009) and `PURCHASE_INVOICES` keeps sales out of the invoices (RF-10 of 002):
+    asking for either alone would hand one of the two a screen its role was
+    written to exclude. Whoever passes both is the owner, which is exactly whose
+    dashboard the guía visual draws in `3b`.
+
+    No window: the four numbers are questions about today, and the cut says so
+    (`PurchasesDashboard`).
+    """
+    return await service.dashboard()

@@ -65,12 +65,14 @@ from app.modules.purchases.schemas import (
     PaymentRead,
     PurchaseOrderList,
     PurchaseOrderRead,
+    PurchasesDashboard,
     ReceiptRead,
     SupplierAliasRead,
     SupplierCorrectionMark,
     SupplierList,
     SupplierRead,
     SupplierTotalsRead,
+    UpcomingDue,
 )
 from app.shared.corrections import CorrectionStatus
 from app.shared.errors import ConflictError, NotFoundError, ValidationError
@@ -175,7 +177,6 @@ DISPUTED_BY_PORTAL = "La cargó una persona y el portal la publicó distinta"
 # (RF-20, RF-21 de 011).
 DISPUTED_INVOICE_CASE = "disputed_invoice"
 RESOLVED_IN_INVOICES = "la pantalla de facturas"
-
 ALREADY_REGISTERED = "Esa factura ya está registrada"
 ORDER_ALREADY_REGISTERED = "Esa orden ya está registrada"
 SUPPLIER_NOT_IN_REGISTER = "Ese proveedor no está en el padrón"
@@ -263,6 +264,21 @@ AGING_BANDS: tuple[tuple[str, int | None], ...] = (
 # received is finished, and a finished order is not stalled however long it sat
 # (RF-10 of 007).
 RECEIVED_STATUS = "Recibida"
+
+# Cuántos días mira hacia adelante «vence en 7 días» del tablero. Es la semana
+# de trabajo que la guía visual dibuja en `3b`, y no un parámetro: el número
+# está escrito en el rótulo de la tarjeta, así que cambiarlo cambia lo que la
+# pantalla dice y no sólo lo que cuenta.
+DUE_SOON_DAYS = 7
+
+# Cuántos vencimientos entran en la tarjeta de «próximos vencimientos». Los que
+# siguen están en el calendario, que es la pantalla que existe para eso.
+UPCOMING_DUES = 5
+
+# Hasta dónde mira hacia adelante la lista de vencimientos. Un año y no «todo»:
+# una factura que vence en 2031 no es un próximo vencimiento, y el corte tiene
+# que ser explícito para que la tarjeta no dependa de cuántas filas haya.
+DAYS_AHEAD = 365
 
 HUNDRED = Decimal(100)
 
@@ -849,6 +865,10 @@ class PurchasesService:
         existing.portal_receipt_issued = row.receipt_issued
         await self.session.flush()
 
+        # Antes que cualquier otra comparación: si esta factura la escribió una
+        # persona, lo que acaba de llegar no es «otra lectura que discrepa», es
+        # el origen publicando por fin la fila que alguien tuvo que
+        # reconstruir. Ninguno de los dos gana solo (ver `ManualEntryDisputed`).
         if existing.origin is RecordOrigin.MANUAL:
             # La rama entera es de esta factura y **termina acá**. Dejarla caer
             # en la comparación de duplicados de abajo la apartaría de nuevo por
@@ -2883,6 +2903,82 @@ class PurchasesService:
         """The orders that have sat too long, for the daily digest (RF-35 of 007)."""
         listing = await self.list_orders(limit=100_000, only_stalled=True)
         return listing.items
+
+    # --- The purchases cut of the owner's dashboard (013) -----------------
+
+    async def dashboard(self) -> PurchasesDashboard:
+        """What is owed, what falls due this week and what never arrived.
+
+        **No window.** The other two cuts of the dashboard take one because they
+        are about a period —what was invoiced in August, how prices moved— and
+        these four are about today: a debt is what is owed *now*, and an order
+        that has not arrived has not arrived *now*. Offering a period control
+        over them would be offering a control that changes nothing.
+
+        Everything it leaves out, it says: the invoices in review and the ones
+        paid beyond their total are not in the debt, and their counts travel in
+        the same answer so the screen can put the reason next to the number
+        (Artículo II).
+        """
+        today = today_here()
+        owed, open_invoices = await self.purchases.outstanding()
+        in_review, inconsistent = await self.purchases.uncounted_invoices()
+
+        # Un año por delante, y de ahí sale todo lo que mira hacia adelante: la
+        # semana es un recorte de la misma lista, y pedirla dos veces sería
+        # pagar dos veces las cuatro consultas que `_read_invoices` hace para
+        # saber qué se pagó y qué tiene recibo.
+        ahead = await self._read_invoices(
+            await self.purchases.falling_due(today, today + timedelta(days=DAYS_AHEAD))
+        )
+        within_the_week = today + timedelta(days=DUE_SOON_DAYS)
+        soon = [
+            item for item in ahead if item.due_on is not None and item.due_on <= within_the_week
+        ]
+
+        limit_days = int(await self._setting(STALLED_DAYS_KEY))
+        per_status = await self.purchases.orders_per_status()
+
+        return PurchasesDashboard(
+            owed=owed,
+            open_invoices=open_invoices,
+            excluded_in_review=in_review,
+            excluded_inconsistent=inconsistent,
+            due_soon_days=DUE_SOON_DAYS,
+            due_soon=len(soon),
+            due_soon_without_receipt=len([item for item in soon if not item.receipt_issued]),
+            overdue=await self.purchases.overdue_unpaid(today),
+            orders_pending=sum(
+                count for status, count in per_status.items() if status != RECEIVED_STATUS
+            ),
+            orders_stalled=await self.purchases.orders_stuck_since(
+                received_status=RECEIVED_STATUS, before=today - timedelta(days=limit_days)
+            ),
+            stalled_days=limit_days,
+            upcoming=[self._as_upcoming(item, today) for item in ahead[:UPCOMING_DUES]],
+        )
+
+    @staticmethod
+    def _as_upcoming(invoice: InvoiceRead, today: date) -> UpcomingDue:
+        """One row of «próximos vencimientos», with the days counted here.
+
+        `due_on` is not null in this list —`falling_due` asks for a date— but the
+        column allows it, so the fallback keeps the type honest instead of
+        asserting something the database does not promise.
+        """
+        due_on = invoice.due_on or today
+        return UpcomingDue(
+            invoice_id=invoice.id,
+            number=invoice.number,
+            supplier_name=invoice.supplier_name,
+            supplier_text=invoice.supplier_text,
+            total=invoice.total,
+            balance=invoice.balance,
+            due_on=due_on,
+            days_left=(due_on - today).days,
+            receipt_issued=invoice.receipt_issued,
+            in_review=invoice.review_state is InvoiceReviewState.PENDING,
+        )
 
     async def dismiss_repeat(self, order_id: int, *, actor_user_id: int) -> PurchaseOrderRead:
         """Drop the repeated-order flag, recording who did it (RF-18, RF-19)."""

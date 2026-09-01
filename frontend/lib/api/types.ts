@@ -1881,6 +1881,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What is owed, what falls due next and what never arrived
+         * @description The owner, and only the owner.
+         *
+         *     **Two sections and not one**, which is the whole authorisation decision of
+         *     this endpoint. `DASHBOARD` keeps purchasing out of the tablero (RF-08 of
+         *     009) and `PURCHASE_INVOICES` keeps sales out of the invoices (RF-10 of 002):
+         *     asking for either alone would hand one of the two a screen its role was
+         *     written to exclude. Whoever passes both is the owner, which is exactly whose
+         *     dashboard the guía visual draws in `3b`.
+         *
+         *     No window: the four numbers are questions about today, and the cut says so
+         *     (`PurchasesDashboard`).
+         */
+        get: operations["purchases_dashboard_api_v1_dashboard_purchases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3556,6 +3586,53 @@ export interface components {
             repeat_dismissed_at?: string | null;
         };
         /**
+         * PurchasesDashboard
+         * @description What is owed, what falls due next and what was ordered and never arrived.
+         *
+         *     The four cuts of the owner's dashboard that are about purchases, and none of
+         *     them takes a window: «cuánto debo» and «qué vence esta semana» are questions
+         *     about today, and a period control over them would be a control that changes
+         *     nothing (RF-05 gives a window to the cuts that have one).
+         *
+         *     What is **left out** travels with the number, like everywhere else: an
+         *     invoice in review or one paid beyond its total does not add to the debt, and
+         *     how many there are is reported rather than buried (RF-23 of 004, RF-16 and
+         *     RF-28 of 005).
+         *
+         *     **A sum and a warning are not the same question**, and this cut answers both
+         *     with different rules. `owed` is a sum, so it only adds up what the platform
+         *     can vouch for. `due_soon`, `overdue` and `upcoming` are warnings, and they
+         *     include the invoices in review: a due date arrives whether or not somebody
+         *     resolved who the supplier is, and hiding it until then would be deciding not
+         *     to warn. What travels marked is the amount (`in_review`), not the date.
+         */
+        PurchasesDashboard: {
+            /** Owed */
+            owed: string;
+            /** Open Invoices */
+            open_invoices: number;
+            /** Excluded In Review */
+            excluded_in_review: number;
+            /** Excluded Inconsistent */
+            excluded_inconsistent: number;
+            /** Due Soon Days */
+            due_soon_days: number;
+            /** Due Soon */
+            due_soon: number;
+            /** Due Soon Without Receipt */
+            due_soon_without_receipt: number;
+            /** Overdue */
+            overdue: number;
+            /** Orders Pending */
+            orders_pending: number;
+            /** Orders Stalled */
+            orders_stalled: number;
+            /** Stalled Days */
+            stalled_days: number;
+            /** Upcoming */
+            upcoming: components["schemas"]["UpcomingDue"][];
+        };
+        /**
          * Quality
          * @description How many tests passed, and how much of the code they covered.
          */
@@ -3565,20 +3642,6 @@ export interface components {
             /** Coverage */
             coverage: number;
         };
-        /**
-         * RecordOrigin
-         * @description Whether the platform read this record from the portal, or somebody typed it.
-         *
-         *     The payments and the due dates already draw the same line, and this is the
-         *     same one over an invoice and over an order: a datum a person loaded by hand
-         *     **must never be shown as something the portal published** (Artículo I). It
-         *     is also the only way to tell, later, that the row the portal finally
-         *     publishes is the same one somebody had already reconstructed — which is
-         *     when it stops being bookkeeping and starts being the difference between one
-         *     invoice and two.
-         * @enum {string}
-         */
-        RecordOrigin: "PORTAL" | "MANUAL";
         /**
          * ReceiptRead
          * @description The reception receipt of an invoice (RF-29, RF-36, RF-47 of 005).
@@ -3604,6 +3667,20 @@ export interface components {
             /** Document */
             document?: string | null;
         };
+        /**
+         * RecordOrigin
+         * @description Whether the platform read this record from the portal, or somebody typed it.
+         *
+         *     The payments and the due dates already draw the same line, and this is the
+         *     same one over an invoice and over an order: a datum a person loaded by hand
+         *     **must never be shown as something the portal published** (Artículo I). It
+         *     is also the only way to tell, later, that the row the portal finally
+         *     publishes is the same one somebody had already reconstructed — which is
+         *     when it stops being bookkeeping and starts being the difference between one
+         *     invoice and two.
+         * @enum {string}
+         */
+        RecordOrigin: "PORTAL" | "MANUAL";
         /**
          * RedecisionRequest
          * @description Where a rule already in force should point from now on.
@@ -4123,6 +4200,43 @@ export interface components {
             proposed_category_id?: number | null;
             /** Proposed Category Name */
             proposed_category_name?: string | null;
+        };
+        /**
+         * UpcomingDue
+         * @description One invoice about to fall due, as the dashboard lists it.
+         *
+         *     The balance travels beside the total because they are different questions:
+         *     the total is what the invoice was for, the balance is what is still owed on
+         *     it. A calendar that shows the total of a half-paid invoice is telling
+         *     somebody to pay it twice.
+         */
+        UpcomingDue: {
+            /** Invoice Id */
+            invoice_id: number;
+            /** Number */
+            number: string;
+            /** Supplier Name */
+            supplier_name: string | null;
+            /** Supplier Text */
+            supplier_text: string;
+            /** Total */
+            total: string;
+            /** Balance */
+            balance: string;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Days Left */
+            days_left: number;
+            /** Receipt Issued */
+            receipt_issued: boolean;
+            /**
+             * In Review
+             * @default false
+             */
+            in_review: boolean;
         };
         /**
          * UserCreate
@@ -7223,6 +7337,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purchases_dashboard_api_v1_dashboard_purchases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchasesDashboard"];
                 };
             };
         };

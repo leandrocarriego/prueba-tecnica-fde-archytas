@@ -453,6 +453,122 @@ class PurchasesRepository:
         )
         return list(result.scalars().all())
 
+    # --- What the owner's dashboard asks about purchases ------------------
+
+    def _vouched_for(self) -> ColumnElement[bool]:
+        """The invoices whose numbers this platform is willing to add up.
+
+        The same two exclusions `supplier_totals` applies in Python, written
+        here in SQL for the question that is about the whole ledger and not
+        about one supplier: an invoice **in review** has a total nobody
+        confirmed, and one **paid beyond its total** is inconsistent, and adding
+        either into "what I owe" would be reporting a debt the platform cannot
+        vouch for (RF-23 of 004, RF-16 and RF-28 of 005).
+        """
+        return and_(
+            Invoice.review_state != InvoiceReviewState.PENDING,
+            self._paid_expression() <= Invoice.total,
+        )
+
+    async def outstanding(self) -> tuple[Decimal, int]:
+        """What is still owed to suppliers, and over how many invoices.
+
+        Only the invoices with something left on them: a settled invoice is not
+        a debt of zero pesos, it is not a debt.
+        """
+        balance = Invoice.total - self._paid_expression()
+        result = await self.session.execute(
+            select(func.coalesce(func.sum(balance), 0), func.count())
+            .select_from(Invoice)
+            .where(self._vouched_for(), balance > 0)
+        )
+        row = result.one()
+        return Decimal(row[0]), int(row[1])
+
+    async def uncounted_invoices(self) -> tuple[int, int]:
+        """How many invoices the debt leaves out, and for which of the two reasons.
+
+        Counted apart and in this order, like `supplier_totals`: being held is
+        what somebody can act on, and it wins when an invoice is both.
+        """
+        in_review = (
+            select(func.count())
+            .select_from(Invoice)
+            .where(Invoice.review_state == InvoiceReviewState.PENDING)
+        )
+        inconsistent = (
+            select(func.count())
+            .select_from(Invoice)
+            .where(
+                Invoice.review_state != InvoiceReviewState.PENDING,
+                self._paid_expression() > Invoice.total,
+            )
+        )
+        return (
+            int((await self.session.execute(in_review)).scalar_one()),
+            int((await self.session.execute(inconsistent)).scalar_one()),
+        )
+
+    async def falling_due(self, start: date, end: date) -> list[Invoice]:
+        """Invoices with something still owed, falling due inside a window.
+
+        Ordered by the day they fall, which is the order somebody pays them in.
+
+        **The ones in review are in this list**, and that is the difference
+        between a warning and a sum. `outstanding` leaves them out because a
+        total nobody confirmed cannot be added up; a due date nobody confirmed
+        still arrives, and a platform that hides it until somebody resolves the
+        supplier is a platform that decided not to warn (Artículo II). They
+        travel marked, so the screen can say the amount is not confirmed instead
+        of pretending it is.
+
+        An invoice paid beyond its total drops out on its own: its balance is
+        negative, and what is overpaid is not falling due.
+        """
+        balance = Invoice.total - self._paid_expression()
+        result = await self.session.execute(
+            select(Invoice)
+            .where(
+                balance > 0,
+                Invoice.due_on.is_not(None),
+                Invoice.due_on.between(start, end),
+            )
+            .order_by(Invoice.due_on, Invoice.id)
+        )
+        return list(result.scalars().all())
+
+    async def overdue_unpaid(self, today: date) -> int:
+        """How many invoices are past their due date with something still owed."""
+        balance = Invoice.total - self._paid_expression()
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Invoice)
+            .where(
+                balance > 0,
+                Invoice.due_on.is_not(None),
+                Invoice.due_on < today,
+            )
+        )
+        return int(result.scalar_one())
+
+    async def orders_stuck_since(self, *, received_status: str, before: date) -> int:
+        """Orders short of arriving that have sat in the same state for too long.
+
+        The word for "arrived" travels in from the service on purpose: it is
+        vocabulary of the domain, it already lives there once (`RECEIVED_STATUS`),
+        and a second copy here is how two answers to one question start to
+        drift.
+        """
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(PurchaseOrder)
+            .where(
+                PurchaseOrder.status_text != received_status,
+                PurchaseOrder.status_since < before,
+            )
+        )
+        return int(result.scalar_one())
+
     # --- The document of an invoice --------------------------------------
 
     async def put_document(self, document: InvoiceDocument) -> InvoiceDocument:
