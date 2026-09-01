@@ -2221,6 +2221,8 @@ export interface components {
       items: components['schemas']['CategoryRead'][]
       /** Unclassified Count */
       unclassified_count: number
+      /** Pending Review Count */
+      pending_review_count: number
       /** Total Products */
       total_products: number
     }

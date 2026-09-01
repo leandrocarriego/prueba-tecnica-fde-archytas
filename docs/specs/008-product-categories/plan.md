@@ -25,13 +25,13 @@
 | Artículo | Cumple | Cómo |
 |---|---|---|
 | I — El origen es ajeno y de sólo lectura | Sí | La feature no toca SIGProv. `catalog` consume `category_raw` / `subcategory_raw` que `001` ya extraía del `.xlsx` y guardaba en `staging.price_row` (`ingestion/parsers.py:196-208`, `ingestion/models.py:84-85`). No se agrega navegación ni una request al portal: `grep -rnE "httpx\|requests\." app/modules/portal` sigue vacío. |
-| II — Nada se descarta | **Parcial** | **En la ingesta se cumple, y es el artículo que esta feature encarna.** Una forma escrita sin equivalencia no va a un cajón de «otros»: se acumula en `unresolved` y sale como `UnknownCategoryObserved` (`catalog/service.py:349-362`), que `triage` convierte en un caso pendiente (`triage/handlers.py:118-139`). Un producto sin categoría queda `category_id IS NULL` y **es** «sin rubro», contado en `CategoryList` y visible en la cola (`catalog/service.py:699-711`). **Donde no se cumple es en la resolución de un caso**: hay cuatro salidas mudas que resuelven el caso y no hacen nada, sin fila en `operations.exception` y sin que nadie se entere. Ver *Riesgos* y el punto 12 de *Deriva*. |
+| II — Nada se descarta | Sí | **En la ingesta se cumple, y es el artículo que esta feature encarna.** Una forma escrita sin equivalencia no va a un cajón de «otros»: se acumula en `unresolved` y sale como `UnknownCategoryObserved` (`catalog/service.py:349-362`), que `triage` convierte en un caso pendiente (`triage/handlers.py:118-139`). Un producto sin categoría queda `category_id IS NULL` y **es** «sin rubro», contado en `CategoryList` y visible en la cola (`catalog/service.py:699-711`). **Donde no se cumplía era en la resolución de un caso** —cuatro salidas mudas que lo resolvían sin hacer nada— y **quedó cerrado el 2026-09-01**: una decisión que nombra un rubro inexistente, que no nombra ninguno o que nombra algo que no es un número se rechaza, y el rechazo aborta la transacción en la que `triage` estaba resolviendo, así que el caso sigue en la cola (`catalog/service.py`, `catalog/handlers.py:_rubro_of`, `TestADecisionThatCannotBeApplied`). |
 | III — Flujo unidireccional, `raw` inmutable | Sí | `raw` no se lee ni se escribe en esta feature. La clasificación va de `staging` (vía el evento) a `core`, en un solo sentido, y es reproducible: vaciar `core.product.category_id` y volver a aplicar el lote reconstruye el estado sin extraer de nuevo. `tests/architecture/test_raw_immutability.py` no cambia. |
 | IV — Las fronteras entre módulos son reales | Sí | `catalog` y `triage` no se importan: hablan por `UnknownCategoryObserved`, `QuarantineCaseResolved`, `QuarantineRuleRevoked` y `QuarantineRuleRedecided`, todos en `app/shared/events/catalog.py`. `catalog` mantiene su **proyección** de las equivalencias (`core.category_alias`) en lugar de leer `operations.resolution_rule`, igual que `ingestion` con `staging.resolution_rule`. La única frontera cruzada es `identity.dependencies` (`catalog/routes.py:43-49`, `triage/routes.py:15`), la excepción fijada por nombre de archivo en `tests/architecture/test_module_boundaries.py`. |
-| V — Spec primero, y con firma | Sí, con una salvedad | `spec.md` en `Aprobado`, firmada por Leandro Carriego — FDE el 2026-08-29, **antes** del commit que construyó la feature. La salvedad no es del código sino de la cadena: `plan.md` y `tasks.md` se escribieron después, y `/analyze`, `/converge` y `/review-feature` no corrieron. Este plan no agrega alcance; lo que el código hace de más o de menos está en *Deriva contra la spec firmada*. |
-| VI — Lo que no está tipado y testeado no está terminado | Parcial | Tipos completos, `mypy` limpio sobre `app/`. La clasificación se testea en `tests/integration/features/test_product_categories.py` (20 tests en seis clases) contra el fixture fijado, nunca contra el portal (`TEST-03`). **Falta cobertura en dos puntos**, y están dichos: RF-26 no tiene ni implementación ni test, y las rutas de `/categories` no tienen test de integración HTTP propio ni fila en `tests/integration/api/test_rbac.py`. Ver *Deriva*. |
+| V — Spec primero, y con firma | Sí, con una salvedad | `spec.md` en `Aprobado`, firmada por Leandro Carriego — FDE el 2026-08-29, **antes** del commit que construyó la feature. La salvedad no es del código sino de la cadena: `plan.md` y `tasks.md` se escribieron después, y `/analyze`, `/converge` y `/review-feature` no corrieron —los dos últimos son el paso que sigue a esta pasada—. Este plan no agrega alcance; lo que el código hace de más o de menos está en *Deriva contra la spec firmada*. |
+| VI — Lo que no está tipado y testeado no está terminado | Sí | Tipos completos, `mypy` limpio sobre `app/`. La clasificación se testea en `tests/integration/features/test_product_categories.py` (29 tests en nueve clases) contra el fixture fijado, nunca contra el portal (`TEST-03`). Los dos huecos que esta fila declaraba están cerrados: **RF-26 tiene implementación y test**, y las rutas de `/categories` tienen prueba por comportamiento —quién llega y quién recibe 403— en `tests/integration/features/test_category_ownership.py`, que la 010 escribió, más el circuito por HTTP de un caso de rubro en `TestDecidingOneFromTheScreen`. Suite completa al 2026-09-01: 1659 pasan, cobertura 93,11 %. |
 | VII — Las credenciales de terceros viven sólo en el entorno | Sí | La feature no ve credenciales: no hay extracción. |
-| VIII — Un idioma para cada audiencia | Parcial | Código, eventos y modelos en inglés; los `reason` de los casos (`triage/service.py:45`), los mensajes de error (`catalog/service.py:120-122`) y las tres pantallas, en español. **La excepción real**: un caso `unknown_category` se dibuja en `/revision` con su `kind` crudo en inglés, porque `CASE_KINDS` no lo tiene (`frontend/lib/triage/types.ts:15-21`). Ver *Deriva*. |
+| VIII — Un idioma para cada audiencia | Sí | Código, eventos y modelos en inglés; los `reason` de los casos (`triage/service.py:45`), los mensajes de error (`catalog/service.py:120-122`) y las tres pantallas, en español. La excepción que esta fila declaraba —un caso `unknown_category` dibujado con su `kind` crudo en inglés porque `CASE_KINDS` no lo tenía— **la cerró la 010** con su tarea 4. |
 | IX — Las dependencias entran por la puerta | Sí | **Cero dependencias nuevas**, back y front. `backend/pyproject.toml` y `frontend/package.json` no cambiaron por esta feature. |
 
 **Excepciones solicitadas:** ninguna.
@@ -275,7 +275,7 @@ de defaultear.
 
 | Método y ruta | Dependencia declarada | Quién entra | RF | Cuerpo / respuesta |
 |---|---|---|---|---|
-| `GET /categories` | `get_current_user` | los tres roles | RF-01, RF-03, RF-04, RF-09, RF-10, RF-11 | → `CategoryList{ items:[CategoryRead{id,name,product_count,aliases:[CategoryAliasRead]}], unclassified_count, total_products }` |
+| `GET /categories` | `require_section(PRODUCT_CATEGORIES, READ)` desde la 010 | los tres roles | RF-01, RF-03, RF-04, RF-09, RF-10, RF-11, RF-26 | → `CategoryList{ items:[CategoryRead{id,name,product_count,aliases:[CategoryAliasRead]}], unclassified_count, pending_review_count, total_products }` |
 | `GET /categories/unclassified` | `get_current_user` | los tres roles | RF-11, RF-12, RF-14, RF-15, RF-17 | `?skip&limit` → `UnclassifiedList{ items:[UnclassifiedProduct{product_id,code,description,category_raw,subcategory_raw,proposed_category_id,proposed_category_name}], total, skip, limit }` |
 | `GET /categories/aliases` | `get_current_user` | los tres roles | RF-27 (parcial: ver *Deriva*) | → `list[CategoryAliasRead{id,category_id,text_original,text_normalized,rule_id,source,created_at}]` |
 | `POST /categories` | `require_section(PRODUCT_CATEGORIES, WRITE)` | dueño · ventas | RF-05 | `CategoryWrite{name:1..100}` → `201 CategoryRead`. `409` si el nombre ya existe |
@@ -328,7 +328,7 @@ Cada RF de la spec, con dónde vive y dónde se prueba. En **negrita**, lo que n
 |---|---|---|
 | RF-01 | `core.category` + `GET /categories` + `/rubros` | `TestKeepingTheRubroList` |
 | RF-02 | `_classify` (`service.py:651-685`) contra `category_alias` | `TestTheSignedTableIsAlreadyLoaded` |
-| RF-03 | `CategoryRead.aliases` → `CategoryList.tsx:65` | **sin test propio: ninguna prueba abre un rubro y cuenta sus formas escritas. La clase que esta fila citaba, `TestTheSignedTableIsAlreadyLoaded`, verifica otras tres cosas — que todo alias tenga `rule_id` (`test_product_categories.py:87`), que las sembradas no se atribuyan a nadie (`:102`) y que dos grafías que sólo difieren en mayúsculas resuelvan al mismo rubro (`:114`). Y se muestran 11 formas, no 18: ver el punto 13 de *Deriva*** |
+| RF-03 | `CategoryRead.aliases` → `CategoryList.tsx:65` | `test_a_rubro_shows_the_written_forms_that_have_a_row`, y hay que leerlo antes de creerle: **fija las dos formas que la pantalla muestra, no las tres que el criterio firmado pide** — el punto 13 de *Deriva*, que sigue siendo del humano. La clase que esta fila citaba, `TestTheSignedTableIsAlreadyLoaded`, prueba otras tres cosas: que todo alias tenga `rule_id`, que las sembradas no se atribuyan a nadie y que dos grafías que sólo difieren en mayúsculas resuelvan al mismo rubro |
 | RF-04 | `products_per_category()` | `TestRevokingAnEquivalence::test_the_cuts_still_add_up_to_the_total` |
 | RF-05 | `create_category` + `POST /categories` | `test_a_rubro_can_be_added_and_renamed` |
 | RF-06 | `rename_category` + `PATCH /categories/{id}` | `test_a_rubro_can_be_added_and_renamed` |
@@ -348,11 +348,11 @@ Cada RF de la spec, con dónde vive y dónde se prueba. En **negrita**, lo que n
 | RF-20 | `PUT /products/{id}/category` sobre un producto ya clasificado | **la API lo permite; ninguna pantalla ofrece llegar a un producto ya clasificado** |
 | RF-21 | `UnknownCategoryObserved` → `open_case` | `test_it_opens_one_case_for_a_hundred_products` |
 | RF-22 | `_classify` deja `category_id` nulo | `test_the_products_are_left_without_a_rubro` |
-| RF-23 | `payload["category_text"]` del caso | **el backend lo guarda; `CaseCard.tsx` no lo muestra** |
-| RF-24 | `learn_category_alias` sobre `QuarantineCaseResolved` | `test_deciding_classifies_what_was_already_set_aside` (llama al servicio, no a la pantalla) |
+| RF-23 | `payload["category_text"]` del caso, mostrado por `CaseCard.tsx` desde la 010 | `test_a_written_form_is_decided_and_applied_over_http` |
+| RF-24 | `learn_category_alias` sobre `QuarantineCaseResolved` | `test_deciding_classifies_what_was_already_set_aside`, y el circuito entero por ruta en `test_a_written_form_is_decided_and_applied_over_http` |
 | RF-25 | el alias se consulta en cada lote | `test_the_decision_matches_on_the_written_form` |
-| RF-26 | — | **no existe: nadie cuenta los pendientes por categoría, y no hay test** |
-| RF-27 | `GET /categories/aliases` + `GET /triage/rules` para el autor | **parcial: quién decidió sale de `triage`, que ventas no puede leer** |
+| RF-26 | `unclassified_written_forms()` + `pending_review_count` en `CategoryList` → `/rubros` | `TestHowManyAreWaitingOnAReview`, y por HTTP en `TestDecidingOneFromTheScreen` |
+| RF-27 | `GET /categories/aliases` + `GET /triage/rules` para el autor | `test_the_seeded_forms_are_not_attributed_to_anybody`. Que ventas no lea `triage` dejó de degradarlo cuando la 010 puso los rubros del lado de compras |
 | RF-28 | `redecide_rule` + `PATCH /triage/rules/{id}` | `TestCorrectingAnEquivalence` |
 | RF-29 | `repoint_category_alias` | `test_it_reassigns_without_going_through_review` |
 | RF-30 | `DELETE /triage/rules/{id}` | `TestRevokingAnEquivalence` |
@@ -396,8 +396,8 @@ Cada RF de la spec, con dónde vive y dónde se prueba. En **negrita**, lo que n
 | `redecide_rule` sobre una regla ya revocada | Medio: reviviría una equivalencia que alguien apagó | Rechazado con `ConflictError` (`triage/service.py:231-232`), fijado por `test_a_revoked_equivalence_cannot_be_re_pointed` |
 | Al revocar, un producto vuelve a revisión y su `category_id` queda colgado | Medio: los totales de RF-10 dejarían de cerrar | `forget_category_alias` desasigna por `classified_by_rule_id` y el producto vuelve a «sin rubro», que sigue contando. Fijado por `test_the_cuts_still_add_up_to_the_total` |
 | `learn_category_alias` recorre la cola de sin clasificar con un tope de 5000 (`MAX_RECLASSIFIED`) | Bajo hoy —el catálogo tiene 100 productos— y creciente | El tope existe para que una decisión no se convierta en un scan sin límite. Si el catálogo crece, la reclasificación tiene que pasar a una task de Celery, no a subir el número |
-| La pantalla de equivalencias muestra botones que el backend rechaza para ventas | **Alto y visible**: Julián ve «Corregir» y «Dejar sin efecto» y recibe 403 | **No mitigado.** Es la deriva de autorización de abajo, y es de `/converge` |
-| Una decisión sobre un caso `unknown_category` que nombra un rubro inexistente —o a la que le falta el texto— **resuelve el caso y no hace nada** | Medio, y silencioso: el caso sale de la cola, la equivalencia no se crea, ningún producto se clasifica y no queda fila en `operations.exception`. `decision` es un dict libre desde la ruta (`triage/schemas.py:47-49`), así que la puerta está abierta | **No mitigado.** Cuatro salidas mudas: `catalog/service.py:884-888` (log y `return`), `catalog/service.py:916-918` (`return` sin log siquiera), y en `catalog/handlers.py` el `if category_id is not None and text:` de `:130` y el `if category_id is None: return` de `:168-169`, ninguno con `else`. `triage` ya escribió `case.status = RESOLVED` y commitea igual (`triage/service.py:164-184`) |
+| La pantalla de equivalencias muestra botones que el backend rechaza para ventas | **Alto y visible**: Julián veía «Corregir» y «Dejar sin efecto» y recibía 403 | **Cerrado por la 010.** Los rubros pasaron a compras, que es quien ya escribía en `triage`: las dos puntas piden lo mismo y la pantalla dejó de ofrecer lo que el backend rechaza |
+| Una decisión sobre un caso `unknown_category` que nombra un rubro inexistente —o a la que le falta el texto— **resuelve el caso y no hace nada** | Medio, y silencioso: el caso sale de la cola, la equivalencia no se crea, ningún producto se clasifica y no queda fila en `operations.exception`. `decision` es un dict libre desde la ruta (`triage/schemas.py:47-49`), así que la puerta está abierta | **Cerrado el 2026-09-01.** Las cuatro salidas mudas fallan: `learn_category_alias` levanta `NotFoundError` si el rubro no existe, `repoint_category_alias` hace lo mismo, y las dos ramas de `catalog/handlers.py` pasan por `_rubro_of`, que rechaza una decisión sin rubro o con uno que no es un número. El rechazo aborta la transacción de `triage`, así que el `case.status = RESOLVED` que ya estaba escrito **no se commitea** y el caso sigue en la cola. Fijado por `TestADecisionThatCannotBeApplied` y por su gemelo de HTTP |
 | Resolver un caso `unknown_category` con `remember: false` crea una equivalencia **sin regla**: `rule_id` queda nulo y RF-28 y RF-30 no la alcanzan | Bajo hoy —la pantalla siempre manda `remember: true`— y silencioso: la equivalencia se aplica igual, pero no se puede corregir ni apagar | **No mitigado.** El invariante «toda equivalencia tiene su regla» lo sostienen la siembra y el camino normal, no la base: `core.category_alias.rule_id` es nulable (`catalog/models.py:253`) |
 
 ## Contexto de traspaso
@@ -420,10 +420,11 @@ el día uno—. Y lo que no hay que hacer bajo ningún concepto: resolver el mat
 que adivine. `collapse_written_form` hace tres cosas y ninguna más. Si una forma escrita no está en
 la tabla, va a revisión: **esa es la feature**.
 
-Si venís a cerrar los huecos, están enumerados abajo en *Deriva* y desglosados como tareas 21, 22, 24
-y 30 en `tasks.md`. Las tres primeras son frontend y backend chico; la cuarta —quién autoriza un caso
-de `triage` según su `kind`— es una decisión de arquitectura y **está frenada a la espera de la firma
-de la 010**: planificarla antes es resolver un alcance que nadie acordó (Artículo V).
+Los cuatro huecos que este párrafo mandaba a cerrar —tareas 21, 22, 24 y 30— **están cerrados**: las
+dos de autorización y pantalla las trajo la 010, y el conteo de RF-26 y sus tests entraron el
+2026-09-01. Lo que queda para alguien que venga a seguir está en *Deriva*, puntos 6 a 11 y 13, y
+ninguno tiene tarea todavía porque son material de `/converge`: qué se corrige, el código o el
+acuerdo, lo decide el humano (Artículo V).
 
 **Para el Tester** — Lo que puede romperse de verdad, en orden:
 
@@ -443,19 +444,19 @@ de la 010**: planificarla antes es resolver un alcance que nadie acordó (Artíc
 5. **La propuesta que empata.** Una subcategoría que apunta a dos rubros entre los clasificados tiene
    que caer en RF-17 —sin propuesta—, no desempatar.
 
-**Tests que hoy pasan por la razón equivocada, y que hay que mirar:** RF-24 y RF-25 están verdes
-porque los tests resuelven el caso **llamando al servicio**, que es la mitad construida. Desde la
-pantalla no se puede resolver un caso `unknown_category`: no hay control. Un test de UI o de ruta que
-lo intente es lo que falta, y es la tarea 24 de `tasks.md`. Lo mismo con RF-28 y RF-30: los tests los
-ejercen desde el servicio, y por HTTP con un usuario de ventas darían 403.
+**Los tests que pasaban por la razón equivocada, y qué se hizo con ellos (2026-09-01):** RF-24 y
+RF-25 estaban verdes porque cada test resolvía el caso **llamando al servicio**, que era la mitad
+construida. Ahora hay un test que lo hace por ruta —`TestDecidingOneFromTheScreen`, de la forma
+escrita desconocida hasta los productos clasificados— y el que llamaba al servicio se queda: prueban
+cosas distintas y ninguno reemplaza al otro. Lo de RF-28 y RF-30 dejó de ser cierto por otra vía: la
+010 movió los rubros a compras, así que quien resuelve estos casos y quien escribe `/categories` son
+la misma persona, y no hay 403 en el medio.
 
-**Y RF-03 no tiene test.** La tabla de cobertura lo atribuía a `TestTheSignedTableIsAlreadyLoaded`, y
-esa clase no lo prueba: sus tres pruebas verifican `rule_id`, atribución y matcheo, ninguna abre un
-rubro y cuenta sus formas escritas. Si escribís ese test, escribilo contra lo que el sistema hace —
-`Pinturas y Adhesivos` muestra **dos** formas, no tres— y no contra el criterio firmado, que hoy no
-se cumple (punto 13 de *Deriva*). Un test que espere tres está probando el acuerdo, no el sistema, y
-uno que espere dos fija una deriva que el humano todavía no resolvió: dejá dicho en su docstring cuál
-de las dos cosas estás fijando.
+**Y RF-03 ya tiene test**, `test_a_rubro_shows_the_written_forms_that_have_a_row`. Está escrito
+contra lo que el sistema hace —`Pinturas y Adhesivos` muestra **dos** formas, no tres— y no contra el
+criterio firmado, que no se cumple (punto 13 de *Deriva*). Su docstring lo dice con todas las letras,
+porque un test que espera dos fija una deriva que el humano todavía no resolvió: si se resuelve a
+favor del acuerdo, **esa aserción es lo que tiene que cambiar**, y está escrita para que se vea.
 
 Todo contra el fixture ya fijado, `tests/fixtures/portal/price-list-page-2026-08-28.html` y su
 `.xlsx`, que tiene los números exactos de la spec: 18 formas, 7 rubros, 8 sin categoría, 100
@@ -502,9 +503,12 @@ sistema.
 
 Lo que sigue **no es alcance de este plan y no legitima nada**: es la lista de dónde el código y la
 `spec.md` firmada no describen el mismo producto. Es material de `/converge`, y qué se corrige —el
-código o el acuerdo— **lo decide el humano** (Artículo V). Los cinco primeros están además
-desglosados como tareas 21, 22, 24 y 30 en `tasks.md`; del 6 al 13 salieron de esta auditoría y no
-tienen todavía tarea.
+código o el acuerdo— **lo decide el humano** (Artículo V).
+
+**Al 2026-09-01 quedan siete abiertos: del 6 al 11, y el 13.** Los puntos 1 a 4 los cerró la 010, y
+los puntos 5 y 12 se cerraron construyéndolos —RF-26 y las salidas mudas—; cada uno lo dice en su
+lugar, y ninguno se borró: un punto de deriva tachado explica por qué el producto es como es mejor
+que un punto que desapareció.
 
 1. **Ventas no puede hacer nada de lo que H4 y H5 le piden.** Las cinco rutas de `triage` exigen
    `Section.PRICES` en escritura —dueño y compras— y ventas ahí sólo lee. Alcanza a RF-23, RF-24,
@@ -522,9 +526,12 @@ tienen todavía tarea.
    cuatro kinds y ninguna para `unknown_category`: el caso se dibuja con su `kind` crudo en inglés,
    sin mostrar `category_text` (RF-23) y **sin ningún control para asignarle un rubro** (RF-24).
    `frontend/components/triage/CaseCard.tsx:108-158`, `frontend/lib/triage/types.ts:15-21`.
-5. **RF-26 no existe.** Nada cuenta cuántos productos están pendientes de revisión por su categoría:
-   `CategoryList` lleva `unclassified_count` y `total_products` y nada más. Es el único de los 31 sin
-   implementación **y** sin test. `backend/app/modules/catalog/service.py:699-711`.
+5. ~~**RF-26 no existe.**~~ **Cerrado el 2026-09-01.** `CategoryList` lleva ahora
+   `pending_review_count` junto a `unclassified_count` y `total_products`, y `/rubros` lo muestra en
+   la fila «Sin rubro» y como enlace a la cola. Son los productos sin rubro cuya forma escrita
+   todavía no tiene equivalencia — no los que llegaron sin ninguna categoría, que no esperan una
+   decisión de nadie. `catalog/repository.unclassified_written_forms()`,
+   `catalog/service.list_categories()`, `TestHowManyAreWaitingOnAReview`.
 6. **RF-20 no tiene camino en la UI.** `PUT /products/{id}/category` acepta un producto ya
    clasificado, pero la única pantalla que llega a esa ruta lista sólo productos con `category_id IS
    NULL`. `backend/app/modules/catalog/repository.py:360-370`.
@@ -550,18 +557,24 @@ tienen todavía tarea.
     Funciona; una migración que hace dos cosas se lee peor que dos que hacen una.
     `backend/alembic/versions/0010_product_categories.py:119-131,167`.
 
-12. **Una decisión sobre un caso de rubro puede resolverse en silencio y no hacer nada.** Si la
-    `decision` nombra un `category_id` que no existe, `learn_category_alias` loguea un `warning` y
-    hace `return` (`backend/app/modules/catalog/service.py:884-888`); si al reapuntar falta el alias
-    o el rubro, `repoint_category_alias` hace `return` sin log siquiera (`:916-918`); y en
-    `backend/app/modules/catalog/handlers.py` el `if category_id is not None and text:` de `:130` y el
-    `if category_id is None: return` de `:168-169` no tienen `else`. En los cuatro casos `triage` ya
-    puso `case.status = RESOLVED`, publicó y commiteó (`backend/app/modules/triage/service.py:164-184`):
-    **el caso sale de la cola, la equivalencia no se crea, ningún producto se clasifica y no queda
-    fila en `operations.exception`**. Es el Artículo II al revés, y `decision` es un dict libre desde
-    la ruta (`backend/app/modules/triage/schemas.py:47-49`), así que la puerta no depende de un bug
-    de otro módulo. Hoy la pantalla no puede llegar acá —no hay control para resolver un caso
-    `unknown_category`, punto 4 de esta lista—, lo que lo hace latente, no inexistente.
+12. ~~**Una decisión sobre un caso de rubro puede resolverse en silencio y no hacer nada.**~~
+    **Cerrado el 2026-09-01, y había dejado de ser latente.** Las cuatro salidas mudas eran: el
+    `warning` y `return` de `learn_category_alias` cuando la `decision` nombraba un `category_id`
+    inexistente, el `return` sin log de `repoint_category_alias`, y los dos `if` sin `else` de
+    `catalog/handlers.py`. En los cuatro `triage` ya había puesto `case.status = RESOLVED` y
+    commiteaba igual, así que **el caso salía de la cola, la equivalencia no se creaba, ningún
+    producto se clasificaba y no quedaba fila en `operations.exception`**: el Artículo II al revés.
+
+    Ahora los cuatro rechazan. `_rubro_of` (`catalog/handlers.py`) es la puerta donde para una
+    decisión que no nombra rubro o nombra algo que no es un número —`decision` sigue siendo un dict
+    libre desde la ruta—, y `learn_category_alias` y `repoint_category_alias` levantan `NotFoundError`
+    si el rubro no existe. Como el handler corre en la transacción del publicador (Artículo IV), el
+    rechazo la aborta: el caso sigue pendiente y la persona lee el motivo. La única que sigue siendo
+    un `return` es el alias ausente al reapuntar, que ahora loguea: ahí no se pierde ninguna decisión,
+    porque una regla puede existir legítimamente sin equivalencia proyectada.
+
+    **Lo que la 010 había cambiado mientras tanto:** la pantalla del caso `unknown_category` existe
+    desde entonces, así que esta puerta pasó de latente a alcanzable con dos clics.
 
 13. **RF-03 no se cumple como está escrito su criterio de aceptación.** La spec firmada dice «Al
     abrir Pinturas y Adhesivos se ven las **tres** formas escritas que le corresponden»
@@ -575,7 +588,7 @@ tienen todavía tarea.
     propia fila y un índice que las admita, o el acuerdo, que hoy cuenta grafías donde el sistema
     guarda equivalencias— **lo decide el humano** (Artículo V). `spec.md:131,191`.
 
-> **La 010 se firmó, y esta nota cambió de signo.**
+> **La 010 se firmó y se construyó entera.**
 > `docs/specs/010-category-ownership/spec.md` quedó **Aprobada el 2026-08-31**: enmienda nueve
 > requisitos de esta spec —RF-05, RF-06, RF-07, RF-13, RF-15, RF-20, RF-24, RF-28 y RF-30— y mueve
 > los rubros de ventas a compras. Este plan sigue escrito contra la **008 firmada tal como está**, y
@@ -585,4 +598,8 @@ tienen todavía tarea.
 > cierran solos con la fila de la matriz; el cuarto —`CaseCard.tsx` sin rama para
 > `unknown_category`— es lo único que la 010 construye de cero, y es su RF-14.
 >
-> Los puntos 5 a 11 **no los toca la 010** y siguen siendo deriva de esta feature.
+> Los cuatro están construidos y en `main` (`66913ff`, 12 de 12 tareas).
+>
+> Los puntos 5 a 11 y el 13 **no los toca la 010**. De ésos, el 5 y el 12 se cerraron el 2026-09-01
+> construyéndolos, y **el 6 al 11 y el 13 siguen abiertos**: son lo que `/converge` tiene para
+> mirar, y ninguno tiene tarea porque qué se corrige es del humano.

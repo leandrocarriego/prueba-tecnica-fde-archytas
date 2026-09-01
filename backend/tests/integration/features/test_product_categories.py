@@ -17,6 +17,7 @@ Todo contra la lista fijada en `tests/fixtures/portal/`, nunca contra el portal
 from decimal import Decimal
 
 import pytest
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,7 +26,7 @@ from app.modules.catalog.service import UNKNOWN_CATEGORY, CatalogService
 from app.modules.identity.models import User
 from app.modules.triage.models import CaseStatus, ExceptionCase
 from app.modules.triage.service import TriageService
-from app.shared.errors import ConflictError
+from app.shared.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.events import NormalizedPriceRow
 from app.shared.sections import BusinessSection
 
@@ -36,6 +37,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.database]
 # `resolve` no acepta un default: qué áreas puede tocar alguien es cosa de quien
 # llama, y un default sería la cola creyéndole a cualquiera (RF-13 de 011).
 EVERY_AREA = frozenset(BusinessSection)
+
+API_PREFIX = "/api/v1"
 
 
 def row(
@@ -105,6 +108,31 @@ class TestTheSignedTableIsAlreadyLoaded:
         # Assert
         assert aliases
         assert all(alias.rule_id is not None for alias in aliases)
+
+    async def test_a_rubro_shows_the_written_forms_that_have_a_row(
+        self, session: AsyncSession
+    ) -> None:
+        """RF-03, and it fixes **what the system does**, not what was signed.
+
+        The signed acceptance criterion says that opening «Pinturas y
+        Adhesivos» shows the **three** written forms that reach it, and the
+        screen shows **two**: `PINTURAS Y ADHESIVOS` and `Pinturas/Adhesivos`.
+        The three still *resolve* — `Pinturas y Adhesivos` in title case has the
+        same matching key as the first, and that is why it has no row of its
+        own. So this test asserts two, deliberately, and it is the assertion
+        that has to change if the human decides the agreement is what stands:
+        it is point 13 of *Deriva* in `plan.md`, and until then this pins the
+        behaviour so nobody changes it by accident.
+        """
+        # Act
+        listing = await CatalogService(session).list_categories()
+
+        # Assert
+        paints = next(item for item in listing.items if item.name == "Pinturas y Adhesivos")
+        assert [alias.text_original for alias in paints.aliases] == [
+            "PINTURAS Y ADHESIVOS",
+            "Pinturas/Adhesivos",
+        ]
 
     async def test_the_seeded_forms_are_not_attributed_to_anybody(
         self, session: AsyncSession
@@ -488,3 +516,254 @@ class TestKeepingTheRubroList:
             item.name == "Parquización"
             for item in (await CatalogService(session).list_categories()).items
         )
+
+
+class TestHowManyAreWaitingOnAReview:
+    """RF-26, the requirement that had neither a line built nor a test.
+
+    «Sin rubro» and «pendiente de revisión» are two different numbers over the
+    same products, and the screen shows both because they are emptied in two
+    different places: what arrived with no category at all is classified by
+    hand (H2), and what arrived written in a way nobody decided about waits for
+    a decision in the queue (H4). Counting them as one would say the review
+    queue holds work it does not have.
+    """
+
+    async def test_the_count_is_what_the_queue_has_open(self, session: AsyncSession) -> None:
+        """The three products behind the one open case, and the one that is not."""
+        # Arrange
+        before = await CatalogService(session).list_categories()
+
+        # Act — three products with the same unknown written form, and a
+        # fourth that came with no category at all.
+        await apply(
+            session,
+            [row(f"CAT-06{index:02d}", category="Bulones Varios") for index in range(3)]
+            + [row("CAT-0610", category=None)],
+        )
+
+        # Assert — all four are «sin rubro»; only the three that opened the
+        # case are pending a review.
+        listing = await CatalogService(session).list_categories()
+        assert listing.unclassified_count == before.unclassified_count + 4
+        assert listing.pending_review_count == before.pending_review_count + 3
+        assert len(await pending_categories(session)) == 1
+
+    async def test_deciding_the_written_form_empties_it(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Resolving the case takes its products out of the count, in one move."""
+        # Arrange
+        before = await CatalogService(session).list_categories()
+        await apply(
+            session, [row(f"CAT-06{index:02d}", category="Bulones Varios") for index in (3, 4)]
+        )
+        case = (await pending_categories(session))[0]
+        target = await named(session, "Ferretería General")
+
+        # Act
+        await TriageService(session).resolve(
+            case.id, decision={"category_id": target.id}, user_id=owner.id, visible=EVERY_AREA
+        )
+
+        # Assert — and the products left «sin rubro» too, because they got
+        # their rubro: the two counts move together here, and only here.
+        listing = await CatalogService(session).list_categories()
+        assert listing.pending_review_count == before.pending_review_count
+        assert listing.unclassified_count == before.unclassified_count
+
+
+class TestADecisionThatCannotBeApplied:
+    """Article II from the side nobody was watching: the case that resolves into nothing.
+
+    `decision` is a free dict from the route, and every one of these used to
+    return in silence **after** `triage` had marked the case RESOLVED and was
+    about to commit: the question left the queue, no equivalence was written,
+    no product was classified, and no exception was filed. Refusing aborts that
+    transaction, which is the only thing that keeps the question.
+    """
+
+    async def _a_case(self, session: AsyncSession) -> int:
+        """One open case over a written form nobody has decided about.
+
+        The **id**, not the row: every test here rolls the refused decision
+        back, and a rollback expires every object the session holds — reading
+        an attribute off one afterwards is IO where no `await` can happen.
+        """
+        await apply(session, [row("CAT-0700", category="Bulones Varios")])
+        # Committed on purpose: the rollback each test runs has to undo the
+        # refused decision and nothing else. Without this it would also undo
+        # the case, and every assertion here would pass over an empty queue.
+        await session.commit()
+        return (await pending_categories(session))[0].id
+
+    async def test_a_rubro_that_does_not_exist_does_not_resolve_the_case(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """The decision names rubro 9999, and the case stays where it was."""
+        # Arrange
+        case_id = await self._a_case(session)
+
+        # Act
+        with pytest.raises(NotFoundError):
+            await TriageService(session).resolve(
+                case_id, decision={"category_id": 9999}, user_id=owner.id, visible=EVERY_AREA
+            )
+        await session.rollback()
+
+        # Assert — still pending, and the product still waiting for it.
+        assert [open_case.id for open_case in await pending_categories(session)] == [case_id]
+        assert (await product(session, "CAT-0700")).category_id is None
+
+    async def test_a_decision_that_names_no_rubro_is_refused(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """A decision with nothing in it used to resolve the case and do nothing."""
+        # Arrange
+        case_id = await self._a_case(session)
+
+        # Act
+        with pytest.raises(ValidationError):
+            await TriageService(session).resolve(
+                case_id, decision={"remember": True}, user_id=owner.id, visible=EVERY_AREA
+            )
+        await session.rollback()
+
+        # Assert
+        assert [open_case.id for open_case in await pending_categories(session)] == [case_id]
+
+    async def test_a_rubro_that_is_not_a_number_is_refused(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """`decision` is a free dict, so «Ferretería» arrives here as a string."""
+        # Arrange
+        case_id = await self._a_case(session)
+
+        # Act
+        with pytest.raises(ValidationError):
+            await TriageService(session).resolve(
+                case_id,
+                decision={"category_id": "Ferretería"},
+                user_id=owner.id,
+                visible=EVERY_AREA,
+            )
+        await session.rollback()
+
+        # Assert
+        assert [open_case.id for open_case in await pending_categories(session)] == [case_id]
+
+    async def test_the_equivalence_is_not_written_either(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """Nothing half-applied: no alias for a decision that was refused."""
+        # Arrange
+        case_id = await self._a_case(session)
+
+        # Act
+        with pytest.raises(NotFoundError):
+            await TriageService(session).resolve(
+                case_id, decision={"category_id": 9999}, user_id=owner.id, visible=EVERY_AREA
+            )
+        await session.rollback()
+
+        # Assert
+        aliases = (
+            (
+                await session.execute(
+                    select(CategoryAlias).where(CategoryAlias.text_normalized == "bulones varios")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert not aliases
+
+
+class TestDecidingOneFromTheScreen:
+    """The half of H4 the service-level tests never touched: the round trip.
+
+    RF-24 and RF-25 were green because every test resolved the case by calling
+    `TriageService` — the half that was built. What a person does is a request:
+    open the queue, read the written form the product arrived with (RF-23),
+    name a rubro, and see the count of what is pending come down (RF-26). Each
+    of those is a route, and none of them was exercised.
+
+    It runs as **compras**, which is the 010 talking: the rubros are maintained
+    by whoever buys, so the person who meets this case is Marcela.
+    """
+
+    async def test_a_written_form_is_decided_and_applied_over_http(
+        self, session: AsyncSession, purchasing_client: AsyncClient
+    ) -> None:
+        """From the unknown written form to the classified products, by request only."""
+        # Arrange — two products of the same list arrive written in a way the
+        # signed table does not have.
+        await apply(
+            session,
+            [row("CAT-0800", category="Bulones Varios"), row("CAT-0801", category="Bulones Varios")],
+        )
+        await session.commit()
+
+        # Act — the queue shows one case, and it says how the category arrived
+        # written (RF-23), which is the whole basis for deciding.
+        queue = await purchasing_client.get(
+            f"{API_PREFIX}/triage/cases", params={"kind": UNKNOWN_CATEGORY}
+        )
+        assert queue.status_code == 200
+        case = queue.json()["items"][0]
+        assert case["payload"]["category_text"] == "Bulones Varios"
+
+        listing = await purchasing_client.get(f"{API_PREFIX}/categories")
+        assert listing.json()["pending_review_count"] == 2
+        rubro = next(
+            item for item in listing.json()["items"] if item["name"] == "Ferretería General"
+        )
+
+        decided = await purchasing_client.post(
+            f"{API_PREFIX}/triage/cases/{case['id']}/resolution",
+            json={"decision": {"category_id": rubro["id"]}, "remember": True},
+        )
+
+        # Assert — the case is closed, both products carry the rubro, and the
+        # screen that asked the question stops asking it.
+        assert decided.status_code == 200
+        after = (await purchasing_client.get(f"{API_PREFIX}/categories")).json()
+        assert after["pending_review_count"] == 0
+        assert next(item for item in after["items"] if item["id"] == rubro["id"])["aliases"]
+        assert (await product(session, "CAT-0800")).category_id == rubro["id"]
+        assert (await product(session, "CAT-0801")).category_id == rubro["id"]
+
+    async def test_a_decision_that_names_no_rubro_is_refused_over_http(
+        self, session: AsyncSession, purchasing_client: AsyncClient
+    ) -> None:
+        """The silent resolution, from the door it can actually be reached through.
+
+        `decision` is a free dict on the way in, so the empty one is a request
+        anybody can send. It used to answer 200 over a case that left the queue
+        having done nothing.
+        """
+        # Arrange
+        await apply(session, [row("CAT-0810", category="Bulones Varios")])
+        await session.commit()
+        queue = await purchasing_client.get(
+            f"{API_PREFIX}/triage/cases", params={"kind": UNKNOWN_CATEGORY}
+        )
+        case_id = queue.json()["items"][0]["id"]
+
+        # Act
+        refused = await purchasing_client.post(
+            f"{API_PREFIX}/triage/cases/{case_id}/resolution",
+            json={"decision": {}, "remember": True},
+        )
+
+        # Assert — refused, and the question is still there to be answered.
+        assert refused.status_code == 422
+        # The suite shares one session between the test and the request, so the
+        # abort that closing a real request performs has to be asked for here:
+        # without it the case would still carry the RESOLVED the service set
+        # before the refusal, which is memory, not what the database holds.
+        await session.rollback()
+        still_open = await purchasing_client.get(
+            f"{API_PREFIX}/triage/cases", params={"kind": UNKNOWN_CATEGORY}
+        )
+        assert [item["id"] for item in still_open.json()["items"]] == [case_id]

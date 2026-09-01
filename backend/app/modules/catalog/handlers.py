@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.catalog.service import (
+    CASE_WITHOUT_WRITTEN_FORM,
+    CATEGORY_DECISION_WITHOUT_RUBRO,
     HIGHLIGHT_THRESHOLD_KEY,
     MISSING_PRODUCT,
     UNKNOWN_CATEGORY,
@@ -18,6 +20,7 @@ from app.modules.catalog.service import (
     UNREADABLE_ROW,
     CatalogService,
 )
+from app.shared.errors import ValidationError
 from app.shared.events import (
     BusinessParameterChanged,
     PriceHistoryNormalized,
@@ -65,6 +68,27 @@ def _price_of(decision: dict[str, object]) -> Decimal | None:
         logger.warning("A decision carried a negative price")
         return None
     return price
+
+
+def _rubro_of(decision: dict[str, object]) -> int:
+    """The rubro a decision about a written form names, or refuse the decision.
+
+    `decision` is a free dict from the route (`triage/schemas.py`), so this is
+    the door where one that names no rubro — or names something that is not a
+    number — has to stop. It used to pass through an `if` with no `else` and
+    resolve the case in silence, which is Article II backwards: the queue lost
+    the question and nobody learned the answer never applied.
+    """
+    raw = decision.get("category_id")
+    # `bool` is an `int` in Python, and `True` would quietly become rubro 1.
+    if isinstance(raw, bool) or not isinstance(raw, int | str):
+        raise ValidationError(CATEGORY_DECISION_WITHOUT_RUBRO, details={"category_id": raw})
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValidationError(
+            CATEGORY_DECISION_WITHOUT_RUBRO, details={"category_id": raw}
+        ) from None
 
 
 @events.subscribe(PriceListNormalized)
@@ -125,12 +149,13 @@ async def apply_decision(event: QuarantineCaseResolved, session: AsyncSession) -
         # The decision is about a **written form**, not about one product: the
         # matcher carries the text, and applying it classifies every product
         # that came with it (RF-24, RF-25 of 008).
-        category_id = event.decision.get("category_id")
+        category_id = _rubro_of(event.decision)
         text = str(event.matcher.get("category_text") or payload.get("category_text") or "")
-        if category_id is not None and text:
-            await service.learn_category_alias(
-                rule_id=event.rule_id, category_text=text, category_id=int(category_id)
-            )
+        if not text:
+            raise ValidationError(CASE_WITHOUT_WRITTEN_FORM, details={"case_id": event.case_id})
+        await service.learn_category_alias(
+            rule_id=event.rule_id, category_text=text, category_id=category_id
+        )
     elif event.kind == MISSING_PRODUCT:
         product_id = int(payload.get("product_id", 0) or 0)
         if product_id and action == DISCONTINUE:
@@ -164,11 +189,8 @@ async def repoint_rule(event: QuarantineRuleRedecided, session: AsyncSession) ->
     """
     if event.kind != UNKNOWN_CATEGORY:
         return
-    category_id = event.decision.get("category_id")
-    if category_id is None:
-        return
     await CatalogService(session).repoint_category_alias(
-        rule_id=event.rule_id, category_id=int(category_id)
+        rule_id=event.rule_id, category_id=_rubro_of(event.decision)
     )
 
 

@@ -121,6 +121,8 @@ CATEGORY_FIELD = "category_id"
 NO_SUCH_CATEGORY = "No encontramos ese rubro"
 CATEGORY_ALREADY_EXISTS = "Ya hay un rubro con ese nombre"
 CATEGORY_HAS_PRODUCTS = "El rubro tiene productos asignados y por eso no se puede eliminar"
+CATEGORY_DECISION_WITHOUT_RUBRO = "La decisión tiene que decir a qué rubro va esa forma escrita"
+CASE_WITHOUT_WRITTEN_FORM = "El caso no dice con qué categoría llegó escrito el producto"
 
 # How many unclassified products one decision reaches in a single pass. The
 # catalog is a hundred products today and the whole queue fits well inside
@@ -717,13 +719,28 @@ class CatalogService:
 
         «Sin rubro» travels beside the list rather than inside it, because it
         is not a row of `core.category` — but it is reported, so the cuts add
-        up to the total the screen shows (RF-09, RF-10, RF-11).
+        up to the total the screen shows (RF-09, RF-10, RF-11). Beside it
+        travels how many of those are waiting on a decision about their
+        written form (RF-26).
         """
         categories = await self.catalog.list_categories()
         counts = await self.catalog.products_per_category()
         aliases: dict[int, list[CategoryAliasRead]] = defaultdict(list)
+        decided: set[str] = set()
         for alias in await self.catalog.aliases():
             aliases[alias.category_id].append(CategoryAliasRead.model_validate(alias))
+            decided.add(alias.text_normalized)
+        # RF-26: not every product «sin rubro» is waiting for a decision. The
+        # ones that are are those whose written form nobody has decided about
+        # — the ones the queue is holding a case for. A product that arrived
+        # with no category at all has nothing to decide: it is classified by
+        # hand in the queue of H2, and counting it here would say the review
+        # queue holds work it does not have.
+        pending = sum(
+            count
+            for form, count in (await self.catalog.unclassified_written_forms()).items()
+            if collapse_written_form(form) not in decided
+        )
         return CategoryList(
             items=[
                 CategoryRead(
@@ -735,6 +752,7 @@ class CatalogService:
                 for category in categories
             ],
             unclassified_count=counts.get(None, 0),
+            pending_review_count=pending,
             total_products=sum(counts.values()),
         )
 
@@ -910,10 +928,16 @@ class CatalogService:
         written form get their rubro the moment somebody decides.
         """
         if await self.catalog.get_category(category_id) is None:
-            logger.warning(
-                "A decision named a rubro that does not exist", extra={"rule_id": rule_id}
+            # Article II, and it used to be the other way round: this returned
+            # after a warning, while `triage` had already marked the case
+            # RESOLVED and was about to commit. The case left the queue, no
+            # equivalence was written, no product was classified and no
+            # exception was filed — the decision vanished. Raising aborts the
+            # transaction the case was resolved in, so it stays pending and the
+            # person is told which rubro does not exist.
+            raise NotFoundError(
+                NO_SUCH_CATEGORY, details={"category_id": category_id, "rule_id": rule_id}
             )
-            return
         normalized = collapse_written_form(category_text)
         await self.catalog.put_alias(
             text_normalized=normalized,
@@ -941,8 +965,21 @@ class CatalogService:
         `classified_by_rule_id = rule_id` — so a product somebody classified by
         hand does not move, because it never depended on this equivalence.
         """
+        if await self.catalog.get_category(category_id) is None:
+            raise NotFoundError(
+                NO_SUCH_CATEGORY, details={"category_id": category_id, "rule_id": rule_id}
+            )
         alias = await self.catalog.alias_by_rule(rule_id)
-        if alias is None or await self.catalog.get_category(category_id) is None:
+        if alias is None:
+            # This one is legitimate and stays a return: a rule can exist here
+            # without having projected an equivalence — one decided with
+            # `remember: false` never got a rule, and one resolved before this
+            # module learned the kind has nothing to re-point. There is no
+            # decision being lost, so there is nothing to abort.
+            logger.warning(
+                "A re-pointed rule has no equivalence in the catalog",
+                extra={"rule_id": rule_id, "category_id": category_id},
+            )
             return
         alias.category_id = category_id
         moved = await self.catalog.products_classified_by(rule_id)

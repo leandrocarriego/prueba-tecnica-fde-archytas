@@ -48,6 +48,12 @@ export default async function CategoriesPage() {
         <Link className="text-link hover:underline" href="/rubros/equivalencias">
           Equivalencias guardadas
         </Link>
+        {/* RF-26: los que esperan que alguien decida su forma escrita. No son
+            todos los «sin rubro» — por eso el número va aparte y lleva a la
+            cola de revisión, que es donde se decide. */}
+        <Link className="text-link hover:underline" href="/revision">
+          Pendientes de revisión ({listing.pending_review_count})
+        </Link>
       </nav>
 
       <CategoryList
