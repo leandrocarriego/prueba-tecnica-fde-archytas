@@ -206,6 +206,21 @@ class InvoiceDocumentRead(BaseModel):
     # client's. It is what identified the supplier without anybody deciding
     # (RF-11), so the screen can say that is what happened.
     read_supplier_tax_id: str | None = None
+    # De qué está hecho el archivo, para que la pantalla pueda **mostrarlo** y no
+    # sólo enlazarlo (`3g` de la guía pide la vista previa del original).
+    #
+    # Sin esto la pantalla tendría que adivinar: un `<iframe>` para todo sirve
+    # para un PDF, para una imagen y para un texto, y deja un recuadro en blanco
+    # cuando lo que llegó fue una planilla — que es de los dos formatos que el
+    # portal publica. Un recuadro vacío es peor que decir «esto es una planilla,
+    # abrila», porque no dice que no se puede.
+    content_type: str | None = None
+    # Si hay bytes que servir. `readable` es otra pregunta —si se pudo *leer* lo
+    # que decía—, y las dos se separan: un escaneo ilegible tiene archivo para
+    # mostrar y no tiene texto, y sin esta distinción la pantalla ofrecería una
+    # vista previa de la nada, o escondería el original justo cuando es lo único
+    # que queda para decidir.
+    has_file: bool = False
 
 
 class InvoiceRead(BaseModel):

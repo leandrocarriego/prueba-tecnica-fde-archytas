@@ -2836,6 +2836,13 @@ export interface components {
             read_supplier_text: string | null;
             /** Read Supplier Tax Id */
             read_supplier_tax_id?: string | null;
+            /** Content Type */
+            content_type?: string | null;
+            /**
+             * Has File
+             * @default false
+             */
+            has_file: boolean;
         };
         /**
          * InvoiceList
