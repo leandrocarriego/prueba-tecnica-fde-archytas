@@ -66,7 +66,14 @@ const VENTAS: Permissions = { PRODUCT_CATEGORIES: READ, SALES: WRITE }
 
 const UN_RUBRO: Category = { id: 3, name: 'Herramientas', product_count: 12, aliases: [] }
 
-const LISTADO = { items: [UN_RUBRO], unclassified_count: 0, total_products: 12 }
+const LISTADO = {
+  items: [UN_RUBRO],
+  unclassified_count: 0,
+  // Sin pendientes de revisión: lo que esta prueba mira son los botones
+  // que la matriz ofrece, y el conteo de RF-26 de la 008 no cambia ninguno.
+  pending_review_count: 0,
+  total_products: 12,
+}
 
 const UNA_FORMA_ESCRITA: Case = {
   id: 55,
