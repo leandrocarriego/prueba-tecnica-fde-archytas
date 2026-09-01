@@ -114,6 +114,21 @@ export function CategoryList({
             <td className="amount py-2">{count(listing.unclassified_count)}</td>
             <td className="py-2 text-muted-foreground">
               El producto llegó sin categoría, o con una que todavía no está asignada
+              {listing.pending_review_count > 0 && (
+                <>
+                  {' — '}
+                  {/* RF-26. El desglose importa porque las dos mitades se
+                      resuelven en pantallas distintas: lo que llegó sin nada
+                      se clasifica a mano, y lo que llegó con una forma escrita
+                      que nadie decidió espera en la cola de revisión. */}
+                  <strong className="font-medium text-foreground">
+                    {count(listing.pending_review_count)}
+                  </strong>{' '}
+                  {listing.pending_review_count === 1
+                    ? 'espera una decisión en revisión'
+                    : 'esperan una decisión en revisión'}
+                </>
+              )}
             </td>
             {canEdit && <td />}
           </tr>

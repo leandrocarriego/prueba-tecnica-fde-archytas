@@ -377,6 +377,26 @@ class CatalogRepository:
         )
         return int(result.scalar_one())
 
+    async def unclassified_written_forms(self) -> dict[str, int]:
+        """The written forms the products with no rubro came with, and how many.
+
+        Grouped by the text as it arrived, not by its normalized key: the
+        service holds the only definition of what «the same written form»
+        means (`collapse_written_form`), and a second one written in SQL is a
+        second definition that drifts (RF-26).
+        """
+        result = await self.session.execute(
+            select(Product.category_raw, func.count())
+            .where(
+                Product.category_id.is_(None),
+                Product.status == ProductStatus.ACTIVE,
+                Product.category_raw.is_not(None),
+                Product.category_raw != "",
+            )
+            .group_by(Product.category_raw)
+        )
+        return {str(row[0]): int(row[1]) for row in result.all()}
+
     async def rubro_of_subcategory(self) -> dict[str, set[int]]:
         """Which rubros each subcategory resolves to, among what is classified.
 

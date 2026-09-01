@@ -165,6 +165,10 @@ class CategoryList(BaseModel):
     # Not a row of `core.category`: null is «sin rubro», and it is reported
     # beside the list so every cut adds up to the total (RF-10).
     unclassified_count: int
+    # How many of those are waiting on a decision about their written form,
+    # which is not the same number: a product that arrived with no category
+    # at all is «sin rubro» and has nothing under review (RF-26).
+    pending_review_count: int
     total_products: int
 
 
