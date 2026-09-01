@@ -179,7 +179,7 @@ no cuando está escrita.
 | P8 · Avisos | Resuelto | 007-orders-alerts |
 | P9 · Control propio | Resuelto | 003-system-control |
 | P10 · Accesos | Resuelto | 002-access-control |
-| P11 · Fechas | En desarrollo | 006-due-date-calendar |
+| P11 · Fechas | Resuelto | 006-due-date-calendar |
 | P12 · Recibos | En desarrollo | 005-payments-receipts |
 
 Estados: **Pendiente** (todavía no se empezó) · **En desarrollo** (hay una spec aprobada y la

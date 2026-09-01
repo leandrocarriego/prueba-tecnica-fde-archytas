@@ -2,7 +2,7 @@
  * RF-41 de la 006: la barra lateral se pliega en un teléfono.
  *
  * El defecto que este test congela lo encontró la verificación a mano de la
- * 006 (`docs/specs/006-due-date-calendar/evidence/`): la barra apilada medía
+ * 006 (`docs/specs/archive/006-due-date-calendar/evidence/`): la barra apilada medía
  * 832px sobre un viewport de 664px, así que al abrir el calendario en un
  * teléfono la primera pantalla entera era el menú y había que desplazarse una
  * pantalla y media para ver el primer vencimiento.
