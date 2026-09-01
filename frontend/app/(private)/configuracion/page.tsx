@@ -1,11 +1,10 @@
 import { NoPermission } from '@/components/common/NoPermission'
 import { AlertRoutes } from '@/components/notifications/AlertRoutes'
-import { ParameterRow } from '@/components/operations/ParameterRow'
+import { ParameterCard } from '@/components/operations/ParameterCard'
 import { readFromApi } from '@/lib/api/server'
 import type { AlertRoute } from '@/lib/notifications/types'
 import type { Parameter } from '@/lib/operations/types'
 import { ErrorState } from '@/components/ui/state'
-import { Card } from '@/components/ui/card'
 import { Notice } from '@/components/ui/notice'
 
 export const metadata = {
@@ -31,6 +30,11 @@ export const metadata = {
  * that was already being read, and then counting at all. The banner below asks
  * `has_effect` on every render, which is the only count that cannot go stale.
  *
+ * **La forma es la grilla de la guía** (`docs/design/` 3m): cada parámetro es
+ * una tarjeta, y cada tarjeta se guarda sola. Un único «Guardar cambios» al pie
+ * se llevaría por delante lo que RF-06 pide —que un valor rechazado diga *cuál*
+ * fue— y dejaría al dueño adivinando cuál de dieciséis no entró.
+ *
  * The gate is the endpoint. `GET /operations/parameters` is owner-only, so
  * anybody else is refused and lands on the refusal below — hiding a link was
  * never the restriction. What the refusal is *not* is the answer to everything
@@ -50,7 +54,7 @@ export default async function ParametersPage() {
       return <NoPermission what="los parámetros del sistema" />
     }
     return (
-      <div className="max-w-3xl space-y-6">
+      <div className="space-y-6">
         <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
         <ErrorState title="No pudimos traer los parámetros.">
           Probá de nuevo en unos minutos.
@@ -63,7 +67,7 @@ export default async function ParametersPage() {
   const waiting = parameters.filter(parameter => !parameter.has_effect).length
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Parámetros del sistema</h1>
         <p className="text-sm text-muted-foreground">
@@ -87,11 +91,11 @@ export default async function ParametersPage() {
         </Notice>
       )}
 
-      <Card>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {parameters.map(parameter => (
-          <ParameterRow key={parameter.key} parameter={parameter} />
+          <ParameterCard key={parameter.key} parameter={parameter} />
         ))}
-      </Card>
+      </div>
 
       {routes.ok && <AlertRoutes routes={routes.data} />}
     </div>

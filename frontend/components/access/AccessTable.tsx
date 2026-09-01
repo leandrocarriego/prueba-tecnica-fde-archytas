@@ -35,6 +35,14 @@ function stateOf(user: UserRead): { label: string; tone: BadgeTone } {
   return { label: 'Activo', tone: 'ok' }
 }
 
+/**
+ * La tabla de accesos, con la forma de la guía (`docs/design/` 3m).
+ *
+ * Los encabezados son `.section-label` —mono, versalita— porque nombran las
+ * columnas sin competir con lo que dice cada fila, y el correo y el teléfono
+ * van en mono: son un dato que se compara de un vistazo, no una frase
+ * (`UI-04`).
+ */
 export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; viewerId: number }) {
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<ActionResult | null>(null)
@@ -44,81 +52,91 @@ export function AccessTable({ accesses, viewerId }: { accesses: UserRead[]; view
   }
 
   return (
-    <div className="space-y-4">
-      {result && <Notice tone={result.ok ? 'ok' : 'danger'} title={result.message} />}
+    <div>
+      {result && (
+        <div className="border-b border-border p-4">
+          <Notice tone={result.ok ? 'ok' : 'danger'} title={result.message} />
+        </div>
+      )}
 
-      <table className="w-full text-left text-sm">
-        <thead className="border-b text-muted-foreground">
-          <tr>
-            <th className="py-2">Persona</th>
-            <th>Correo</th>
-            <th>Teléfono</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th className="text-right">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {accesses.map(access => {
-            const { label, tone } = stateOf(access)
-            const isViewer = access.id === viewerId
-            return (
-              <tr key={access.id} className="border-b last:border-0">
-                <td className="py-3">
-                  {access.name}
-                  {access.last_name ? ` ${access.last_name}` : ''}
-                </td>
-                <td className="text-muted-foreground">{access.email}</td>
-                <td className="text-muted-foreground">{access.phone}</td>
-                <td>
-                  <select
-                    defaultValue={access.role}
-                    disabled={pending || isViewer}
-                    onChange={event => run(() => changeRole(access.id, event.target.value))}
-                    className={selectClassName}
-                  >
-                    {ROLES.map(role => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <Badge tone={tone}>{label}</Badge>
-                </td>
-                <td className="py-3 text-right">
-                  {isViewer ? (
-                    // RF-22: the owner cannot lock themselves out, so the
-                    // screen does not offer it. The backend refuses it anyway.
-                    <span className="text-xs text-muted-foreground">Sos vos</span>
-                  ) : access.is_active ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => run(() => deactivateAccess(access.id))}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-muted">
+            <tr className="[&>th]:px-5 [&>th]:py-2.5">
+              <th className="section-label">Persona</th>
+              <th className="section-label">Correo</th>
+              <th className="section-label">Teléfono</th>
+              <th className="section-label">Rol</th>
+              <th className="section-label">Estado</th>
+              <th className="section-label text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accesses.map(access => {
+              const { label, tone } = stateOf(access)
+              const isViewer = access.id === viewerId
+              return (
+                <tr
+                  key={access.id}
+                  className="border-t border-border align-middle [&>td]:px-5 [&>td]:py-3"
+                >
+                  <td className="font-medium whitespace-nowrap">
+                    {access.name}
+                    {access.last_name ? ` ${access.last_name}` : ''}
+                  </td>
+                  <td className="amount text-muted-foreground">{access.email}</td>
+                  <td className="amount text-muted-foreground">{access.phone}</td>
+                  <td>
+                    <select
+                      defaultValue={access.role}
+                      disabled={pending || isViewer}
+                      onChange={event => run(() => changeRole(access.id, event.target.value))}
+                      className={selectClassName}
+                      aria-label={`Rol de ${access.name}`}
                     >
-                      Desactivar
-                    </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={pending}
-                      onClick={() => run(() => reactivateAccess(access.id))}
-                    >
-                      Reactivar
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                      {ROLES.map(role => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <Badge tone={tone}>{label}</Badge>
+                  </td>
+                  <td className="text-right">
+                    {isViewer ? (
+                      // RF-22: the owner cannot lock themselves out, so the
+                      // screen does not offer it. The backend refuses it anyway.
+                      <span className="text-xs text-muted-foreground">Sos vos</span>
+                    ) : access.is_active ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => run(() => deactivateAccess(access.id))}
+                      >
+                        Desactivar
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => run(() => reactivateAccess(access.id))}
+                      >
+                        Reactivar
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

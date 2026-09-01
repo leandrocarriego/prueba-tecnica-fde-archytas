@@ -32,6 +32,11 @@ function bound(value: unknown): string | number | undefined {
 /**
  * One parameter of the system, with what it does and what it may be (RF-05).
  *
+ * **Es una tarjeta**, y las tarjetas van en la grilla de la pantalla
+ * (`docs/design/` 3m): un parámetro es una decisión chica y completa —qué hace,
+ * entre qué valores, quién lo cambió— y en una lista de filas a lo ancho las
+ * tres cosas quedaban lejos del campo que gobiernan.
+ *
  * A Client Component because it is a field with state. Each row saves on its
  * own: a value the backend refuses says which row was wrong instead of failing
  * the whole panel, and the message it shows is the backend's, which is where
@@ -52,7 +57,7 @@ function bound(value: unknown): string | number | undefined {
  * whether it was accepted or refused, so «Guardado.» and the range the API
  * answers with are the entire difference between the two (RF-22, RF-06).
  */
-export function ParameterRow({ parameter }: { parameter: Parameter }) {
+export function ParameterCard({ parameter }: { parameter: Parameter }) {
   const router = useRouter()
   const initial = String(parameter.value ?? '')
   const [value, setValue] = useState(initial)
@@ -74,25 +79,29 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
   }
 
   return (
-    <form className="space-y-2 border-t p-4 sm:p-5" onSubmit={onSubmit}>
-      <div className="flex flex-wrap items-baseline gap-2">
-        <label className="text-sm font-medium" htmlFor={parameter.key}>
-          {parameter.label}
-        </label>
-        {/* Es el estado del parámetro, así que es una píldora (`RF-06`). */}
-        {!parameter.has_effect && (
-          <Badge title="El valor se guarda y queda listo, pero todavía no hay ninguna funcionalidad que lo lea.">
-            Todavía sin efecto
-          </Badge>
-        )}
+    <form
+      className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:p-5"
+      onSubmit={onSubmit}
+    >
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <label className="font-semibold" htmlFor={parameter.key}>
+            {parameter.label}
+          </label>
+          {/* Es el estado del parámetro, así que es una píldora (`RF-06`). */}
+          {!parameter.has_effect && (
+            <Badge title="El valor se guarda y queda listo, pero todavía no hay ninguna funcionalidad que lo lea.">
+              Todavía sin efecto
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">{parameter.effect}</p>
       </div>
 
-      <p className="text-sm text-muted-foreground">{parameter.effect}</p>
-
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <Input
           id={parameter.key}
-          className="w-40"
+          className="amount w-32"
           type={isTime ? 'time' : 'number'}
           step={parameter.kind === 'DECIMAL' ? '0.01' : undefined}
           min={isTime ? undefined : bound(parameter.minimum)}
@@ -102,32 +111,41 @@ export function ParameterRow({ parameter }: { parameter: Parameter }) {
           onChange={event => setValue(event.target.value)}
         />
         {parameter.unit && <span className="text-sm text-muted-foreground">{parameter.unit}</span>}
-        <Button type="submit" disabled={saving || !changed}>
+        <Button type="submit" size="sm" className="ml-auto" disabled={saving || !changed}>
           {saving ? 'Guardando…' : 'Guardar'}
         </Button>
-        <p
-          aria-live="polite"
-          className={`text-sm ${message?.ok ? 'text-ok' : 'text-danger'}`}
-          role="status"
-        >
-          {message?.text ?? ''}
-        </p>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {isTime
-          ? 'Una hora del día, entre 00:00 y 23:59.'
-          : `Entre ${String(parameter.minimum)} y ${String(parameter.maximum)}.`}{' '}
-        {parameter.changed_at
-          ? 'Este valor lo cambiaste vos.'
-          : `Es el valor con el que arranca el sistema (${String(parameter.initial)}).`}{' '}
+      <p
+        aria-live="polite"
+        className={`text-sm ${message?.ok ? 'text-ok' : 'text-danger'}`}
+        role="status"
+      >
+        {message?.text ?? ''}
+      </p>
+
+      {/*
+        El rango y la procedencia van en una línea y el enlace en la otra: en
+        una sola, el «Ver quién lo cambió» quedaba pegado al valor de fábrica y
+        las tres cosas se leían como una frase sola.
+      */}
+      <div className="mt-auto space-y-0.5 text-xs text-muted-foreground">
+        <p>
+          <span className="amount">
+            {isTime
+              ? 'Entre 00:00 y 23:59'
+              : `Entre ${String(parameter.minimum)} y ${String(parameter.maximum)}`}
+          </span>
+          {' · '}
+          {parameter.changed_at ? 'lo cambiaste vos' : `de fábrica (${String(parameter.initial)})`}
+        </p>
         <Link
-          className="underline underline-offset-2"
+          className="text-link underline-offset-2 hover:underline"
           href={`/historial?entidad=operations.parameter&id=${encodeURIComponent(parameter.key)}`}
         >
           Ver quién lo cambió y cuándo
         </Link>
-      </p>
+      </div>
     </form>
   )
 }

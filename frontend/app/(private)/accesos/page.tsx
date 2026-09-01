@@ -1,7 +1,6 @@
 import { getSession } from '@/app/actions/auth'
 import { listAccesses } from '@/app/actions/access'
-import { NewAccessForm } from '@/components/access/NewAccessForm'
-import { AccessTable } from '@/components/access/AccessTable'
+import { AccessPanel } from '@/components/access/AccessPanel'
 import { NoPermission } from '@/components/common/NoPermission'
 import { canEdit } from '@/lib/auth/permissions'
 
@@ -18,16 +17,15 @@ export default async function AccessesPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Accesos</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-bold">Accesos</h1>
+        <p className="text-sm text-muted-foreground">
           Quién entra al sistema, con qué rol, y en qué estado está cada acceso.
         </p>
-      </div>
+      </header>
 
-      <NewAccessForm />
-      <AccessTable accesses={accesses.items} viewerId={session.user.id} />
+      <AccessPanel accesses={accesses.items} viewerId={session.user.id} />
     </div>
   )
 }
