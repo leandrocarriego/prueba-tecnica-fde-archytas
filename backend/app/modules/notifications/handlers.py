@@ -170,6 +170,9 @@ async def warn_about_a_due_invoice(event: InvoiceDueSoon, session: AsyncSession)
             supplier=event.supplier_name,
             due_on=event.due_on.isoformat(),
             days_ahead=event.days_ahead,
+            # El evento lo trae desde el primer día y el mensaje no lo usaba:
+            # es lo único que hace falta para que el aviso lleve a la factura.
+            invoice_id=event.invoice_id,
         ),
     )
 
