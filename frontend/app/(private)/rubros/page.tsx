@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { getSession } from '@/app/actions/auth'
+import { RubroNormalizer } from '@/components/catalog/RubroNormalizer'
 import { CategoryList } from '@/components/categories/CategoryList'
 import { NoPermission } from '@/components/common/NoPermission'
 import { fetchFromApi } from '@/lib/api/server'
@@ -55,6 +56,13 @@ export default async function CategoriesPage() {
           Pendientes de revisión ({listing.pending_review_count})
         </Link>
       </nav>
+
+      {/*
+        La revisión visual de cada rubro y sus formas escritas (guía visual
+        `3k`). Vive acá, en Rubros, y no en la lista de precios: es una lectura
+        del catálogo de rubros, no de los precios.
+      */}
+      <RubroNormalizer listing={listing} />
 
       <CategoryList
         listing={listing}

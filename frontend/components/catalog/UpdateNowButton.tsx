@@ -76,11 +76,12 @@ export function UpdateNowButton() {
   return (
     <div className="flex flex-col items-end gap-1">
       {/*
-        Traer la lista es la tarea de esta pantalla, y por eso es su único
-        naranja (`RF-11`). Los otros dos controles —el filtro y los enlaces— son
-        navegación.
+        Tinta, no naranja. Traer la lista es una acción frecuente, no la decisión
+        de la pantalla: la guía visual `3k` reserva el único acento para
+        «unificar rubros» abajo, y una sola acción llena por pantalla es la regla
+        (`UI-05`). Por eso este botón es `default` (tinta) y no `brand`.
       */}
-      <Button variant="brand" onClick={onClick} disabled={running}>
+      <Button variant="default" onClick={onClick} disabled={running}>
         {running ? 'Trayendo la lista…' : 'Actualizar ahora'}
       </Button>
       {outcome && <p className={`text-sm ${TONES[outcome.tone]}`}>{outcome.message}</p>}

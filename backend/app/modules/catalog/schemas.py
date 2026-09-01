@@ -94,6 +94,11 @@ class PriceRead(BaseModel):
     # Against the last price of the previous calendar month (RF-24). None when
     # there is no point to compare against.
     monthly_variation_pct: Decimal | None = None
+    # The rubro of the product, shown as a column beside the price. `None` is
+    # «sin rubro», which the screen paints as a warning: a product with no
+    # category is one more thing waiting on a decision (RF-16 of 008).
+    category_id: int | None = None
+    category_name: str | None = None
     # The fields of this row somebody corrected by hand (RF-26, RF-27, RF-28).
     corrections: list[CorrectionMark] = []
 
@@ -105,6 +110,36 @@ class PriceList(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class PriceMovement(BaseModel):
+    """One of the two directions a price can move between the last two lists."""
+
+    count: int
+    # The average of the movements in this direction, as a signed percentage.
+    # `None` when nothing moved this way and there is nothing to average.
+    average_pct: Decimal | None = None
+
+
+class PriceSummary(BaseModel):
+    """The four counts on top of the prices screen, over the whole catalog.
+
+    Each number is computed from what the catalog already holds — the price in
+    force against the one before it (`previous_price`), whether the product came
+    in the last list (`is_stale`) and whether it has a rubro — never from the
+    page the table happens to be showing. The screen reads the movement of the
+    last sync, so a card is honest about the whole list, not about 200 rows.
+    """
+
+    # Products whose price in force is above the one before it (RF-24).
+    raised: PriceMovement
+    # Products whose price in force is below the one before it.
+    lowered: PriceMovement
+    # Active products with no rubro yet: the «nuevos sin rubro» card, and the
+    # one number here that is also «asignar en lote» (RF-16 of 008).
+    unclassified: int
+    # Products that stopped coming in the list and keep their last price (RF-08).
+    discontinued: int
 
 
 class PricePointRead(BaseModel):

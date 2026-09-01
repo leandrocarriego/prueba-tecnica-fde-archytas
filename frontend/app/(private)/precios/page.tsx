@@ -1,11 +1,16 @@
-import Link from 'next/link'
-
+import { PriceFilters } from '@/components/catalog/PriceFilters'
+import { PriceHeader } from '@/components/catalog/PriceHeader'
+import { PriceSummaryCards } from '@/components/catalog/PriceSummaryCards'
 import { PriceTable } from '@/components/catalog/PriceTable'
-import { UpdateNowButton } from '@/components/catalog/UpdateNowButton'
-import { UpdateStatus } from '@/components/catalog/UpdateStatus'
 import { fetchFromApi } from '@/lib/api/server'
-import type { PriceList, PriceUpdateStatus } from '@/lib/catalog/types'
+import type {
+  CategoryList,
+  PriceList,
+  PriceSummary,
+  PriceUpdateStatus,
+} from '@/lib/catalog/types'
 import { ErrorState } from '@/components/ui/state'
+import { Notice } from '@/components/ui/notice'
 
 /** The supplier publishes a hundred products; the page shows them all. */
 const PAGE_SIZE = 200
@@ -14,77 +19,79 @@ export const metadata = {
   title: 'Precios — Plataforma Cordillera',
 }
 
+interface PricesSearchParams {
+  q?: string
+  rubro?: string
+  changed?: string
+}
+
+/** A positive integer from the address bar, or null when it is not one. */
+function categoryFrom(value: string | undefined): number | null {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 /**
- * The prices screen (RF-04), with the state of the update on top (RF-09, RF-11)
- * and the button that brings the list without waiting (RF-14).
+ * La pantalla de precios (RF-04), con la forma de la guía visual (`3k`).
  *
- * A Server Component: it holds the session cookie already, so it asks the API
- * itself and ships rendered HTML instead of making the browser do a round trip
- * through the proxy.
+ * Un encabezado que muestra la sincronización como un hecho (RF-09, RF-11), las
+ * cuatro cuentas de todo el catálogo, la tabla filtrable con el rubro por fila,
+ * y abajo la revisión de rubros y sus formas escritas.
+ *
+ * Un Server Component: ya tiene la cookie de sesión, así que le pregunta a la
+ * API él mismo y manda HTML renderizado en vez de un ida y vuelta del navegador.
  */
 export default async function PricesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; destacados?: string }>
+  searchParams: Promise<PricesSearchParams>
 }) {
-  const { q, destacados } = await searchParams
-  const highlighted = destacados === '1'
+  const { q, rubro, changed } = await searchParams
+  const categoryId = categoryFrom(rubro)
+  const onlyChanged = changed === '1'
 
   const query = new URLSearchParams({ limit: String(PAGE_SIZE) })
   if (q) query.set('q', q)
-  if (highlighted) query.set('highlighted', 'true')
+  if (categoryId !== null) query.set('category_id', String(categoryId))
+  if (onlyChanged) query.set('changed', 'true')
 
-  const [prices, status] = await Promise.all([
+  const [prices, summary, status, categories] = await Promise.all([
     fetchFromApi<PriceList>(`/prices?${query.toString()}`),
+    fetchFromApi<PriceSummary>('/prices/summary'),
     fetchFromApi<PriceUpdateStatus>('/price-updates/status'),
+    fetchFromApi<CategoryList>('/categories'),
   ])
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Lista de precios</h1>
-          <UpdateStatus status={status} />
-        </div>
-        <UpdateNowButton />
-      </header>
+    <div className="space-y-4">
+      <PriceHeader total={prices?.total ?? 0} status={status} />
 
-      <nav className="flex items-center gap-4 text-sm">
-        <Link
-          className={highlighted ? 'text-muted-foreground' : 'font-medium text-link'}
-          href="/precios"
-        >
-          Todos
-        </Link>
-        <Link
-          className={highlighted ? 'font-medium text-link' : 'text-muted-foreground'}
-          href="/precios?destacados=1"
-        >
-          Solo los que subieron fuerte
-        </Link>
-        <Link className="ml-auto text-link hover:underline" href="/revision">
-          Revisión
-        </Link>
-        {/*
-          The two parameters of the price update moved to the one parameters
-          panel: the signed spec of 003 forbids a parameter living inside the
-          screen of the feature that reads it. The link points there, and
-          `/precios/configuracion` redirects to the same place.
-        */}
-        <Link className="text-link hover:underline" href="/configuracion">
-          Parámetros
-        </Link>
-      </nav>
+      {status?.is_stalled && (
+        // El aviso rojo sigue gritando cuando la extracción dejó de funcionar:
+        // la píldora del encabezado dice «Atrasado», y esto explica cuánto y
+        // desde cuándo (RF-11). Los precios de abajo pueden estar viejos.
+        <Notice tone="danger" title="La actualización de precios dejó de funcionar.">
+          Van {status.consecutive_failures} consultas seguidas sin éxito. Los precios de abajo
+          pueden estar desactualizados.
+        </Notice>
+      )}
+
+      {summary && <PriceSummaryCards summary={summary} />}
 
       {prices === null ? (
         <ErrorState title="No pudimos traer los precios.">
           Probá de nuevo en unos minutos.
         </ErrorState>
       ) : (
-        <>
-          <p className="text-sm text-muted-foreground">{prices.total} productos</p>
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <PriceFilters
+            categories={(categories?.items ?? []).map(({ id, name }) => ({ id, name }))}
+            q={q ?? ''}
+            changed={onlyChanged}
+            categoryId={categoryId}
+          />
           <PriceTable items={prices.items} />
-        </>
+        </div>
       )}
     </div>
   )

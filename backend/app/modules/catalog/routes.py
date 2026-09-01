@@ -36,6 +36,7 @@ from app.modules.catalog.schemas import (
     CorrectionWrite,
     PriceHistoryRead,
     PriceList,
+    PriceSummary,
     ProductCategoryWrite,
     UnclassifiedList,
     UnclassifiedProduct,
@@ -69,6 +70,8 @@ SkipParam = Annotated[int, Query(ge=0, description="Rows to skip")]
 LimitParam = Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE, description="Rows per page")]
 SearchParam = Annotated[str | None, Query(max_length=500, description="Match code or description")]
 HighlightedParam = Annotated[bool, Query(description="Only the rises above the threshold")]
+ChangedParam = Annotated[bool, Query(description="Only rows whose price moved from the last one")]
+CategoryParam = Annotated[int | None, Query(description="Only products under this rubro")]
 
 router = APIRouter(prefix="/prices", tags=["Prices"])
 corrections_router = APIRouter(prefix="/catalog", tags=["Corrections"])
@@ -85,9 +88,31 @@ async def list_prices(
     limit: LimitParam = DEFAULT_PAGE_SIZE,
     q: SearchParam = None,
     highlighted: HighlightedParam = False,
+    changed: ChangedParam = False,
+    category_id: CategoryParam = None,
 ) -> PriceList:
     """Every authenticated role: the owner, purchasing and sales."""
-    return await service.list_prices(skip=skip, limit=limit, query=q, highlighted=highlighted)
+    return await service.list_prices(
+        skip=skip,
+        limit=limit,
+        query=q,
+        highlighted=highlighted,
+        changed=changed,
+        category_id=category_id,
+    )
+
+
+# A literal segment, declared before `/{product_id}/history` so it is never read
+# as a product id.
+@router.get(
+    "/summary",
+    dependencies=[Depends(get_current_user)],
+    summary="The four counts on top of the price list",
+)
+async def price_summary(service: CatalogDep) -> PriceSummary:
+    """The whole-catalog movement of the last sync: rose, fell, new without a
+    rubro, and stopped coming. Every authenticated role."""
+    return await service.price_summary()
 
 
 @router.get(

@@ -1,10 +1,10 @@
 import Link from 'next/link'
 
 import { FIELD_NOUNS, isConflicted, markFor } from '@/lib/catalog/corrections'
-import { formatMoment, formatPrice, formatVariation, variationTone } from '@/lib/catalog/format'
+import { formatPrice, formatVariation } from '@/lib/catalog/format'
 import type { Price } from '@/lib/catalog/types'
 import { Empty } from '@/components/ui/state'
-import { Code } from '@/components/ui/amount'
+import { Money } from '@/components/ui/amount'
 import { Badge } from '@/components/ui/badge'
 
 interface PriceTableProps {
@@ -15,80 +15,96 @@ interface PriceTableProps {
  * What a correction carries, narrowed to what `formatPrice` can read.
  *
  * The generated schema types these values `unknown`, and rightly: a correction
- * row holds whatever the field it corrects held, and the same column serves a
- * price, a currency and a description. `formatPrice` takes an amount, so the
- * question gets asked instead of asserted — asserting `as string` would promise
- * the compiler a shape nothing checked, and the day the API sends anything else
- * the table writes «$ NaN» where a price should be: `Number.isNaN` does not
- * coerce, so whatever arrived walks straight past the formatter's own guard and
- * into `Intl`. Asked, it renders the «—» that guard reserves for a value it
- * cannot read.
+ * row holds whatever the field it corrects held. `formatPrice` takes an amount,
+ * so the question gets asked instead of asserted — the day the API sends
+ * anything else the formatter renders «—» rather than «$ NaN».
  */
 function amount(value: unknown): string | number | null {
   return typeof value === 'string' || typeof value === 'number' ? value : null
 }
 
 /**
- * The price list in force (RF-04).
+ * The percentage between the price in force and the one before it, or `null`
+ * when there is nothing to compare against.
  *
- * A Server Component: it renders data and has no interactivity of its own, so
- * there is no reason to ship it to the browser.
+ * This is the column the design calls VARIACIÓN: the move between the last two
+ * lists (price vs `previous_price`), not the month-over-month figure that lives
+ * on the product's own page. Both numbers are real; this is the one the table
+ * draws beside ANTERIOR so the two columns tell one story.
+ */
+function variationFrom(price: string | null, previous: string | null): number | null {
+  if (price === null || previous === null) return null
+  const now = Number(price)
+  const before = Number(previous)
+  if (Number.isNaN(now) || Number.isNaN(before) || before === 0) return null
+  return ((now - before) / before) * 100
+}
+
+/**
+ * La lista de precios en vigencia (RF-04), con la forma de la guía visual (`3k`).
  *
- * Four marks earn their place in the table. A **rise above the threshold** is
- * what the owner asked to see without reading a hundred rows (RF-25), and a
- * product that **did not come in the last list** says so next to the price it
- * is still showing, instead of looking as fresh as the rest (RF-08).
+ * Cinco columnas: producto, rubro, precio hoy, anterior y variación. El rubro
+ * viaja en la misma fila que el precio; «Sin rubro» se pinta ámbar porque es una
+ * de las cosas que esperan una decisión.
  *
- * The other two come from 003. A **corrected** price is told apart at a glance
- * and carries what the portal had said right beside it (RF-26, RF-27) — a
- * number nobody can explain is worth less than a number that is slightly off.
- * And when the portal has since reported something else, the row says **so**
- * instead of quietly applying it (RF-28): the correction stands until a person
- * decides, and this is where they find out there is something to decide.
+ * Cuatro marcas siguen ganando su lugar. Una **suba fuerte** tiñe la fila
+ * (RF-25). Un producto que **no vino en la última lista** lo dice al lado del
+ * precio que sigue mostrando (RF-08). Un precio **corregido** a mano se
+ * distingue y lleva lo que el portal había dicho (RF-26, RF-27); y cuando el
+ * portal informó otra cosa desde entonces, la fila lo dice en vez de aplicarlo
+ * solo (RF-28).
  */
 export function PriceTable({ items }: PriceTableProps) {
   if (items.length === 0) {
     return (
-      <Empty title="Todavía no hay precios cargados.">
-        Se cargan solos con la próxima consulta al portal.
+      <Empty title="No hay productos que coincidan.">
+        Probá con otra búsqueda, o quitá los filtros.
       </Empty>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50 text-left">
-          <tr>
-            <th className="p-3 font-medium">Código</th>
-            <th className="p-3 font-medium">Descripción</th>
-            <th className="p-3 text-right font-medium">Precio</th>
-            <th className="p-3 text-right font-medium">Anterior</th>
-            <th className="p-3 text-right font-medium">Vs. mes pasado</th>
-            <th className="p-3 font-medium">Actualizado</th>
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <colgroup>
+          <col className="w-[36%]" />
+          <col className="w-[18%]" />
+          <col className="w-[16%]" />
+          <col className="w-[16%]" />
+          <col className="w-[14%]" />
+        </colgroup>
+        <thead>
+          <tr className="border-b border-border bg-muted">
+            <th className="section-label px-4 py-2.5 text-left">Producto</th>
+            <th className="section-label px-4 py-2.5 text-left">Rubro</th>
+            <th className="section-label px-4 py-2.5 text-left">Precio hoy</th>
+            <th className="section-label px-4 py-2.5 text-left">Anterior</th>
+            <th className="section-label px-4 py-2.5 text-left">Variación</th>
           </tr>
         </thead>
         <tbody>
           {items.map(item => {
             const corrected = markFor(item.corrections, 'price')
-            // Every contradicted field, not just the price. The row carries the
-            // marks of all three correctable fields, and reading only one of
+            // Every contradicted field, not just the price: reading only one of
             // them was how a contradicted **description** reached this screen
             // saying nothing at all (RF-26, RF-28).
             const contradicted = item.corrections.filter(isConflicted)
+            const isNew = item.previous_price === null
+            const variation = variationFrom(item.price, item.previous_price)
             return (
               <tr
                 key={item.product_id}
-                className={`border-t ${item.is_highlighted ? 'bg-warn-surface' : ''}`}
+                className={`border-b border-border align-middle ${
+                  item.is_highlighted ? 'bg-warn-surface' : ''
+                }`}
               >
-                <td className="p-3">
-                  <Link className="text-link hover:underline" href={`/precios/${item.product_id}`}>
-                    <Code value={item.code} />
+                <td className="px-4 py-3">
+                  <Link
+                    className="text-sm text-foreground hover:text-link hover:underline"
+                    href={`/precios/${item.product_id}`}
+                  >
+                    {item.description}
                   </Link>
-                </td>
-                <td className="p-3">
-                  {item.description}
-                  {/* Los tres son estados del dato, así que son píldoras (`RF-06`). */}
                   {item.is_highlighted && (
                     <Badge tone="warn" className="ml-2">
                       Subió fuerte
@@ -97,13 +113,9 @@ export function PriceTable({ items }: PriceTableProps) {
                   {item.is_stale && <Badge className="ml-2">No vino en la última lista</Badge>}
                   {/*
                     Keyed by the field, and the row cannot carry two marks of
-                    one: the backend's `CORRECTABLE_FIELDS` maps each field to
-                    exactly one entity, and the database holds a partial unique
-                    index over `(entity_type, entity_id, field)` covering every
-                    correction that is not `REVERTED` — which is precisely the
-                    set `corrections_in_force` selects. A second mark for the
-                    same field is not something this list happens not to see: it
-                    is a row the database will not accept.
+                    one: the database holds a partial unique index over
+                    `(entity_type, entity_id, field)`. A second mark for the same
+                    field is a row the database will not accept.
                   */}
                   {contradicted.map(mark => (
                     <Badge tone="danger" className="ml-2" key={mark.field}>
@@ -113,36 +125,31 @@ export function PriceTable({ items }: PriceTableProps) {
                     </Badge>
                   ))}
                 </td>
-                {/*
-                  Las tres columnas de plata en mono tabular y a la derecha, que
-                  es lo que hace que las comas caigan en la misma vertical
-                  (`RF-09`, `RF-10`). El formateo sigue saliendo de
-                  `lib/catalog/format`, que es donde vive el precio del catálogo.
-                */}
-                <td className="amount p-3 text-right font-medium">
-                  {formatPrice(item.price)}
+                <td className="px-4 py-3">
+                  {item.category_name === null ? (
+                    <Badge tone="warn">Sin rubro</Badge>
+                  ) : (
+                    <Badge>{item.category_name}</Badge>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <Money value={item.price} as="span" className="text-sm font-medium" />
                   {corrected && (
-                    <span className="block font-sans text-xs font-normal text-muted-foreground">
-                      Corregido a mano · el portal decía{' '}
-                      {formatPrice(amount(corrected.portal_value))}
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Corregido · el portal decía {formatPrice(amount(corrected.portal_value))}
                     </span>
                   )}
                 </td>
-                <Code
-                  value={formatPrice(item.previous_price)}
-                  cell
-                  className="p-3 text-muted-foreground"
-                />
-                <td
-                  className={`amount p-3 text-right ${variationTone(item.monthly_variation_pct)}`}
-                >
-                  {formatVariation(item.monthly_variation_pct)}
+                <td className="px-4 py-3">
+                  {isNew ? (
+                    <span className="text-sm text-muted-ink">nuevo</span>
+                  ) : (
+                    <Money value={item.previous_price} as="span" className="text-sm text-muted-ink" />
+                  )}
                 </td>
-                <Code
-                  value={formatMoment(item.effective_at)}
-                  cell
-                  className="p-3 text-left text-muted-foreground"
-                />
+                <td className="px-4 py-3">
+                  <VariationCell isNew={isNew} variation={variation} />
+                </td>
               </tr>
             )
           })}
@@ -150,4 +157,12 @@ export function PriceTable({ items }: PriceTableProps) {
       </table>
     </div>
   )
+}
+
+/** La celda de variación: píldora ámbar si subió, verde si bajó, «=» si no se movió. */
+function VariationCell({ isNew, variation }: { isNew: boolean; variation: number | null }) {
+  if (isNew) return <Badge tone="info">Nuevo</Badge>
+  if (variation === null) return <span className="text-sm text-muted-ink">—</span>
+  if (Math.round(variation * 10) === 0) return <span className="text-sm text-muted-ink">=</span>
+  return <Badge tone={variation > 0 ? 'warn' : 'ok'}>{formatVariation(variation)}</Badge>
 }

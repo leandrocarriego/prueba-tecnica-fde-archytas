@@ -9,6 +9,8 @@ import type { components } from '@/lib/api/types'
 
 export type Price = components['schemas']['PriceRead']
 export type PriceList = components['schemas']['PriceList']
+export type PriceSummary = components['schemas']['PriceSummary']
+export type PriceMovement = components['schemas']['PriceMovement']
 export type PriceHistory = components['schemas']['PriceHistoryRead']
 export type PricePoint = components['schemas']['PricePointRead']
 export type PriceUpdateStatus = components['schemas']['PriceUpdateStatusRead']

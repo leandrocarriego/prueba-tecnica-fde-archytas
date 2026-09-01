@@ -106,25 +106,96 @@ class CatalogRepository:
         limit: int = 200,
         query: str | None = None,
         highlighted: bool = False,
-    ) -> list[tuple[Product, ProductPrice | None]]:
-        """Return a page of products with their price in force."""
-        statement = self._prices_query(query, highlighted)
-        result = await self.session.execute(
-            statement.order_by(Product.code).offset(skip).limit(limit)
-        )
-        return [(row[0], row[1]) for row in result.all()]
+        changed: bool = False,
+        category_id: int | None = None,
+    ) -> list[tuple[Product, ProductPrice | None, Category | None]]:
+        """Return a page of products with their price in force and their rubro.
 
-    async def count_prices(self, *, query: str | None = None, highlighted: bool = False) -> int:
+        Priced products come first, then those the portal never priced. In a
+        list *of prices*, a product without one is not what the screen is about,
+        and leaving it up top buries the rows that are. `price IS NULL` is true
+        only when there is no price row (the column itself is `NOT NULL`), so
+        ordering by it ascending puts the priced ones ahead; the code keeps the
+        order stable within each group.
+        """
+        statement = self._prices_query(query, highlighted, changed, category_id)
+        result = await self.session.execute(
+            statement.order_by(ProductPrice.price.is_(None), Product.code)
+            .offset(skip)
+            .limit(limit)
+        )
+        return [(row[0], row[1], row[2]) for row in result.all()]
+
+    async def count_prices(
+        self,
+        *,
+        query: str | None = None,
+        highlighted: bool = False,
+        changed: bool = False,
+        category_id: int | None = None,
+    ) -> int:
         """How many products match the same filters as `list_prices`."""
-        subquery = self._prices_query(query, highlighted).subquery()
+        subquery = self._prices_query(query, highlighted, changed, category_id).subquery()
         result = await self.session.execute(select(func.count()).select_from(subquery))
         return int(result.scalar_one())
 
+    async def price_movement(self) -> dict[str, tuple[int, Decimal | None]]:
+        """The whole-catalog counts the summary cards show, in one round trip.
+
+        A product «rose» when the price in force is above `previous_price` and
+        «fell» when it is below — the same comparison the table draws per row,
+        run over the entire list rather than the page. The average travels with
+        each direction so the «+ 9,2 %» under «subieron» is the mean of the
+        rises, not of everything. Products with no price or no `previous_price`
+        have not moved and count for neither.
+        """
+        moved = (
+            ProductPrice.price.isnot(None)
+            & ProductPrice.previous_price.isnot(None)
+            & (ProductPrice.previous_price != 0)
+        )
+        pct = (
+            (ProductPrice.price - ProductPrice.previous_price)
+            / ProductPrice.previous_price
+            * 100
+        )
+        result = await self.session.execute(
+            select(
+                func.count().filter(moved & (ProductPrice.price > ProductPrice.previous_price)),
+                func.avg(pct).filter(moved & (ProductPrice.price > ProductPrice.previous_price)),
+                func.count().filter(moved & (ProductPrice.price < ProductPrice.previous_price)),
+                func.avg(pct).filter(moved & (ProductPrice.price < ProductPrice.previous_price)),
+            )
+        )
+        raised_n, raised_avg, lowered_n, lowered_avg = result.one()
+        return {
+            "raised": (int(raised_n), None if raised_avg is None else Decimal(raised_avg)),
+            "lowered": (int(lowered_n), None if lowered_avg is None else Decimal(lowered_avg)),
+        }
+
+    async def count_stale(self) -> int:
+        """Products that stopped coming in the list and keep their last price (RF-08)."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(ProductPrice)
+            .where(ProductPrice.is_stale.is_(True))
+        )
+        return int(result.scalar_one())
+
     @staticmethod
-    def _prices_query(query: str | None, highlighted: bool) -> Select[Any]:
-        """The one statement behind the listing and its count."""
-        statement = select(Product, ProductPrice).outerjoin(
-            ProductPrice, ProductPrice.product_id == Product.id
+    def _prices_query(
+        query: str | None, highlighted: bool, changed: bool, category_id: int | None
+    ) -> Select[Any]:
+        """The one statement behind the listing and its count.
+
+        The rubro travels on the same row as the price: one left join, so a
+        product with no category still comes back (as «sin rubro») and the
+        listing never drops a row for lacking one.
+        """
+        statement = (
+            select(Product, ProductPrice, Category)
+            .outerjoin(ProductPrice, ProductPrice.product_id == Product.id)
+            .outerjoin(Category, Category.id == Product.category_id)
         )
         if query:
             pattern = f"%{query}%"
@@ -133,6 +204,16 @@ class CatalogRepository:
             )
         if highlighted:
             statement = statement.where(ProductPrice.is_highlighted.is_(True))
+        if changed:
+            # «Sólo con cambios»: the price in force differs from the one before
+            # it. A product with no `previous_price` has nothing to differ from
+            # and is not a change.
+            statement = statement.where(
+                ProductPrice.previous_price.isnot(None),
+                ProductPrice.price != ProductPrice.previous_price,
+            )
+        if category_id is not None:
+            statement = statement.where(Product.category_id == category_id)
         return statement
 
     # --- The history -----------------------------------------------------

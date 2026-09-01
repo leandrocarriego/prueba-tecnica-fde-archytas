@@ -61,8 +61,10 @@ from app.modules.catalog.schemas import (
     PriceCurvePoint,
     PriceHistoryRead,
     PriceList,
+    PriceMovement,
     PricePointRead,
     PriceRead,
+    PriceSummary,
     StockCut,
     UnclassifiedList,
     UnclassifiedProduct,
@@ -1689,24 +1691,57 @@ class CatalogService:
         limit: int = 200,
         query: str | None = None,
         highlighted: bool = False,
+        changed: bool = False,
+        category_id: int | None = None,
     ) -> PriceList:
         """The prices screen: code, description and the price in force (RF-04)."""
         rows = await self.catalog.list_prices(
-            skip=skip, limit=limit, query=query, highlighted=highlighted
+            skip=skip,
+            limit=limit,
+            query=query,
+            highlighted=highlighted,
+            changed=changed,
+            category_id=category_id,
         )
-        total = await self.catalog.count_prices(query=query, highlighted=highlighted)
+        total = await self.catalog.count_prices(
+            query=query, highlighted=highlighted, changed=changed, category_id=category_id
+        )
         previous_month = await self.catalog.last_point_before(self._start_of_month())
         # One query for the page rather than one per row (RF-26).
         marks: dict[str, list[Correction]] = defaultdict(list)
         for correction in await self.catalog.corrections_in_force(
-            [str(product.id) for product, _ in rows]
+            [str(product.id) for product, _, _ in rows]
         ):
             marks[correction.entity_id].append(correction)
         items = [
-            self._price_read(product, price, previous_month.get(product.id), marks[str(product.id)])
-            for product, price in rows
+            self._price_read(
+                product, price, category, previous_month.get(product.id), marks[str(product.id)]
+            )
+            for product, price, category in rows
         ]
         return PriceList(items=items, total=total, skip=skip, limit=limit)
+
+    async def price_summary(self) -> PriceSummary:
+        """The four counts on top of the prices screen (RF-08, RF-24, RF-16 of 008).
+
+        Whole-catalog aggregates, not a tally of the page: the cards report the
+        movement of the whole list. Each number comes from a datum the catalog
+        already holds, so nothing here is estimated or made up.
+        """
+        movement = await self.catalog.price_movement()
+        raised_count, raised_avg = movement["raised"]
+        lowered_count, lowered_avg = movement["lowered"]
+        return PriceSummary(
+            raised=PriceMovement(count=raised_count, average_pct=self._round_pct(raised_avg)),
+            lowered=PriceMovement(count=lowered_count, average_pct=self._round_pct(lowered_avg)),
+            unclassified=await self.catalog.count_unclassified(),
+            discontinued=await self.catalog.count_stale(),
+        )
+
+    @staticmethod
+    def _round_pct(value: Decimal | None) -> Decimal | None:
+        """A percentage to two places, the same shape a row's variation carries."""
+        return None if value is None else value.quantize(Decimal("0.01"))
 
     async def price_history(self, product_id: int) -> PriceHistoryRead:
         """How the price of one product evolved (RF-23)."""
@@ -1975,6 +2010,7 @@ class CatalogService:
         self,
         product: Product,
         price: ProductPrice | None,
+        category: Category | None,
         previous_month: Decimal | None,
         corrections: list[Correction],
     ) -> PriceRead:
@@ -1993,6 +2029,8 @@ class CatalogService:
             monthly_variation_pct=self._variation(
                 None if price is None else price.price, previous_month
             ),
+            category_id=None if category is None else category.id,
+            category_name=None if category is None else category.name,
             corrections=self._marks(corrections),
         )
 
