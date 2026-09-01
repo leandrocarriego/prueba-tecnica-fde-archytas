@@ -36,6 +36,25 @@ interface Entry {
   label: string
   /** Sin sección: cualquier sesión la alcanza. */
   section?: Section
+  /**
+   * De qué cuenta lleva la señal roja, si lleva alguna.
+   *
+   * El número no vive acá: lo trae el layout con la sesión, porque es un dato
+   * del backend y cambia en cada carga. Lo que la entrada declara es **cuál**
+   * de esas cuentas le corresponde, que sí es una propiedad suya.
+   */
+  counter?: keyof Counters
+}
+
+/**
+ * Los números que el menú puede mostrar sobre una entrada.
+ *
+ * Hoy es uno solo —lo que espera una decisión—, y está tipado como registro
+ * para que agregar el siguiente (la guía visual también dibuja «Avisos 7») sea
+ * una línea acá y otra en el layout, y no otra prop suelta.
+ */
+export interface Counters {
+  triage: number
 }
 
 interface Group {
@@ -59,23 +78,21 @@ const GROUPS: ReadonlyArray<Group> = [
     ],
   },
   {
-    /*
-     * Ventas es un grupo propio y no una entrada de «Catálogo y datos» porque
-     * el backend ya modela `SALES` como una de las tres áreas del negocio
-     * (`BusinessSection`), y porque quien entra con acceso de Ventas tiene que
-     * ver su área, no una sección adentro del área de otro (`RF-22`).
-     *
-     * `/ventas` redirige a `/ventas/revision`, que es la única pantalla que hay
-     * hoy: el `href` queda estable —el resaltado por prefijo marca el grupo
-     * cuando se está en cualquier pantalla de ventas— sin inventar una pantalla
-     * que la spec no pidió.
-     */
-    title: 'Ventas',
-    entries: [{ href: '/ventas', label: 'Ventas', section: 'SALES' }],
-  },
-  {
     title: 'Catálogo y datos',
     entries: [
+      /*
+       * Ventas encabeza el grupo en vez de ser un grupo propio: hay una sola
+       * pantalla de ventas, y un título con una sola entrada debajo es un
+       * renglón que no agrupa nada. `RF-22` se sigue cumpliendo —la sección
+       * aparece en el menú y se abre desde ahí—; en qué grupo vive no lo fija
+       * la spec, y lo decidió el dueño.
+       *
+       * `/ventas` redirige a `/ventas/revision`, que es la única pantalla que
+       * hay hoy: el `href` queda estable —el resaltado por prefijo marca la
+       * entrada desde cualquier pantalla de ventas— sin inventar una pantalla
+       * que la spec no pidió.
+       */
+      { href: '/ventas', label: 'Ventas', section: 'SALES' },
       { href: '/precios', label: 'Catálogo y precios', section: 'PRICES' },
       { href: '/rubros', label: 'Rubros', section: 'PRODUCT_CATEGORIES' },
       /*
@@ -85,7 +102,7 @@ const GROUPS: ReadonlyArray<Group> = [
        * Julián, el dueño de esa mitad. La pantalla recorta lo que *muestra* a
        * las áreas que el que mira alcanza, en vez de cerrarse.
        */
-      { href: '/revision', label: 'Revisar esto' },
+      { href: '/revision', label: 'Para decidir', counter: 'triage' },
     ],
   },
   {
@@ -120,7 +137,16 @@ function isPrefix(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function Navigation({ user, permissions }: { user: UserRead; permissions: Permissions }) {
+export function Navigation({
+  user,
+  permissions,
+  counters,
+}: {
+  user: UserRead
+  permissions: Permissions
+  /** Las cuentas que el menú muestra. Sin ellas no dibuja ninguna señal. */
+  counters?: Partial<Counters>
+}) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -199,7 +225,22 @@ export function Navigation({ user, permissions }: { user: UserRead; permissions:
                       : 'text-white/65 hover:bg-white/5 hover:text-white'
                   )}
                 >
-                  {entry.label}
+                  <span className="flex items-center justify-between gap-2">
+                    {entry.label}
+                    {/*
+                      Cuántos esperan una decisión, en rojo y sobre la entrada.
+                      **Cero no se dibuja**: un contador en cero es una alarma
+                      apagada que igual ocupa lugar, y a la semana nadie mira
+                      ninguno de los dos estados. La cuenta ya viene recortada a
+                      las áreas que esta persona alcanza (RF-12), así que el
+                      número del menú y el de la pantalla son el mismo.
+                    */}
+                    {entry.counter && (counters?.[entry.counter] ?? 0) > 0 && (
+                      <span className="amount inline-flex min-w-5 flex-none items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+                        {counters?.[entry.counter]}
+                      </span>
+                    )}
+                  </span>
                 </Link>
               ))}
             </div>

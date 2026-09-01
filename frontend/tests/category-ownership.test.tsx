@@ -31,7 +31,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveCase } from '@/app/actions/triage'
 import { Navigation } from '@/components/auth/Navigation'
 import { RubroNormalizer } from '@/components/catalog/RubroNormalizer'
-import { CaseCard } from '@/components/triage/CaseCard'
+import { CaseDetail } from '@/components/triage/CaseDetail'
 import { READ, WRITE, type Permissions } from '@/lib/auth/permissions'
 import { canEdit } from '@/lib/auth/permissions'
 import type { Category } from '@/lib/catalog/types'
@@ -157,9 +157,16 @@ describe('una forma escrita sin rubro, en la cola de revisión', () => {
   })
 
   it('se dibuja con su nombre en castellano y con la forma que llegó', () => {
-    render(<CaseCard item={UNA_FORMA_ESCRITA} mayCorrect={false} categories={[UN_RUBRO]} />)
+    render(
+      <CaseDetail
+        item={UNA_FORMA_ESCRITA}
+        mayCorrect={false}
+        categories={[UN_RUBRO]}
+        suppliers={[]}
+      />
+    )
 
-    // Sin su entrada en `CASE_KINDS` la tarjeta escribe el `kind` crudo, en
+    // Sin su entrada en `CASE_KINDS` el panel escribe el `kind` crudo, en
     // inglés, en una pantalla que lee una persona (Artículo VIII).
     expect(screen.getByText('Forma escrita sin rubro')).toBeInTheDocument()
     expect(screen.getByText('Bulones Varios')).toBeInTheDocument()
@@ -167,23 +174,44 @@ describe('una forma escrita sin rubro, en la cola de revisión', () => {
 
   it('la resuelve compras eligiendo un rubro, sin salir de la pantalla', async () => {
     const persona = userEvent.setup()
-    render(<CaseCard item={UNA_FORMA_ESCRITA} mayCorrect={false} categories={[UN_RUBRO]} />)
+    render(
+      <CaseDetail
+        item={UNA_FORMA_ESCRITA}
+        mayCorrect={false}
+        categories={[UN_RUBRO]}
+        suppliers={[]}
+      />
+    )
 
-    // Act — Marcela elige el rubro y la asigna, que es RF-14 entero: el mismo
-    // lugar donde ya resuelve todo lo que la actualización aparta.
+    // Act — Marcela mira el dato, elige el rubro y confirma. Son los tres pasos
+    // del asistente, y RF-14 entero: el mismo lugar donde ya resuelve todo lo
+    // que la actualización aparta.
+    await persona.click(screen.getByRole('button', { name: 'Siguiente' }))
     await persona.selectOptions(screen.getByRole('combobox'), '3')
+    await persona.click(screen.getByRole('button', { name: 'Siguiente' }))
     await persona.click(screen.getByRole('button', { name: 'Asignar este rubro' }))
 
     // Assert — la decisión viaja como `category_id`, que es lo que el backend
     // espera para aprender la equivalencia y aplicarla hacia atrás (RF-06).
-    expect(resolveCase).toHaveBeenCalledWith(55, { category_id: 3 })
+    expect(resolveCase).toHaveBeenCalledWith(55, { category_id: 3 }, true)
   })
 
-  it('no ofrece asignar hasta que hay un rubro elegido', () => {
-    render(<CaseCard item={UNA_FORMA_ESCRITA} mayCorrect={false} categories={[UN_RUBRO]} />)
+  it('no deja avanzar hasta que hay un rubro elegido', async () => {
+    const persona = userEvent.setup()
+    render(
+      <CaseDetail
+        item={UNA_FORMA_ESCRITA}
+        mayCorrect={false}
+        categories={[UN_RUBRO]}
+        suppliers={[]}
+      />
+    )
+
+    await persona.click(screen.getByRole('button', { name: 'Siguiente' }))
 
     // Resolver sin decisión es cerrar el caso sin decidirlo, que es lo que el
-    // Artículo II no quiere: la cola existe para que alguien conteste.
-    expect(screen.getByRole('button', { name: 'Asignar este rubro' })).toBeDisabled()
+    // Artículo II no quiere: la cola existe para que alguien conteste. El
+    // asistente no llega al paso de confirmar sin una respuesta.
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled()
   })
 })

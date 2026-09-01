@@ -6,11 +6,20 @@ a parameter: each of those is a fact this module reacts to, in the transaction
 of whoever published it.
 """
 
+from collections.abc import Mapping
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.purchases.service import (
+    INVOICE_ENTITY,
+    KEEP_MANUAL,
+    KEEP_PORTAL,
     MATCH_THRESHOLD_KEY,
+    ORDER_ENTITY,
     RECEIPT_NOTICE_KEY,
     REPEAT_WINDOW_KEY,
     STALLED_DAYS_KEY,
@@ -26,6 +35,7 @@ from app.shared.events import (
     InvoicesRegistered,
     PaymentsNormalized,
     PurchaseOrdersNormalized,
+    QuarantineCaseResolved,
     SuppliersNormalized,
     events,
 )
@@ -158,3 +168,150 @@ async def push_the_calendar_change(event: DueDateChanged, session: AsyncSession)
             "invoice_id": event.invoice_id,
         },
     )
+
+
+# --- Lo que una persona decidió en «Para decidir» ------------------------
+#
+# Las cuatro clases de caso que terminan en una escritura de este módulo. Los
+# strings se escriben acá y no se importan de `triage`: un módulo no importa
+# otro (Artículo IV), y son justamente vocabulario compartido para que las dos
+# puntas se entiendan sin conocerse.
+UNREADABLE_INVOICE_ROW = "unreadable_invoice_row"
+UNREADABLE_ORDER_ROW = "unreadable_order_row"
+DISPUTED_INVOICE = "disputed_invoice"
+DISPUTED_ORDER = "disputed_order"
+
+# La decisión de cargar la fila a mano, frente a la de sólo darla por revisada.
+LOAD = "load"
+
+
+def _text(values: Mapping[str, Any], key: str) -> str:
+    """Un string de la decisión, o vacío. Nada se convierte confiando."""
+    value = values.get(key)
+    return str(value).strip() if isinstance(value, str | int | float) else ""
+
+
+def _date_of(values: Mapping[str, Any], key: str) -> date | None:
+    """Una fecha ISO de la decisión, o `None` si no es una fecha."""
+    raw = _text(values, key)
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        logger.warning("A decision carried a date that is not one", extra={"field": key})
+        return None
+
+
+def _money_of(values: Mapping[str, Any], key: str) -> Decimal | None:
+    """Un importe de la decisión, con las mismas puertas cerradas que en `catalog`.
+
+    `Decimal` construye `nan`, `snan` e `Infinity` sin quejarse, y esto escribe
+    sobre una columna de plata que después se compara y se suma. Un `NaN` que
+    pasara por acá no se quedaría quieto: haría fallar el próximo total.
+    """
+    raw = _text(values, key)
+    if not raw:
+        return None
+    try:
+        amount = Decimal(raw)
+    except (InvalidOperation, ArithmeticError):
+        logger.warning("A decision carried an amount that is not a number", extra={"field": key})
+        return None
+    if not amount.is_finite() or amount < 0:
+        logger.warning("A decision carried an amount that is not one", extra={"field": key})
+        return None
+    return amount
+
+
+def _int_of(values: Mapping[str, Any], key: str) -> int | None:
+    """Un entero de la decisión, o `None`."""
+    value = values.get(key)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+@events.subscribe(QuarantineCaseResolved)
+async def apply_purchases_decision(event: QuarantineCaseResolved, session: AsyncSession) -> None:
+    """Escribir lo que una persona decidió sobre una fila de compras.
+
+    Son dos decisiones distintas y las dos existen por lo mismo. **Cargarla a
+    mano** es la otra mitad del Artículo II: hasta la 011 una fila que el portal
+    publicaba rota sólo se podía dar por revisada, así que la factura no entraba
+    a ningún total ni al calendario, y avisar sin dejar arreglar es la mitad de
+    una promesa. **Elegir quién gana** es lo que pasa cuando el portal publica,
+    meses después, esa misma fila ya legible y distinta.
+
+    Una decisión que no es ninguna de las dos —darla por revisada— no escribe
+    nada acá, y eso no es un caso que falte: es la respuesta que el origen de
+    sólo lectura admite cuando el papel no está a mano.
+
+    Corre en la transacción de quien resolvió el caso: si esto falla, la
+    resolución falla con él y el caso sigue pendiente, que es exactamente lo que
+    tiene que pasar cuando el número ya estaba registrado (`GEN-09`).
+    """
+    decision = event.decision
+    service = PurchasesService(session)
+
+    if event.kind == UNREADABLE_INVOICE_ROW and _text(decision, "action") == LOAD:
+        issued_on = _date_of(decision, "issued_on")
+        total = _money_of(decision, "total")
+        supplier_id = _int_of(decision, "supplier_id")
+        number = _text(decision, "number")
+        if issued_on is None or total is None or supplier_id is None or not number:
+            logger.warning("An invoice to load by hand arrived incomplete")
+            return
+        await service.register_invoice_by_hand(
+            number=number,
+            issued_on=issued_on,
+            total=total,
+            supplier_id=supplier_id,
+            actor_user_id=event.decided_by_user_id,
+            occurred_at=event.decided_at,
+        )
+        return
+
+    if event.kind == UNREADABLE_ORDER_ROW and _text(decision, "action") == LOAD:
+        ordered_on = _date_of(decision, "ordered_on")
+        supplier_id = _int_of(decision, "supplier_id")
+        number = _text(decision, "number")
+        if ordered_on is None or supplier_id is None or not number:
+            logger.warning("An order to load by hand arrived incomplete")
+            return
+        await service.register_order_by_hand(
+            number=number,
+            ordered_on=ordered_on,
+            supplier_id=supplier_id,
+            product_text=_text(decision, "product_text"),
+            quantity=_int_of(decision, "quantity"),
+            amount=_money_of(decision, "amount"),
+            actor_user_id=event.decided_by_user_id,
+            occurred_at=event.decided_at,
+        )
+        return
+
+    if event.kind in {DISPUTED_INVOICE, DISPUTED_ORDER}:
+        keep = _text(decision, "keep")
+        if keep not in {KEEP_PORTAL, KEEP_MANUAL}:
+            logger.warning("A settled dispute did not say which values stay")
+            return
+        entity_id = _int_of(event.payload, "entity_id")
+        if entity_id is None:
+            logger.warning("A settled dispute did not say which record it was about")
+            return
+        # Lo que el portal publicó viaja en el caso, que es donde quedó cuando
+        # se abrió la discusión: el evento que la abrió ya no existe, y volver a
+        # leer el portal para preguntárselo sería contestar con otra cosa.
+        stored = event.payload.get("published")
+        published = (
+            {str(key): str(value) for key, value in stored.items()}
+            if isinstance(stored, dict)
+            else {}
+        )
+        await service.settle_manual_dispute(
+            entity=INVOICE_ENTITY if event.kind == DISPUTED_INVOICE else ORDER_ENTITY,
+            entity_id=entity_id,
+            keep=keep,
+            published=published,
+            actor_user_id=event.decided_by_user_id,
+            occurred_at=event.decided_at,
+        )

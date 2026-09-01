@@ -36,19 +36,47 @@ export const CASE_KINDS = {
   unreadable_payment_row: 'Comprobante de pago que no se pudo interpretar',
   unreadable_message_row: 'Mensaje del buzón que no se pudo interpretar',
   unreadable_sale_row: 'Venta que no se pudo interpretar',
+  /*
+    Las dos que abre la carga manual. No existían mientras la única salida de
+    una fila ilegible era darla por revisada: aparecen cuando una persona
+    reconstruyó la factura o la orden, y el portal la publicó después ya
+    legible y distinta.
+  */
+  disputed_invoice: 'Factura cargada a mano que el portal trajo distinta',
+  disputed_order: 'Orden cargada a mano que el portal trajo distinta',
 } as const satisfies Record<string, string>
 
 /**
- * Las clases que sólo se pueden dar por revisadas.
+ * Las clases que una persona puede **cargar a mano**, y qué carga.
  *
- * No es una limitación que haya que disculpar: una fila que el portal publicó
- * rota no se puede arreglar desde acá —el origen es de sólo lectura— y cargarla
- * a mano quedó fuera de alcance. Lo que una persona puede hacer es verla,
- * entenderla y dejar constancia de que la vio, que es más de lo que había.
+ * Es la otra mitad del Artículo II. Hasta acá una fila que el portal publicaba
+ * rota sólo se podía dar por revisada: quedaba contada y visible —que ya era
+ * más de lo que había— y el dato no entraba nunca, así que la factura no
+ * figuraba en ningún total ni en el calendario de vencimientos. Avisar sin
+ * dejar arreglar es la mitad de una promesa.
+ *
+ * Siguen admitiendo «darlo por revisado», y no como consuelo: el papel puede no
+ * estar a mano, y cerrar el caso sin el dato es una respuesta honesta.
+ */
+export const LOADABLE_KINDS = {
+  unreadable_invoice_row: 'invoice',
+  unreadable_order_row: 'order',
+} as const satisfies Record<string, string>
+
+/** Las dos clases en las que hay que elegir entre dos valores. */
+export const DISPUTED_KINDS: readonly string[] = ['disputed_invoice', 'disputed_order']
+
+/**
+ * Las clases que **sólo** se pueden dar por revisadas.
+ *
+ * Eran seis y ahora son cuatro: las facturas y las órdenes se pueden cargar a
+ * mano (`LOADABLE_KINDS`). Las cuatro que quedan no es que falten: un
+ * comprobante, un mensaje del buzón o una fila del padrón que el portal publicó
+ * rota no tienen dónde entrar de este lado, y reconstruirlos a mano sería
+ * inventar un dato del que nadie tiene el papel. Lo que una persona puede hacer
+ * es verlos, entenderlos y dejar constancia de que los vio.
  */
 export const ACKNOWLEDGE_ONLY_KINDS: readonly string[] = [
-  'unreadable_invoice_row',
-  'unreadable_order_row',
   'unreadable_supplier_row',
   'unreadable_payment_row',
   'unreadable_message_row',

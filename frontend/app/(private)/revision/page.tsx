@@ -1,17 +1,16 @@
-import Link from 'next/link'
-
 import { getSession } from '@/app/actions/auth'
-import { CaseCard } from '@/components/triage/CaseCard'
+import { CaseQueue } from '@/components/triage/CaseQueue'
+import { ReviewHeader } from '@/components/triage/ReviewHeader'
 import { RuleList } from '@/components/triage/RuleList'
 import { Empty, ErrorState } from '@/components/ui/state'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
-import { formatMoment } from '@/lib/catalog/format'
 import type { CategoryList } from '@/lib/catalog/types'
-import { sectionLabel, type CaseList, type Rule } from '@/lib/triage/types'
+import type { SupplierList } from '@/lib/purchases/types'
+import type { CaseList, Rule } from '@/lib/triage/types'
 
 export const metadata = {
-  title: 'Revisión — Plataforma Cordillera',
+  title: 'Para decidir — Plataforma Cordillera',
 }
 
 interface ReviewPageProps {
@@ -19,7 +18,8 @@ interface ReviewPageProps {
 }
 
 /**
- * What the platform set aside, and the decisions taken about it.
+ * «Para decidir»: lo que la plataforma apartó, y las decisiones tomadas sobre
+ * eso.
  *
  * This screen is the visible half of Artículo II: nothing is discarded, so
  * everything the pipeline could not resolve on its own ends up here with the
@@ -35,6 +35,11 @@ interface ReviewPageProps {
  * **Y cada uno ve lo suyo** (RF-12). El recorte lo hace el backend contra las
  * áreas que el rol de quien mira alcanza; acá no hay una segunda copia de esa
  * regla, ni la puede haber: la pantalla dibuja lo que le llega.
+ *
+ * La forma es la del diseño firmado (guía visual `3d`): encabezado con el
+ * estado de la cola y el filtro por área, la lista angosta a la izquierda y el
+ * caso abierto a la derecha. Antes era una pila de tarjetas todas abiertas —el
+ * contenido correcto en una forma que no era ninguna de las acordadas.
  */
 export default async function ReviewPage({ searchParams }: ReviewPageProps) {
   const { area } = await searchParams
@@ -51,25 +56,35 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
   const mayReadRules = session !== null && canEdit(session.permissions, 'PRICES')
   const query = area ? `&section=${encodeURIComponent(area)}` : ''
 
-  const [cases, rules, categories] = await Promise.all([
+  const [cases, rules, categories, suppliers] = await Promise.all([
     fetchFromApi<CaseList>(`/triage/cases?limit=100${query}`),
     mayReadRules ? fetchFromApi<Rule[]>('/triage/rules') : Promise.resolve(null),
     // Los rubros, para que un caso de forma escrita nueva se pueda resolver acá
-    // mismo (RF-14 de 010). Los pide la pantalla y no la tarjeta: `CaseCard` es
+    // mismo (RF-14 de 010). Los pide la pantalla y no el panel: `CaseDetail` es
     // de `triage` y no tiene por qué saber que existe un catálogo.
     fetchFromApi<CategoryList>('/categories'),
+    /*
+      El padrón, para poder cargar a mano la factura o la orden que el portal
+      publicó rota. Lo pide la pantalla y no el panel, igual que los rubros.
+
+      Quien no alcanza el padrón recibe `null` —el backend contesta 403— y la
+      carga a mano no se ofrece. No es una puerta que se esconde: sin proveedor
+      no hay factura que registrar, y ofrecer un formulario que termina en un
+      403 sería peor que decir quién puede hacerlo.
+    */
+    fetchFromApi<SupplierList>('/suppliers'),
   ])
-  // Asked here so a card can offer the second door when a load is refused by a
+  // Asked here so a case can offer the second door when a load is refused by a
   // correction in force. It is not the permission that opens this screen —
   // cualquier sesión llega, y el backend recorta por área— sino la de cambiar
   // una corrección, que es `PRODUCT_CATALOG` en escritura. Esto sólo mantiene
-  // fuera de la tarjeta un link que respondería 403.
+  // fuera del panel un link que respondería 403.
   const mayCorrect = session !== null && canEdit(session.permissions, 'PRODUCT_CATALOG')
 
   if (cases === null) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Revisión</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Para decidir</h1>
         <ErrorState title="No pudimos traer los pendientes.">
           Probá de nuevo en un momento.
         </ErrorState>
@@ -78,82 +93,38 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
   }
 
   return (
-    <div className="space-y-8">
-      <Link className="text-sm text-link hover:underline" href="/precios">
-        « Volver a la lista de precios
-      </Link>
+    <div className="space-y-4">
+      <ReviewHeader
+        pendingTotal={cases.pending_total}
+        resolvedToday={cases.resolved_today}
+        oldestAt={cases.oldest_at ?? null}
+        sections={cases.sections}
+        area={area}
+      />
 
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Revisar esto</h1>
-        <p className="text-sm text-muted-foreground">
-          {cases.pending_total === 0
-            ? 'No quedó nada sin resolver.'
-            : `${cases.pending_total} ${
-                cases.pending_total === 1 ? 'pendiente' : 'pendientes'
-              } sin resolver.`}
-          {/*
-            El más viejo, que es lo que deja ver si la lista se está abandonando
-            antes de que sea un problema (RF-16).
-          */}
-          {cases.oldest_at !== null &&
-            ` El más viejo espera desde ${formatMoment(cases.oldest_at)}.`}
-        </p>
-      </header>
-
-      {/*
-        El filtro por área (RF-22). Las opciones las manda el backend con la
-        página: qué áreas alcanza un rol lo contesta `identity` y nadie más, y
-        una copia de esa matriz acá sería la misma regla en dos lugares. Con una
-        sola área no se dibuja, porque no hay nada que elegir — que es el caso de
-        Marcela y el de Julián, y deja el filtro donde sirve: en la pantalla del
-        dueño, que es quien ve todo.
-      */}
-      {cases.sections.length > 1 && (
-        <nav className="flex flex-wrap gap-2 text-sm">
-          <Link
-            className={`rounded border px-3 py-1 ${!area ? 'bg-muted font-medium' : ''}`}
-            href="/revision"
-          >
-            Todo
-          </Link>
-          {cases.sections.map(section => (
-            <Link
-              key={section}
-              className={`rounded border px-3 py-1 ${
-                area === section ? 'bg-muted font-medium' : ''
-              }`}
-              href={`/revision?area=${section}`}
-            >
-              {sectionLabel(section)}
-            </Link>
-          ))}
-        </nav>
+      {cases.items.length === 0 ? (
+        <Empty title="Nada apartado.">
+          Cuando el sistema no pueda resolver algo solo, va a aparecer acá con el motivo.
+        </Empty>
+      ) : (
+        <CaseQueue
+          items={cases.items}
+          pendingTotal={cases.pending_total}
+          mayCorrect={mayCorrect}
+          categories={categories?.items ?? []}
+          suppliers={suppliers?.items ?? []}
+        />
       )}
 
-      <section className="space-y-3">
-        {cases.items.length === 0 ? (
-          <Empty title="Nada apartado.">
-            Cuando el sistema no pueda resolver algo solo, va a aparecer acá con el motivo.
-          </Empty>
-        ) : (
-          cases.items.map(item => (
-            <CaseCard
-              key={item.id}
-              item={item}
-              mayCorrect={mayCorrect}
-              categories={categories?.items ?? []}
-            />
-          ))
-        )}
-      </section>
-
       {mayReadRules && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-medium">Decisiones guardadas</h2>
-          <p className="text-sm text-muted-foreground">
-            El sistema las aplica solo a los casos iguales. Si dejás una sin efecto, esos casos
-            vuelven a esta pantalla.
-          </p>
+        <section className="space-y-3 rounded-xl border border-border bg-card p-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-foreground">Decisiones guardadas</h2>
+            <p className="text-sm text-muted-foreground">
+              El sistema las aplica solo a los casos iguales. Si dejás una sin efecto, esos casos
+              vuelven a esta pantalla.
+            </p>
+          </div>
           <RuleList rules={rules ?? []} />
         </section>
       )}

@@ -26,9 +26,7 @@ export const metadata = {
  * ninguna, lo dice.
  */
 export default async function SyncHistoryPage() {
-  const runs = await fetchFromApi<JobRunList>(
-    `/operations/jobs?task_name=${PRICE_TASK}&limit=50`
-  )
+  const runs = await fetchFromApi<JobRunList>(`/operations/jobs?task_name=${PRICE_TASK}&limit=50`)
 
   return (
     <div className="space-y-6">

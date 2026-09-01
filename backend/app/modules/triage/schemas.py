@@ -51,6 +51,10 @@ class CaseList(BaseModel):
     # list is short whenever the page is.
     pending_total: int = 0
     oldest_at: datetime | None = None
+    # What the queue emptied today, on the shop's clock. It is the other half of
+    # the same sentence: a screen that only counts what is left reads as a list
+    # that never moves, and the work that did move is the reason it is shorter.
+    resolved_today: int = 0
     # The areas this person may ask to see on their own (RF-22). It travels with
     # the page so the screen can draw the filter **without keeping a second copy
     # of the role matrix**: which areas a role reaches is `identity`'s answer

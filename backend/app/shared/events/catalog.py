@@ -368,6 +368,35 @@ class QuarantineCaseResolved(DomainEvent):
 
 
 @dataclass(frozen=True, slots=True)
+class ManualEntryDisputed(DomainEvent):
+    """El portal publicó una fila que alguien ya había cargado a mano, y no coinciden.
+
+    Se publica cuando la lectura alcanza un registro cuyo origen es una persona
+    y los valores difieren. **Ninguno de los dos gana solo**: el registro queda
+    apartado —fuera de todos los totales, como cualquier dato dudoso— y la
+    diferencia se abre como un caso, con los dos valores al lado, para que
+    alguien elija.
+
+    Es la decisión que tomó el dueño el 2026-09-01, y es la única que no le
+    miente a ninguna de las dos partes: pisar lo cargado a mano tira trabajo
+    hecho sin avisar, y dejarlo ganar deja la plataforma discrepando del origen
+    sin que nadie se entere.
+
+    Los valores viajan como texto ya formateado porque los lee una persona en
+    una pantalla, no un cálculo: un evento nunca lleva un modelo (`GEN-08`), y
+    acá tampoco lleva un `Decimal` que del otro lado habría que volver a
+    formatear para mostrarlo.
+    """
+
+    entity: str
+    entity_id: int
+    number: str
+    supplier_text: str
+    typed: dict[str, str]
+    published: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
 class QuarantineRuleRevoked(DomainEvent):
     """A learned rule was left without effect, so its cases come back."""
 

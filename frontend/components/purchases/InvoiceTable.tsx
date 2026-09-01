@@ -82,6 +82,18 @@ export function InvoiceTable({ invoices }: { invoices: Invoice[] }) {
                       llegó {invoice.arrival_count} veces
                     </span>
                   )}
+                  {/*
+                    Una factura que escribió una persona **no se muestra como
+                    algo que publicó el portal** (Artículo I). Es la mitad
+                    visible de la carga manual: sin esto, un total tipeado a
+                    mano se lee igual que uno leído del origen, y nadie que
+                    mire la lista puede saber cuál es cuál.
+                  */}
+                  {invoice.origin === 'MANUAL' && (
+                    <Badge tone="info" className="ml-2">
+                      Cargada a mano
+                    </Badge>
+                  )}
                 </td>
                 <td className="py-2">
                   {invoice.supplier_name ?? (

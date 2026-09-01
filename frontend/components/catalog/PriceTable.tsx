@@ -144,7 +144,11 @@ export function PriceTable({ items }: PriceTableProps) {
                   {isNew ? (
                     <span className="text-sm text-muted-ink">nuevo</span>
                   ) : (
-                    <Money value={item.previous_price} as="span" className="text-sm text-muted-ink" />
+                    <Money
+                      value={item.previous_price}
+                      as="span"
+                      className="text-sm text-muted-ink"
+                    />
                   )}
                 </td>
                 <td className="px-4 py-3">

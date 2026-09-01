@@ -86,6 +86,22 @@ class PaymentOrigin(enum.StrEnum):
     MANUAL = "MANUAL"
 
 
+class RecordOrigin(enum.StrEnum):
+    """Whether the platform read this record from the portal, or somebody typed it.
+
+    The payments and the due dates already draw the same line, and this is the
+    same one over an invoice and over an order: a datum a person loaded by hand
+    **must never be shown as something the portal published** (Artículo I). It
+    is also the only way to tell, later, that the row the portal finally
+    publishes is the same one somebody had already reconstructed — which is
+    when it stops being bookkeeping and starts being the difference between one
+    invoice and two.
+    """
+
+    PORTAL = "PORTAL"
+    MANUAL = "MANUAL"
+
+
 class PaymentState(enum.StrEnum):
     """Whether a payment is counted, waiting for a decision, or undone."""
 
@@ -233,6 +249,21 @@ class Invoice(Base):
     # The name exactly as the portal wrote it, kept whatever happens next: it is
     # what the review screen shows, and what an assignment matches on.
     supplier_text: Mapped[str] = mapped_column(String(255), default="")
+    # Whether this invoice was read from the portal or typed by a person after
+    # the portal published a row nobody could interpret.
+    origin: Mapped[RecordOrigin] = mapped_column(
+        Enum(RecordOrigin, name="record_origin", schema=CORE_SCHEMA),
+        default=RecordOrigin.PORTAL,
+        server_default=RecordOrigin.PORTAL.value,
+    )
+    # Los valores que el portal publicó y una persona **rechazó**, cuando
+    # decidió que quedaba lo cargado a mano.
+    #
+    # Sin esto la pregunta vuelve sola: el portal republica su fila cada doce
+    # horas, y cada lectura reabriría la misma discusión que alguien ya
+    # contestó. Con esto se pregunta una vez por desacuerdo — si el origen
+    # cambia de opinión y publica algo distinto, eso sí es una discusión nueva.
+    rejected_portal_values: Mapped[dict[str, str] | None] = mapped_column(JSONB, default=None)
     # Derived from the supplier's agreed term (RF-26 of 005), and rewritten when
     # somebody reschedules it on the calendar before it falls due (RF-26 of 006).
     due_on: Mapped[date | None] = mapped_column(Date, default=None, index=True)
@@ -558,6 +589,20 @@ class PurchaseOrder(Base):
         ForeignKey(f"{CORE_SCHEMA}.supplier.id", ondelete="RESTRICT"), default=None
     )
     supplier_text: Mapped[str] = mapped_column(String(255), default="")
+    # Leída del portal, o cargada a mano sobre una fila que nadie pudo leer.
+    origin: Mapped[RecordOrigin] = mapped_column(
+        Enum(RecordOrigin, name="record_origin", schema=CORE_SCHEMA),
+        default=RecordOrigin.PORTAL,
+        server_default=RecordOrigin.PORTAL.value,
+    )
+    # Los valores que el portal publicó y una persona **rechazó**, cuando
+    # decidió que quedaba lo cargado a mano.
+    #
+    # Sin esto la pregunta vuelve sola: el portal republica su fila cada doce
+    # horas, y cada lectura reabriría la misma discusión que alguien ya
+    # contestó. Con esto se pregunta una vez por desacuerdo — si el origen
+    # cambia de opinión y publica algo distinto, eso sí es una discusión nueva.
+    rejected_portal_values: Mapped[dict[str, str] | None] = mapped_column(JSONB, default=None)
     product_code: Mapped[str | None] = mapped_column(String(64), default=None)
     product_text: Mapped[str] = mapped_column(String(500), default="")
     quantity: Mapped[int | None] = mapped_column(Integer, default=None)

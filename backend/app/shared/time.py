@@ -12,7 +12,7 @@ The frontend learned this the hard way and pinned the zone in
 on the server side, for the moment a filter reaches the database.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 BUSINESS_TIME_ZONE = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -30,3 +30,14 @@ def as_business_time(value: datetime | None) -> datetime | None:
     if value is None or value.tzinfo is not None:
         return value
     return value.replace(tzinfo=BUSINESS_TIME_ZONE)
+
+
+def start_of_business_day(moment: datetime | None = None) -> datetime:
+    """Midnight in Buenos Aires of the day `moment` falls on.
+
+    «Hoy» is a day of the shop's calendar, not a UTC one: between 21:00 and
+    midnight local, UTC has already turned the page, and a count of what was
+    decided today would go back to zero while the team is still working.
+    """
+    local = (moment or datetime.now(UTC)).astimezone(BUSINESS_TIME_ZONE)
+    return local.replace(hour=0, minute=0, second=0, microsecond=0)

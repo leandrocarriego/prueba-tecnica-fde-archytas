@@ -514,6 +514,65 @@ class TestHowLongItHasBeenWaiting:
         assert listed.pending_total == 2
         assert listed.oldest_at is not None
 
+    async def test_the_screen_also_says_what_left_the_queue_today(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """La otra mitad del encabezado: la cola se mueve, y se ve que se movió.
+
+        Una pantalla que sólo cuenta lo que queda se lee como una lista que no
+        avanza nunca — y el trabajo que sí avanzó es exactamente la razón por la
+        que hoy es más corta.
+
+        El día es el del negocio y no el de UTC: entre las 21:00 y la medianoche
+        de Buenos Aires, UTC ya cambió de día, y ahí el conteo volvería a cero
+        con el local todavía abierto.
+        """
+        # Arrange — dos apartados, uno resuelto recién.
+        await a_broken_payment_arrives(session)
+        await a_broken_message_arrives(session)
+        service = TriageService(session)
+        case = (await cases_of(session, UNREADABLE_PAYMENT_ROW))[0]
+        await service.resolve(
+            case.id,
+            decision={"action": "ignore"},
+            user_id=owner.id,
+            remember=False,
+            visible=EVERY_AREA,
+        )
+
+        # Act
+        listed = await service.list_cases(visible=EVERY_AREA)
+
+        # Assert — uno menos esperando, y uno contado del lado del que se decidió.
+        assert listed.pending_total == 1
+        assert listed.resolved_today == 1
+
+    async def test_what_was_decided_yesterday_is_not_of_today(
+        self, session: AsyncSession, owner: User
+    ) -> None:
+        """El conteo es de hoy, y por eso la prueba mueve el reloj hacia atrás."""
+        # Arrange
+        await a_broken_payment_arrives(session)
+        service = TriageService(session)
+        case = (await cases_of(session, UNREADABLE_PAYMENT_ROW))[0]
+        await service.resolve(
+            case.id,
+            decision={"action": "ignore"},
+            user_id=owner.id,
+            remember=False,
+            visible=EVERY_AREA,
+        )
+        # Act — la misma decisión, tomada ayer.
+        await session.execute(
+            update(ExceptionCase)
+            .where(ExceptionCase.id == case.id)
+            .values(resolved_at=datetime.now(UTC) - timedelta(days=1))
+        )
+        await session.flush()
+
+        # Assert
+        assert (await service.list_cases(visible=EVERY_AREA)).resolved_today == 0
+
 
 class TestClosedByTheScreenThatOwnedTheWork:
     """H5, RF-20 y RF-21: la lista no miente cuando el trabajo se hizo en otra parte.
