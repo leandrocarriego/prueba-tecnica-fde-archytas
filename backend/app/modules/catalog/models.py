@@ -344,6 +344,35 @@ class Correction(Base, CorrectionColumns):
         return f"<Correction {self.entity_type}:{self.entity_id}.{self.field} {self.status}>"
 
 
+class OrderSpend(Base):
+    """What was spent on each purchase-order line, as this module's own projection.
+
+    The amounts live in `purchases` (`core.purchase_order`), which this module
+    must not read (Artículo IV). So it keeps a copy fed by the event
+    `PurchaseOrdersNormalized`: one row per order line, with the product it was
+    for and the amount. That is all «gasto por rubro» needs — the rubro of each
+    line comes from joining `product_code` against this module's own `product`,
+    and a line whose product has no rubro (or no product at all) is spend «sin
+    rubro», which is exactly the «pedazos sueltos» the client complained about.
+
+    Keyed by the staging row so re-reading the same order twice leaves the same
+    total: the projection is idempotent, like the tasks that feed it.
+    """
+
+    __tablename__ = "order_spend"
+    __table_args__ = (
+        Index("ix_order_spend_product_code", "product_code"),
+        {"schema": CORE_SCHEMA},
+    )
+
+    staging_row_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=False)
+    product_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+
+    def __repr__(self) -> str:
+        return f"<OrderSpend row={self.staging_row_id} code={self.product_code} {self.amount}>"
+
+
 # Re-exported so the rest of the module names the status without reaching past
 # `models.py` for it.
 __all__ = [
@@ -354,6 +383,7 @@ __all__ = [
     "CatalogSetting",
     "Correction",
     "CorrectionStatus",
+    "OrderSpend",
     "PricePoint",
     "PriceSource",
     "Product",

@@ -2238,6 +2238,10 @@ export interface components {
             pending_review_count: number;
             /** Total Products */
             total_products: number;
+            /** Spend Unclassified */
+            spend_unclassified: string;
+            /** Spend Total */
+            spend_total: string;
         };
         /**
          * CategoryRead
@@ -2250,6 +2254,8 @@ export interface components {
             name: string;
             /** Product Count */
             product_count: number;
+            /** Spend */
+            spend: string;
             /** Aliases */
             aliases: components["schemas"]["CategoryAliasRead"][];
         };

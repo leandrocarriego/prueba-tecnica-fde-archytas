@@ -190,6 +190,10 @@ class CategoryRead(BaseModel):
     id: int
     name: str
     product_count: int
+    # What was spent on this rubro, summed from the purchase orders (P7). It is
+    # the answer to «cuánto gasté en pinturas»: real amounts the portal printed,
+    # never a total split by guess.
+    spend: Decimal
     aliases: list[CategoryAliasRead]
 
 
@@ -205,6 +209,11 @@ class CategoryList(BaseModel):
     # at all is «sin rubro» and has nothing under review (RF-26).
     pending_review_count: int
     total_products: int
+    # The spend that landed on «sin rubro» —a line whose product has no rubro or
+    # whose code matched no product—: the «pedazos sueltos» made countable. Plus
+    # the whole spend, so the rubros and «sin rubro» add up to it (P7).
+    spend_unclassified: Decimal
+    spend_total: Decimal
 
 
 class CategoryWrite(BaseModel):
