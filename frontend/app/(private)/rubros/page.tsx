@@ -1,8 +1,5 @@
-import Link from 'next/link'
-
 import { getSession } from '@/app/actions/auth'
 import { RubroNormalizer } from '@/components/catalog/RubroNormalizer'
-import { CategoryList } from '@/components/categories/CategoryList'
 import { NoPermission } from '@/components/common/NoPermission'
 import { fetchFromApi } from '@/lib/api/server'
 import { canEdit } from '@/lib/auth/permissions'
@@ -13,15 +10,17 @@ export const metadata = {
 }
 
 /**
- * Los rubros del catálogo, con su conteo y cómo llegan escritos (H1 y H2).
+ * Los rubros del catálogo: cuánto se gastó en cada uno, cuántos productos tiene
+ * y con cuántas formas llega escrito.
  *
- * «Sin rubro» aparece como un grupo más y entra en el total: es lo que hace que
- * el corte cierre sin que nadie tenga que sumar aparte.
+ * Toda la pantalla es un solo panel, `RubroNormalizer`. No hay encabezado ni
+ * accesos rápidos arriba: el panel ya se titula y lleva sus propias entradas a
+ * las colas (sin rubro, equivalencias, revisión). Un H1 «Rubros» y una barra de
+ * enlaces encima eran el resto de la pantalla vieja y decían dos veces lo mismo.
  *
  * **Los mantiene compras, y ventas los consulta** (010). No hay ningún rol
  * escrito acá: las acciones se ofrecen según lo que la matriz de permisos diga
  * de esta sección, que es el mismo lugar donde el backend decide el 403.
- * Esconder un botón nunca fue el mecanismo — es una comodidad sobre él.
  */
 export default async function CategoriesPage() {
   const [listing, session] = await Promise.all([
@@ -34,40 +33,9 @@ export default async function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Rubros</h1>
-        <p className="text-sm text-muted-foreground">
-          Cada rubro con cuántos productos tiene y con todas las formas en que llega escrito.
-        </p>
-      </header>
-
-      <nav className="flex gap-4 text-sm">
-        <Link className="text-link hover:underline" href="/rubros/sin-clasificar">
-          Productos sin rubro ({listing.unclassified_count})
-        </Link>
-        <Link className="text-link hover:underline" href="/rubros/equivalencias">
-          Equivalencias guardadas
-        </Link>
-        {/* RF-26: los que esperan que alguien decida su forma escrita. No son
-            todos los «sin rubro» — por eso el número va aparte y lleva a la
-            cola de revisión, que es donde se decide. */}
-        <Link className="text-link hover:underline" href="/revision">
-          Pendientes de revisión ({listing.pending_review_count})
-        </Link>
-      </nav>
-
-      {/*
-        La revisión visual de cada rubro y sus formas escritas (guía visual
-        `3k`). Vive acá, en Rubros, y no en la lista de precios: es una lectura
-        del catálogo de rubros, no de los precios.
-      */}
-      <RubroNormalizer listing={listing} />
-
-      <CategoryList
-        listing={listing}
-        canEdit={canEdit(session?.permissions ?? {}, 'PRODUCT_CATEGORIES')}
-      />
-    </div>
+    <RubroNormalizer
+      listing={listing}
+      canEdit={canEdit(session?.permissions ?? {}, 'PRODUCT_CATEGORIES')}
+    />
   )
 }

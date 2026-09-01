@@ -16,6 +16,7 @@ from app.modules.catalog.models import (
     CategoryAlias,
     Correction,
     CorrectionStatus,
+    OrderSpend,
     PricePoint,
     PriceSource,
     Product,
@@ -382,6 +383,61 @@ class CatalogRepository:
             .group_by(Product.category_id)
         )
         return {row[0]: int(row[1]) for row in result.all()}
+
+    async def record_order_spend(
+        self, lines: list[tuple[int, str | None, Decimal]]
+    ) -> None:
+        """Write what a batch of purchase-order lines spent, idempotently.
+
+        One row per staging line: reading the same order twice has to leave the
+        same total. `ON CONFLICT` over the staging row updates it in place, so a
+        correction to a line that was already read is reflected rather than
+        added on top.
+        """
+        if not lines:
+            return
+        values = [
+            {"staging_row_id": staging_row_id, "product_code": product_code, "amount": amount}
+            for staging_row_id, product_code, amount in lines
+        ]
+        statement = insert(OrderSpend).values(values)
+        await self.session.execute(
+            statement.on_conflict_do_update(
+                index_elements=[OrderSpend.staging_row_id],
+                set_={
+                    "product_code": statement.excluded.product_code,
+                    "amount": statement.excluded.amount,
+                },
+            )
+        )
+        await self.session.flush()
+
+    async def spend_by_category(self) -> tuple[dict[int, Decimal], Decimal, Decimal]:
+        """What was spent on each rubro, plus «sin rubro» and the total (P7).
+
+        The rubro of each line comes from joining its `product_code` against this
+        module's own `product`: a line whose product has no rubro —or whose code
+        matches no product at all— lands in the null group, which is the spend
+        «sin rubro» the client sees as «pedazos sueltos». Nothing is estimated:
+        every amount is one the portal printed on an order.
+        """
+        result = await self.session.execute(
+            select(Product.category_id, func.sum(OrderSpend.amount))
+            .select_from(OrderSpend)
+            .outerjoin(Product, Product.code == OrderSpend.product_code)
+            .group_by(Product.category_id)
+        )
+        per_category: dict[int, Decimal] = {}
+        unclassified = Decimal(0)
+        total = Decimal(0)
+        for category_id, amount in result.all():
+            spent = Decimal(amount or 0)
+            total += spent
+            if category_id is None:
+                unclassified += spent
+            else:
+                per_category[int(category_id)] = spent
+        return per_category, unclassified, total
 
     async def aliases(self) -> list[CategoryAlias]:
         """Every equivalence in force, newest last."""

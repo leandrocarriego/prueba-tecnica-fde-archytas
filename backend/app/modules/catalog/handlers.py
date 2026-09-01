@@ -25,6 +25,7 @@ from app.shared.events import (
     BusinessParameterChanged,
     PriceHistoryNormalized,
     PriceListNormalized,
+    PurchaseOrdersNormalized,
     QuarantineCaseResolved,
     QuarantineRuleRedecided,
     QuarantineRuleRevoked,
@@ -109,6 +110,17 @@ async def import_history(event: PriceHistoryNormalized, session: AsyncSession) -
     await CatalogService(session).import_published_history(
         product_code=event.product_code, points=event.points
     )
+
+
+@events.subscribe(PurchaseOrdersNormalized)
+async def record_order_spend(event: PurchaseOrdersNormalized, session: AsyncSession) -> None:
+    """Keep this module's «gasto por rubro» fed by the orders that were typed (P7).
+
+    `purchases` owns the amounts; this module never reads its table (Artículo
+    IV). It reacts to the fact that a batch of orders was normalised and keeps
+    its own projection, which is what the rubros screen adds up by rubro.
+    """
+    await CatalogService(session).record_order_spend(event.orders)
 
 
 @events.subscribe(QuarantineCaseResolved)

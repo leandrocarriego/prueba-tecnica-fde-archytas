@@ -79,6 +79,7 @@ from app.shared.events import (
     MissingProduct,
     NormalizedHistoryPoint,
     NormalizedPriceRow,
+    NormalizedPurchaseOrder,
     ProductPricesUpdated,
     ProductsRegistered,
     RegisteredProduct,
@@ -716,6 +717,22 @@ class CatalogService:
         product.category_id = category_id
         product.classified_by_rule_id = rule_id
 
+    async def record_order_spend(self, orders: tuple[NormalizedPurchaseOrder, ...]) -> None:
+        """Keep «gasto por rubro» fed by the purchase orders that were typed (P7).
+
+        Only lines that carry an amount move a total. A line the portal left
+        without one is not spend of zero — it is spend not yet known, and it
+        stays out until it has a number. The rubro is not decided here: it is a
+        join done at read time against this module's own products, so a line
+        whose product later gets a rubro moves from «sin rubro» to it on its own.
+        """
+        lines = [
+            (order.staging_row_id, order.product_code, order.amount)
+            for order in orders
+            if order.amount is not None
+        ]
+        await self.catalog.record_order_spend(lines)
+
     async def list_categories(self) -> CategoryList:
         """The rubros with their count and their written forms (RF-01, RF-03, RF-04).
 
@@ -727,6 +744,7 @@ class CatalogService:
         """
         categories = await self.catalog.list_categories()
         counts = await self.catalog.products_per_category()
+        spend, spend_unclassified, spend_total = await self.catalog.spend_by_category()
         aliases: dict[int, list[CategoryAliasRead]] = defaultdict(list)
         decided: set[str] = set()
         for alias in await self.catalog.aliases():
@@ -749,6 +767,7 @@ class CatalogService:
                     id=category.id,
                     name=category.name,
                     product_count=counts.get(category.id, 0),
+                    spend=spend.get(category.id, Decimal(0)),
                     aliases=aliases.get(category.id, []),
                 )
                 for category in categories
@@ -756,6 +775,8 @@ class CatalogService:
             unclassified_count=counts.get(None, 0),
             pending_review_count=pending,
             total_products=sum(counts.values()),
+            spend_unclassified=spend_unclassified,
+            spend_total=spend_total,
         )
 
     async def create_category(self, *, name: str, actor_user_id: int) -> CategoryRead:
@@ -769,7 +790,9 @@ class CatalogService:
         )
         await self.session.commit()
         logger.info("Category created", extra={"category_id": category.id})
-        return CategoryRead(id=category.id, name=category.name, product_count=0, aliases=[])
+        return CategoryRead(
+            id=category.id, name=category.name, product_count=0, spend=Decimal(0), aliases=[]
+        )
 
     async def rename_category(
         self, category_id: int, *, name: str, actor_user_id: int
@@ -787,10 +810,12 @@ class CatalogService:
         )
         await self.session.commit()
         counts = await self.catalog.products_per_category()
+        spend, _, _ = await self.catalog.spend_by_category()
         return CategoryRead(
             id=category.id,
             name=category.name,
             product_count=counts.get(category.id, 0),
+            spend=spend.get(category.id, Decimal(0)),
             aliases=[
                 CategoryAliasRead.model_validate(alias)
                 for alias in await self.catalog.aliases()

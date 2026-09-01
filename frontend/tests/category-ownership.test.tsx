@@ -30,7 +30,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveCase } from '@/app/actions/triage'
 import { Navigation } from '@/components/auth/Navigation'
-import { CategoryList } from '@/components/categories/CategoryList'
+import { RubroNormalizer } from '@/components/catalog/RubroNormalizer'
 import { CaseCard } from '@/components/triage/CaseCard'
 import { READ, WRITE, type Permissions } from '@/lib/auth/permissions'
 import { canEdit } from '@/lib/auth/permissions'
@@ -64,7 +64,13 @@ const USER = { id: 1, name: 'Marcela', last_name: 'Díaz' } as components['schem
 const COMPRAS: Permissions = { PRODUCT_CATEGORIES: WRITE, PRICES: WRITE }
 const VENTAS: Permissions = { PRODUCT_CATEGORIES: READ, SALES: WRITE }
 
-const UN_RUBRO: Category = { id: 3, name: 'Herramientas', product_count: 12, aliases: [] }
+const UN_RUBRO: Category = {
+  id: 3,
+  name: 'Herramientas',
+  product_count: 12,
+  spend: '0',
+  aliases: [],
+}
 
 const LISTADO = {
   items: [UN_RUBRO],
@@ -73,6 +79,9 @@ const LISTADO = {
   // que la matriz ofrece, y el conteo de RF-26 de la 008 no cambia ninguno.
   pending_review_count: 0,
   total_products: 12,
+  // El gasto no cambia qué botones ofrece la matriz: ceros alcanzan.
+  spend_unclassified: '0',
+  spend_total: '0',
 }
 
 const UNA_FORMA_ESCRITA: Case = {
@@ -119,18 +128,23 @@ describe('los rubros en la barra lateral', () => {
 
 describe('las acciones sobre un rubro', () => {
   it('con el acceso de ventas la pantalla no ofrece ninguna', () => {
-    render(<CategoryList listing={LISTADO} canEdit={canEdit(VENTAS, 'PRODUCT_CATEGORIES')} />)
+    render(<RubroNormalizer listing={LISTADO} canEdit={canEdit(VENTAS, 'PRODUCT_CATEGORIES')} />)
 
-    // RF-12: ni agregar, ni renombrar, ni eliminar. Lo que ve es el rubro.
-    expect(screen.queryByRole('button')).toBeNull()
-    expect(screen.getByText('Herramientas')).toBeInTheDocument()
+    // RF-12: ni agregar, ni cambiar el nombre, ni eliminar. Elegir un rubro de
+    // la lista no es una acción sobre él —no escribe nada—, así que se mira lo
+    // que sí escribiría: con `READ` no aparece ninguno de esos botones.
+    for (const accion of ['Agregar rubro', 'Cambiar nombre', 'Eliminar rubro']) {
+      expect(screen.queryByRole('button', { name: accion })).toBeNull()
+    }
+    // Lo que ve es el rubro (aparece en la lista y en el panel).
+    expect(screen.getAllByText('Herramientas').length).toBeGreaterThan(0)
   })
 
   it('con el acceso de compras están todas', () => {
-    render(<CategoryList listing={LISTADO} canEdit={canEdit(COMPRAS, 'PRODUCT_CATEGORIES')} />)
+    render(<RubroNormalizer listing={LISTADO} canEdit={canEdit(COMPRAS, 'PRODUCT_CATEGORIES')} />)
 
     // RF-01, RF-02 y RF-03 del lado que se ve.
-    for (const accion of ['Agregar', 'Renombrar', 'Eliminar']) {
+    for (const accion of ['Agregar rubro', 'Cambiar nombre', 'Eliminar rubro']) {
       expect(screen.getByRole('button', { name: accion })).toBeInTheDocument()
     }
   })
