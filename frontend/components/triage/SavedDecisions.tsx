@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { ResolvedSales } from '@/components/sales/ResolvedSales'
 import { RuleList } from '@/components/triage/RuleList'
+import type { Category } from '@/lib/catalog/types'
 import type { ResolvedGroup } from '@/lib/sales/types'
 import { sectionLabel, sectionOfKind, type Rule } from '@/lib/triage/types'
 
@@ -28,7 +29,20 @@ const AREAS = ['PURCHASING', 'SALES', 'SYSTEM'] as const
  * sobre las dos consultas que alimentan esto. Filtrar por área es una comodidad
  * para leer, nunca la restricción.
  */
-export function SavedDecisions({ rules, sales }: { rules: Rule[]; sales: ResolvedGroup[] }) {
+export function SavedDecisions({
+  rules,
+  sales,
+  categories,
+}: {
+  rules: Rule[]
+  sales: ResolvedGroup[]
+  /*
+    Sólo para nombrar el rubro de una regla. Los pide la pantalla, que ya los
+    traía para resolver un caso: `triage` es genérico y no tiene por qué saber
+    que existe un catálogo de rubros.
+  */
+  categories: Category[]
+}) {
   const [area, setArea] = useState<string>('all')
 
   // Qué áreas tienen algo. Las ventas resueltas son de ventas por definición;
@@ -79,7 +93,7 @@ export function SavedDecisions({ rules, sales }: { rules: Rule[]; sales: Resolve
 
       <div className="space-y-2">
         {shownSales.length > 0 && <h3 className="section-label">Reglas que el sistema aplica</h3>}
-        <RuleList rules={shownRules} />
+        <RuleList rules={shownRules} categories={categories} />
       </div>
     </section>
   )
