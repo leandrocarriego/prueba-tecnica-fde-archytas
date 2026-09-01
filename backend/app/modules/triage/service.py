@@ -27,6 +27,7 @@ from app.shared.events import (
 )
 from app.shared.parameters import initial_value
 from app.shared.sections import BusinessSection
+from app.shared.time import start_of_business_day
 
 logger = get_logger(__name__)
 
@@ -61,6 +62,19 @@ UNREADABLE_PAYMENT_ROW = "unreadable_payment_row"
 UNREADABLE_MESSAGE_ROW = "unreadable_message_row"
 UNREADABLE_SALE_ROW = "unreadable_sale_row"
 
+# Las dos clases que abre la **carga manual**, y que no existían mientras la
+# única salida de una fila ilegible era darla por revisada: una persona
+# reconstruye la factura o la orden que el portal publicó rota, y meses después
+# el portal la publica de nuevo, ya legible y distinta.
+#
+# Ninguno de los dos gana solo. Pisar lo cargado a mano tira trabajo hecho sin
+# avisar; dejarlo ganar deja la plataforma discrepando del origen sin que nadie
+# se entere. Así que el registro queda apartado —fuera de todos los totales,
+# como cualquier dato dudoso— y la diferencia se pregunta con los dos valores al
+# lado. Es la decisión del dueño del 2026-09-01.
+DISPUTED_INVOICE = "disputed_invoice"
+DISPUTED_ORDER = "disputed_order"
+
 # Where each of the four came from, in the words of the portal screen a person
 # would go looking at (RF-11). Spanish, because the screen shows it.
 SUPPLIER_ORIGIN = "padrón de proveedores"
@@ -81,6 +95,7 @@ INVOICE_ORIGIN = "facturas"
 UNKNOWN_PRODUCT_REASON = "El producto no está entre los conocidos"
 MISSING_PRODUCT_REASON = "El producto dejó de figurar en la lista"
 UNKNOWN_CATEGORY_REASON = "No sabemos a qué rubro corresponde esta forma escrita"
+DISPUTED_ENTRY_REASON = "La cargó una persona y el portal la publicó distinta"
 
 ALREADY_RESOLVED = "This case has already been resolved"
 NOT_YOUR_SECTION = "No tenés permiso para resolver un pendiente de esta área"
@@ -185,6 +200,11 @@ class TriageService:
         # many are waiting (RF-15).
         pending_total = await self.triage.count_cases(status=CaseStatus.PENDING, sections=sections)
         oldest_at = await self.triage.oldest_pending_at(sections=sections)
+        # And what left the queue today, which is the half of the header that
+        # says the list moves. The day is the shop's, never UTC's.
+        resolved_today = await self.triage.count_resolved_since(
+            since=start_of_business_day(), sections=sections
+        )
 
         stale_days = int(await self._setting(STALE_DAYS_KEY))
         now = datetime.now(UTC)
@@ -195,6 +215,7 @@ class TriageService:
             limit=limit,
             pending_total=pending_total,
             oldest_at=oldest_at,
+            resolved_today=resolved_today,
             sections=sorted(visible),
         )
 

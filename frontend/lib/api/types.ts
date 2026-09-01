@@ -2116,6 +2116,11 @@ export interface components {
             /** Oldest At */
             oldest_at?: string | null;
             /**
+             * Resolved Today
+             * @default 0
+             */
+            resolved_today: number;
+            /**
              * Sections
              * @default []
              */
@@ -2724,6 +2729,8 @@ export interface components {
             review_state: components["schemas"]["InvoiceReviewState"];
             /** Review Reason */
             review_reason: string | null;
+            /** @default PORTAL */
+            origin: components["schemas"]["RecordOrigin"];
             /** Arrival Count */
             arrival_count: number;
             /** File Kind */
@@ -3558,6 +3565,20 @@ export interface components {
             /** Coverage */
             coverage: number;
         };
+        /**
+         * RecordOrigin
+         * @description Whether the platform read this record from the portal, or somebody typed it.
+         *
+         *     The payments and the due dates already draw the same line, and this is the
+         *     same one over an invoice and over an order: a datum a person loaded by hand
+         *     **must never be shown as something the portal published** (Artículo I). It
+         *     is also the only way to tell, later, that the row the portal finally
+         *     publishes is the same one somebody had already reconstructed — which is
+         *     when it stops being bookkeeping and starts being the difference between one
+         *     invoice and two.
+         * @enum {string}
+         */
+        RecordOrigin: "PORTAL" | "MANUAL";
         /**
          * ReceiptRead
          * @description The reception receipt of an invoice (RF-29, RF-36, RF-47 of 005).

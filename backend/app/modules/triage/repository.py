@@ -136,6 +136,28 @@ class TriageRepository:
             statement = statement.where(ExceptionCase.section.in_(sections))
         return statement
 
+    async def count_resolved_since(
+        self, *, since: datetime, sections: frozenset[BusinessSection] | None = None
+    ) -> int:
+        """How many cases left the queue since `since` (RF-15).
+
+        Both ways of leaving count, because both are work that got done: a
+        person deciding it here, and a person doing the work on the screen that
+        owned it, which closes the case on its own (RF-20).
+
+        Narrowed by the same areas as the listing: what the screen says was
+        resolved today is what **this** person could have seen waiting.
+        """
+        statement = self._filtered(
+            select(func.count()).select_from(ExceptionCase),
+            CaseStatus.RESOLVED,
+            None,
+            None,
+            sections,
+        ).where(ExceptionCase.resolved_at >= since)
+        result = await self.session.execute(statement)
+        return int(result.scalar_one())
+
     async def oldest_pending_at(
         self, *, sections: frozenset[BusinessSection] | None = None
     ) -> datetime | None:

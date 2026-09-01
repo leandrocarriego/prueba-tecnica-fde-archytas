@@ -21,7 +21,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from rapidfuzz import fuzz, process
@@ -47,6 +47,7 @@ from app.modules.purchases.models import (
     PurchaseCorrection,
     PurchaseOrder,
     Receipt,
+    RecordOrigin,
     Supplier,
     SupplierAliasSource,
 )
@@ -82,6 +83,7 @@ from app.shared.events import (
     InvoicesNeedingReview,
     InvoicesRegistered,
     ManualChangeRecorded,
+    ManualEntryDisputed,
     NormalizedInvoice,
     NormalizedPayment,
     NormalizedPurchaseOrder,
@@ -146,6 +148,37 @@ FILE_UNREADABLE = "No se pudo leer el archivo de la factura"
 # own, this already says so.
 UNREADABLE_PAYMENT_ROW = "unreadable_payment_row"
 RESOLVED_IN_PAYMENTS = "la pantalla de comprobantes"
+
+# --- Lo que carga una persona (2026-09-01) -------------------------------
+#
+# Cómo se nombran las dos cosas que se pueden cargar a mano cuando el portal
+# publica una fila que nadie puede leer. Viajan como string en el evento, así
+# que `triage` las nombra igual sin importar nada de este módulo (Artículo IV).
+INVOICE_ENTITY = "invoice"
+ORDER_ENTITY = "purchase_order"
+
+# Las dos respuestas posibles cuando el portal publica, ya legible, una fila que
+# alguien había reconstruido a mano y no coinciden.
+KEEP_PORTAL = "portal"
+KEEP_MANUAL = "manual"
+
+DISPUTED_BY_PORTAL = "La cargó una persona y el portal la publicó distinta"
+
+# La clase de caso que abre esa discusión y la pantalla que también puede
+# cerrarla. Escritas acá por la misma razón que `UNREADABLE_PAYMENT_ROW` más
+# arriba: son vocabulario que viaja en un evento, no un import de `triage`.
+#
+# Existe porque la factura apartada aparece en **dos** lugares —la cola de
+# facturas, porque quedó `PENDING`, y «Para decidir», porque la discusión se
+# pregunta ahí— y quien la resuelva primero tiene que llevarse el caso puesto.
+# Un pendiente que sigue en la lista después de resuelto es la lista mintiendo
+# (RF-20, RF-21 de 011).
+DISPUTED_INVOICE_CASE = "disputed_invoice"
+RESOLVED_IN_INVOICES = "la pantalla de facturas"
+
+ALREADY_REGISTERED = "Esa factura ya está registrada"
+ORDER_ALREADY_REGISTERED = "Esa orden ya está registrada"
+SUPPLIER_NOT_IN_REGISTER = "Ese proveedor no está en el padrón"
 
 VOUCHER_WITHOUT_INVOICE = "El comprobante no dice a qué factura corresponde"
 VOUCHER_UNKNOWN_INVOICE = "El comprobante menciona una factura que no tenemos registrada"
@@ -232,6 +265,42 @@ AGING_BANDS: tuple[tuple[str, int | None], ...] = (
 RECEIVED_STATUS = "Recibida"
 
 HUNDRED = Decimal(100)
+
+
+def _money_text(value: Decimal | None) -> str:
+    """Un importe como texto, con la **misma** forma salga de donde salga.
+
+    Los dos lados de una discusión se comparan como strings —es lo que queda
+    guardado de lo que alguien rechazó— y el mismo número llega escrito
+    distinto según de dónde venga: de la base sale con la escala de la columna
+    (`152400.0000`) y de una fila recién normalizada, sin ella (`152400`).
+    Compararlos así diría que difieren dos importes iguales, y volvería a
+    preguntar una discusión ya contestada.
+    """
+    if value is None:
+        return "—"
+    return format(value.quantize(Decimal("0.0001")), "f")
+
+
+def _amount_of(value: str) -> Decimal | None:
+    """Un importe que volvió de la cola, convertido sin confiar en él.
+
+    `Decimal` construye `nan` e `Infinity` sin quejarse, y esto escribe sobre
+    una columna de plata: la misma puerta que `CatalogService._as_number` y
+    `_price_of` ya cierran del lado del catálogo. Lo que no se puede convertir
+    vuelve `None`, que en una orden es un importe que no se conoce — no cero.
+    """
+    if value in {"", "—"}:
+        return None
+    try:
+        amount = Decimal(value)
+    except (InvalidOperation, ArithmeticError):
+        logger.warning("A settled dispute carried an amount that is not a number")
+        return None
+    if not amount.is_finite() or amount < 0:
+        logger.warning("A settled dispute carried an amount that is not one")
+        return None
+    return amount
 
 
 def today_here() -> date:
@@ -780,6 +849,19 @@ class PurchasesService:
         existing.portal_receipt_issued = row.receipt_issued
         await self.session.flush()
 
+        if existing.origin is RecordOrigin.MANUAL:
+            # La rama entera es de esta factura y **termina acá**. Dejarla caer
+            # en la comparación de duplicados de abajo la apartaría de nuevo por
+            # otro motivo, que para quien mira la pantalla es la misma pregunta
+            # ya contestada, hecha otra vez con otras palabras.
+            published = {"fecha": row.issued_on.isoformat(), "total": _money_text(row.total)}
+            if existing.total == row.total and existing.issued_on == row.issued_on:
+                return None
+            if existing.rejected_portal_values == published:
+                return None
+            await self._dispute(existing, published)
+            return None
+
         if existing.total == row.total:
             return None
         if existing.review_state is InvoiceReviewState.PENDING:
@@ -794,6 +876,356 @@ class PurchasesService:
             supplier_text=existing.supplier_text,
             excerpt=f"{existing.total} ≠ {row.total}",
         )
+
+    async def _dispute(self, invoice: Invoice, published: dict[str, str]) -> None:
+        """Apartar la factura y preguntar cuál de los dos valores queda.
+
+        Se aparta **sin pisar nada**: mientras la discusión está abierta, la
+        factura no suma en ningún total (que es lo que hace `PENDING`), y los dos
+        juegos de valores siguen existiendo — el escrito, en la fila; el
+        publicado, en el evento que abre el caso—. Escribir el del portal acá
+        sería decidir la discusión antes de preguntarla.
+        """
+        invoice.review_state = InvoiceReviewState.PENDING
+        invoice.review_reason = DISPUTED_BY_PORTAL
+        await self.session.flush()
+        await events.publish(
+            ManualEntryDisputed(
+                entity=INVOICE_ENTITY,
+                entity_id=invoice.id,
+                number=invoice.number,
+                supplier_text=invoice.supplier_text,
+                typed={
+                    "fecha": invoice.issued_on.isoformat(),
+                    "total": _money_text(invoice.total),
+                },
+                published=published,
+            ),
+            self.session,
+        )
+
+    async def _dispute_order(self, order: PurchaseOrder, published: dict[str, str]) -> None:
+        """Apartar la orden y preguntar cuál de los dos valores queda."""
+        order.review_state = OrderReviewState.PENDING
+        order.review_reason = DISPUTED_BY_PORTAL
+        await self.session.flush()
+        await events.publish(
+            ManualEntryDisputed(
+                entity=ORDER_ENTITY,
+                entity_id=order.id,
+                number=order.number,
+                supplier_text=order.supplier_text,
+                typed={
+                    "fecha": order.ordered_on.isoformat(),
+                    "importe": _money_text(order.amount),
+                },
+                published=published,
+            ),
+            self.session,
+        )
+
+    # --- Lo que carga una persona ----------------------------------------
+
+    async def register_invoice_by_hand(
+        self,
+        *,
+        number: str,
+        issued_on: date,
+        total: Decimal,
+        supplier_id: int,
+        actor_user_id: int,
+        occurred_at: datetime | None = None,
+    ) -> Invoice:
+        """Alta de la factura que el portal publicó rota y una persona reconstruyó.
+
+        Es la otra mitad del Artículo II. Hasta acá una fila ilegible sólo se
+        podía dar por revisada: quedaba contada y visible —que ya era más de lo
+        que había— y el dato no entraba nunca, así que la factura no aparecía en
+        ningún total ni en el calendario de vencimientos.
+
+        Entra marcada como `MANUAL` y eso no es contabilidad interna: es la
+        promesa del Artículo I de no mostrar como publicado por el portal algo
+        que escribió una persona, y es lo único que permite reconocer, el día
+        que el portal publique esa fila, que es la misma factura y no una
+        segunda.
+
+        El vencimiento sale del plazo acordado del proveedor, igual que el de
+        cualquier otra (RF-26 de 005): no se pregunta, porque no es un dato de
+        la factura sino del acuerdo con quien la emitió.
+        """
+        supplier = await self.purchases.supplier(supplier_id)
+        if supplier is None:
+            raise NotFoundError(SUPPLIER_NOT_IN_REGISTER, details={"supplier_id": supplier_id})
+
+        existing = await self.purchases.invoice_of(
+            supplier_id=supplier_id, number=number, supplier_text=supplier.legal_name
+        )
+        if existing is not None:
+            # Ya está. Insistir sería la segunda factura que este alta existe
+            # para no crear, y el índice único la rechazaría con un error que no
+            # dice nada.
+            raise ConflictError(
+                ALREADY_REGISTERED, details={"invoice_id": existing.id, "number": number}
+            )
+
+        moment = occurred_at or datetime.now(UTC)
+        due_on = (
+            issued_on + timedelta(days=supplier.payment_term_days)
+            if supplier.payment_term_days is not None
+            else None
+        )
+        invoice = await self.purchases.add_invoice(
+            Invoice(
+                number=number,
+                issued_on=issued_on,
+                total=total,
+                supplier_id=supplier_id,
+                supplier_text=supplier.legal_name,
+                origin=RecordOrigin.MANUAL,
+                due_on=due_on,
+                original_due_on=due_on,
+                # Nadie la tiene que revisar: la revisó la persona que la
+                # escribió, y quién y cuándo quedan asentados acá y en el log.
+                review_state=InvoiceReviewState.RESOLVED,
+                resolved_by_user_id=actor_user_id,
+                resolved_at=moment,
+            )
+        )
+        await self._sync_due_date(invoice)
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=INVOICE_ENTITY,
+                entity_id=str(invoice.id),
+                action=AuditAction.CREATED,
+                actor_user_id=actor_user_id,
+                section=BusinessSection.PURCHASING,
+                new_value={
+                    "number": number,
+                    "issued_on": issued_on.isoformat(),
+                    "total": str(total),
+                    "supplier_id": supplier_id,
+                },
+                reason_code="LOADED_BY_HAND",
+                occurred_at=moment,
+            ),
+            self.session,
+        )
+        # Sin batch, porque no salió de ninguna lectura. Se anuncia igual: un
+        # comprobante que estaba esperando esta factura se imputa solo, y esa es
+        # exactamente la mitad del trabajo que la persona no tendría por qué
+        # volver a hacer a mano (RF-44).
+        await events.publish(
+            InvoicesRegistered(
+                invoices=(
+                    RegisteredInvoice(
+                        invoice_id=invoice.id,
+                        supplier_id=supplier_id,
+                        number=number,
+                        issued_on=issued_on,
+                        total=total,
+                        due_on=due_on,
+                    ),
+                ),
+                batch_id=None,
+            ),
+            self.session,
+        )
+        logger.info(
+            "Invoice loaded by hand",
+            extra={"invoice_id": invoice.id, "number": number, "actor": actor_user_id},
+        )
+        return invoice
+
+    async def register_order_by_hand(
+        self,
+        *,
+        number: str,
+        ordered_on: date,
+        supplier_id: int,
+        product_text: str = "",
+        quantity: int | None = None,
+        amount: Decimal | None = None,
+        actor_user_id: int,
+        occurred_at: datetime | None = None,
+    ) -> PurchaseOrder:
+        """Alta de la orden que el portal publicó rota y una persona reconstruyó.
+
+        Lo mismo que con la factura, con una diferencia que es del dominio: una
+        orden cargada a mano **no se puede cronometrar en su estado**. La
+        plataforma no la vio llegar, así que lo único cierto es hace cuánto se
+        emitió, y se dice como eso (RF-49 de 007) en vez de fingir que el reloj
+        de RF-05 arrancó cuando alguien la escribió.
+        """
+        supplier = await self.purchases.supplier(supplier_id)
+        if supplier is None:
+            raise NotFoundError(SUPPLIER_NOT_IN_REGISTER, details={"supplier_id": supplier_id})
+
+        existing = await self.purchases.order_numbered(number)
+        if existing is not None:
+            raise ConflictError(
+                ORDER_ALREADY_REGISTERED, details={"order_id": existing.id, "number": number}
+            )
+
+        moment = occurred_at or datetime.now(UTC)
+        order = await self.purchases.add_order(
+            PurchaseOrder(
+                number=number,
+                ordered_on=ordered_on,
+                supplier_id=supplier_id,
+                supplier_text=supplier.legal_name,
+                origin=RecordOrigin.MANUAL,
+                product_text=product_text,
+                quantity=quantity,
+                amount=amount,
+                status_text="",
+                status_since=today_here(),
+                observed_from_start=False,
+                review_state=OrderReviewState.RESOLVED,
+                resolved_by_user_id=actor_user_id,
+                resolved_at=moment,
+            )
+        )
+        await events.publish(
+            ManualChangeRecorded(
+                entity_type=ORDER_ENTITY,
+                entity_id=str(order.id),
+                action=AuditAction.CREATED,
+                actor_user_id=actor_user_id,
+                section=BusinessSection.PURCHASING,
+                new_value={
+                    "number": number,
+                    "ordered_on": ordered_on.isoformat(),
+                    "supplier_id": supplier_id,
+                },
+                reason_code="LOADED_BY_HAND",
+                occurred_at=moment,
+            ),
+            self.session,
+        )
+        logger.info(
+            "Purchase order loaded by hand",
+            extra={"order_id": order.id, "number": number, "actor": actor_user_id},
+        )
+        return order
+
+    async def settle_manual_dispute(
+        self,
+        *,
+        entity: str,
+        entity_id: int,
+        keep: str,
+        published: dict[str, str],
+        actor_user_id: int,
+        occurred_at: datetime | None = None,
+    ) -> None:
+        """Aplicar lo que se decidió sobre una fila cargada a mano y publicada distinta.
+
+        Las dos respuestas hacen algo. **Queda el portal**: los valores
+        publicados pisan a los escritos y el registro pasa a tener el origen que
+        de verdad tiene desde ahora. **Queda lo cargado a mano**: los valores no
+        se tocan y el origen sigue siendo la persona, que es la verdad de ese
+        dato aunque el portal diga otra cosa.
+
+        En los dos casos el registro deja de estar apartado, porque la duda que
+        lo apartaba está contestada, y en los dos queda asentado quién contestó.
+        """
+        moment = occurred_at or datetime.now(UTC)
+        record = (
+            await self.purchases.invoice(entity_id)
+            if entity == INVOICE_ENTITY
+            else await self.purchases.order(entity_id)
+        )
+        if record is None:
+            # El registro se fue mientras el caso esperaba. No es un error: la
+            # decisión ya quedó guardada del lado de la cola, y acá no hay a qué
+            # aplicarla.
+            logger.warning("A settled dispute found no record", extra={"entity_id": entity_id})
+            return
+
+        changed: dict[str, str] = {}
+        if keep == KEEP_PORTAL:
+            changed = self._apply_published(record, published)
+            record.origin = RecordOrigin.PORTAL
+            record.rejected_portal_values = None
+        else:
+            # Se queda lo que escribió la persona, y queda dicho **qué** rechazó:
+            # el portal va a publicar esa misma fila cada doce horas, y sin esto
+            # la pregunta ya contestada volvería con cada lectura.
+            record.rejected_portal_values = published
+
+        if isinstance(record, Invoice):
+            record.review_state = InvoiceReviewState.RESOLVED
+        else:
+            record.review_state = OrderReviewState.RESOLVED
+        record.review_reason = None
+        record.resolved_by_user_id = actor_user_id
+        record.resolved_at = moment
+        await self.session.flush()
+
+        if isinstance(record, Invoice):
+            await self._sync_due_date(record)
+
+        if changed:
+            await events.publish(
+                ManualChangeRecorded(
+                    entity_type=entity,
+                    entity_id=str(entity_id),
+                    action=AuditAction.UPDATED,
+                    actor_user_id=actor_user_id,
+                    section=BusinessSection.PURCHASING,
+                    new_value=changed,
+                    reason_code="PORTAL_PUBLISHED_IT_LATER",
+                    occurred_at=moment,
+                ),
+                self.session,
+            )
+        logger.info(
+            "Manual dispute settled",
+            extra={"entity": entity, "entity_id": entity_id, "keep": keep},
+        )
+
+    @staticmethod
+    def _apply_published(
+        record: Invoice | PurchaseOrder, published: dict[str, str]
+    ) -> dict[str, str]:
+        """Escribir sobre el registro lo que el portal publicó, y decir qué cambió.
+
+        Cada valor se convierte acá y no se confía: lo que llega es lo que este
+        módulo puso en el evento hace meses, y volvió después de dar la vuelta
+        por la cola y por el navegador. Un valor que no se puede convertir se
+        deja como estaba — pisar un dato bueno con basura sería peor que no
+        aplicar la decisión.
+        """
+        changed: dict[str, str] = {}
+        fecha = published.get("fecha")
+        if fecha:
+            try:
+                parsed = date.fromisoformat(fecha)
+            except ValueError:
+                logger.warning("A settled dispute carried a date that is not one")
+            else:
+                if isinstance(record, Invoice):
+                    record.issued_on = parsed
+                else:
+                    record.ordered_on = parsed
+                changed["fecha"] = fecha
+
+        importe = published.get("importe")
+        if importe is not None and isinstance(record, PurchaseOrder):
+            record.amount = _amount_of(importe)
+            changed["importe"] = importe
+
+        total = published.get("total")
+        if total is not None and isinstance(record, Invoice):
+            try:
+                amount = Decimal(total)
+            except (InvalidOperation, ArithmeticError):
+                logger.warning("A settled dispute carried a total that is not a number")
+            else:
+                if amount.is_finite() and amount >= 0:
+                    record.total = amount
+                    changed["total"] = total
+        return changed
 
     async def record_document(
         self,
@@ -1109,6 +1541,9 @@ class PurchasesService:
         confirmed, instead of from the ones they were about to replace.
         """
         invoice = await self._require_invoice(invoice_id)
+        # Antes de tocarla: si estaba apartada por una discusión con el portal,
+        # resolverla acá también contesta esa discusión.
+        was_disputed = invoice.review_reason == DISPUTED_BY_PORTAL
         await self._correct_invoice_fields(
             invoice,
             number=number,
@@ -1125,6 +1560,7 @@ class PurchasesService:
             invoice.resolved_by_user_id = actor_user_id
             invoice.resolved_at = datetime.now(UTC)
             await self.session.flush()
+            await self._announce_dispute_settled(invoice, was_disputed)
             await self.session.commit()
             return await self.get_invoice(invoice_id)
 
@@ -1148,11 +1584,32 @@ class PurchasesService:
                 alias_id=alias_id,
                 actor_user_id=actor_user_id,
             )
+        await self._announce_dispute_settled(invoice, was_disputed)
         await self.session.commit()
         logger.info(
             "Invoice resolved", extra={"invoice_id": invoice_id, "supplier_id": supplier.id}
         )
         return await self.get_invoice(invoice_id)
+
+    async def _announce_dispute_settled(self, invoice: Invoice, was_disputed: bool) -> None:
+        """Decir que la discusión con el portal se contestó en esta pantalla.
+
+        Anunciado y no llamado: `purchases` no puede tocar `triage`
+        (Artículo IV), así que declara un hecho —una clase y una clave— y quien
+        le importe escucha. La clave es la misma con la que se abrió el caso, y
+        no una parecida: un fingerprint reconstruido con generosidad cerraría un
+        caso que nadie resolvió.
+        """
+        if not was_disputed:
+            return
+        await events.publish(
+            QuarantinedSourceResolved(
+                kind=DISPUTED_INVOICE_CASE,
+                key=f"{INVOICE_ENTITY}:{invoice.id}",
+                resolved_where=RESOLVED_IN_INVOICES,
+            ),
+            self.session,
+        )
 
     async def _correct_invoice_fields(
         self,
@@ -2296,6 +2753,20 @@ class PurchasesService:
             supplier, reason = await self.resolve_supplier(row.supplier_text)
             existing = await self.purchases.order_numbered(row.number)
             if existing is not None:
+                # Una orden que escribió una persona y que el portal por fin
+                # publica: si no dicen lo mismo, no se pisa ninguna de las dos.
+                # El **estado** se actualiza igual, porque el estado es un hecho
+                # del portal y no está en discusión.
+                if existing.origin is RecordOrigin.MANUAL:
+                    published = {
+                        "fecha": row.ordered_on.isoformat(),
+                        "importe": _money_text(row.amount),
+                    }
+                    differs = existing.ordered_on != row.ordered_on or existing.amount != row.amount
+                    if differs and existing.rejected_portal_values != published:
+                        await self._dispute_order(existing, published)
+                # El estado se actualiza igual: es un hecho del portal, y no es
+                # lo que está en discusión.
                 if existing.status_text != row.status_text:
                     # Seen somewhere else than last time: the clock of RF-05
                     # restarts, and an order that advanced stops being stalled

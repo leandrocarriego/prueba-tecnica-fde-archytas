@@ -35,7 +35,7 @@ const LAS_DIECISEIS = [
   'Ventas',
   'Catálogo y precios',
   'Rubros',
-  'Revisar esto',
+  'Para decidir',
   'Acciones',
   'Historial',
   'Accesos',
@@ -68,7 +68,7 @@ describe('la barra lateral', () => {
     expect(secciones()).toEqual([
       'Tablero',
       'Ventas',
-      'Revisar esto',
+      'Para decidir',
       'Acciones',
       'Historial',
       'Salud',
@@ -83,8 +83,27 @@ describe('la barra lateral', () => {
 
     // Compras se queda sin una sola entrada: el título tampoco tiene que estar.
     expect(screen.queryByText('Compras')).toBeNull()
-    // Ventas sí tiene la suya, así que su título sigue.
-    expect(screen.getByText('Ventas', { selector: 'p' })).toBeInTheDocument()
+    // «Catálogo y datos» conserva dos —Ventas y la cola—, así que su título
+    // sigue. Ventas ya no es un grupo: es la primera entrada de este.
+    expect(screen.getByText('Catálogo y datos', { selector: 'p' })).toBeInTheDocument()
+    expect(screen.queryByText('Ventas', { selector: 'p' })).toBeNull()
+  })
+
+  it('avisa cuántos esperan una decisión, sin que haya que entrar a mirar', () => {
+    render(<Navigation user={USER} permissions={DUENO} counters={{ triage: 12 }} />)
+
+    // El número va sobre la entrada, que es el único lugar donde se ve desde
+    // cualquier pantalla: quien está mirando una factura se entera igual.
+    const entrada = screen.getByRole('link', { name: /Para decidir/ })
+    expect(entrada).toHaveTextContent('12')
+  })
+
+  it('sin pendientes no dibuja ninguna señal', () => {
+    render(<Navigation user={USER} permissions={DUENO} counters={{ triage: 0 }} />)
+
+    // Un contador en cero es una alarma apagada que igual ocupa lugar: a la
+    // semana nadie distingue ninguno de los dos estados.
+    expect(screen.getByRole('link', { name: 'Para decidir' })).toHaveTextContent(/^Para decidir$/)
   })
 
   it('RF-04 · el nombre de quien trabaja y la salida se ven sin abrir nada', () => {

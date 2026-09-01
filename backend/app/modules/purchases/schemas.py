@@ -12,6 +12,7 @@ from app.modules.purchases.models import (
     OrderReviewState,
     PaymentOrigin,
     PaymentState,
+    RecordOrigin,
     SupplierAliasSource,
 )
 from app.shared.corrections import CorrectionStatus
@@ -228,6 +229,11 @@ class InvoiceRead(BaseModel):
     original_due_on: date | None
     review_state: InvoiceReviewState
     review_reason: str | None
+    # De dónde salió: del portal, o de una persona que la escribió sobre una
+    # fila que el portal publicó ilegible. Viaja hasta la pantalla porque el
+    # Artículo I lo pide: un dato que escribió alguien no se muestra como algo
+    # que publicó el origen.
+    origin: RecordOrigin = RecordOrigin.PORTAL
     arrival_count: int
     file_kind: str | None
     product_code: str | None

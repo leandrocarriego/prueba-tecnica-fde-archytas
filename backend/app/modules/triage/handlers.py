@@ -17,6 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging import get_logger
 from app.modules.triage.service import (
+    DISPUTED_ENTRY_REASON,
+    DISPUTED_INVOICE,
+    DISPUTED_ORDER,
     HISTORY_ORIGIN,
     INVOICE_ORIGIN,
     MESSAGE_ORIGIN,
@@ -46,6 +49,7 @@ from app.shared.events import (
     BusinessParameterChanged,
     InvoiceRowsQuarantined,
     KnownProductsMissing,
+    ManualEntryDisputed,
     MessageRowsQuarantined,
     PaymentRowsQuarantined,
     PriceHistoryRowsQuarantined,
@@ -459,3 +463,40 @@ async def remember_parameter(event: BusinessParameterChanged, session: AsyncSess
     if event.key != STALE_DAYS_KEY:
         return
     await TriageService(session).remember_setting(event.key, event.value)
+
+
+# Cómo nombra `purchases` a cada una de las dos cosas que se pueden cargar a
+# mano. Escrito acá y no importado de allá: un módulo no importa otro
+# (Artículo IV), y lo que viaja en el evento es justamente un string para que
+# las dos puntas puedan nombrarlo sin conocerse.
+INVOICE_ENTITY = "invoice"
+
+
+@events.subscribe(ManualEntryDisputed)
+async def open_disputed_entry(event: ManualEntryDisputed, session: AsyncSession) -> None:
+    """El portal publicó una fila que alguien ya había cargado a mano, y difieren.
+
+    El caso lleva **los dos valores**, porque la pregunta no se puede contestar
+    con uno solo: quien decide tiene que ver qué escribió la persona y qué dijo
+    el portal, uno al lado del otro.
+
+    La clave es el registro y no la lectura: el portal puede volver a publicar
+    la misma fila muchas veces, y son la misma discusión sobre la misma factura,
+    no una discusión nueva por cada lectura (RF-35).
+    """
+    kind = DISPUTED_INVOICE if event.entity == INVOICE_ENTITY else DISPUTED_ORDER
+    await TriageService(session).open_case(
+        kind=kind,
+        section=BusinessSection.PURCHASING,
+        reason=DISPUTED_ENTRY_REASON,
+        payload={
+            "entity": event.entity,
+            "entity_id": event.entity_id,
+            "number": event.number,
+            "supplier_text": event.supplier_text,
+            "typed": dict(event.typed),
+            "published": dict(event.published),
+            "origin": INVOICE_ORIGIN if event.entity == INVOICE_ENTITY else ORDER_ORIGIN,
+        },
+        key=f"{event.entity}:{event.entity_id}",
+    )
