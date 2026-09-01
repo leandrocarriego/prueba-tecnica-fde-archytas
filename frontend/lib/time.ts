@@ -85,3 +85,39 @@ export function formatPlainDate(value: string | null | undefined): string {
   const [year, month, day] = value.slice(0, 10).split('-')
   return year && month && day ? `${day}/${month}/${year}` : '—'
 }
+
+/** Los doce meses, como se rotula un eje: cortos y en versalita. */
+const MONTH_LABELS = [
+  'ENE',
+  'FEB',
+  'MAR',
+  'ABR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AGO',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DIC',
+]
+
+/**
+ * El mes de un eje: `2026-08-01` → `AGO`, o `AGO 26` cuando hace falta el año.
+ *
+ * Se parte el string en vez de parsearlo, por la misma razón que
+ * `formatPlainDate`: un mes del negocio no tiene hora, así que no hay ninguna
+ * zona a la que convertirlo, y `new Date('2026-01-01')` en Buenos Aires es el
+ * 31 de diciembre — un eje corrido un mes entero, todos los eneros.
+ *
+ * El año va sólo donde el eje lo necesita —el primer mes, y cada enero—, que es
+ * lo que hace legible una serie que arranca en 2023 sin repetir el año catorce
+ * veces.
+ */
+export function formatMonth(value: string | null | undefined, withYear = false): string {
+  if (!value) return '—'
+  const [year, month] = value.slice(0, 10).split('-')
+  const label = MONTH_LABELS[Number(month) - 1]
+  if (!label) return '—'
+  return withYear && year ? `${label} ${year.slice(2)}` : label
+}

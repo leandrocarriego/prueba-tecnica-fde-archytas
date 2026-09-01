@@ -80,6 +80,17 @@ Los dos existían como color escrito a mano dentro de `globals.css` —el único
 lo permite— y por eso no rompían nada; pero un color sin nombre no se puede reusar ni cambiar, que
 es justamente lo que `UI-09` pide evitar.
 
+Y una señal que no es un color sino un **relleno**:
+
+| Clase | Significa | Dónde se ve |
+|---|---|---|
+| `.hatch-excluded` | El rayado de **"esto quedó afuera del número"**: una porción que existe, que se mide y que **no está sumada** en el dato de al lado | La composición del corte de stock, en el tablero |
+
+Va rayada y no de un color liso a propósito: sobre una barra de composición, un liso más se lee
+como una categoría más. La guía la dibuja así en `3b` —la barra de agosto del gráfico y el renglón
+«sin rubro asignado»— y es la forma visual del Artículo II: lo que no se pudo interpretar se
+muestra, no se descarta en silencio.
+
 ## Estado de la aplicación
 
 **El sistema está adoptado en toda la plataforma.** Las dieciséis secciones del menú, Mi cuenta y

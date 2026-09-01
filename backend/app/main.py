@@ -44,6 +44,7 @@ from app.modules.purchases.routes import (
     invoices_router,
     orders_router,
     payments_router,
+    purchases_dashboard_router,
     receipts_router,
     review_router,
     suppliers_router,
@@ -269,6 +270,7 @@ def register_routers(application: FastAPI) -> None:
     application.include_router(sales_router, prefix=API_PREFIX)
     application.include_router(sales_dashboard_router, prefix=API_PREFIX)
     application.include_router(catalog_dashboard_router, prefix=API_PREFIX)
+    application.include_router(purchases_dashboard_router, prefix=API_PREFIX)
 
 
 def register_exception_handlers(application: FastAPI) -> None:
