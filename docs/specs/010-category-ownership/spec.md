@@ -175,19 +175,24 @@ Todo lo demás de la feature de rubros queda como está firmado.
   una pantalla para inventar roles.
 - **El stock y el tablero.** Siguen de ventas.
 
-## Preguntas abiertas
+## Lo que se confirmó al firmar
 
 <!--
-  Todo lo que falte definir, marcado como [NECESITA ACLARACIÓN: pregunta concreta].
-  Una spec con preguntas abiertas NO se firma: primero se resuelven con /clarify.
-  Cuando no queda ninguna, esta sección se borra.
+  Esta sección era «Preguntas abiertas» y ya no lo es: las cuatro decisiones que
+  listaba quedaron confirmadas con la firma del 2026-08-31, y así consta abajo.
+  No se borró porque cada una nombra la alternativa que se descartó, y esa es la
+  parte que hay que poder releer cuando alguien pregunte por qué quedó así.
 -->
 
-No queda ninguna pregunta sin responder que trabe la firma. Sí quedan cuatro decisiones que se
-tomaron mirando lo que ya está acordado, y no preguntándoselas al cliente. Se leen antes de firmar,
-porque firmar es firmarlas.
+Ninguna pregunta sin responder trabó la firma. Sí había cuatro decisiones tomadas mirando lo que ya
+estaba acordado, y no preguntándoselas al cliente: se pusieron sobre la mesa para que firmar fuera
+firmarlas.
 
-### Para confirmar al firmar
+**Las cuatro quedaron confirmadas el 2026-08-31 por Leandro Carriego — FDE**, en el mismo acto que
+aprobó esta spec, y ninguna de las alternativas que cada una ofrecía se tomó. Se dejan escritas tal
+como se leyeron, con la alternativa que se descartó incluida.
+
+### Confirmadas con la firma del 2026-08-31
 
 - **Los productos sin rubro también pasan a compras, no sólo los rubros.** El acuerdo de los accesos
   los había dejado entre las revisiones de ventas —*"resuelve las revisiones humanas de su lado
